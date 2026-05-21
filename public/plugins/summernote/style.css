@@ -1,0 +1,81 @@
+.modal-dialog {
+    max-width: 80% !important;
+}
+
+.card-body::after, .card-footer::after, .card-header::after {
+    display: block;
+    clear: both !important;
+    content: none;
+}
+
+#app > div > div {
+    background: none;
+    box-shadow: none;
+}
+
+.card.maximized-card {
+    background-color: #fff !important;
+    background-clip: border-box !important;
+}
+
+.fa {
+    color: #adb5bd;
+    font-weight: 600;
+}
+
+#app > div > div > div.card-header {
+    background: #fff;
+}
+
+.card-header {
+    min-height: 50px;
+}
+
+.short_project_description {
+    color: #888;
+}
+
+.fas.fa-eye {
+    color: #adb5bd
+}
+
+.card-default {
+    border-top: 3px solid #adb5bd;
+}
+
+.card-header {
+    color: black;
+}
+
+.short_description_project {
+    color: #adb5bd;
+}
+
+.card-header {
+    border-bottom: none;
+}
+
+.fa:hover {
+    color: #4b545c;
+    cursor: pointer !important;
+}
+
+.fa-eye, .fa-trash, .fa-edit {
+    font-size: 16px;
+}
+
+.pointer {
+    cursor: pointer !important;
+}
+
+.subject_project_name {
+    color: black !important;
+}
+
+.content-wrapper {
+    height: inherit !important;
+}
+
+.ui-tooltip.ui-widget.ui-corner-all.ui-widget-content {
+    display: none;
+}

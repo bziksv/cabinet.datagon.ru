@@ -1,0 +1,11 @@
+.card-footer {
+    background: white !important;
+}
+
+.handle.ui-sortable-handle:hover {
+    cursor: move;
+}
+
+div.card {
+    width: 30%;
+}

@@ -1,0 +1,28 @@
+.toast-top-right.success-message, .toast-top-right.error-message {
+    display: none;
+}
+
+td.d-flex {
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+}
+
+.fixed-height {
+    height: 150px;
+}
+
+.fixed-th-height {
+    height: 130px;
+}
+
+th:nth-child(4), th:nth-child(5), th:nth-child(6), th:nth-child(7), th:nth-child(8) {
+    width: 10%;
+}
+
+@media (max-width: 1300px) {
+    .fixed-th-height {
+        height: 150px;
+    }
+}
+

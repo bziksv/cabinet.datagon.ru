@@ -33,15 +33,7 @@ class MonitoringAdminController extends Controller
         if ($request->ajax())
             return $this->getQueuesForDataTable($request);
 
-        $statistics = $this->getStatCollection();
-
-        $users = User::query()
-            ->select('id', 'name', 'last_name', 'email')
-            ->orderBy('email')
-            ->get()
-            ->mapWithKeys(function (User $user) {
-                return [$user->id => trim($user->name . ' ' . $user->last_name)];
-            });
+        $statistics = (new StatisticsAdmin())->getDashboardStatistics();
 
         $sites = MonitoringProject::query()
             ->select('url')
@@ -49,7 +41,7 @@ class MonitoringAdminController extends Controller
             ->orderBy('url')
             ->pluck('url', 'url');
 
-        return view('monitoring.admin.stat', compact('statistics', 'users', 'sites'));
+        return view('monitoring.admin.stat', compact('statistics', 'sites'));
     }
 
     public function adminPage()
@@ -177,18 +169,4 @@ class MonitoringAdminController extends Controller
         return $jobs;
     }
 
-    protected function getStatCollection()
-    {
-        $statistics = collect([]);
-
-        $stat = new StatisticsAdmin();
-
-        $statistics->push($stat->getCountOfCheckUpForCurrentDay());
-        $statistics->push($stat->getCountOfCheckUpForCurrentMonth());
-        $statistics->push($stat->getCountOfErrorsForCurrentDay());
-        $statistics->push($stat->getCountOfProjects());
-        $statistics->push($stat->getCountOfTasksInQueue());
-
-        return $statistics->filter()->values();
-    }
 }

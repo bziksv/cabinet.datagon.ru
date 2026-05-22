@@ -1,6 +1,8 @@
 @component('component.card', ['title' => __('Monitoring position')])
 
     @slot('css')
+        <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.css') }}">
+        <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.css') }}">
         <!-- Toastr -->
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
         <!-- DataTables -->
@@ -37,7 +39,11 @@
                         <div class="col-6">
                             <div class="form-group">
                                 {!! Form::label('user', __('User')) !!}
-                                {!! Form::select('user', $users, null, ['class' => 'custom-select', 'placeholder' => 'Выберите пользователя']) !!}
+                                {!! Form::select('user', [], null, [
+                                    'class' => 'custom-select',
+                                    'id' => 'stat-delete-user',
+                                    'data-placeholder' => 'Email (мин. 2 символа)',
+                                ]) !!}
                             </div>
                         </div>
                         <div class="col-6">
@@ -86,6 +92,7 @@
     </div>
 
     @slot('js')
+        <script src="{{ asset('plugins/select2/js/select2.js') }}"></script>
         <!-- Toastr -->
         <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
         <!-- Bootstrap 4 -->
@@ -103,6 +110,26 @@
                 "preventDuplicates": true,
                 "timeOut": "5000"
             };
+
+            $('#stat-delete-user').select2({
+                theme: 'bootstrap4',
+                width: '100%',
+                placeholder: $('#stat-delete-user').data('placeholder') || '',
+                allowClear: true,
+                minimumInputLength: 2,
+                ajax: {
+                    url: '{{ route('users.search-emails') }}',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        return { q: params.term || '' };
+                    },
+                    processResults: function (data) {
+                        return { results: data.results || [] };
+                    },
+                    cache: true
+                }
+            });
 
             let table = $('#queues').DataTable({
                 dom: '<"card-header"<"card-title"><"float-right"l>><"card-body p-0"rt><"card-footer clearfix"p><"clear">',

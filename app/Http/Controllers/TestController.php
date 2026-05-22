@@ -11,6 +11,9 @@ class TestController extends Controller
      */
     public function index()
     {
+        if (! app()->environment('local')) {
+            abort(404);
+        }
 
         /**
          * default

@@ -35,6 +35,9 @@ PATHS=(
   "/get-queue-count"
   "/competitors-config"
   "/monitoring/admin"
+  "/monitoring/stat"
+  "/cluster-configuration"
+  "/ai-generation/story"
 )
 
 echo "user_id=$USER_ID"

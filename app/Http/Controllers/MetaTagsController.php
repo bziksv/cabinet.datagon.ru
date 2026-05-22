@@ -464,17 +464,38 @@ class MetaTagsController extends Controller
     /**
      * JSON истории мета-тегов (не встраивать data в HTML — может быть >2 MB).
      */
-    public function historyData($id)
+    public function historyData(Request $request, $id)
     {
         $history = MetaTagsHistory::query()
-            ->with(['project:id,user_id,name'])
+            ->select(['id', 'meta_tag_id', 'data'])
             ->findOrFail($id);
 
-        if ($history->project->user_id != Auth::id()) {
+        $ownsProject = MetaTag::query()
+            ->where('id', $history->meta_tag_id)
+            ->where('user_id', Auth::id())
+            ->exists();
+
+        if (! $ownsProject) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        return response()->json(json_decode($history->data, true) ?? []);
+        $data = json_decode($history->data, true) ?? [];
+
+        if (! $request->has('offset') && ! $request->has('limit')) {
+            return response()->json($data);
+        }
+
+        $offset = max(0, (int) $request->get('offset', 0));
+        $limit = min(100, max(1, (int) $request->get('limit', 50)));
+        $slice = array_slice($data, $offset, $limit);
+
+        return response()->json([
+            'items' => $slice,
+            'total' => count($data),
+            'offset' => $offset,
+            'limit' => $limit,
+            'has_more' => ($offset + $limit) < count($data),
+        ]);
     }
 
     public function showHistoryCompare($id, $id_compare)

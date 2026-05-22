@@ -3,7 +3,7 @@
     <div class="row">
         <div class="col-md-12">
 
-            <div v-if="loading" class="text-muted py-3">{{ lang.loading || 'Загрузка…' }}</div>
+            <div v-if="loading && history.length === 0" class="text-muted py-3">{{ lang.loading || 'Загрузка…' }}</div>
             <div v-else-if="loadError" class="alert alert-danger">{{ loadError }}</div>
 
             <template v-else>
@@ -72,6 +72,13 @@
                     </div>
 
                 </div>
+
+                <div v-if="hasMore" class="text-center py-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" :disabled="loadingMore" @click="loadMore">
+                        {{ loadingMore ? (lang.loading || 'Загрузка…') : (lang.load_more || 'Показать ещё') }}
+                    </button>
+                    <span class="text-muted small ml-2" v-if="total">{{ history.length }} / {{ total }}</span>
+                </div>
             </template>
 
         </div>
@@ -99,23 +106,56 @@
             return {
                 history: [],
                 loading: true,
+                loadingMore: false,
                 loadError: null,
                 seenCard: [],
+                offset: 0,
+                limit: 50,
+                total: 0,
+                hasMore: false,
             }
         },
         mounted() {
-            axios.get('/meta-tags/history/' + this.historyId + '/data')
-                .then((response) => {
-                    this.history = Array.isArray(response.data) ? response.data : [];
-                })
-                .catch(() => {
-                    this.loadError = this.lang.error_load || 'Не удалось загрузить историю';
-                })
-                .finally(() => {
-                    this.loading = false;
-                });
+            this.fetchChunk(0, true);
         },
         methods: {
+            fetchChunk(offset, initial) {
+                if (initial) {
+                    this.loading = true;
+                } else {
+                    this.loadingMore = true;
+                }
+
+                axios.get('/meta-tags/history/' + this.historyId + '/data', {
+                    params: { offset: offset, limit: this.limit },
+                })
+                    .then((response) => {
+                        const payload = response.data;
+                        if (payload && Array.isArray(payload.items)) {
+                            this.history = offset === 0 ? payload.items : this.history.concat(payload.items);
+                            this.offset = offset + payload.items.length;
+                            this.total = payload.total || 0;
+                            this.hasMore = !!payload.has_more;
+                        } else if (Array.isArray(payload)) {
+                            this.history = payload;
+                            this.hasMore = false;
+                            this.total = payload.length;
+                        }
+                    })
+                    .catch(() => {
+                        this.loadError = this.lang.error_load || 'Не удалось загрузить историю';
+                    })
+                    .finally(() => {
+                        this.loading = false;
+                        this.loadingMore = false;
+                    });
+            },
+            loadMore() {
+                if (!this.hasMore || this.loadingMore) {
+                    return;
+                }
+                this.fetchChunk(this.offset, false);
+            },
             Analyzer(link) {
                 var form = document.createElement("form");
                 form.action = "/text-analyzer";

@@ -9,7 +9,18 @@
 /* Шапка (разметка из public/html/index.html) */
 #header-nav-bar.cabinet-header .navbar-badge {
     position: static;
-    margin-left: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 0.4rem;
+    min-width: 1.5rem;
+    height: 1.5rem;
+    padding: 0 0.45rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    line-height: 1;
+    vertical-align: middle;
+    border-radius: 50rem;
 }
 
 .cabinet-header-limits-hint.is-empty {

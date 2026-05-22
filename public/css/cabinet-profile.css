@@ -1,0 +1,101 @@
+/* Профиль — public/html/pages/profile.html + widgets/info-box */
+
+.cabinet-profile-page .cabinet-profile-stats .info-box {
+    height: 100%;
+    min-height: 5.5rem;
+    margin-bottom: 0;
+    text-decoration: none;
+    color: inherit;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.cabinet-profile-page .cabinet-profile-stats .info-box:hover {
+    box-shadow: var(--bs-box-shadow);
+    transform: translateY(-1px);
+}
+
+.cabinet-profile-page .cabinet-profile-stats .info-box-icon {
+    width: 70px;
+    min-width: 70px;
+    height: 70px;
+    font-size: 1.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cabinet-profile-page .cabinet-profile-stats .info-box-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 70px;
+}
+
+.cabinet-profile-page .cabinet-profile-stats .info-box-number {
+    font-size: 1.35rem;
+    font-weight: 700;
+}
+
+.cabinet-profile-page .cabinet-profile-stat-tariff {
+    font-size: 1.05rem !important;
+}
+
+.cabinet-profile-page .cabinet-profile-stat-menu {
+    font-size: 1.1rem !important;
+}
+
+.cabinet-profile-page .cabinet-profile-aside .cabinet-profile-avatar {
+    width: 96px;
+    height: 96px;
+    object-fit: cover;
+}
+
+.cabinet-profile-page .cabinet-profile-avatar-wrap {
+    width: 96px;
+}
+
+.cabinet-profile-page .cabinet-profile-telegram-badge {
+    width: 1.75rem;
+    height: 1.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 2px solid var(--bs-body-bg);
+}
+
+.cabinet-profile-page .cabinet-profile-preview {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.cabinet-profile-page .cabinet-profile-tabs-card .nav-tabs {
+    border-bottom: 0;
+}
+
+.cabinet-profile-page .nav-tabs .nav-link {
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.cabinet-profile-page .select2-container--bootstrap4 .select2-selection {
+    min-height: calc(1.5em + 0.75rem + 2px);
+}
+
+.cabinet-profile-page .img-flag {
+    width: 1.25rem;
+    height: auto;
+    margin-right: 0.35rem;
+    vertical-align: middle;
+}
+
+@media (max-width: 991.98px) {
+    .cabinet-profile-page .cabinet-profile-stats .info-box-icon {
+        width: 56px;
+        min-width: 56px;
+        height: 56px;
+        font-size: 1.35rem;
+    }
+}

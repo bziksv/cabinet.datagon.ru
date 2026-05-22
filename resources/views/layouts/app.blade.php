@@ -21,6 +21,7 @@
     <link rel="shortcut icon" href="{{ asset('img/favicon.svg') }}"/>
     <title>@yield('title')</title>
     @include('layouts.partials.lte4-head')
+    <link rel="stylesheet" href="{{ asset('css/cabinet-telegram-prompt.css') }}">
     @yield('css')
     <script src="{{ asset('plugins/jquery/jquery.min.js') }}"></script>
 </head>
@@ -46,6 +47,8 @@
         <strong>&copy; 2021&ndash;{{ date('Y') }} <a href="https://datagon.ru/" class="text-decoration-none">Датагон</a>. Все права защищены.</strong>
     </footer>
 </div>
+
+@include('layouts.partials.telegram-connect-prompt')
 
 @include('layouts.partials.lte4-scripts')
 <script src="{{ asset('js/cabinet-jquery-modal-bridge.js') }}"></script>

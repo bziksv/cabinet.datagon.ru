@@ -2,305 +2,303 @@
 
 @section('title', __('Users'))
 
-@slot('css')
+@section('css')
     @include('layouts.partials.vendor-datatables-css', ['bundle' => 'editor'])
-    <!-- Toastr -->
     <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
-    <!-- Select2 -->
-    <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.css') }}">
-    <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.css') }}">
-
-    <style>
-        .project-actions {
-            min-width: 200px;
-        }
-    </style>
-@endslot
+    <link rel="stylesheet" href="{{ asset('css/cabinet-users.css') }}">
+@endsection
 
 @section('content')
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">{{ __('Users') }}</h3>
-
-            <div class="card-tools">
-                <div class="btn-group">
-                    <button type="button" class="btn btn-tool dropdown-toggle" data-bs-toggle="dropdown"
-                            data-offset="-200" aria-expanded="false">
-                        <i class="fas fa-bars"></i>
-                    </button>
-                    <div class="dropdown-menu" role="menu">
-                        <a href="{{ route('get.verified.users', 'xls') }}" class="dropdown-item">Excel</a>
-                        <a href="{{ route('get.verified.users', 'csv') }}" class="dropdown-item">CSV</a>
-                        <a type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#exportModal">Фильтр
-                            выгрузки</a>
-                        <a type="button" class="dropdown-item" data-bs-toggle="modal"
-                           data-bs-target="#assignTariffModal">{{ __('Assign tariff')  }}</a>
-                        <a href="{{ route('users.statistics') }}"
-                           class="dropdown-item">{{ __('General statistics users') }}</a>
-                        <a href="{{ route('statistics.modules') }}"
-                           class="dropdown-item">{{ __('General statistics modules') }}</a>
-                    </div>
-                </div>
+    <div class="cabinet-users-page">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <h2 class="h4 mb-0">
+                <i class="bi bi-people me-2 text-primary" aria-hidden="true"></i>{{ __('Users') }}
+            </h2>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ route('users.statistics') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-graph-up me-1"></i>{{ __('General statistics users') }}
+                </a>
+                <a href="{{ route('statistics.modules') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-grid me-1"></i>{{ __('General statistics modules') }}
+                </a>
             </div>
         </div>
 
-        <table class="table table-striped projects" id="service-users"></table>
+        <div class="card cabinet-users-card">
+            <div class="card-header d-flex flex-wrap align-items-center justify-content-between">
+                <h3 class="card-title mb-0">{{ __('User list') }}</h3>
+                <div class="dropdown">
+                    <button type="button"
+                            class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false">
+                        <i class="bi bi-download me-1"></i>{{ __('Export and actions') }}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <a class="dropdown-item" href="{{ route('get.verified.users', 'xls') }}">
+                                <i class="bi bi-file-earmark-excel me-2 text-success"></i>Excel
+                            </a>
+                        </li>
+                        <li>
+                            <a class="dropdown-item" href="{{ route('get.verified.users', 'csv') }}">
+                                <i class="bi bi-filetype-csv me-2 text-primary"></i>CSV
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#exportModal">
+                                <i class="bi bi-funnel me-2"></i>{{ __('User Upload Filter') }}
+                            </button>
+                        </li>
+                        <li>
+                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#assignTariffModal">
+                                <i class="bi bi-tag me-2"></i>{{ __('Assign tariff') }}
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-body p-0 cabinet-users-table-wrap">
+                <table class="table table-striped table-hover align-middle mb-0 w-100" id="service-users" width="100%"></table>
+            </div>
+        </div>
     </div>
 
     @include('users.modal.index', ['id' => 'exportModal', 'action' => route('filter.exports.users'), 'title' => __('User Upload Filter')])
     @include('users.modal.index', ['id' => 'assignTariffModal', 'action' => route('users.tariff'), 'title' => __('Assign tariff')])
-@stop
+@endsection
 
 @section('js')
-    <!-- Toastr -->
     <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
-    <!-- Select2 -->
     <script src="{{ asset('plugins/select2/js/select2.js') }}"></script>
     <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
     @include('layouts.partials.vendor-datatables-js', ['bundle' => 'editor'])
     <script>
-        $(document).ready(function () {
+        $(function () {
+            var routes = {
+                login: @json(url('/users/__ID__/login')),
+                edit: @json(url('/users/__ID__/edit')),
+                stats: @json(url('/visit-statistics/__ID__')),
+                destroy: @json(url('/users/__ID__')),
+            };
+
+            function userUrl(template, id) {
+                return template.replace('__ID__', id);
+            }
 
             $('#service-users').DataTable({
-                dom: '<"card-header"<"card-title"l><"card-tools"f>><"card-body p-0"rt><"card-footer clearfix"p><"clear">',
-                autoWidth: true,
+                dom: '<"row align-items-center g-2"<"col-sm-auto"l><"col-sm"f>>rt<"row align-items-center g-2"<"col-sm-auto"i><"col-sm"p>>',
+                autoWidth: false,
                 lengthMenu: [10, 25, 50, 100],
                 pageLength: 50,
-                pagingType: "simple_numbers",
+                pagingType: 'simple_numbers',
                 language: {
-                    lengthMenu: "_MENU_",
-                    search: "_INPUT_",
-                    searchPlaceholder: "Email",
+                    lengthMenu: '_MENU_',
+                    search: '',
+                    searchPlaceholder: @json(__('Search by email or name')),
                     paginate: {
-                        "first": "«",
-                        "last": "»",
-                        "next": "»",
-                        "previous": "«"
+                        first: '«',
+                        last: '»',
+                        next: '›',
+                        previous: '‹',
                     },
-                    processing: '<img src="/img/1485.gif" style="width: 50px; height: 50px;">',
+                    processing: '<div class="spinner-border spinner-border-sm text-primary" role="status"></div>',
+                    emptyTable: @json(__('No data available in table')),
+                    zeroRecords: @json(__('No matching records found')),
                 },
                 processing: true,
                 serverSide: true,
                 ajax: {
-                    url: "{{ route('users.index') }}",
+                    url: @json(route('users.index')),
                     type: 'GET',
                 },
-                order: [
-                    [0, 'asc'],
-                ],
+                order: [[0, 'desc']],
                 createdRow: function (row, data) {
-                    $(row).find('td:nth-child(5)').attr('data-order', data.id);
-                    $(row).find('td:nth-child(7)').attr('data-order', data.last_online_strtotime);
+                    $(row).find('td').eq(6).attr('data-order', data.last_online_strtotime || 0);
                 },
                 columnDefs: [
                     {orderable: true, targets: [0, 1, 2, 4, 6]},
                     {orderable: false, targets: '_all'},
+                    {className: 'text-end', targets: [7]},
                 ],
                 columns: [
                     {
                         name: 'id',
-                        title: '{{ __('ID') }}',
+                        title: @json(__('ID')),
                         data: 'id',
+                        className: 'text-nowrap',
                     },
                     {
                         name: 'name',
-                        title: '{{ __('Name') }}',
+                        title: @json(__('Name')),
                         data: function (row) {
-                            return row.name + ' ' + row.last_name;
+                            var name = ((row.name || '') + ' ' + (row.last_name || '')).trim();
+                            return name || '—';
                         },
                     },
                     {
                         name: 'email',
-                        title: '{{ __('Email') }}',
+                        title: @json(__('Email')),
                         data: function (row) {
-                            let content = row.email + '<br>';
-
+                            var html = '<div class="text-break">' + $('<div>').text(row.email).html() + '</div>';
                             if (row.email_verified_at) {
-                                content += '<span class="badge bg-success">{{ __('VERIFIED') }}</span><br>';
+                                html += '<span class="badge text-bg-success mt-1">' + @json(__('VERIFIED')) + '</span> ';
                             }
-
                             if (row.read_letter) {
-                                content += '<span class="badge bg-primary">{{ __('The letter has been read') }}</span>'
+                                html += '<span class="badge text-bg-primary mt-1">' + @json(__('The letter has been read')) + '</span>';
                             }
-
-                            return content;
+                            return html;
                         },
-
                     },
                     {
-                        title: '{{ __('Tariff') }}',
+                        title: @json(__('Tariff')),
                         data: function (row) {
-                            let content = '';
-                            let tariff = row.tariff;
-
-                            if (Object.keys(tariff).length > 0) {
-                                content += '<span class="badge badge-warning">' + tariff.name + '</span><br>';
-                                content += '<small>Активность до:</small><br>';
-                                content += '<small>' + tariff.active_to + '</small><br>';
-                                content += '<small>' + tariff.active_to_diffForHumans + '</small>';
+                            var tariff = row.tariff || {};
+                            if (!tariff.name) {
+                                return '<span class="text-secondary">—</span>';
                             }
-
-                            return content;
+                            return '<span class="badge text-bg-warning">' + $('<div>').text(tariff.name).html() + '</span><br>' +
+                                '<small class="text-secondary">' + @json(__('Active until')) + ':</small><br>' +
+                                '<small>' + tariff.active_to + '</small><br>' +
+                                '<small class="text-secondary">' + tariff.active_to_diffForHumans + '</small>';
                         },
                     },
                     {
                         name: 'created_at',
-                        title: '{{ __('Created') }}',
+                        title: @json(__('Created')),
                         data: function (row) {
-                            let content = row.created + '<br>';
-
-                            content += '<small>' + row.created_diffForHumans + '</small>';
-
-                            return content;
+                            return row.created + '<br><small class="text-secondary">' + row.created_diffForHumans + '</small>';
                         },
+                        className: 'text-nowrap',
                     },
                     {
-                        title: '{{ __('Roles') }}',
-                        className: 'project-state',
+                        title: @json(__('Roles')),
                         data: function (row) {
-                            let content = '';
-                            let roles = row.roles;
-
-                            if (roles.length > 0) {
-                                $.each(roles, function (i, el) {
-                                    content += '<span class="badge badge-success">' + el.name + '</span><br>';
-                                });
+                            var roles = row.roles || [];
+                            if (!roles.length) {
+                                return '<span class="text-secondary">—</span>';
                             }
-
-                            return content;
+                            var html = '';
+                            $.each(roles, function (i, el) {
+                                html += '<span class="badge text-bg-secondary me-1 mb-1">' + $('<div>').text(el.name).html() + '</span>';
+                            });
+                            return html;
                         },
                     },
                     {
                         name: 'last_online_at',
-                        title: '{{ __('Was online') }}',
+                        title: @json(__('Was online')),
                         data: function (row) {
-                            let content = row.last_online + '<br>';
-
-                            content += '<small>' + row.last_online_diffForHumans + '</small>';
-
-                            return content;
+                            if (!row.last_online) {
+                                return '<span class="text-secondary">' + @json(__('Never')) + '</span>';
+                            }
+                            return row.last_online + '<br><small class="text-secondary">' + row.last_online_diffForHumans + '</small>';
                         },
+                        className: 'text-nowrap',
                     },
                     {
-                        className: 'project-actions text-right',
-                        data: (row) => {
-                            let content = '';
-                            let btnClass = 'btn btn-info btn-sm mr-1';
+                        title: @json(__('Actions')),
+                        className: 'cabinet-users-actions',
+                        data: function (row) {
+                            var html = '<div class="cabinet-users-actions">';
+                            html += '<a class="btn btn-outline-secondary btn-sm" href="' + userUrl(routes.login, row.id) + '" title="' + @json(__('Login')) + '"><i class="bi bi-box-arrow-in-right"></i></a>';
+                            html += '<a class="btn btn-outline-primary btn-sm" href="' + userUrl(routes.edit, row.id) + '" title="' + @json(__('Edit')) + '"><i class="bi bi-pencil"></i></a>';
+                            html += '<a class="btn btn-outline-info btn-sm" href="' + userUrl(routes.stats, row.id) + '" title="' + @json(__('User statistic')) + '"><i class="bi bi-pie-chart"></i></a>';
 
-                            content += '<a class="' + btnClass + '" href="/users/' + row.id + '/login" title="{{ __('Login') }}"><i class="fas fa-user-alt"></i></a>';
-                            content += '<a class="' + btnClass + '" href="/users/' + row.id + '/edit" title="{{ __('Edit') }}"><i class="fas fa-pencil-alt"></i></a>';
-                            content += '<a class="' + btnClass + '" href="/visit-statistics/' + row.id + '" title="{{ __('User statistic') }}"><i class="fas fa-chart-pie"></i></a>';
-
-                            if (
-                                Object.prototype.toString.call(row.metrics) === '[object Array]' ||
-                                typeof row.metrics === 'object' && !Array.isArray(row.metrics) && row.metrics !== null ||
-                                typeof row.metrics === 'string'
-                            ) {
-                                content += '<a class="' + btnClass + '" data-bs-toggle="collapse" href="#collapseExample' + row.id + '" title="{{ __('utm metrics') }}"><i class="fas fa-share-alt"></i></a>';
+                            if (row.metrics) {
+                                html += '<a class="btn btn-outline-secondary btn-sm" data-bs-toggle="collapse" href="#metrics-' + row.id + '" title="' + @json(__('utm metrics')) + '"><i class="bi bi-share"></i></a>';
                             }
 
-                            content += '<a class="btn btn-danger btn-sm" onclick="deleteUser(' + row.id + ')" title="{{ __('Delete') }}"><i class="fas fa-trash"></i></a>';
+                            html += '<button type="button" class="btn btn-outline-danger btn-sm" onclick="deleteUser(' + row.id + ')" title="' + @json(__('Delete')) + '"><i class="bi bi-trash"></i></button>';
+                            html += '</div>';
 
-                            if (row.metrics)
-                                content += metricsTemp(row);
+                            if (row.metrics) {
+                                html += metricsBlock(row);
+                            }
 
-                            return content;
+                            return html;
                         },
                     },
                 ],
-                initComplete: () => {
-                    $('.btn').tooltip({
-                        animation: false,
-                        trigger: 'hover',
-                    });
+                initComplete: function () {
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+                        document.querySelectorAll('#service-users [title]').forEach(function (el) {
+                            new bootstrap.Tooltip(el);
+                        });
+                    }
                 },
             });
 
-            $('#service-users_length').css({
-                'padding-left': '15px',
-                'padding-top': '15px',
-            });
-
-            $('#service-users_info ').css({
-                'padding-left': '15px',
-                'padding-top': '15px',
-            });
-
-            $('#service-users_filter ').css({
-                'padding-right': '15px',
-                'padding-top': '15px',
-            });
-
-            $('#service-users_paginate ').css({
-                'margin-right': '15px',
-                'margin-top': '15px',
-                'margin-bottom': '15px',
-            });
-
-            $("#select-users").select2({
+            $('#select-users').select2({
                 width: '100%',
                 placeholder: $('#select-users').data('placeholder') || '',
                 allowClear: true,
                 minimumInputLength: 2,
+                dropdownParent: $('#assignTariffModal'),
                 ajax: {
-                    url: '{{ route('users.search-emails') }}',
+                    url: @json(route('users.search-emails')),
                     dataType: 'json',
                     delay: 250,
                     data: function (params) {
-                        return { q: params.term || '' };
+                        return {q: params.term || ''};
                     },
                     processResults: function (data) {
-                        return { results: data.results || [] };
+                        return {results: data.results || []};
                     },
-                    cache: true
-                }
+                    cache: true,
+                },
             });
         });
 
         function deleteUser(id) {
-            if (window.confirm("{{ __('Do you really want to delete?') }}")) {
-                axios.post('/users/' + id, {_method: 'DELETE'}).then(() => {
-                    window.location.reload();
-                });
+            if (!window.confirm(@json(__('Do you really want to delete?')))) {
+                return false;
+            }
 
-                return true;
+            var token = document.querySelector('meta[name="csrf-token"]');
+            var url = @json(url('/users/__ID__')).replace('__ID__', id);
+
+            if (typeof axios !== 'undefined') {
+                axios.post(url, {_method: 'DELETE'}).then(function () {
+                    $('#service-users').DataTable().ajax.reload(null, false);
+                });
+            } else {
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': token ? token.getAttribute('content') : '',
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({_method: 'DELETE'}),
+                }).then(function () {
+                    $('#service-users').DataTable().ajax.reload(null, false);
+                });
             }
 
             return false;
         }
 
-        function metricsTemp(user) {
-            let container = $('<div />', {
-                class: 'mt-2'
-            });
-
-            let collapse = $('<div />', {
-                class: 'collapse text-left mt-3',
-                id: 'collapseExample' + user.id,
+        function metricsBlock(user) {
+            var collapse = $('<div />', {
+                class: 'collapse cabinet-users-metrics text-start mt-2',
+                id: 'metrics-' + user.id,
             });
 
             try {
-                if (typeof user.metrics == 'string') {
-                    let info = JSON.parse(user.metrics)
-                    $.each(info, function (k, v) {
-                        collapse.append($('<div />').html('<b>' + k + '</b>: ' + decodeURI(v)));
-                    });
-                } else {
-                    $.each(user.metrics, function (k, v) {
-                        collapse.append($('<div />').html('<b>' + k + '</b>: ' + decodeURI(v)));
-                    });
-                }
+                var info = typeof user.metrics === 'string' ? JSON.parse(user.metrics) : user.metrics;
+                $.each(info, function (k, v) {
+                    collapse.append(
+                        $('<div />', {class: 'row-metrics'}).html(
+                            '<strong>' + $('<div>').text(k).html() + '</strong>: ' + $('<div>').text(decodeURIComponent(v)).html()
+                        )
+                    );
+                });
             } catch (e) {
             }
 
-            container.append(collapse);
-
-            return container[0].outerHTML;
+            return $('<div />').append(collapse)[0].outerHTML;
         }
-    </script>
-    <script>
-        $(document).ready(function () {
-            $('#app > div > div.card > div.card-header > div > div > button').trigger('click')
-        })
     </script>
 @endsection

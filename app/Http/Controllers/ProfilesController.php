@@ -61,7 +61,13 @@ class ProfilesController extends Controller
             $tariffProperties[$property['id']]['fields'][] = $tariffSetting;
         }
 
-        return view('profile.index', compact('user', 'lang', 'name', 'tariffProperties'));
+        return view('profile.index', [
+            'user' => $user,
+            'lang' => $lang,
+            'name' => $name,
+            'tariffProperties' => $tariffProperties,
+            'telegramConnected' => $user->isTelegramConnected(),
+        ]);
     }
 
     /**
@@ -120,9 +126,11 @@ class ProfilesController extends Controller
             'name' => ['required', 'string', 'min:3', 'max:255'],
             'last_name' => ['required', 'string', 'min:3', 'max:255'],
             'email' => ['required', 'string', 'email', 'min:3', 'max:255'],
+            'image' => ['nullable', 'image', 'mimes:jpeg,jpg,png', 'max:2048'],
         ]);
 
         $user = $this->user;
+        $disk = Storage::disk('public');
 
         $user->name = $request->input('name');
         $user->last_name = $request->input('last_name');
@@ -133,13 +141,17 @@ class ProfilesController extends Controller
             $user->email_verified_at = null;
         }
 
-        if ($request->hasFile('image')) {
+        if ($request->boolean('remove_avatar') && $user->image) {
+            if ($disk->exists($user->image)) {
+                $disk->delete($user->image);
+            }
+            $user->image = null;
+        } elseif ($request->hasFile('image')) {
+            if ($user->image && $disk->exists($user->image)) {
+                $disk->delete($user->image);
+            }
 
-            if ($user->image)
-                Storage::delete($user->image);
-
-            $path = $request->file('image')->store('avatar');
-            $user->image = $path;
+            $user->image = $request->file('image')->store('avatar', 'public');
         }
 
         $user->save();
@@ -216,9 +228,29 @@ class ProfilesController extends Controller
         try {
             TelegramBot::sendTestNotify();
         } catch (\ErrorException $exception) {
-            return redirect()->back()->with('status', 'Для отправки уведомления нажмите "Подписаться на уведомления"');
+            return redirect()->back()->with('status', __('Subscribe to notifications in Telegram first.'));
         }
 
-        return redirect()->back()->with('status', 'Уведомление отправленно!');
+        return redirect()->back()->with('status', __('Test notification sent.'));
+    }
+
+    /**
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
+     */
+    public function snoozeTelegramConnectPrompt(Request $request)
+    {
+        $until = Carbon::now()->addWeeks(2);
+
+        $this->user->telegram_prompt_snoozed_until = $until;
+        $this->user->save();
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'ok' => true,
+                'snoozed_until' => $until->toIso8601String(),
+            ]);
+        }
+
+        return redirect()->back();
     }
 }

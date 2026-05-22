@@ -3,65 +3,58 @@
 namespace App\Http\Controllers;
 
 use App\ClickTracking;
-use App\MainProject;
-
-use App\User;
-use Illuminate\Contracts\Foundation\Application;
-use Illuminate\Contracts\View\Factory;
+use App\Support\HomeDashboard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\View\View;
-
 
 class HomeController extends Controller
 {
-
-    /**
-     * @return array|false|Application|Factory|View|mixed
-     */
     public function index()
     {
-        if (! Auth::check()) {
+        if (!Auth::check()) {
             return redirect('/login');
         }
 
-        $result = $this->getProjects();
-
-        return view('home', compact('result'));
+        return view('home', $this->dashboardViewData());
     }
 
-    protected function getProjects(): array
+    /**
+     * Альтернативный макет главной (bento + список модулей).
+     */
+    public function variant2()
     {
-        if (cabinet_skip_heavy_web()) {
-            $cached = session('cabinet_home_projects');
-            if (is_array($cached)) {
-                return $cached;
-            }
+        if (!Auth::check()) {
+            return redirect('/login');
         }
 
-        if (User::isUserAdmin()) {
-            $result = MainProject::all()->toArray();
-        } else {
-            $result = MainProject::where('show', '=', 1)->get()->toArray();
+        return view('home-v2', $this->dashboardViewData());
+    }
+
+    /**
+     * Вариант 3: KPI-полоса + сетка иконок (app hub).
+     */
+    public function variant3()
+    {
+        if (!Auth::check()) {
+            return redirect('/login');
         }
 
-        if (app()->environment('local')) {
-            foreach ($result as &$row) {
-                if (isset($row['link'])) {
-                    $row['link'] = localize_cabinet_url($row['link']);
-                }
-            }
-            unset($row);
-        }
+        return view('home-v3', $this->dashboardViewData());
+    }
 
-        if (cabinet_skip_heavy_web()) {
-            session(['cabinet_home_projects' => $result]);
-        }
+    protected function dashboardViewData(): array
+    {
+        $modules = HomeDashboard::modules();
 
-        return $result;
+        return [
+            'summary' => HomeDashboard::summary(),
+            'modules' => $modules,
+            'featuredModules' => array_slice($modules, 0, 2),
+            'listModules' => array_slice($modules, 2),
+        ];
     }
 
     public function clickTracking(Request $request): JsonResponse
@@ -73,15 +66,14 @@ class HomeController extends Controller
                 'url' => preg_replace('/[0-9#]+/', '', $request->url),
                 'user_id' => Auth::id(),
             ], [
-                'button_counter' => DB::raw('button_counter + 1')
+                'button_counter' => DB::raw('button_counter + 1'),
             ]);
         } catch (\Throwable $e) {
             Log::debug('click tracking error', [
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ]);
         }
 
         return response()->json([], 201);
     }
-
 }

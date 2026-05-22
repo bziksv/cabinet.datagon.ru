@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\ClickTracking;
 use App\Common;
 use App\MainProject;
+use App\MenuItemsPosition;
 use App\User;
 use App\VisitStatistic;
 use Illuminate\Http\JsonResponse;
@@ -36,9 +37,18 @@ class MainProjectsController extends Controller
 
     public function index()
     {
-        $data = MainProject::orderBy('position', 'asc')->get();
+        $projects = MainProject::orderBy('position', 'asc')->get();
 
-        return view('main-projects.index', compact('data'));
+        return view('main-projects.index', [
+            'projects' => $projects,
+            'stats' => [
+                'total' => $projects->count(),
+                'visible' => $projects->where('show', true)->count(),
+                'with_statistics' => $projects->filter(static function (MainProject $p) {
+                    return !empty($p->controller);
+                })->count(),
+            ],
+        ]);
     }
 
     public function create()
@@ -62,11 +72,13 @@ class MainProjectsController extends Controller
 
         $record = $request->all();
 
-        $record['show'] = $record['show'] === 'on';
+        $record['show'] = !empty($record['show']);
 
         $record['buttons'] = json_encode(explode("\r\n", $record['buttons']));
 
         MainProject::create($record);
+
+        $this->clearModulesCache();
 
         return redirect()->route('main-projects.index');
     }
@@ -99,6 +111,8 @@ class MainProjectsController extends Controller
 
         $project->update($request);
 
+        $this->clearModulesCache();
+
         return redirect()->route('main-projects.index');
     }
 
@@ -106,7 +120,15 @@ class MainProjectsController extends Controller
     {
         MainProject::where('id', $id)->delete();
 
+        $this->clearModulesCache();
+
         return response()->json([], 200);
+    }
+
+    protected function clearModulesCache(): void
+    {
+        MenuItemsPosition::clearSortMenuCache();
+        session()->forget(['cabinet_menu_modules_v4', 'cabinet_home_modules_flat']);
     }
 
     public function statistics(MainProject $project, Request $request)

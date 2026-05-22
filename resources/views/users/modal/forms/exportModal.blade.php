@@ -1,29 +1,28 @@
-<div class="group group-required">
-    <label for="countDays">{{ __('The day of the last online') }}</label>
-    <div class="row">
-        <div class="col-6">
+<div class="mb-3">
+    <label class="form-label" for="dateType">{{ __('The day of the last online') }}</label>
+    <div class="row g-2">
+        <div class="col-md-6">
             <select name="dateType" id="dateType" class="form-select">
-                <option value="all">От начала регистрации до выбранного дня</option>
-                <option value="only">Только выбранный день</option>
+                <option value="all">{{ __('From registration until selected day') }}</option>
+                <option value="only">{{ __('Only selected day') }}</option>
             </select>
         </div>
-        <div class="col-6">
-            <input class="form form-control" type="datetime-local" name="lastOnline">
+        <div class="col-md-6">
+            <input class="form-control" type="datetime-local" name="lastOnline" id="lastOnline">
         </div>
     </div>
 </div>
 
-
-<div class="group group-required mt-3">
-    <label for="verify">{{ __('File Type') }}</label>
+<div class="mb-3">
+    <label class="form-label" for="fileType">{{ __('File Type') }}</label>
     <select name="fileType" id="fileType" class="form-select">
-        <option value="xls">excel</option>
-        <option value="csv">csv</option>
+        <option value="xls">Excel</option>
+        <option value="csv">CSV</option>
     </select>
 </div>
 
-<div class="group group-required mt-3">
-    <label for="verify">{{ __('Type user') }}</label>
+<div class="mb-0">
+    <label class="form-label" for="verify">{{ __('Type user') }}</label>
     <select name="verify" id="verify" class="form-select">
         <option value="verify">{{ __('Verified user') }}</option>
         <option value="noVerify">{{ __('No verified user') }}</option>

@@ -1,0 +1,24 @@
+.cabinet-telegram-connect-modal .cabinet-telegram-connect-modal__list li {
+    display: flex;
+    align-items: flex-start;
+}
+
+.cabinet-telegram-connect-modal .modal-footer .btn-outline-secondary {
+    white-space: normal;
+    text-align: left;
+}
+
+@media (max-width: 575.98px) {
+    .cabinet-telegram-connect-modal .modal-footer {
+        flex-direction: column-reverse;
+        align-items: stretch !important;
+    }
+
+    .cabinet-telegram-connect-modal .modal-footer .d-flex {
+        width: 100%;
+    }
+
+    .cabinet-telegram-connect-modal .modal-footer .btn-primary {
+        width: 100%;
+    }
+}

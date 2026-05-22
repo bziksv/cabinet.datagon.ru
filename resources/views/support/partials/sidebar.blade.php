@@ -2,26 +2,36 @@
     use App\SupportTicket;
     $statusFilters = [
         'all' => __('All tickets'),
-        SupportTicket::STATUS_OPEN => __('Awaiting reply'),
-        SupportTicket::STATUS_ANSWERED => __('Answered'),
+        SupportTicket::STATUS_OPEN => ($isStaff ?? false) ? __('Needs reply') : __('Awaiting reply'),
+        SupportTicket::STATUS_ANSWERED => ($isStaff ?? false) ? __('Answered by support') : __('Answered'),
         SupportTicket::STATUS_CLOSED => __('Closed'),
     ];
+    $onCreate = request()->routeIs('support.create');
 @endphp
 
-<div class="col-lg-3">
-    <a href="{{ route('support.create') }}" class="btn btn-primary w-100 mb-3">
+<div class="col-lg-3 cabinet-support-sidebar">
+    <a href="{{ route('support.create') }}"
+       class="btn btn-primary w-100 mb-3 {{ $onCreate ? 'disabled' : '' }}"
+       @if($onCreate) aria-disabled="true" @endif>
         <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>{{ __('New ticket') }}
     </a>
     <div class="card">
-        <div class="card-header">
+        <div class="card-header py-2">
             <h3 class="card-title mb-0">{{ __('Folders') }}</h3>
         </div>
         <div class="card-body p-0">
             <ul class="nav nav-pills flex-column mb-0">
                 @foreach($statusFilters as $code => $label)
+                    @php
+                        $folderActive = !$onCreate && request()->routeIs('support.index') && ($filter ?? 'all') === $code;
+                        $openCount = $counts[SupportTicket::STATUS_OPEN] ?? 0;
+                        $badgeClass = ($code === SupportTicket::STATUS_OPEN && ($isStaff ?? false) && $openCount > 0)
+                            ? 'text-bg-danger'
+                            : (($folderActive) ? 'text-bg-light' : 'text-bg-secondary');
+                    @endphp
                     <li class="nav-item">
                         <a href="{{ route('support.index', array_filter(['status' => $code === 'all' ? null : $code, 'q' => $search ?? null])) }}"
-                           class="nav-link rounded-0 d-flex justify-content-between {{ ($filter ?? 'all') === $code ? 'active' : '' }}">
+                           class="nav-link rounded-0 d-flex justify-content-between {{ $folderActive ? 'active' : '' }}">
                             <span>
                                 @if($code === 'all')
                                     <i class="bi bi-inbox me-2" aria-hidden="true"></i>
@@ -35,7 +45,7 @@
                                 {{ $label }}
                             </span>
                             @if(($counts[$code] ?? 0) > 0)
-                                <span class="badge {{ ($filter ?? 'all') === $code ? 'text-bg-light' : 'text-bg-secondary' }}">
+                                <span class="badge {{ $badgeClass }}">
                                     {{ $counts[$code] }}
                                 </span>
                             @endif
@@ -45,11 +55,25 @@
             </ul>
         </div>
     </div>
+
+    @include('support.partials.recent-tickets')
+
     @if($isStaff ?? false)
         <div class="card mt-3">
-            <div class="card-body small text-secondary">
+            <div class="card-body small text-secondary py-3">
                 <i class="bi bi-info-circle me-1"></i>
                 {{ __('Only administrators can reply to tickets.') }}
+            </div>
+        </div>
+    @else
+        <div class="card mt-3">
+            <div class="card-body small text-secondary py-3">
+                <p class="mb-2 fw-semibold text-body">{{ __('How it works') }}</p>
+                <ol class="mb-0 ps-3">
+                    <li>{{ __('Create a ticket with your question.') }}</li>
+                    <li>{{ __('Support will reply in the same thread.') }}</li>
+                    <li>{{ __('You can add details until the ticket is closed.') }}</li>
+                </ol>
             </div>
         </div>
     @endif

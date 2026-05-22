@@ -1,0 +1,100 @@
+/* Главная кабинета — дашборд */
+
+.cabinet-home-page .cabinet-home-hero {
+    background: linear-gradient(135deg, var(--bs-primary-bg-subtle) 0%, var(--bs-body-bg) 55%);
+    border: 1px solid var(--bs-border-color-translucent);
+    border-radius: var(--bs-border-radius-lg);
+}
+
+.cabinet-home-page .cabinet-home-stats .info-box {
+    height: 100%;
+    min-height: 5.5rem;
+    margin-bottom: 0;
+    text-decoration: none;
+    color: inherit;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.cabinet-home-page .cabinet-home-stats .info-box:hover {
+    box-shadow: var(--bs-box-shadow);
+    transform: translateY(-1px);
+}
+
+.cabinet-home-page .cabinet-home-stats .info-box-icon {
+    width: 70px;
+    min-width: 70px;
+    height: 70px;
+    font-size: 1.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cabinet-home-page .cabinet-home-stats .info-box-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 70px;
+}
+
+.cabinet-home-page .cabinet-home-stats .info-box-number {
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+
+.cabinet-home-page .cabinet-home-module-card {
+    height: 100%;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+    border-top: 3px solid var(--cabinet-module-accent, var(--bs-primary));
+}
+
+.cabinet-home-page .cabinet-home-module-card:hover {
+    box-shadow: var(--bs-box-shadow);
+    transform: translateY(-2px);
+}
+
+.cabinet-home-page .cabinet-home-module-card__icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--bs-border-radius);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: #fff;
+    background: var(--cabinet-module-accent, var(--bs-primary));
+    flex-shrink: 0;
+}
+
+.cabinet-home-page .cabinet-home-module-card__icon .nav-icon,
+.cabinet-home-page .cabinet-home-module-card__icon i {
+    color: inherit;
+    font-size: 1.35rem;
+    line-height: 1;
+}
+
+.cabinet-home-page .cabinet-home-module-card__desc {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 3.9rem;
+}
+
+.cabinet-home-page .cabinet-home-module-card.is-hidden {
+    display: none !important;
+}
+
+.cabinet-home-page .cabinet-home-empty {
+    border: 1px dashed var(--bs-border-color);
+    border-radius: var(--bs-border-radius-lg);
+}
+
+@media (max-width: 575.98px) {
+    .cabinet-home-page .cabinet-home-stats .info-box-icon {
+        width: 56px;
+        min-width: 56px;
+        height: 56px;
+        font-size: 1.35rem;
+    }
+}

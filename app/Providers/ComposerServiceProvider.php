@@ -9,6 +9,8 @@ use App\ViewComposers\DescriptionComposer;
 use App\ViewComposers\LimitsComposer;
 use App\ViewComposers\MenuComposer;
 use App\ViewComposers\StatisticsComposer;
+use App\ViewComposers\SupportInboxBadgeComposer;
+use App\ViewComposers\TelegramConnectPromptComposer;
 use App\ViewComposers\UserPanelComposer;
 use Illuminate\Support\ServiceProvider;
 
@@ -38,7 +40,9 @@ class ComposerServiceProvider extends ServiceProvider
         view()->composer('layouts.partials.app-header', UserPanelComposer::class);
         view()->composer('layouts.partials.app-header', LimitsComposer::class);
         view()->composer('layouts.partials.app-header', CountUnreadNewsComposer::class);
+        view()->composer('layouts.partials.app-header', SupportInboxBadgeComposer::class);
         view()->composer('navigation.sidebar', MenuComposer::class);
         view()->composer('layouts.app', StatisticsComposer::class);
+        view()->composer('layouts.app', TelegramConnectPromptComposer::class);
     }
 }

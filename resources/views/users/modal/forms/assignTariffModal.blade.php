@@ -1,17 +1,22 @@
-<div class="form-group">
-    {!! Form::label('users', __('Select users')) !!}
-    {!! Form::select('users[]', [], null, ['class' => 'form-select', 'id' => 'select-users', 'multiple' => 'multiple', 'data-placeholder' => __('Start typing email (min 2 characters)')]) !!}
-    @error('users') <span class="error invalid-feedback">{{ $message }}</span> @enderror
+<div class="mb-3">
+    {!! Form::label('users', __('Select users'), ['class' => 'form-label']) !!}
+    {!! Form::select('users[]', [], null, [
+        'class' => 'form-select',
+        'id' => 'select-users',
+        'multiple' => 'multiple',
+        'data-placeholder' => __('Start typing email (min 2 characters)'),
+    ]) !!}
+    @error('users') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
 </div>
 
-<div class="form-group">
-    {!! Form::label('tariff', __('Select tariff')) !!}
+<div class="mb-3">
+    {!! Form::label('tariff', __('Select tariff'), ['class' => 'form-label']) !!}
     {!! Form::select('tariff', $tariffSelect['tariff'], null, ['class' => 'form-select']) !!}
-    @error('tariff') <span class="error invalid-feedback">{{ $message }}</span> @enderror
+    @error('tariff') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
 </div>
 
-<div class="form-group">
-    {!! Form::label('period', __('Select period')) !!}
+<div class="mb-0">
+    {!! Form::label('period', __('Select period'), ['class' => 'form-label']) !!}
     {!! Form::select('period', $tariffSelect['period'], null, ['class' => 'form-select']) !!}
-    @error('period') <span class="error invalid-feedback">{{ $message }}</span> @enderror
+    @error('period') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
 </div>

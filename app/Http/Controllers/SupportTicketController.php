@@ -4,9 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Support\SupportAccess;
 use App\SupportTicket;
-use App\SupportTicketMessage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -24,7 +24,7 @@ class SupportTicketController extends Controller
         $search = trim((string) $request->query('q', ''));
         $isStaff = SupportAccess::isStaff();
 
-        $query = SupportTicket::query()
+        $query = $this->baseTicketQuery($isStaff)
             ->with([
                 'user' => static function ($q) {
                     $q->select('id', 'name', 'last_name', 'email', 'image');
@@ -35,46 +35,21 @@ class SupportTicketController extends Controller
             ])
             ->orderByDesc('updated_at');
 
-        if ($isStaff) {
-            $query->forStaffInbox($filter);
-        } else {
-            $query->where('user_id', Auth::id());
-            if (in_array($filter, [SupportTicket::STATUS_OPEN, SupportTicket::STATUS_ANSWERED, SupportTicket::STATUS_CLOSED], true)) {
-                $query->where('status', $filter);
-            }
-        }
-
-        if ($search !== '') {
-            $query->where(function ($builder) use ($search, $isStaff) {
-                $builder->where('subject', 'like', '%' . $search . '%');
-                if ($isStaff) {
-                    $builder->orWhereHas('user', function ($userQuery) use ($search) {
-                        $userQuery->where('email', 'like', '%' . $search . '%')
-                            ->orWhere('name', 'like', '%' . $search . '%')
-                            ->orWhere('last_name', 'like', '%' . $search . '%');
-                    });
-                }
-            });
-        }
+        $this->applyInboxFilter($query, $isStaff, $filter);
+        $this->applySearch($query, $search, $isStaff);
 
         $tickets = $query->paginate(20)->appends($request->only(['status', 'q']));
 
-        $counts = $this->inboxCounts($isStaff);
-
-        return view('support.index', compact('tickets', 'filter', 'search', 'isStaff', 'counts'));
+        return view('support.index', $this->inboxViewData($isStaff, $filter, $search, [
+            'tickets' => $tickets,
+        ]));
     }
 
     public function create(): View
     {
         $isStaff = SupportAccess::isStaff();
-        $counts = $this->inboxCounts($isStaff);
 
-        return view('support.create', [
-            'isStaff' => $isStaff,
-            'counts' => $counts,
-            'filter' => 'all',
-            'search' => '',
-        ]);
+        return view('support.create', $this->inboxViewData($isStaff, 'all', ''));
     }
 
     public function store(Request $request): RedirectResponse
@@ -119,22 +94,17 @@ class SupportTicketController extends Controller
         ]);
 
         $isStaff = SupportAccess::isStaff();
-        $canStaffReply = SupportAccess::canReplyAsStaff($ticket);
-        $canUserReply = SupportAccess::canReplyAsUser($ticket);
-
-        $counts = $this->inboxCounts($isStaff);
         $filter = request()->query('status', 'all');
         $search = trim((string) request()->query('q', ''));
 
-        return view('support.show', compact(
-            'ticket',
-            'isStaff',
-            'canStaffReply',
-            'canUserReply',
-            'counts',
-            'filter',
-            'search'
-        ));
+        return view('support.show', $this->inboxViewData($isStaff, $filter, $search, [
+            'ticket' => $ticket,
+            'activeTicketId' => $ticket->id,
+            'canStaffReply' => SupportAccess::canReplyAsStaff($ticket),
+            'canUserReply' => SupportAccess::canReplyAsUser($ticket),
+            'canReopen' => SupportAccess::canReopen($ticket),
+            'ticketNav' => $this->ticketNeighbors($ticket, $isStaff),
+        ]));
     }
 
     public function storeMessage(Request $request, SupportTicket $ticket): RedirectResponse
@@ -166,12 +136,7 @@ class SupportTicketController extends Controller
                 'is_staff' => $asStaff,
             ]);
 
-            if ($asStaff) {
-                $ticket->status = SupportTicket::STATUS_ANSWERED;
-            } else {
-                $ticket->status = SupportTicket::STATUS_OPEN;
-            }
-
+            $ticket->status = $asStaff ? SupportTicket::STATUS_ANSWERED : SupportTicket::STATUS_OPEN;
             $ticket->save();
         });
 
@@ -201,6 +166,27 @@ class SupportTicketController extends Controller
         return redirect()->route('support.index', ['status' => 'closed']);
     }
 
+    public function reopen(SupportTicket $ticket): RedirectResponse
+    {
+        $this->authorizeTicket($ticket);
+
+        if (!$ticket->isClosed()) {
+            return redirect()->route('support.show', $ticket);
+        }
+
+        if (!SupportAccess::canReopen($ticket)) {
+            abort(403);
+        }
+
+        $ticket->status = SupportTicket::STATUS_OPEN;
+        $ticket->closed_at = null;
+        $ticket->save();
+
+        flash()->overlay(__('Ticket reopened'), __('Success'))->success();
+
+        return redirect()->route('support.show', $ticket);
+    }
+
     protected function authorizeTicket(SupportTicket $ticket): void
     {
         if (!SupportAccess::canViewTicket($ticket)) {
@@ -208,24 +194,106 @@ class SupportTicketController extends Controller
         }
     }
 
-    protected function inboxCounts(bool $isStaff): array
+    protected function baseTicketQuery(bool $isStaff)
     {
-        if ($isStaff) {
-            return [
-                'all' => SupportTicket::count(),
-                SupportTicket::STATUS_OPEN => SupportTicket::where('status', SupportTicket::STATUS_OPEN)->count(),
-                SupportTicket::STATUS_ANSWERED => SupportTicket::where('status', SupportTicket::STATUS_ANSWERED)->count(),
-                SupportTicket::STATUS_CLOSED => SupportTicket::where('status', SupportTicket::STATUS_CLOSED)->count(),
-            ];
+        $query = SupportTicket::query();
+
+        if (!$isStaff) {
+            $query->where('user_id', Auth::id());
         }
 
-        $userId = Auth::id();
+        return $query;
+    }
+
+    protected function applyInboxFilter($query, bool $isStaff, string $filter): void
+    {
+        if ($isStaff) {
+            $query->forStaffInbox($filter);
+
+            return;
+        }
+
+        if (in_array($filter, [SupportTicket::STATUS_OPEN, SupportTicket::STATUS_ANSWERED, SupportTicket::STATUS_CLOSED], true)) {
+            $query->where('status', $filter);
+        }
+    }
+
+    protected function applySearch($query, string $search, bool $isStaff): void
+    {
+        if ($search === '') {
+            return;
+        }
+
+        $query->where(function ($builder) use ($search, $isStaff) {
+            $builder->where('subject', 'like', '%' . $search . '%')
+                ->orWhereHas('messages', function ($messageQuery) use ($search) {
+                    $messageQuery->where('body', 'like', '%' . $search . '%');
+                });
+
+            if ($isStaff) {
+                $builder->orWhereHas('user', function ($userQuery) use ($search) {
+                    $userQuery->where('email', 'like', '%' . $search . '%')
+                        ->orWhere('name', 'like', '%' . $search . '%')
+                        ->orWhere('last_name', 'like', '%' . $search . '%');
+                });
+            }
+        });
+    }
+
+    protected function inboxViewData(bool $isStaff, string $filter, string $search, array $extra = []): array
+    {
+        return array_merge([
+            'isStaff' => $isStaff,
+            'counts' => $this->inboxCounts($isStaff),
+            'filter' => $filter,
+            'search' => $search,
+            'recentTickets' => $this->recentTickets($isStaff, $extra['activeTicketId'] ?? null),
+        ], $extra);
+    }
+
+    protected function inboxCounts(bool $isStaff): array
+    {
+        $rows = $this->baseTicketQuery($isStaff)
+            ->selectRaw('status, COUNT(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
 
         return [
-            'all' => SupportTicket::where('user_id', $userId)->count(),
-            SupportTicket::STATUS_OPEN => SupportTicket::where('user_id', $userId)->where('status', SupportTicket::STATUS_OPEN)->count(),
-            SupportTicket::STATUS_ANSWERED => SupportTicket::where('user_id', $userId)->where('status', SupportTicket::STATUS_ANSWERED)->count(),
-            SupportTicket::STATUS_CLOSED => SupportTicket::where('user_id', $userId)->where('status', SupportTicket::STATUS_CLOSED)->count(),
+            'all' => (int) $rows->sum(),
+            SupportTicket::STATUS_OPEN => (int) ($rows[SupportTicket::STATUS_OPEN] ?? 0),
+            SupportTicket::STATUS_ANSWERED => (int) ($rows[SupportTicket::STATUS_ANSWERED] ?? 0),
+            SupportTicket::STATUS_CLOSED => (int) ($rows[SupportTicket::STATUS_CLOSED] ?? 0),
+        ];
+    }
+
+    protected function recentTickets(bool $isStaff, ?int $activeTicketId = null): Collection
+    {
+        return $this->baseTicketQuery($isStaff)
+            ->with(['user' => static function ($q) {
+                $q->select('id', 'name', 'last_name', 'email');
+            }])
+            ->orderByDesc('updated_at')
+            ->limit(8)
+            ->get();
+    }
+
+    protected function ticketNeighbors(SupportTicket $ticket, bool $isStaff): array
+    {
+        $base = $this->baseTicketQuery($isStaff);
+
+        $prev = (clone $base)
+            ->where('updated_at', '>', $ticket->updated_at)
+            ->orderBy('updated_at', 'asc')
+            ->first();
+
+        $next = (clone $base)
+            ->where('updated_at', '<', $ticket->updated_at)
+            ->orderByDesc('updated_at')
+            ->first();
+
+        return [
+            'prev' => $prev,
+            'next' => $next,
         ];
     }
 }

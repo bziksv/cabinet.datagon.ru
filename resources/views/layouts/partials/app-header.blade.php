@@ -16,9 +16,15 @@
                 </a>
             </li>
             <li class="nav-item d-none d-md-block">
-                <a class="nav-link @if(request()->routeIs('support.*')) active @endif" href="{{ route('support.index') }}">
+                <a class="nav-link @if(request()->routeIs('support.*')) active @endif"
+                   href="{{ route('support.index', array_filter(['status' => $supportBadgeFilter ?? null])) }}">
                     <i class="bi bi-headset me-1" aria-hidden="true"></i>
                     {{ __('Support') }}
+                    @if(($supportBadgeCount ?? 0) > 0)
+                        <span class="navbar-badge badge text-bg-danger ms-1" title="{{ $supportBadgeTitle ?? '' }}">
+                            {{ $supportBadgeCount > 99 ? '99+' : $supportBadgeCount }}
+                        </span>
+                    @endif
                 </a>
             </li>
         </ul>

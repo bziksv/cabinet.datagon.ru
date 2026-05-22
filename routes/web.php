@@ -44,6 +44,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('test', 'TestController@index')->name('test');
 
     Route::get('/', 'HomeController@index')->name('home');
+    Route::get('/home/variant-2', 'HomeController@variant2')->name('home.variant2');
+    Route::get('/home/variant-3', 'HomeController@variant3')->name('home.variant3');
 
     Route::resource('main-projects', 'MainProjectsController');
     Route::get('/main-projects/statistics/{project}', 'MainProjectsController@statistics')->name('main-projects.statistics');
@@ -99,6 +101,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('profile/', 'ProfilesController@update')->name('profile.update');
     Route::patch('profile/', 'ProfilesController@password')->name('profile.password');
     Route::get('test-telegram-notify', 'ProfilesController@testTelegramNotify')->name('profile.test-telegram-notify');
+    Route::post('profile/telegram-connect-prompt/snooze', 'ProfilesController@snoozeTelegramConnectPrompt')
+        ->name('profile.telegram-connect-prompt.snooze');
 
     Route::get('support', 'SupportTicketController@index')->name('support.index');
     Route::get('support/create', 'SupportTicketController@create')->name('support.create');
@@ -106,6 +110,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('support/{ticket}', 'SupportTicketController@show')->name('support.show');
     Route::post('support/{ticket}/messages', 'SupportTicketController@storeMessage')->name('support.messages.store');
     Route::patch('support/{ticket}/close', 'SupportTicketController@close')->name('support.close');
+    Route::patch('support/{ticket}/reopen', 'SupportTicketController@reopen')->name('support.reopen');
 
     Route::get('description/{description}/edit/{position?}', 'DescriptionController@edit')->name('description.edit');
     Route::patch('description/{description}', 'DescriptionController@update')->name('description.update');

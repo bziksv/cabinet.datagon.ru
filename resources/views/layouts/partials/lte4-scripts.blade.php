@@ -1,7 +1,7 @@
 @php $html = asset('html'); @endphp
 <script src="{{ $html }}/npm/overlayscrollbars@2.11.0/browser/overlayscrollbars.browser.es6.min.js" crossorigin="anonymous"></script>
 <script src="{{ $html }}/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" crossorigin="anonymous"></script>
-<script src="{{ $html }}/npm/bootstrap@5.3.7/dist/js/bootstrap.min.js" crossorigin="anonymous"></script>
+<script src="{{ $html }}/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" crossorigin="anonymous"></script>
 <script src="{{ $html }}/js/adminlte.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {

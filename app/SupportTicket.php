@@ -31,7 +31,7 @@ class SupportTicket extends Model
 
     public function messages(): HasMany
     {
-        return $this->hasMany(SupportTicketMessage::class)->orderBy('created_at');
+        return $this->hasMany(SupportTicketMessage::class)->orderByDesc('created_at');
     }
 
     public function latestMessage(): HasOne
@@ -59,6 +59,18 @@ class SupportTicket extends Model
     public function isClosed(): bool
     {
         return $this->status === self::STATUS_CLOSED;
+    }
+
+    /** Для владельца тикета: есть ответ поддержки, ещё не закрыт. */
+    public function hasNewReplyForOwner(): bool
+    {
+        return $this->status === self::STATUS_ANSWERED;
+    }
+
+    /** Для staff: тикет ждёт ответа поддержки. */
+    public function needsStaffAttention(): bool
+    {
+        return $this->status === self::STATUS_OPEN;
     }
 
     public static function statusLabels(): array

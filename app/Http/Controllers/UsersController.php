@@ -94,8 +94,12 @@ class UsersController extends Controller
         $query = User::query()->without(['pay', 'roles']);
 
         $search = $request->get('search');
-        if ($search = $search['value']) {
-            $query->where('email', 'like', $search . '%');
+        if ($search = trim((string) ($search['value'] ?? ''))) {
+            $query->where(function ($builder) use ($search) {
+                $builder->where('email', 'like', '%' . $search . '%')
+                    ->orWhere('name', 'like', '%' . $search . '%')
+                    ->orWhere('last_name', 'like', '%' . $search . '%');
+            });
         }
 
         if ($order = Arr::first($request->get('order'))) {
@@ -103,9 +107,12 @@ class UsersController extends Controller
             $query->orderBy($columns[$order['column']]['name'], $order['dir']);
         }
 
-        $users = $query->with(['pay' => function ($payQuery) {
-            $payQuery->where('status', true);
-        }])->paginate($length, ['*'], 'page', $page);
+        $users = $query->with([
+            'pay' => function ($payQuery) {
+                $payQuery->where('status', true);
+            },
+            'roles',
+        ])->paginate($length, ['*'], 'page', $page);
 
         $users->transform(function ($user) {
 
@@ -121,11 +128,17 @@ class UsersController extends Controller
             $user->created = $user->created_at->format('d.m.Y H:i:s');
             $user->created_diffForHumans = $user->created_at->diffForHumans();
 
-            //Was online
+            // Was online
             $loa = $user->last_online_at;
-            $user->last_online_strtotime = strtotime($loa);
-            $user->last_online = $loa->format('d.m.Y H:i:s');
-            $user->last_online_diffForHumans = $loa->diffForHumans();
+            if ($loa) {
+                $user->last_online_strtotime = $loa->timestamp;
+                $user->last_online = $loa->format('d.m.Y H:i');
+                $user->last_online_diffForHumans = $loa->diffForHumans();
+            } else {
+                $user->last_online_strtotime = 0;
+                $user->last_online = null;
+                $user->last_online_diffForHumans = null;
+            }
 
             return $user;
         });

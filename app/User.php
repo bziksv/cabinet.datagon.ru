@@ -35,7 +35,7 @@ class User extends Authenticatable implements MustVerifyEmail
      * @var array
      */
     protected $fillable = [
-        'balance', 'name', 'last_name', 'email', 'lang', 'password', 'last_authorization', 'telegram_token', 'metrics', 'statistic'
+        'balance', 'name', 'last_name', 'email', 'lang', 'password', 'last_authorization', 'telegram_token', 'telegram_prompt_snoozed_until', 'metrics', 'statistic'
     ];
 
     /**
@@ -55,6 +55,7 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $casts = [
         'email_verified_at' => 'datetime',
         'last_online_at' => 'datetime',
+        'telegram_prompt_snoozed_until' => 'datetime',
         'metrics' => 'json',
     ];
 
@@ -294,5 +295,28 @@ class User extends Authenticatable implements MustVerifyEmail
         $arFio = array_unique([$this->name, $this->last_name]);
 
         return implode(" ", $arFio);
+    }
+
+    public function isTelegramConnected(): bool
+    {
+        return (bool) $this->telegram_bot_active && !empty($this->chat_id);
+    }
+
+    public function shouldShowTelegramConnectPrompt(): bool
+    {
+        if ($this->isTelegramConnected()) {
+            return false;
+        }
+
+        if ($this->telegram_prompt_snoozed_until && $this->telegram_prompt_snoozed_until->isFuture()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function telegramBotSubscribeUrl(): string
+    {
+        return 'https://t.me/RedBoxServiceBot?start=' . base64_encode($this->email);
     }
 }

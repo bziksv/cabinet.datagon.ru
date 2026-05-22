@@ -63,6 +63,25 @@
     font-size: 0.8em;
 }
 
+.cabinet-main-projects-page .cabinet-mp-icon-preview--sm {
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: 0.85rem;
+}
+
+.cabinet-main-projects-page .cabinet-mp-visit-stats {
+    margin-bottom: 0;
+}
+
+.cabinet-main-projects-page .cabinet-mp-visit-stats-table thead th {
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+.cabinet-main-projects-page .cabinet-mp-visit-stats-table tbody td {
+    font-size: 0.875rem;
+}
+
 .cabinet-main-projects-page .cabinet-mp-icon-live {
     width: 3rem;
     height: 3rem;

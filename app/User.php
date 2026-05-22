@@ -249,10 +249,22 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(MetaTag::class);
     }
 
-    public function deleteNoVerify()
+    /**
+     * @deprecated Используйте {@see deleteUnverifiedOlderThan()} из cron DeleteUnverifiedUsers.
+     */
+    public function deleteNoVerify(): int
     {
-        $this->where('email_verified_at', '=', null)
-            ->where('created_at', '<=', Carbon::now()->subDays($this->delete))
+        return static::deleteUnverifiedOlderThan($this->delete);
+    }
+
+    /**
+     * Удалить аккаунты без email_verified_at, зарегистрированные раньше чем $days дней назад.
+     */
+    public static function deleteUnverifiedOlderThan(int $days): int
+    {
+        return static::query()
+            ->whereNull('email_verified_at')
+            ->where('created_at', '<=', Carbon::now()->subDays($days))
             ->delete();
     }
 
@@ -266,11 +278,21 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public static function isUserAdmin(): bool
     {
-        if (Auth::check()) {
-            foreach (Auth::user()->role as $role) {
-                if ($role == '1' || $role == '3') {
-                    return true;
-                }
+        if (!Auth::check()) {
+            return false;
+        }
+
+        apply_global_team_permissions();
+        $user = Auth::user();
+        $user->loadMissing('roles');
+
+        if ($user->hasRole(['admin', 'Super Admin'])) {
+            return true;
+        }
+
+        foreach ($user->roles as $role) {
+            if (in_array((int) $role->id, [1, 3], true)) {
+                return true;
             }
         }
 
@@ -295,6 +317,17 @@ class User extends Authenticatable implements MustVerifyEmail
         $arFio = array_unique([$this->name, $this->last_name]);
 
         return implode(" ", $arFio);
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeTelegramConnected($query)
+    {
+        return $query->where('telegram_bot_active', true)
+            ->whereNotNull('chat_id')
+            ->where('chat_id', '!=', '');
     }
 
     public function isTelegramConnected(): bool

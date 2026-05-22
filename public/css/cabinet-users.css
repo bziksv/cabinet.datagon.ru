@@ -1,5 +1,84 @@
 /* Админка пользователей — DataTables + AdminLTE 4 */
 
+.cabinet-users-page .cabinet-users-legend {
+    border-left: 3px solid var(--bs-primary);
+}
+
+.cabinet-users-page .cabinet-users-legend .badge {
+    font-size: 0.7rem;
+    vertical-align: middle;
+}
+
+.cabinet-users-page .cabinet-users-activity-kpi .info-box {
+    min-height: 5.25rem;
+    height: 100%;
+}
+
+.cabinet-users-page .cabinet-users-activity-kpi .info-box-icon {
+    width: 56px;
+    min-width: 56px;
+    height: 56px;
+    font-size: 1.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cabinet-users-page .cabinet-users-activity-kpi .info-box-text {
+    font-size: 0.75rem;
+    line-height: 1.25;
+}
+
+.cabinet-users-page .cabinet-users-activity-chart-wrap {
+    position: relative;
+    width: 100%;
+}
+
+.cabinet-users-page .cabinet-users-stat .info-box {
+    height: 100%;
+    min-height: 5rem;
+    margin-bottom: 0;
+}
+
+.cabinet-users-page .cabinet-users-stat .cabinet-users-stat-link {
+    border-radius: var(--bs-border-radius);
+    transition: background-color 0.15s ease;
+}
+
+.cabinet-users-page .cabinet-users-stat .cabinet-users-stat-link:hover {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.cabinet-users-page .cabinet-users-stat .info-box-icon {
+    width: 64px;
+    min-width: 64px;
+    height: 64px;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cabinet-users-page .cabinet-users-filters .card-header {
+    background: var(--bs-tertiary-bg);
+}
+
+.cabinet-users-page .cabinet-users-dt-top {
+    padding: 0 1rem;
+}
+
+.cabinet-users-page .cabinet-users-search-bar .input-group {
+    max-width: 36rem;
+}
+
+.cabinet-users-page .cabinet-users-search-bar .form-control {
+    min-width: 12rem;
+}
+
+.cabinet-users-page #service-users_wrapper .dataTables_filter {
+    display: none !important;
+}
+
 .cabinet-users-page .cabinet-users-card .card-header {
     flex-wrap: wrap;
     gap: 0.75rem;

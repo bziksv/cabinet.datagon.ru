@@ -80,7 +80,14 @@
                         'multiple' => true,
                         'size' => min(6, max(3, $roles->count())),
                     ]) !!}
-                    <div class="form-text">{{ __('Leave empty to allow all roles. Hold Ctrl/Cmd to select several.') }}</div>
+                    <div class="form-text">
+                        {{ __('Sidebar visibility: which roles see this menu item for regular users. Empty = all roles.') }}
+                        {{ __('Not the same as permission') }}
+                        <a href="{{ route('manage-access.index') }}">«{{ __('Main projects') }}»</a>
+                        {{ __('on') }}
+                        <a href="{{ route('manage-access.index') }}">{{ __('Roles and permissions') }}</a>
+                        ({{ __('opens') }} /main-projects).
+                    </div>
                 </div>
                 <div class="col-12">
                     <div class="form-check">
@@ -104,12 +111,12 @@
                         type="button"
                         data-bs-toggle="collapse"
                         data-bs-target="#cabinet-mp-stats-collapse"
-                        aria-expanded="false">
+                        aria-expanded="{{ $isEdit && (!empty($project->controller) || !empty($buttonsText)) ? 'true' : 'false' }}">
                     <i class="bi bi-bar-chart me-1"></i>{{ __('Statistics settings') }}
                     <span class="text-secondary fw-normal small">({{ __('optional') }})</span>
                 </button>
             </div>
-            <div id="cabinet-mp-stats-collapse" class="collapse">
+            <div id="cabinet-mp-stats-collapse" class="collapse @if($isEdit && (!empty($project->controller) || !empty($buttonsText))) show @endif">
                 <div class="card-body">
                     <p class="small text-secondary">
                         {{ __('If a controller is set, visits and actions are collected. Format: one line per method.') }}

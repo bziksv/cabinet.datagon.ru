@@ -1,0 +1,28 @@
+/* /visits-statistics — общая статистика визитов по пользователям */
+
+.cabinet-visits-stats-page .info-box {
+    min-height: 5rem;
+    margin-bottom: 0;
+}
+
+.cabinet-visits-stats-page .info-box-icon {
+    width: 56px;
+    min-width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+}
+
+.cabinet-visits-stats-page #cabinet-visits-stats-table {
+    font-size: 0.875rem;
+}
+
+.cabinet-visits-stats-page .dt-buttons {
+    margin-bottom: 0.25rem;
+}
+
+.cabinet-visits-stats-page .dt-buttons .btn {
+    margin-right: 0.25rem;
+}

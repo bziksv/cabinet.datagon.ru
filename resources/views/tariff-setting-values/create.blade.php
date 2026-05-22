@@ -1,34 +1,36 @@
 @extends('layouts.app')
 
-@section('css')
+@section('title', __('Add tariff value'))
 
-@stop
+@section('css')
+    <link rel="stylesheet" href="{{ asset('css/cabinet-tariff-settings.css') }}">
+@endsection
 
 @section('content')
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card card-primary">
-                <div class="card-header">
-                    <h3 class="card-title">{{ __('Tariff settings') }}</h3>
-                </div>
+    <div class="cabinet-tariff-settings-page">
+        <div class="mb-3">
+            <h2 class="h4 mb-1">
+                <i class="bi bi-plus-circle me-2 text-primary"></i>{{ __('Add tariff value') }}
+            </h2>
+            <p class="text-secondary small mb-0">
+                {{ __('Property') }}: <strong>{{ $setting->name ?: $setting->code }}</strong>
+                · <code>{{ $setting->code }}</code>
+            </p>
+        </div>
 
+        <div class="card shadow-sm">
+            <div class="card-body">
                 {!! Form::open(['method' => 'POST', 'route' => ['tariff-setting-values.store']]) !!}
-
-                {!! Form::hidden('tariff_setting_id', request('id')) !!}
-
-                <div class="card-body">
-                    @include('tariff-setting-values.partials._form')
-                </div>
-                <div class="card-footer">
-                    {!! Form::submit('Сохранить', ['class' => 'btn btn-primary float-right']) !!}
+                {!! Form::hidden('tariff_setting_id', $setting->id) !!}
+                @include('tariff-setting-values.partials._form')
+                <div class="d-flex flex-wrap gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1"></i>{{ __('Save') }}
+                    </button>
+                    <a href="{{ route('tariff-settings.index') }}#{{ $setting->code }}" class="btn btn-outline-secondary">{{ __('Back') }}</a>
                 </div>
                 {!! Form::close() !!}
             </div>
         </div>
     </div>
-@stop
-
-@section('js')
-
-
 @endsection

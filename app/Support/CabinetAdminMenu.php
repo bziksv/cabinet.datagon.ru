@@ -11,8 +11,11 @@ use Illuminate\Support\Facades\Auth;
  */
 class CabinetAdminMenu
 {
-    /** main_projects.id — порядок в выпадающем списке */
+    /** main_projects.id — порядок в выпадающем списке шестерёнки */
     public const PROJECT_IDS = [16, 26, 29, 17, 27, 33, 31];
+
+    /** Скрыты из шестерёнки, но остаются в PROJECT_IDS (не дублируются в сайдбаре) */
+    public const GEAR_HIDDEN_IDS = [17];
 
     /** @var array<int, array{id:int,title:string,link:string,external:bool}>|null */
     private static $itemsCache;
@@ -48,10 +51,11 @@ class CabinetAdminMenu
             return self::$itemsCache;
         }
 
-        $ids = implode(',', array_map('intval', self::PROJECT_IDS));
+        $gearIds = array_values(array_diff(self::PROJECT_IDS, self::GEAR_HIDDEN_IDS));
+        $ids = implode(',', array_map('intval', $gearIds));
 
         $projects = MainProject::query()
-            ->whereIn('id', self::PROJECT_IDS)
+            ->whereIn('id', $gearIds)
             ->orderByRaw("FIELD(id, {$ids})")
             ->get(['id', 'title', 'link']);
 

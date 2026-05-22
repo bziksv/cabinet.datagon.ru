@@ -1,0 +1,129 @@
+/* Статистика модуля main-projects/statistics/{id} */
+
+.cabinet-module-stats-page .cabinet-ms-module-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--bs-border-radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.35rem;
+}
+
+.cabinet-module-stats-page .cabinet-ms-module-icon i,
+.cabinet-module-stats-page .cabinet-ms-module-icon .nav-icon {
+    color: inherit;
+}
+
+.cabinet-module-stats-page .cabinet-ms-kpi .info-box {
+    height: 100%;
+    min-height: 5rem;
+    margin-bottom: 0;
+}
+
+.cabinet-module-stats-page .cabinet-ms-kpi .info-box-icon {
+    width: 56px;
+    min-width: 56px;
+    height: 56px;
+    font-size: 1.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cabinet-module-stats-page .cabinet-ms-chart-wrap {
+    position: relative;
+    height: 300px;
+}
+
+.cabinet-module-stats-page .cabinet-ms-doughnut-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 220px;
+    height: 200px;
+    margin: 0 auto;
+}
+
+.cabinet-module-stats-page .cabinet-ms-weekday-wrap {
+    position: relative;
+    height: 200px;
+}
+
+.cabinet-module-stats-page .cabinet-ms-user-filter {
+    min-width: 10rem;
+    max-width: 14rem;
+}
+
+.cabinet-module-stats-page .cabinet-ms-insights .h5 {
+    font-variant-numeric: tabular-nums;
+}
+
+.cabinet-module-stats-page .cabinet-ms-prev-card .badge {
+    font-weight: 500;
+}
+
+.cabinet-module-stats-page .cabinet-ms-trend-up {
+    color: var(--bs-success);
+}
+
+.cabinet-module-stats-page .cabinet-ms-trend-down {
+    color: var(--bs-danger);
+}
+
+.cabinet-module-stats-page .cabinet-ms-trend-muted {
+    color: var(--bs-secondary-color);
+}
+
+.cabinet-module-stats-page .cabinet-ms-top-users td {
+    font-size: 0.8125rem;
+}
+
+.cabinet-module-stats-page .cabinet-ms-daily-accordion .accordion-button {
+    font-size: 0.875rem;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.cabinet-module-stats-page .cabinet-ms-daily-accordion .accordion-button:not(.collapsed) {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.cabinet-module-stats-page .cabinet-ms-day-peak .accordion-button {
+    background-color: rgba(var(--bs-warning-rgb), 0.12);
+}
+
+.cabinet-module-stats-page .cabinet-ms-day-muted {
+    opacity: 0.65;
+}
+
+.cabinet-module-stats-page .cabinet-ms-day-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    justify-content: flex-end;
+}
+
+.cabinet-module-stats-page .cabinet-ms-users-table {
+    font-size: 0.8125rem;
+}
+
+.cabinet-module-stats-page .cabinet-ms-clicks-table-wrap {
+    padding: 0.5rem;
+}
+
+.cabinet-module-stats-page .cabinet-ms-clicks .dt-buttons {
+    margin-bottom: 0.25rem;
+}
+
+@media (max-width: 767.98px) {
+    .cabinet-module-stats-page .cabinet-ms-day-metrics {
+        width: 100%;
+        justify-content: flex-start;
+        margin-top: 0.25rem;
+    }
+
+    .cabinet-module-stats-page .cabinet-ms-day-label {
+        width: 100%;
+    }
+}

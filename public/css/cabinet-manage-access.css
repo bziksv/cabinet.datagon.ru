@@ -1,0 +1,181 @@
+/* /manage-access — роли и права */
+
+.cabinet-manage-access-page .cabinet-ma-role-card {
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    margin-bottom: 0.75rem;
+    background: var(--bs-body-bg);
+}
+
+.cabinet-manage-access-page .cabinet-ma-role-card--protected {
+    border-left: 3px solid var(--bs-primary);
+}
+
+.cabinet-manage-access-page .cabinet-ma-role-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bs-tertiary-bg);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.cabinet-manage-access-page .cabinet-ma-role-list {
+    list-style: none;
+    margin: 0;
+    padding: 0.5rem;
+    min-height: 2.75rem;
+}
+
+.cabinet-manage-access-page .cabinet-ma-role-list:empty::after {
+    content: attr(data-empty-label);
+    display: block;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color);
+    font-style: italic;
+}
+
+.cabinet-manage-access-page .cabinet-ma-role-list > li,
+.cabinet-manage-access-page .cabinet-ma-permission-pool > li {
+    border-radius: var(--bs-border-radius-sm);
+    padding: 0.4rem 0.5rem;
+    background: var(--bs-secondary-bg);
+    margin-bottom: 0.35rem;
+    border-left: 2px solid var(--bs-border-color);
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.875rem;
+}
+
+.cabinet-manage-access-page .cabinet-ma-role-list > li.cabinet-ma-assigned {
+    border-left-color: var(--bs-success);
+    padding-left: 0.65rem;
+}
+
+.cabinet-manage-access-page .cabinet-ma-role-list > li .cabinet-ma-item-label {
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+}
+
+.cabinet-manage-access-page .cabinet-ma-role-list > li .tools,
+.cabinet-manage-access-page .cabinet-ma-permission-pool > li .tools {
+    display: none;
+    margin-left: auto;
+    flex-shrink: 0;
+    gap: 0.25rem;
+}
+
+.cabinet-manage-access-page .cabinet-ma-role-list > li:hover .tools,
+.cabinet-manage-access-page .cabinet-ma-permission-pool > li:hover .tools {
+    display: inline-flex;
+    align-items: center;
+}
+
+.cabinet-manage-access-page .cabinet-ma-role-list > li .tools button,
+.cabinet-manage-access-page .cabinet-ma-permission-pool > li .tools button {
+    border: 0;
+    background: transparent;
+    padding: 0.1rem 0.25rem;
+    color: var(--bs-secondary-color);
+    line-height: 1;
+}
+
+.cabinet-manage-access-page .cabinet-ma-role-list > li .tools button:hover {
+    color: var(--bs-danger);
+}
+
+.cabinet-manage-access-page .cabinet-ma-permission-pool > li .handle {
+    cursor: grab;
+    color: var(--bs-secondary-color);
+    flex-shrink: 0;
+}
+
+.cabinet-manage-access-page .cabinet-ma-permission-pool > li .handle:active {
+    cursor: grabbing;
+}
+
+.cabinet-manage-access-page .cabinet-ma-group + .cabinet-ma-group {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--bs-border-color);
+}
+
+.cabinet-manage-access-page .cabinet-ma-group-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+
+.cabinet-manage-access-page .sort-highlight {
+    border: 2px dashed var(--bs-primary);
+    background: rgba(var(--bs-primary-rgb), 0.08);
+    min-height: 2rem;
+}
+
+.cabinet-manage-access-page .callout {
+    padding: 0.85rem 1rem;
+    border-left: 4px solid var(--bs-border-color);
+    background: var(--bs-tertiary-bg);
+    border-radius: var(--bs-border-radius);
+    margin-bottom: 0;
+}
+
+.cabinet-manage-access-page .callout-info {
+    border-left-color: var(--bs-info);
+}
+
+.cabinet-manage-access-page .callout-warning {
+    border-left-color: var(--bs-warning);
+}
+
+.cabinet-manage-access-page .callout-success {
+    border-left-color: var(--bs-success);
+}
+
+.cabinet-manage-access-page .cabinet-ma-guide .callout h5 {
+    font-size: 0.95rem;
+}
+
+.cabinet-manage-access-page .cabinet-ma-perm-hint {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+    margin-top: 0.15rem;
+}
+
+.cabinet-manage-access-page .cabinet-ma-users-side {
+    position: sticky;
+    top: 0.75rem;
+}
+
+.cabinet-manage-access-page .cabinet-ma-user-stat {
+    transition: background-color 0.15s ease;
+}
+
+.cabinet-manage-access-page .cabinet-ma-user-stat:hover {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.cabinet-manage-access-page .cabinet-ma-user-stat__icon {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: var(--bs-border-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 1.25rem;
+    color: #fff;
+}
+
+.cabinet-manage-access-page .tabular-nums {
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 991.98px) {
+    .cabinet-manage-access-page .cabinet-ma-users-side {
+        position: static;
+    }
+}

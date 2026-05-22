@@ -18,11 +18,8 @@
                 </p>
             </div>
             <div class="d-flex flex-wrap gap-2">
-                <a href="{{ route('statistics.modules') }}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener">
-                    <i class="bi bi-grid me-1"></i>{{ __('General statistics modules') }}
-                </a>
-                <a href="{{ route('users.statistics') }}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener">
-                    <i class="bi bi-graph-up me-1"></i>{{ __('General statistics users') }}
+                <a href="#cabinet-mp-visit-stats" class="btn btn-sm btn-outline-info">
+                    <i class="bi bi-bar-chart-line me-1"></i>{{ __('Visit statistics') }}
                 </a>
                 <a href="{{ route('main-projects.create') }}" class="btn btn-sm btn-primary">
                     <i class="bi bi-plus-lg me-1"></i>{{ __('Create new') }}
@@ -60,7 +57,13 @@
             </div>
         </div>
 
-        <div class="card shadow-sm">
+        @include('main-projects.partials.visit-statistics-summary', [
+            'moduleStats' => $moduleStats,
+            'visitTotals' => $visitTotals,
+            'showUserStatistics' => !empty($showUserStatistics),
+        ])
+
+        <div class="card shadow-sm mt-3">
             <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
                 <h3 class="card-title h6 mb-0">{{ __('Module list') }}</h3>
                 <div class="input-group input-group-sm" style="max-width: 16rem;">

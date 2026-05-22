@@ -1,123 +1,223 @@
-@component('component.card', ['title' => __('Tariffs settings')])
+@extends('layouts.app')
 
-    @slot('css')
-        <!-- Toastr -->
-        <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
-    @endslot
+@section('title', __('Tariffs settings'))
 
-    <table class="table table-bordered" align="center">
-        <thead>
-        <tr>
-            <th>ID</th>
-            <th data-bs-toggle="tooltip" data-bs-placement="top" title="Необязательное название свойства.">
-                Name
-                <i class="fas fa-question-circle"></i>
-            </th>
-            <th data-bs-toggle="tooltip" data-bs-placement="top" title="Свойство которое мы будем использовать в коде.">
-                Code
-                <i class="fas fa-question-circle"></i>
-            </th>
-            <th data-bs-toggle="tooltip" data-bs-placement="top" title="Необязательное описание свойства.">
-                Description
-                <i class="fas fa-question-circle"></i>
-            </th>
-            <th data-bs-toggle="tooltip" data-bs-placement="top" title="Необязательное сообщение для пользователя. - {TARIFF} = Название тарифа. - {VALUE} = Значение переменной.">
-                Message
-                <i class="fas fa-question-circle"></i>
-            </th>
-            <th style="width: 1%"></th>
-        </tr>
-        </thead>
-        <tbody>
-        @foreach($settings as $setting)
-            <tr id="{{$setting->code}}">
-                <td>{{$setting->id}}</td>
-                <td>{{$setting->name}}</td>
-                <td class="copy">
-                    <code>{{$setting->code}}</code>
-                    <i class="far fa-copy text-muted"></i>
-                </td>
+@section('css')
+    <link rel="stylesheet" href="{{ asset('css/cabinet-tariff-settings.css') }}">
+@endsection
 
-                <td>{{$setting->description}}</td>
-                <td>{{$setting->message}}</td>
+@section('content')
+    <div class="cabinet-tariff-settings-page">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+            <div>
+                <h2 class="h4 mb-2">
+                    <i class="bi bi-sliders me-2 text-primary" aria-hidden="true"></i>{{ __('Tariffs settings') }}
+                </h2>
+                <p class="text-secondary small mb-0" style="max-width: 42rem;">
+                    {{ __('Limits and messages per tariff plan. The code is used in PHP; values apply to Free, paid plans, etc.') }}
+                </p>
+            </div>
+            <a href="{{ route('tariff-settings.create') }}" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>{{ __('Add limit') }}
+            </a>
+        </div>
 
-                <td>
-                    <table width="100%" style="width: 365px">
-                        <tr>
-                            <th data-bs-toggle="tooltip" data-bs-placement="top" title="Тариф для которого нужно значение">
-                                Tariff
-                                <i class="fas fa-question-circle"></i>
-                            </th>
-                            <th data-bs-toggle="tooltip" data-bs-placement="top" title="Значение тарифа">
-                                Value
-                                <i class="fas fa-question-circle"></i>
-                            </th>
-                            <th data-bs-toggle="tooltip" data-bs-placement="top" title="Удаление значения для тарифа">
-                                Delete
-                                <i class="fas fa-question-circle"></i>
-                            </th>
-                        </tr>
-                        @foreach($setting->fields->sortBy('sort') as $field)
+        <div class="row g-3 mb-3 cabinet-ts-stat">
+            <div class="col-12 col-md-6 d-flex">
+                <div class="info-box mb-0 flex-fill">
+                    <span class="info-box-icon text-bg-primary shadow-sm"><i class="bi bi-list-check"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">{{ __('Limit properties') }}</span>
+                        <span class="info-box-number">{{ $stats['settings'] }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-6 d-flex">
+                <div class="info-box mb-0 flex-fill">
+                    <span class="info-box-icon text-bg-success shadow-sm"><i class="bi bi-currency-exchange"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">{{ __('Values per tariff') }}</span>
+                        <span class="info-box-number">{{ $stats['values'] }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-3">
+            <div class="card-body py-2">
+                <div class="input-group input-group-sm" style="max-width: 20rem;">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="search"
+                           class="form-control"
+                           id="cabinet-ts-search"
+                           placeholder="{{ __('Search by name or code') }}…"
+                           autocomplete="off">
+                </div>
+            </div>
+        </div>
+
+        @forelse($settings as $setting)
+            <div class="card shadow-sm mb-3 cabinet-ts-setting-card"
+                 id="{{ $setting->code }}"
+                 data-ts-search="{{ strtolower($setting->name . ' ' . $setting->code) }}">
+                <div class="card-header d-flex flex-wrap align-items-start justify-content-between gap-2">
+                    <div class="min-w-0">
+                        <h3 class="h6 mb-1">
+                            {{ $setting->name ?: __('(no title)') }}
+                            <span class="badge text-bg-secondary ms-1">#{{ $setting->id }}</span>
+                        </h3>
+                        <div class="cabinet-ts-code d-inline-flex align-items-center gap-1 small"
+                             role="button"
+                             tabindex="0"
+                             data-copy-code="{{ $setting->code }}"
+                             title="{{ __('Copy code') }}">
+                            <code>{{ $setting->code }}</code>
+                            <i class="bi bi-clipboard text-secondary"></i>
+                        </div>
+                    </div>
+                    <div class="btn-group btn-group-sm flex-shrink-0">
+                        <a href="{{ route('tariff-setting-values.create', $setting->id) }}"
+                           class="btn btn-outline-primary"
+                           title="{{ __('Add tariff value') }}">
+                            <i class="bi bi-plus-lg"></i>
+                        </a>
+                        <a href="{{ route('tariff-settings.edit', $setting->id) }}"
+                           class="btn btn-outline-secondary"
+                           title="{{ __('Edit') }}">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="POST"
+                              action="{{ route('tariff-settings.destroy', $setting->id) }}"
+                              class="d-inline"
+                              onsubmit="return confirm(@json(__('Delete this limit property and all tariff values?')))">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="btn btn-outline-danger" title="{{ __('Delete') }}">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                @if($setting->description || $setting->message)
+                    <div class="card-body border-bottom py-2 small text-secondary">
+                        @if($setting->description)
+                            <div class="mb-1"><strong>{{ __('Description') }}:</strong> {{ $setting->description }}</div>
+                        @endif
+                        @if($setting->message)
+                            <div class="cabinet-ts-message">
+                                <strong>{{ __('User message') }}:</strong>
+                                <span class="font-monospace">{{ $setting->message }}</span>
+                                <span class="text-muted d-block mt-1">{{ __('Placeholders') }}: <code>{TARIFF}</code>, <code>{VALUE}</code></span>
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead class="table-light">
                             <tr>
-                                <td>{{$field->tariff}}</td>
-                                <td>{{$field->value}}</td>
-                                <td>
-                                    {!! Form::open(['class' => 'd-inline', 'method' => 'DELETE', 'route' => ['tariff-setting-values.destroy', $field->id]]) !!}
-                                    {!! Form::button( '<i class="fas fa-trash"></i>', ['type' => 'submit', 'class' => 'btn btn-danger btn-sm']) !!}
-                                    {!! Form::close() !!}
-                                </td>
+                                <th scope="col">{{ __('Tariff') }}</th>
+                                <th scope="col" class="text-end">{{ __('Value') }}</th>
+                                <th scope="col" class="text-center">{{ __('Sort') }}</th>
+                                <th scope="col" class="text-end">{{ __('Actions') }}</th>
                             </tr>
-                        @endforeach
-                        <tr>
-                            <td colspan="3">
-                                <a class="btn btn-info btn-sm" href="{{ route('tariff-setting-values.create', $setting->id) }}">
-                                    <i class="fas fa-plus"></i>
-                                    Добавить значение
-                                </a>
+                            </thead>
+                            <tbody>
+                            @forelse($setting->fields as $field)
+                                <tr>
+                                    <td>
+                                        <span class="fw-semibold">{{ $tariffLabels[$field->tariff] ?? $field->tariff }}</span>
+                                        @if(isset($tariffLabels[$field->tariff]))
+                                            <code class="small text-secondary ms-1">{{ $field->tariff }}</code>
+                                        @endif
+                                    </td>
+                                    <td class="text-end font-monospace">{{ number_format($field->value, 0, ',', ' ') }}</td>
+                                    <td class="text-center text-secondary">{{ $field->sort }}</td>
+                                    <td class="text-end">
+                                        <form method="POST"
+                                              action="{{ route('tariff-setting-values.destroy', $field->id) }}"
+                                              class="d-inline"
+                                              onsubmit="return confirm(@json(__('Delete this value?')))">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="text-center text-secondary py-4">
+                                        {{ __('No values for tariffs yet.') }}
+                                        <a href="{{ route('tariff-setting-values.create', $setting->id) }}">{{ __('Add the first one') }}</a>
+                                    </td>
+                                </tr>
+                            @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        @empty
+            <div class="card shadow-sm">
+                <div class="card-body text-center text-secondary py-5">
+                    {{ __('No limit properties yet.') }}
+                    <a href="{{ route('tariff-settings.create') }}">{{ __('Add limit') }}</a>
+                </div>
+            </div>
+        @endforelse
+    </div>
+@endsection
 
-                                <a class="btn btn-info btn-sm" href="{{ route('tariff-settings.edit', $setting->id) }}">
-                                    <i class="fas fa-pencil-alt"></i>
-                                    {{ __('Edit') }}
-                                </a>
+@section('js')
+    <script>
+        (function () {
+            var search = document.getElementById('cabinet-ts-search');
+            if (search) {
+                search.addEventListener('input', function () {
+                    var q = search.value.trim().toLowerCase();
+                    document.querySelectorAll('.cabinet-ts-setting-card[data-ts-search]').forEach(function (card) {
+                        var hay = card.getAttribute('data-ts-search') || '';
+                        card.style.display = q === '' || hay.indexOf(q) !== -1 ? '' : 'none';
+                    });
+                });
+            }
 
-                                {!! Form::open(['class' => 'd-inline', 'method' => 'DELETE', 'route' => ['tariff-settings.destroy', $setting->id]]) !!}
-                                {!! Form::button( '<i class="fas fa-trash"></i> ' . __('Delete'), ['type' => 'submit', 'class' => 'btn btn-danger btn-sm']) !!}
-                                {!! Form::close() !!}
-                            </td>
-                        </tr>
-                    </table>
-                </td>
-            </tr>
-        @endforeach
-        </tbody>
-    </table>
-
-    @slot('footer')
-        <a href="{{ route('tariff-settings.create') }}" class="btn btn-primary"><i class="fas fa-plus"></i> {{__('Add')}}</a>
-    @endslot
-
-    @slot('js')
-        <!-- Toastr -->
-        <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
-
-        <script>
-
-            toastr.options = {
-                "timeOut": "1000"
-            };
-
-            $('.copy').click(function(){
-                let str = $(this);
-                let strFormat = str.find('code').text();
-                copy(strFormat);
-                toastr.success('Copied successfully!');
+            document.querySelectorAll('[data-copy-code]').forEach(function (el) {
+                var copy = function () {
+                    var code = el.getAttribute('data-copy-code') || '';
+                    if (!code) return;
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(code);
+                    } else {
+                        var ta = document.createElement('textarea');
+                        ta.value = code;
+                        document.body.appendChild(ta);
+                        ta.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(ta);
+                    }
+                };
+                el.addEventListener('click', copy);
+                el.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        copy();
+                    }
+                });
             });
 
-            $('[data-bs-toggle="tooltip"]').tooltip();
-
-        </script>
-    @endslot
-
-
-@endcomponent
-
+            if (window.location.hash) {
+                var target = document.querySelector(window.location.hash);
+                if (target) {
+                    target.classList.add('border-primary');
+                    target.scrollIntoView({behavior: 'smooth', block: 'start'});
+                }
+            }
+        })();
+    </script>
+@endsection

@@ -1,175 +1,147 @@
-@component('component.card', ['title' => __('Manage access')])
+@extends('layouts.app')
 
-    @slot('css')
-        <!-- Toastr -->
-        <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
-    @endslot
+@section('title', __('Roles and permissions'))
 
-    <div class="row">
-        <div class="col-md-6">
-            @include('manage-access.partials._cards', ['id' => 'role', 'title' => 'Роли пользователей', 'items' => $roles])
-            <!-- /.card -->
+@section('css')
+    <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/cabinet-manage-access.css') }}">
+@endsection
+
+@section('content')
+    @php
+        $rolesCount = $roles->count();
+        $permissionsCount = $permissions->count();
+    @endphp
+
+    <div class="cabinet-manage-access-page">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+            <div>
+                <h2 class="h4 mb-2">
+                    <i class="bi bi-shield-lock me-2 text-primary" aria-hidden="true"></i>{{ __('Roles and permissions') }}
+                </h2>
+                <p class="text-secondary small mb-0">{{ __('Assign cabinet permissions to roles. Users get access through their role.') }}</p>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ route('users.index') }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-people me-1"></i>{{ __('Users') }}
+                </a>
+                <a href="{{ route('main-projects.index') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-grid me-1"></i>{{ __('Menu modules') }}
+                </a>
+            </div>
         </div>
 
-        <div class="col-md-6">
-        @include('manage-access.partials._cards', ['id' => 'permission', 'title' => 'Разрешения', 'items' => $permissions])
-        <!-- /.card -->
+        <div class="row g-2 g-md-3 mb-3">
+            <div class="col-6 col-md-4">
+                <div class="info-box mb-0">
+                    <span class="info-box-icon text-bg-primary shadow-sm"><i class="bi bi-person-badge"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">{{ __('Roles') }}</span>
+                        <span class="info-box-number">{{ $rolesCount }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4">
+                <div class="info-box mb-0">
+                    <span class="info-box-icon text-bg-info shadow-sm"><i class="bi bi-key"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">{{ __('Permissions') }}</span>
+                        <span class="info-box-number">{{ $permissionsCount }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="info-box mb-0">
+                    <span class="info-box-icon text-bg-secondary shadow-sm"><i class="bi bi-code-slash"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">{{ __('In code') }}</span>
+                        <span class="info-box-number small">@@can / middleware</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @include('manage-access.partials.guide')
+
+        <div class="row g-3 align-items-start">
+            <div class="col-lg-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <h3 class="card-title h6 mb-0">
+                            <i class="bi bi-person-badge me-1"></i>{{ __('Roles') }}
+                        </h3>
+                        <button type="button" class="btn btn-sm btn-primary add-item" data-type="role">
+                            <i class="bi bi-plus-lg me-1"></i>{{ __('Add role') }}
+                        </button>
+                    </div>
+                    <div class="card-body cabinet-ma-roles-wrap">
+                        @include('manage-access.partials.roles-panel')
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="card shadow-sm h-100" id="permission">
+                    <div class="card-header py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <h3 class="card-title h6 mb-0">
+                            <i class="bi bi-key me-1"></i>{{ __('Permissions') }}
+                        </h3>
+                        <button type="button" class="btn btn-sm btn-primary add-item" data-type="permission">
+                            <i class="bi bi-plus-lg me-1"></i>{{ __('Add permission') }}
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-secondary small mb-3">
+                            <i class="bi bi-grip-vertical me-1"></i>{{ __('Drag onto a role on the left. Grouped by area of the cabinet.') }}
+                        </p>
+                        @include('manage-access.partials.permissions-panel')
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3">
+                @include('manage-access.partials.users-sidebar', ['userStats' => $userStats])
+            </div>
+        </div>
+
+        <div class="card shadow-sm mt-3">
+            <div class="card-header py-2">
+                <button class="btn btn-link text-decoration-none p-0 fw-semibold text-body collapsed"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#cabinet-ma-can-examples"
+                        aria-expanded="false">
+                    <i class="bi bi-code-square me-1"></i>{{ __('Usage in templates (can directive)') }}
+                </button>
+            </div>
+            <div id="cabinet-ma-can-examples" class="collapse">
+                <div class="card-body small">
+                    @verbatim
+                    <pre class="mb-3 bg-body-secondary p-2 rounded"><code>@can('Users')
+    …
+@endcan</code></pre>
+                    @endverbatim
+                    <p class="text-secondary mb-2">{{ __('Example checks (only if permission exists):') }}</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        @can('Users')
+                            <span class="badge text-bg-success">Users ✓</span>
+                        @else
+                            <span class="badge text-bg-light text-body border">Users —</span>
+                        @endcan
+                        @can('Main projects')
+                            <span class="badge text-bg-success">Main projects ✓</span>
+                        @else
+                            <span class="badge text-bg-light text-body border">Main projects —</span>
+                        @endcan
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+@endsection
 
-    <div class="row">
-        @include('manage-access.partials._content')
-    </div>
-
-    @slot('js')
-
-        <!-- jQuery UI 1.11.4 -->
-        <script src="{{ asset('plugins/jquery-ui/jquery-ui.min.js') }}"></script>
-        <!-- Toastr -->
-        <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
-
-        <script>
-
-            toastr.options = {
-                "timeOut": "1000"
-            };
-
-            $('.copy-item').click(function(){
-                let str = $(this);
-                let strFormat = str.data('copy').toLowerCase().replace(/\s/g, '-');
-
-                copy(strFormat);
-
-                toastr.success('Copied successfully!');
-            });
-
-            $('.add-item').click(function(){
-                let type = $(this).closest('.card').attr('id');
-                if(type){
-                    let name = prompt('Введите название: ' + type);
-                    if(!name)
-                        return false;
-
-                    let letters = /^[a-zA-Z\s]+$/;
-                    if (name.match(letters)){
-
-                        axios.post('/manage-access', {
-                            type: type,
-                            name: name
-                        }).then(function (response) {
-                            window.location.reload();
-                        }).catch(function (error) {
-                                alert(error.response.data.message);
-                        });
-                    }else
-                        alert('Только латинские символы!');
-                }
-            });
-
-            $('.update-item').click(function(){
-                let self = $(this);
-
-                let type = self.closest('.card').attr('id');
-                let id = self.closest('li').data('id');
-
-                let name = prompt('Введите название: ' + type, self.closest('li').find('.text').text());
-                if(!name)
-                    return false;
-
-                let letters = /^[a-zA-Z\s]+$/;
-                if(type && id && name.match(letters)){
-
-                    axios.patch('manage-access/' + id, {
-                        type: type,
-                        name: name,
-                    }).then(function (response) {
-                        if(response.status === 200){
-                            window.location.reload();
-                        }
-                    }).catch(function (error) {
-                        alert(error.response.data.message);
-                    });
-                }else
-                    alert('Только латинские символы!');
-            });
-
-            $('.delete-item').click(function(){
-                let verify = confirm('You sure?');
-                let type = $(this).closest('.card').attr('id');
-
-                if(type && verify){
-                    let id = $(this).closest('li').data('id');
-                    axios.get(`manage-access/destroy/${id}/where/${type}`).then(function (response) {
-                        if(response.status === 200){
-                            window.location.reload();
-                        }
-                    });
-                }
-            });
-
-            $('#role').on('click', '.revoke-permission', function(e){
-                e.preventDefault();
-
-                let self = $(this).closest('li');
-
-                let role = self.prevAll('.root').first().find('.text').text();
-                let permission = self.find('.text').text();
-
-                console.log(role, permission);
-
-                axios.post('/manage-access/assignPermission', {
-                    action: 'revoke',
-                    role: role,
-                    permission: permission
-                }).then(function (response) {
-                    console.log(response);
-                    if(response.status === 200){
-                        self.remove();
-                    }
-                }).catch(function (error) {
-                    alert(error.response.data.message);
-                });
-
-            });
-
-            // jQuery UI sortable for the todo list
-            $('.todo-list').sortable({
-                placeholder: 'sort-highlight',
-                handle: '.handle',
-                forcePlaceholderSize: true,
-                zIndex: 999999,
-                connectWith: '#role .todo-list',
-                remove: function(event, ui) {
-                    let item = ui.item.clone();
-                    $(this).append(item);
-                },
-
-                receive: function( event, ui ) {
-                    ui.item.addClass('sub').css({"padding-left": '20px', "background-color": 'rgb(248 249 250 / 10%)'});
-                    ui.item.find('.tools').html($('<i />').addClass(['fas', 'fa-trash', 'revoke-permission']));
-                    ui.item.find('.handle').removeClass('handle').html($('<i />').addClass(['fas', 'fa-ellipsis-h']));
-
-                    let root = ui.item.prevAll('.root').first();
-                    let role = root.find('.text').text();
-                    let permission = ui.item.find('.text').text();
-
-                    console.log(role, permission);
-
-                    axios.post('/manage-access/assignPermission', {
-                        action: 'assign',
-                        role: role,
-                        permission: permission
-                    }).then(function (response) {
-                        console.log(response);
-                    }).catch(function (error) {
-                        alert(error.response.data.message);
-                    });
-
-                }
-
-            });
-        </script>
-
-    @endslot
-
-@endcomponent
+@section('js')
+    <script src="{{ asset('plugins/jquery-ui/jquery-ui.min.js') }}"></script>
+    <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
+    @include('manage-access.partials.scripts')
+@endsection

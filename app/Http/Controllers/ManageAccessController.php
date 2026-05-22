@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\ManageAccessCatalog;
+use App\Support\ManageAccessUserStats;
 use Illuminate\Http\Request;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class ManageAccessController extends Controller
 {
@@ -23,7 +25,14 @@ class ManageAccessController extends Controller
         $roles = Role::with('permissions')->orderBy('name')->get();
         $permissions = Permission::orderBy('name')->get();
 
-        return view('manage-access.index', compact('roles', 'permissions'));
+        return view('manage-access.index', [
+            'roles' => $roles,
+            'permissions' => $permissions,
+            'permissionGroups' => ManageAccessCatalog::groupPermissions($permissions),
+            'permissionHints' => ManageAccessCatalog::permissionHints(),
+            'protectedRoles' => ManageAccessCatalog::PROTECTED_ROLES,
+            'userStats' => ManageAccessUserStats::snapshot(),
+        ]);
     }
 
     /**

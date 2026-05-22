@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Classes\Tariffs\Facades\Tariffs;
+use App\Classes\Tariffs\FreeTariff;
 use App\Classes\Tariffs\Period\OneDayTariff;
 use App\Classes\Tariffs\Period\PeriodTariff;
 use App\Classes\Tariffs\Tariff;
@@ -10,6 +11,9 @@ use App\Common;
 use App\Exports\FilteredUsersExport;
 use App\Exports\VerifiedUsersExport;
 use App\MainProject;
+use App\Support\UsersActivityDashboard;
+use App\Support\UserVisitStatisticsReport;
+use App\Support\UsersVisitStatisticsReport;
 use App\User;
 use App\VisitStatistic;
 use Carbon\Carbon;
@@ -23,6 +27,7 @@ use Illuminate\Http\Response;
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -50,12 +55,21 @@ class UsersController extends Controller
      */
     public function index(Request $request)
     {
-        if ($request->ajax())
+        if ($request->ajax() || $request->has('draw')) {
             return $this->getDataTable($request);
+        }
 
         $tariffSelect = $this->tariffSelectData();
+        $skipHeavy = filter_var(env('SKIP_HEAVY_WEB_MIDDLEWARE', false), FILTER_VALIDATE_BOOLEAN);
 
-        return view('users.index', compact('tariffSelect'));
+        return view('users.index', [
+            'tariffSelect' => $tariffSelect,
+            'roles' => Role::orderBy('name')->pluck('name', 'name'),
+            'activity' => $skipHeavy
+                ? UsersActivityDashboard::emptySnapshot()
+                : UsersActivityDashboard::snapshot(),
+            'stats' => $this->usersIndexStats(),
+        ]);
     }
 
     /**
@@ -85,70 +99,284 @@ class UsersController extends Controller
 
     protected function getDataTable(Request $request)
     {
-        $collection = collect([]);
+        $start = max(0, (int) $request->get('start', 0));
+        $length = (int) $request->get('length', 50);
+        $length = $length > 0 ? min($length, 100) : 50;
 
-        $start = $request->get('start');
-        $length = $request->get('length');
-        $page = ($length) ? ($start / $length) + 1 : false;
+        $query = User::query()
+            ->select([
+                'users.id',
+                'users.name',
+                'users.last_name',
+                'users.email',
+                'users.email_verified_at',
+                'users.read_letter',
+                'users.created_at',
+                'users.last_online_at',
+                'users.metrics',
+            ])
+            ->without(['pay', 'roles']);
 
-        $query = User::query()->without(['pay', 'roles']);
+        $this->applyUserListFilters($query, $request);
 
-        $search = $request->get('search');
-        if ($search = trim((string) ($search['value'] ?? ''))) {
-            $query->where(function ($builder) use ($search) {
-                $builder->where('email', 'like', '%' . $search . '%')
-                    ->orWhere('name', 'like', '%' . $search . '%')
-                    ->orWhere('last_name', 'like', '%' . $search . '%');
-            });
+        $searchRaw = $request->input('filter_q');
+        if ($searchRaw === null) {
+            $searchBox = $request->get('search');
+            $searchRaw = is_array($searchBox) ? ($searchBox['value'] ?? '') : '';
         }
+        $this->applyUserSmartSearch($query, trim((string) $searchRaw));
+
+        $recordsTotal = $this->usersRecordsTotal();
+        $recordsFiltered = $this->userListHasActiveFilters($request)
+            ? (clone $query)->count()
+            : $recordsTotal;
 
         if ($order = Arr::first($request->get('order'))) {
             $columns = $request->get('columns');
-            $query->orderBy($columns[$order['column']]['name'], $order['dir']);
+            $columnName = $columns[$order['column']]['name'] ?? null;
+            if ($columnName && in_array($columnName, ['id', 'name', 'email', 'created_at', 'last_online_at'], true)) {
+                $query->orderBy($columnName, $order['dir']);
+            } else {
+                $query->orderByDesc('id');
+            }
+        } else {
+            $query->orderByDesc('id');
         }
 
         $users = $query->with([
-            'pay' => function ($payQuery) {
-                $payQuery->where('status', true);
+            'pay' => static function ($payQuery) {
+                $payQuery->where('status', true)
+                    ->select(['id', 'user_id', 'status', 'class_tariff', 'active_to']);
             },
-            'roles',
-        ])->paginate($length, ['*'], 'page', $page);
+            'roles:id,name',
+        ])->skip($start)->take($length)->get();
 
-        $users->transform(function ($user) {
+        $data = $users->map(function (User $user) {
+            return $this->formatUserDataTableRow($user);
+        })->values()->all();
 
-            // Tariff
-            $user->tariff = collect([]);
-            if ($pay = $user->pay->first()) {
-                $user->tariff->put('name', $user->tariff()->name());
-                $user->tariff->put('active_to', $pay->active_to->format('d.m.Y H:i'));
-                $user->tariff->put('active_to_diffForHumans', $pay->active_to->diffForHumans());
+        return response()->json([
+            'draw' => (int) $request->input('draw', 0),
+            'recordsTotal' => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'data' => $data,
+        ]);
+    }
+
+    /**
+     * Компактная строка для DataTables (без лишних полей User и без tariff() на каждую запись).
+     *
+     * @return array<string, mixed>
+     */
+    protected function formatUserDataTableRow(User $user): array
+    {
+        $tariff = [];
+        if ($pay = $user->pay->first()) {
+            $tariff = [
+                'name' => $this->resolveTariffNameForUser($user),
+                'active_to' => $pay->active_to ? $pay->active_to->format('d.m.Y H:i') : null,
+                'active_to_diffForHumans' => $pay->active_to ? $pay->active_to->diffForHumans() : null,
+            ];
+        }
+
+        $loa = $user->last_online_at;
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'last_name' => $user->last_name,
+            'email' => $user->email,
+            'email_verified_at' => $user->email_verified_at,
+            'read_letter' => $user->read_letter,
+            'tariff' => $tariff,
+            'created' => $user->created_at->format('d.m.Y H:i:s'),
+            'created_diffForHumans' => $user->created_at->diffForHumans(),
+            'roles' => $user->roles->map(static function ($role) {
+                return ['id' => $role->id, 'name' => $role->name];
+            })->values()->all(),
+            'last_online_strtotime' => $loa ? $loa->timestamp : 0,
+            'last_online' => $loa ? $loa->format('d.m.Y H:i') : null,
+            'last_online_diffForHumans' => $loa ? $loa->diffForHumans() : null,
+            'metrics' => $user->metrics,
+        ];
+    }
+
+    /**
+     * Имя тарифа по ролям (как getTariffByUser, без PermissionRegistrar и setUser).
+     */
+    protected function resolveTariffNameForUser(User $user): ?string
+    {
+        $roles = $user->relationLoaded('roles') ? $user->getRoleNames() : collect();
+
+        foreach ($this->tariff->getTariffs() as $tariff) {
+            if ($roles->contains($tariff->code())) {
+                return $tariff->name();
             }
+        }
 
-            //Created
-            $user->created = $user->created_at->format('d.m.Y H:i:s');
-            $user->created_diffForHumans = $user->created_at->diffForHumans();
+        if ($roles->contains('Free')) {
+            return (new FreeTariff())->name();
+        }
 
-            // Was online
-            $loa = $user->last_online_at;
-            if ($loa) {
-                $user->last_online_strtotime = $loa->timestamp;
-                $user->last_online = $loa->format('d.m.Y H:i');
-                $user->last_online_diffForHumans = $loa->diffForHumans();
-            } else {
-                $user->last_online_strtotime = 0;
-                $user->last_online = null;
-                $user->last_online_diffForHumans = null;
-            }
+        return null;
+    }
 
-            return $user;
+    /**
+     * KPI на /users (кэш 2 мин — не считать 4× COUNT на каждый reload).
+     *
+     * @return array<string, int>
+     */
+    protected function usersIndexStats(): array
+    {
+        return Cache::remember('cabinet.users.index.stats', now()->addMinutes(2), static function () {
+            return [
+                'total' => User::count(),
+                'verified' => User::whereNotNull('email_verified_at')->count(),
+                'telegram' => User::telegramConnected()->count(),
+                'with_tariff' => User::whereHas('pay', static function ($q) {
+                    $q->where('status', true);
+                })->count(),
+            ];
         });
+    }
 
-        $collection->put('draw', $request->input('draw'));
-        $collection->put('recordsTotal', $users->total());
-        $collection->put('recordsFiltered', $users->total());
-        $collection->put('data', collect($users->items()));
+    protected function usersRecordsTotal(): int
+    {
+        return (int) Cache::remember('cabinet.users.records_total', now()->addMinutes(5), static function () {
+            return User::count();
+        });
+    }
 
-        return $collection;
+    protected function userListHasActiveFilters(Request $request): bool
+    {
+        foreach (['filter_role', 'filter_verify', 'filter_tariff', 'filter_online', 'filter_statistic', 'filter_telegram', 'filter_id_from', 'filter_id_to'] as $key) {
+            if (trim((string) $request->input($key, '')) !== '') {
+                return true;
+            }
+        }
+
+        $searchRaw = $request->input('filter_q');
+        if ($searchRaw === null) {
+            $searchBox = $request->get('search');
+            $searchRaw = is_array($searchBox) ? ($searchBox['value'] ?? '') : '';
+        }
+
+        return trim((string) $searchRaw) !== '';
+    }
+
+    /**
+     * Поиск по имени, фамилии, полному имени, email и ID.
+     */
+    protected function applyUserSmartSearch($query, string $search): void
+    {
+        if ($search === '') {
+            return;
+        }
+
+        if (ctype_digit($search)) {
+            $id = (int) $search;
+            $query->where(function ($q) use ($id, $search) {
+                $q->where('id', $id)
+                    ->orWhere('email', 'like', $search . '%');
+            });
+
+            return;
+        }
+
+        if (strpos($search, '@') !== false) {
+            $query->where('email', 'like', '%' . $search . '%');
+
+            return;
+        }
+
+        $terms = preg_split('/\s+/u', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        foreach ($terms as $term) {
+            $like = '%' . $term . '%';
+            $query->where(function ($q) use ($like) {
+                $q->where('email', 'like', $like)
+                    ->orWhere('name', 'like', $like)
+                    ->orWhere('last_name', 'like', $like)
+                    ->orWhereRaw("CONCAT(COALESCE(name, ''), ' ', COALESCE(last_name, '')) LIKE ?", [$like])
+                    ->orWhereRaw("CONCAT(COALESCE(last_name, ''), ' ', COALESCE(name, '')) LIKE ?", [$like]);
+            });
+        }
+    }
+
+    protected function applyUserListFilters($query, Request $request): void
+    {
+        $role = trim((string) $request->input('filter_role', ''));
+        if ($role !== '') {
+            $query->whereHas('roles', static function ($q) use ($role) {
+                $q->where('name', $role);
+            });
+        }
+
+        $verify = trim((string) $request->input('filter_verify', ''));
+        if ($verify === 'verified') {
+            $query->whereNotNull('email_verified_at');
+        } elseif ($verify === 'unverified') {
+            $query->whereNull('email_verified_at');
+        }
+
+        $tariff = trim((string) $request->input('filter_tariff', ''));
+        if ($tariff === 'none') {
+            $query->whereDoesntHave('pay', static function ($q) {
+                $q->where('status', true);
+            });
+        } elseif ($tariff !== '') {
+            $tariffInstance = $this->tariff->getTariffByCode($tariff);
+            if ($tariffInstance) {
+                $class = get_class($tariffInstance);
+                $query->whereHas('pay', static function ($q) use ($class) {
+                    $q->where('status', true)->where('class_tariff', $class);
+                });
+            }
+        }
+
+        $online = trim((string) $request->input('filter_online', ''));
+        if ($online === 'never') {
+            $query->whereNull('last_online_at');
+        } elseif ($online === '7d') {
+            $query->where('last_online_at', '>=', Carbon::now()->subDays(7));
+        } elseif ($online === '30d') {
+            $query->where('last_online_at', '>=', Carbon::now()->subDays(30));
+        } elseif ($online === 'inactive30d') {
+            $query->where(function ($q) {
+                $q->whereNull('last_online_at')
+                    ->orWhere('last_online_at', '<', Carbon::now()->subDays(30));
+            });
+        }
+
+        $statistic = trim((string) $request->input('filter_statistic', ''));
+        if ($statistic === '1') {
+            $query->where('statistic', 1);
+        } elseif ($statistic === '0') {
+            $query->where(function ($q) {
+                $q->where('statistic', 0)->orWhereNull('statistic');
+            });
+        }
+
+        $idFrom = $request->input('filter_id_from');
+        if ($idFrom !== null && $idFrom !== '') {
+            $query->where('id', '>=', (int) $idFrom);
+        }
+
+        $idTo = $request->input('filter_id_to');
+        if ($idTo !== null && $idTo !== '') {
+            $query->where('id', '<=', (int) $idTo);
+        }
+
+        $telegram = trim((string) $request->input('filter_telegram', ''));
+        if ($telegram === '1') {
+            $query->telegramConnected();
+        } elseif ($telegram === '0') {
+            $query->where(static function ($q) {
+                $q->where('telegram_bot_active', false)
+                    ->orWhereNull('chat_id')
+                    ->orWhere('chat_id', '=', '');
+            });
+        }
     }
 
     public function storeTariff(Request $request)
@@ -249,7 +477,17 @@ class UsersController extends Controller
      */
     public function edit(User $user)
     {
-        $role = Role::all()->pluck('name', 'id')->map(function ($val) {
+        apply_global_team_permissions();
+
+        $user->load([
+            'roles',
+            'pay' => static function ($payQuery) {
+                $payQuery->where('status', true)
+                    ->select(['id', 'user_id', 'status', 'active_to']);
+            },
+        ]);
+
+        $roleOptions = Role::orderBy('name')->pluck('name', 'id')->map(static function ($val) {
             return __($val);
         });
 
@@ -258,13 +496,25 @@ class UsersController extends Controller
             return [$str => __($str)];
         });
 
-        $superAdmin = in_array(3, Auth::user()->role->toArray());
+        $superAdmin = in_array(3, Auth::user()->role->toArray(), true);
 
         if (!$superAdmin) {
-            unset($role[3]);
+            $roleOptions = $roleOptions->except([3]);
         }
 
-        return view('users.edit', compact('user', 'role', 'lang', 'superAdmin'));
+        $activePay = $user->pay->first();
+        $tariffName = $activePay ? $this->resolveTariffNameForUser($user) : null;
+
+        return view('users.edit', [
+            'user' => $user,
+            'roleOptions' => $roleOptions,
+            'lang' => $lang,
+            'superAdmin' => $superAdmin,
+            'canManageStatistic' => User::isUserAdmin(),
+            'activePay' => $activePay,
+            'tariffName' => $tariffName,
+            'telegramConnected' => $user->isTelegramConnected(),
+        ]);
     }
 
     /**
@@ -283,7 +533,11 @@ class UsersController extends Controller
             'password' => ['nullable', 'min:8']
         ]);
 
-        $user->update($request->all());
+        $fields = $request->only(['name', 'last_name', 'email', 'lang']);
+        if (User::isUserAdmin()) {
+            $fields['statistic'] = (int) $request->input('statistic', 0) === 1;
+        }
+        $user->update($fields);
         $user->syncRoles($request->input('role'));
 
         if ($request->input('password') !== null && in_array(3, Auth::user()->role->toArray())) {
@@ -299,7 +553,7 @@ class UsersController extends Controller
             flash()->overlay('Даные пользователя успешно обновлены', 'Уведомление')->success();
         }
 
-        return redirect('users');
+        return redirect()->route('users.index');
     }
 
     /**
@@ -353,20 +607,35 @@ class UsersController extends Controller
         }
     }
 
-    public function visitStatistics(User $user)
+    public function visitStatistics(User $user, Request $request)
     {
         if (Auth::id() !== $user->id && !User::isUserAdmin()) {
             return abort(403);
         }
 
-        $now = Carbon::now()->format('d-m-Y');
-        $counterActions = $this->getCounterActions(Carbon::now()->subDays(30)->format('d-m-Y'), $now, $user->id);
-        $summedCollection = $this->getActions('20-03-2023 - ' . $now, $user->id);
-        $info = VisitStatistic::getModulesInfo($summedCollection);
-//        $lastActions = $this->getLastActions(Carbon::now()->subDays(30)->format('d-m-Y'), $now, $user->id);
-//        dd($lastActions);
+        $from = Carbon::now()->subDays(29)->startOfDay();
+        $to = Carbon::now()->endOfDay();
 
-        return view('users.visit', compact('summedCollection', 'info', 'user', 'counterActions'));
+        if ($request->filled('from') && $request->filled('to')) {
+            $from = Carbon::parse($request->input('from'))->startOfDay();
+            $to = Carbon::parse($request->input('to'))->endOfDay();
+        }
+
+        if ($to->lessThan($from)) {
+            [$from, $to] = [$to->copy()->startOfDay(), $from->copy()->endOfDay()];
+        }
+
+        $hasAnyVisits = VisitStatistic::where('user_id', $user->id)->exists();
+        $report = UserVisitStatisticsReport::build($user, $from, $to);
+
+        return view('users.visit-statistics', [
+            'user' => $user,
+            'report' => $report,
+            'hasAnyVisits' => $hasAnyVisits,
+            'dateFrom' => $from->format('Y-m-d'),
+            'dateTo' => $to->format('Y-m-d'),
+            'dateRange' => UserVisitStatisticsReport::dateRangeString($from, $to),
+        ]);
     }
 
     private function getLastActions($start, $end, $userId)
@@ -382,16 +651,21 @@ class UsersController extends Controller
 
     public function userActionsHistory(Request $request): JsonResponse
     {
-        $collection = $this->getActions($request->dateRange, $request->userId);
-        $range = explode(' - ', $request->dateRange);
-        $lastActions = $this->getLastActions($range[0], $range[1], $request->userId);
+        $user = User::findOrFail((int) $request->input('userId'));
 
-        return response()->json([
-            'collection' => $collection,
-            'info' => VisitStatistic::getModulesInfo($collection, false),
-            'counterActions' => $this->getCounterActions($range[0], $range[1], $request->userId, false),
-            'lastActions' => $lastActions
-        ]);
+        if (Auth::id() !== $user->id && !User::isUserAdmin()) {
+            return abort(403);
+        }
+
+        $range = explode(' - ', (string) $request->input('dateRange', ''));
+        if (count($range) < 2) {
+            return response()->json(['error' => 'Invalid date range'], 422);
+        }
+
+        $from = Carbon::parse($range[0])->startOfDay();
+        $to = Carbon::parse($range[1])->endOfDay();
+
+        return response()->json(UserVisitStatisticsReport::build($user, $from, $to));
     }
 
     public function getDateRangeVisitStatistics(User $user): JsonResponse
@@ -488,47 +762,34 @@ class UsersController extends Controller
 
     }
 
-    public function userVisitStatistics()
+    public function userVisitStatistics(Request $request)
     {
         if (!User::isUserAdmin()) {
             return abort(403);
         }
-        $limit = min(max((int) request('limit', 500), 50), 2000);
 
-        $aggregated = VisitStatistic::query()
-            ->selectRaw('user_id, SUM(actions_counter) as actions_counter, SUM(refresh_page_counter) as refresh_page_counter, SUM(seconds) as seconds')
-            ->groupBy('user_id')
-            ->orderByRaw('SUM(seconds) DESC')
-            ->limit($limit)
-            ->get()
-            ->keyBy('user_id');
+        $limit = min(max((int) $request->input('limit', 500), 50), 2000);
 
-        $users = User::whereIn('id', $aggregated->keys())
-            ->with('roles:id,name')
-            ->get(['id', 'name', 'last_name', 'email', 'metrics']);
-
-        $results = [];
-
-        foreach ($users as $user) {
-            $stat = $aggregated->get($user->id);
-            $results[$user->id] = [
-                'stat' => [
-                    'actions_counter' => (int) $stat->actions_counter,
-                    'refresh_page_counter' => (int) $stat->refresh_page_counter,
-                    'seconds' => (int) $stat->seconds,
-                ],
-                'userInfo' => array_merge(
-                    $user->only(['id', 'name', 'last_name', 'email', 'metrics']),
-                    ['tariff' => self::getRoles($user->roles->toArray())]
-                ),
-            ];
+        $from = null;
+        $to = null;
+        if ($request->filled('from')) {
+            $from = Carbon::parse($request->input('from'))->startOfDay();
+        }
+        if ($request->filled('to')) {
+            $to = Carbon::parse($request->input('to'))->endOfDay();
+        }
+        if ($from && $to && $to->lessThan($from)) {
+            [$from, $to] = [$to->copy()->startOfDay(), $from->copy()->endOfDay()];
         }
 
-        uasort($results, static function (array $a, array $b) {
-            return $b['stat']['seconds'] <=> $a['stat']['seconds'];
-        });
+        $report = UsersVisitStatisticsReport::build($from, $to, $limit);
 
-        return view('users.statistics', compact('results', 'limit'));
+        return view('users.visits-statistics', [
+            'report' => $report,
+            'limit' => $limit,
+            'dateFrom' => $from ? $from->format('Y-m-d') : '',
+            'dateTo' => $to ? $to->format('Y-m-d') : '',
+        ]);
     }
 
     public static function getRoles(array $array): array

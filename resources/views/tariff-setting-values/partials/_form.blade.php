@@ -1,19 +1,18 @@
-
-<div class="form-group">
-    {!! Form::label('tariff', 'Тариф') !!}
-    {!! Form::select('tariff', $select, null, ['class' => 'form-control']) !!}
-    @error('tariff') <span class="error invalid-feedback">{{ $message }}</span> @enderror
-</div>
-
-<div class="form-group">
-    {!! Form::label('sort', 'Сортировка') !!}
-    {!! Form::number('sort', 1, ['class' => 'form-control', 'min' => 1]) !!}
-    @error('sort') <span class="error invalid-feedback">{{ $message }}</span> @enderror
-</div>
-
-<div class="form-group">
-    {!! Form::label('value', 'Основное значение') !!}
-    {!! Form::number('value', 0, ['class' => 'form-control', 'min' => 0]) !!}
-    @error('value') <span class="error invalid-feedback">{{ $message }}</span> @enderror
-    <span class="valid-feedback d-block">Обязательное поле.</span>
+<div class="row g-3">
+    <div class="col-12">
+        <label class="form-label" for="tariff">{{ __('Tariff') }} <span class="text-danger">*</span></label>
+        {!! Form::select('tariff', $select, null, ['class' => 'form-select', 'id' => 'tariff', 'required' => true]) !!}
+        @error('tariff') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+    </div>
+    <div class="col-md-4">
+        <label class="form-label" for="value">{{ __('Value') }} <span class="text-danger">*</span></label>
+        {!! Form::number('value', old('value', 0), ['class' => 'form-control', 'id' => 'value', 'min' => 0, 'required' => true]) !!}
+        @error('value') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+        <div class="form-text">{{ __('Numeric limit for this tariff') }}</div>
+    </div>
+    <div class="col-md-4">
+        <label class="form-label" for="sort">{{ __('Sort') }}</label>
+        {!! Form::number('sort', old('sort', 1), ['class' => 'form-control', 'id' => 'sort', 'min' => 1]) !!}
+        @error('sort') <div class="invalid-feedback d-block">{{ $message }}</div> @enderror
+    </div>
 </div>

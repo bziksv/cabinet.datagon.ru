@@ -6,6 +6,7 @@ use App\ClickTracking;
 use App\Common;
 use App\MainProject;
 use App\MenuItemsPosition;
+use App\Support\ModuleVisitStatisticsReport;
 use App\User;
 use App\VisitStatistic;
 use Illuminate\Http\JsonResponse;
@@ -38,6 +39,7 @@ class MainProjectsController extends Controller
     public function index()
     {
         $projects = MainProject::orderBy('position', 'asc')->get();
+        $moduleStats = $this->modulesWithVisitStats();
 
         return view('main-projects.index', [
             'projects' => $projects,
@@ -48,7 +50,54 @@ class MainProjectsController extends Controller
                     return !empty($p->controller);
                 })->count(),
             ],
+            'moduleStats' => $moduleStats['rows'],
+            'visitTotals' => $moduleStats['totals'],
+            'showUserStatistics' => User::isUserAdmin(),
         ]);
+    }
+
+    /**
+     * Сводка визитов по всем модулям (для /main-projects и /modules-statistics/).
+     *
+     * @return array{rows: array<int, array<string, mixed>>, totals: array<string, int>}
+     */
+    protected function modulesWithVisitStats(): array
+    {
+        $aggregated = VisitStatistic::query()
+            ->selectRaw('project_id, SUM(actions_counter) as actions_counter, SUM(refresh_page_counter) as refresh_page_counter, SUM(seconds) as seconds')
+            ->groupBy('project_id')
+            ->get()
+            ->keyBy('project_id');
+
+        $rows = [];
+        $totals = ['actions' => 0, 'refresh' => 0, 'seconds' => 0];
+
+        foreach (MainProject::query()->orderBy('position')->get(['id', 'title', 'link', 'color', 'icon', 'controller']) as $project) {
+            $stat = $aggregated->get($project->id);
+            $actions = $stat ? (int) $stat->actions_counter : 0;
+            $refresh = $stat ? (int) $stat->refresh_page_counter : 0;
+            $seconds = $stat ? (int) $stat->seconds : 0;
+
+            $totals['actions'] += $actions;
+            $totals['refresh'] += $refresh;
+            $totals['seconds'] += $seconds;
+
+            $rows[] = [
+                'id' => $project->id,
+                'title' => $project->title,
+                'link' => localize_cabinet_url($project->link),
+                'color' => $project->color,
+                'icon' => $project->icon,
+                'tracking' => !empty($project->controller),
+                'statistics' => [
+                    'actions_counter' => $actions,
+                    'refresh_page_counter' => $refresh,
+                    'seconds' => $seconds,
+                ],
+            ];
+        }
+
+        return ['rows' => $rows, 'totals' => $totals];
     }
 
     public function create()
@@ -133,9 +182,7 @@ class MainProjectsController extends Controller
 
     public function statistics(MainProject $project, Request $request)
     {
-        $usersIds = User::where('statistic', 1)->pluck('id')->toArray();
-
-        $from = Carbon::now()->subDays(30)->startOfDay();
+        $from = Carbon::now()->subDays(29)->startOfDay();
         $to = Carbon::now()->endOfDay();
 
         if ($request->filled('from') && $request->filled('to')) {
@@ -143,81 +190,29 @@ class MainProjectsController extends Controller
             $to = Carbon::parse($request->get('to'))->endOfDay();
         }
 
-        $dateFrom = $from->format('Y-m-d');
-        $dateTo = $to->format('Y-m-d');
+        if ($to->lessThan($from)) {
+            [$from, $to] = [$to->copy()->startOfDay(), $from->copy()->endOfDay()];
+        }
 
-        $statistics = VisitStatistic::where('project_id', $project->id)
-            ->whereIn('user_id', $usersIds)
-            ->whereBetween('date', [$dateFrom, $dateTo])
-            ->with(['user' => static function ($query) {
-                $query->select(['id', 'name', 'last_name', 'email']);
-            }])
-            ->orderBy('date', 'desc')
-            ->get(['date', 'user_id', 'actions_counter', 'refresh_page_counter', 'seconds'])
-            ->groupBy('date');
+        $report = ModuleVisitStatisticsReport::build($project, $from, $to);
 
-        $result = $statistics->map(function ($info, $date) {
-            $actionsCounter = $info->sum('actions_counter');
-            $refreshPageCounter = $info->sum('refresh_page_counter');
-            $time = $info->sum('seconds');
-
-            $users = $info->map(function ($elem) {
-                $user = $elem['user'];
-                $user['actionsCounter'] = $elem['actions_counter'];
-                $user['refreshPageCounter'] = $elem['refresh_page_counter'];
-                $user['time'] = Common::secondsToDate($elem['seconds']);
-
-                return $user;
-            });
-
-            return [
-                'actionsCounter' => $actionsCounter,
-                'refreshPageCounter' => $refreshPageCounter,
-                'time' => $time,
-                'users' => $users,
-            ];
-        });
-
-        $result = $result->map(function ($info) {
-            $info['time'] = Common::secondsToDate($info['time']);
-
-            return $info;
-        });
-
-        return view('main-projects.statistics', compact('result', 'project', 'dateFrom', 'dateTo'));
+        return view('main-projects.statistics', [
+            'project' => $project,
+            'report' => $report,
+            'dateFrom' => $from->format('Y-m-d'),
+            'dateTo' => $to->format('Y-m-d'),
+            'moduleLink' => localize_cabinet_url($project->link),
+            'buttonColumns' => json_decode($project->buttons, true) ?: [],
+        ]);
     }
 
     public function moduleVisitStatistics()
     {
-        $aggregated = VisitStatistic::query()
-            ->selectRaw('project_id, SUM(actions_counter) as actions_counter, SUM(refresh_page_counter) as refresh_page_counter, SUM(seconds) as seconds')
-            ->groupBy('project_id')
-            ->get()
-            ->keyBy('project_id');
-
-        $projects = MainProject::query()
-            ->orderBy('position')
-            ->get(['id', 'title', 'link', 'color'])
-            ->map(static function (MainProject $project) use ($aggregated) {
-                $stat = $aggregated->get($project->id);
-
-                return [
-                    'id' => $project->id,
-                    'title' => $project->title,
-                    'link' => $project->link,
-                    'color' => $project->color,
-                    'statistics' => [
-                        'actions_counter' => $stat ? (int) $stat->actions_counter : 0,
-                        'refresh_page_counter' => $stat ? (int) $stat->refresh_page_counter : 0,
-                        'seconds' => $stat ? (int) $stat->seconds : 0,
-                    ],
-                ];
-            })
-            ->values()
-            ->all();
+        $moduleStats = $this->modulesWithVisitStats();
 
         return view('main-projects.statistics-modules', [
-            'projects' => $projects,
+            'projects' => $moduleStats['rows'],
+            'visitTotals' => $moduleStats['totals'],
         ]);
     }
 

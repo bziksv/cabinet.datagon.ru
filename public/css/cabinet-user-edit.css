@@ -1,0 +1,36 @@
+/* Редактирование пользователя (админ) — профиль + forms/layout */
+
+.cabinet-user-edit-page .cabinet-user-edit-aside .cabinet-user-edit-avatar {
+    width: 96px;
+    height: 96px;
+    object-fit: cover;
+}
+
+.cabinet-user-edit-page .cabinet-user-edit-aside .list-group-item {
+    border-left: 0;
+    border-right: 0;
+}
+
+.cabinet-user-edit-page .cabinet-user-edit-form-card .card-header {
+    background: var(--bs-tertiary-bg);
+}
+
+.cabinet-user-edit-page .select2-container--bootstrap4 {
+    width: 100% !important;
+}
+
+.cabinet-user-edit-page .select2-container--bootstrap4 .select2-selection--multiple {
+    min-height: calc(1.5em + 0.75rem + 2px);
+}
+
+.cabinet-user-edit-page .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice {
+    margin-top: 4px;
+}
+
+.cabinet-user-edit-page .img-flag {
+    width: 20px;
+    height: 14px;
+    object-fit: cover;
+    margin-right: 6px;
+    vertical-align: middle;
+}

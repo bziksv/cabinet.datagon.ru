@@ -14,6 +14,8 @@ class TariffSettingValuesController extends Controller
 
     public function __construct()
     {
+        $this->middleware(['role:Super Admin|admin']);
+
         $tariff = (new Tariffs())->getTariffs();
         array_unshift($tariff, new FreeTariff());
         $this->tariffs = $tariff;
@@ -27,10 +29,13 @@ class TariffSettingValuesController extends Controller
     public function create()
     {
         $select = [];
-        foreach ($this->tariffs as $tariff)
+        foreach ($this->tariffs as $tariff) {
             $select[$tariff->code()] = $tariff->name();
+        }
 
-        return view('tariff-setting-values.create', compact('select'));
+        $setting = TariffSetting::findOrFail(request('id'));
+
+        return view('tariff-setting-values.create', compact('select', 'setting'));
     }
 
     /**
@@ -55,7 +60,7 @@ class TariffSettingValuesController extends Controller
         if($setting)
             $params .= $setting['code'];
 
-        return redirect('tariff-settings' . $params);
+        return redirect()->to(url('tariff-settings') . $params);
     }
 
     /**

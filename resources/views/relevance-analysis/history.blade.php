@@ -66,15 +66,15 @@
                 <div class="modal-header">
                     <ul class="nav nav-pills">
                         <li class="nav-item">
-                            <a class="nav-link active" href="#add-to-project" data-toggle="tab">
+                            <a class="nav-link active" href="#add-to-project" data-bs-toggle="tab">
                                 {{ __('Add a label to a project') }}
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="#managing" data-toggle="tab">{{ __('My Tags') }}</a>
+                            <a class="nav-link" href="#managing" data-bs-toggle="tab">{{ __('My Tags') }}</a>
                         </li>
                     </ul>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -103,7 +103,7 @@
                                         {{ __('Save') }}
                                     </button>
                                     <button type="button" class="btn btn-default"
-                                            data-dismiss="modal">
+                                            data-bs-dismiss="modal">
                                         {{ __('Close') }}
                                     </button>
                                 </div>
@@ -146,7 +146,7 @@
                                     {{ __('Create a label') }}
                                 </button>
                                 <button type="button" class="btn btn-default"
-                                        data-dismiss="modal">{{ __('Close') }}</button>
+                                        data-bs-dismiss="modal">{{ __('Close') }}</button>
                             </div>
                         </div>
                     </div>
@@ -160,7 +160,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="exampleModalLabel">{{ __('Add a label to a project') }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -187,7 +187,7 @@
                         {{ __('Save') }}
                     </button>
                     <button type="button" class="btn btn-default"
-                            data-dismiss="modal">
+                            data-bs-dismiss="modal">
                         {{ __('Close') }}
                     </button>
                 </div>
@@ -202,7 +202,7 @@
                 <div class="modal-header">
                     <h5 class="modal-title"
                         id="staticBackdropLabel">{{ __('Repeat the analysis') }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -290,7 +290,7 @@
                                    '56' => __('Chelyabinsk'),
                                    '1104' => __('Cherkessk'),
                                    '16' => __('Yaroslavl'),
-                                   ]), null, ['class' => 'custom-select rounded-0 region']) !!}
+                                   ]), null, ['class' => 'form-select rounded-0 region']) !!}
                         </div>
 
                         <div id="key-phrase">
@@ -298,7 +298,7 @@
                             <div class="form-group required">
                                 <label>{{ __('Top 10/20') }}</label>
                                 <select name="count" id="count"
-                                        class="custom-select rounded-0 count">
+                                        class="form-select rounded-0 count">
                                     <option value="10">10</option>
                                     <option value="20">20</option>
                                 </select>
@@ -387,10 +387,10 @@
                 <input type="hidden" id="type">
                 <div class="modal-footer">
                     <button type="button" class="btn btn-default"
-                            data-dismiss="modal">{{ __('Close') }}
+                            data-bs-dismiss="modal">{{ __('Close') }}
                     </button>
                     <button type="button" class="btn btn-secondary" id="relevance-repeat-scan"
-                            data-dismiss="modal">
+                            data-bs-dismiss="modal">
                         {{ __('Repeat the analysis') }}
                     </button>
                 </div>
@@ -430,8 +430,8 @@
                                href="{{ route('show.config') }}">{{ __('Module administration') }}</a>
                         </li>
                     @endif
-                    <button type="button" class="btn btn-secondary" data-toggle="modal"
-                            data-target="#exampleModal">
+                    <button type="button" class="btn btn-secondary" data-bs-toggle="modal"
+                            data-bs-target="#exampleModal">
                         {{ __('Managing labels') }}
                     </button>
                 </ul>
@@ -466,7 +466,7 @@
                                         <h5 class="modal-title" id="removeModalLabel">
                                             {{ __('Deleting results from a project') }} {{ $item->name }}
                                         </h5>
-                                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                                             <span aria-hidden="true">&times;</span>
                                         </button>
                                     </div>
@@ -489,10 +489,10 @@
                                         <button type="button"
                                                 class="btn btn-secondary remove-empty-results click_tracking"
                                                 data-click="Remove empty results"
-                                                data-target="{{ $item->id }}" data-dismiss="modal">
+                                                data-target="{{ $item->id }}" data-bs-dismiss="modal">
                                             {{ __('Remove') }}
                                         </button>
-                                        <button type="button" class="btn btn-default" data-dismiss="modal">
+                                        <button type="button" class="btn btn-default" data-bs-dismiss="modal">
                                             {{ __('Do not delete') }}
                                         </button>
                                     </div>
@@ -508,7 +508,7 @@
                                             id="removeWithFiltersModalLabel">
                                             {{ __('Deleting results from a project') }} {{ $item->name }}
                                         </h5>
-                                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                                             <span aria-hidden="true">&times;</span>
                                         </button>
                                     </div>
@@ -602,7 +602,7 @@
                                                '56' => __('Chelyabinsk'),
                                                '1104' => __('Cherkessk'),
                                                '16' => __('Yaroslavl'),
-                                               ], null, ['class' => 'custom-select rounded-0 region', 'id' => 'region-filter-'. $item->id]) !!}
+                                               ], null, ['class' => 'form-select rounded-0 region', 'id' => 'region-filter-'. $item->id]) !!}
 
                                         <label class="mt-3">{{ __('Link') }}</label>
                                         <input type="text" class="form form-control"
@@ -646,11 +646,11 @@
                                         <button type="button"
                                                 class="btn btn-secondary remove-with-filters click_tracking"
                                                 data-click="Remove with filters"
-                                                data-dismiss="modal" data-target="{{ $item->id }}">
+                                                data-bs-dismiss="modal" data-target="{{ $item->id }}">
                                             {{ __('Remove') }}
                                         </button>
                                         <button type="button" class="btn btn-default"
-                                                data-dismiss="modal">{{ __('Do not delete') }}</button>
+                                                data-bs-dismiss="modal">{{ __('Do not delete') }}</button>
                                     </div>
                                 </div>
                             </div>
@@ -661,7 +661,7 @@
                                 <div class="modal-content">
                                     <div class="modal-header">
                                         <h5 class="modal-title">{{ __('restart analyzed pages') }} {{ $item->name }}</h5>
-                                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                                             <span aria-hidden="true">&times;</span>
                                         </button>
                                     </div>
@@ -674,9 +674,9 @@
                                         <button data-target="{{ $item->id }}" type="button"
                                                 class="btn btn-secondary repeat-scan-unique-sites click_tracking"
                                                 data-click="Repeat scan unique sites"
-                                                data-dismiss="modal">{{ __('Start') }}</button>
+                                                data-bs-dismiss="modal">{{ __('Start') }}</button>
                                         <button type="button" class="btn btn-default"
-                                                data-dismiss="modal">{{ __('Close') }}</button>
+                                                data-bs-dismiss="modal">{{ __('Close') }}</button>
                                     </div>
                                 </div>
                             </div>
@@ -687,7 +687,7 @@
                                 <div class="modal-content">
                                     <div class="modal-header">
                                         <h5 class="modal-title">{{ __('Run an analysis of the end-to-end results of the project') }} {{ $item->name }}</h5>
-                                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                                             <span aria-hidden="true">&times;</span>
                                         </button>
                                     </div>
@@ -700,9 +700,9 @@
                                         <button data-target="{{ $item->id }}" type="button"
                                                 class="btn btn-secondary start-through-analyse click_tracking"
                                                 data-click="Start through scan"
-                                                data-dismiss="modal">{{ __('Start') }}</button>
+                                                data-bs-dismiss="modal">{{ __('Start') }}</button>
                                         <button type="button" class="btn btn-default"
-                                                data-dismiss="modal">{{ __('Close') }}</button>
+                                                data-bs-dismiss="modal">{{ __('Close') }}</button>
                                     </div>
                                 </div>
                             </div>
@@ -719,7 +719,7 @@
                                         <div class="modal-content">
                                             <div class="modal-header">
                                                 {{ $item->name }}
-                                                <button type="button" class="close" data-dismiss="modal"
+                                                <button type="button" class="close" data-bs-dismiss="modal"
                                                         aria-label="Close">
                                                     <span aria-hidden="true">&times;</span>
                                                 </button>
@@ -732,10 +732,10 @@
                                                         class="btn btn-secondary remove-project-relevance-link"
                                                         data-tag="{{ $tag->id }}"
                                                         data-history="{{ $item->id }}"
-                                                        data-dismiss="modal">
+                                                        data-bs-dismiss="modal">
                                                     {{ __('Remove tag') }}
                                                 </button>
-                                                <button type="button" class="btn btn-default" data-dismiss="modal">
+                                                <button type="button" class="btn btn-default" data-bs-dismiss="modal">
                                                     {{ __('Close') }}
                                                 </button>
                                             </div>
@@ -866,11 +866,7 @@
         <script src="{{ asset('plugins/relevance-analysis/history/childHistoryTable.js') }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/history/common.js') }}"></script>
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables-editor/js/datatables_editor.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/date-sort.js') }}"></script>
         <script src="{{ asset('plugins/keyword-generator/js/lib/clipboard.min.js') }}"></script>
@@ -904,7 +900,7 @@
                             '       style="opacity: 0.6; cursor:pointer;"></i>' +
                             '</span>' +
                             '<div class="dropdown" style="display: inline">' +
-                            '    <i class="fa fa-cogs" id="dropdownMenuButton" data-toggle="dropdown"' +
+                            '    <i class="fa fa-cogs" id="dropdownMenuButton" data-bs-toggle="dropdown"' +
                             '       aria-expanded="false" style="opacity: 0.6; cursor: pointer"></i>' +
                             '    <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">' +
                             '                   <span class="dropdown-item project_name"' +
@@ -921,14 +917,14 @@
                             '                   </span>' +
                             '        <span class="dropdown-item"' +
                             '              style="cursor:pointer;"' +
-                            '              data-toggle="modal" data-target="#removeModal' + row.id + '">' +
+                            '              data-bs-toggle="modal" data-bs-target="#removeModal' + row.id + '">' +
                             '<i class="fa fa-trash"></i> ' +
                             '{{ __('Delete results without comments') }}' +
                             '                   </span>' +
                             '        <span class="dropdown-item"' +
                             '              style="cursor:pointer;"' +
-                            '              data-toggle="modal"' +
-                            '              data-target="#removeWithFiltersModal' + row.id + '">' +
+                            '              data-bs-toggle="modal"' +
+                            '              data-bs-target="#removeWithFiltersModal' + row.id + '">' +
                             '<i class="fa fa-trash"></i> ' +
                             '{{ __('Delete using filters') }}' +
                             '                   </span>' +
@@ -947,8 +943,8 @@
                                 value.name +
                                 '    <i class="fa fa-trash"' +
                                 '       style="opacity: 0.5; cursor: pointer"' +
-                                '       data-toggle="modal"' +
-                                '       data-target="#removeTagModal' + value.id + '' + row.id + '">' +
+                                '       data-bs-toggle="modal"' +
+                                '       data-bs-target="#removeTagModal' + value.id + '' + row.id + '">' +
                                 '    </i>' +
                                 '</div>'
                         })
@@ -961,8 +957,8 @@
                     data: function (row) {
                         return '<span class="count-sites-' + row.id + '">' + row.count_sites + '</span>' +
                             '<i class="fa fa-repeat" style="opacity: 0.6; cursor: pointer"' +
-                            '   data-target="#repeatUniqueScan' + row.id + '"' +
-                            '   data-toggle="modal" data-placement="top"' +
+                            '   data-bs-target="#repeatUniqueScan' + row.id + '"' +
+                            '   data-bs-toggle="modal" data-bs-placement="top"' +
                             '   title="{{ __('restart analyzed pages') }}"></i>'
                     },
 
@@ -993,9 +989,9 @@
                                 '</div>'
                         } else {
                             return '<div class="btn-group">' +
-                                '     <button class="btn btn-secondary" data-target="#startThroughScan' + row.id + '"' +
-                                '             data-toggle="modal"' +
-                                '             data-placement="top" class="btn btn-secondary">' +
+                                '     <button class="btn btn-secondary" data-bs-target="#startThroughScan' + row.id + '"' +
+                                '             data-bs-toggle="modal"' +
+                                '             data-bs-placement="top" class="btn btn-secondary">' +
                                 '         {{ __('End-to-end analysis') }}' +
                                 '     </button>' +
                                 '     <button type="button" class="btn btn-secondary">' +
@@ -1092,7 +1088,7 @@
 
                                         if (val.state === 1) {
                                             state =
-                                                '<button type="button" class="btn btn-secondary get-history-info" data-order="' + val.id + '" data-toggle="modal" data-target="#staticBackdrop">' +
+                                                '<button type="button" class="btn btn-secondary get-history-info" data-order="' + val.id + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
                                                 '   Повторить анализ' +
                                                 '</button>'
                                                 +
@@ -1109,7 +1105,7 @@
                                             checkAnalyseProgress(val.id)
                                         } else if (val.state === -1) {
                                             state =
-                                                '<button type="button" class="btn btn-secondary get-history-info" data-order="' + val.id + '" data-toggle="modal" data-target="#staticBackdrop">' +
+                                                '<button type="button" class="btn btn-secondary get-history-info" data-order="' + val.id + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
                                                 '   Повторить анализ' +
                                                 '</button>' +
                                                 "<span class='text-muted'>Произошла ошибка, повторите попытку или обратитесь к администратору</span>"
@@ -1634,7 +1630,7 @@
                             if (response.code === 200) {
                                 $('#project-' + response.project.id).append(
                                     '<div style="color: ' + response.tag.color + '" id="tag-' + response.tag.id + '-item-' + response.project.id + '">' + response.tag.name + '' +
-                                    ' <i class="fa fa-trash" style="opacity: 0.5; cursor: pointer" data-toggle="modal"' +
+                                    ' <i class="fa fa-trash" style="opacity: 0.5; cursor: pointer" data-bs-toggle="modal"' +
                                     ' data-target=#removeTagModal' + response.timestamps + '></i>' +
                                     '</div>'
                                 )
@@ -1643,7 +1639,7 @@
                                     '   <div class="modal-dialog"> ' +
                                     '       <div class="modal-content"> ' +
                                     '           <div class="modal-header"> ' +
-                                    '               <button type="button" class="close" data-dismiss="modal" ' +
+                                    '               <button type="button" class="close" data-bs-dismiss="modal" ' +
                                     '               aria-label="Close"> ' +
                                     '               <span aria-hidden="true">&times;</span> ' +
                                     '               </button> ' +
@@ -1654,9 +1650,9 @@
                                     '           <button type="button"' +
                                     '               class="btn btn-secondary remove-project-relevance-link"' +
                                     '               data-tag="' + response.tag.id + '" ' +
-                                    '               data-history="' + response.project.id + '" data-dismiss="modal">{{ __('Remove tag') }}' +
+                                    '               data-history="' + response.project.id + '" data-bs-dismiss="modal">{{ __('Remove tag') }}' +
                                     '           </button> ' +
-                                    '           <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}' +
+                                    '           <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}' +
                                     '           </button>' +
                                     '           </div>' +
                                     '       </div>' +

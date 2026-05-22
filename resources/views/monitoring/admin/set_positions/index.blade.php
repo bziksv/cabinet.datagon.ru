@@ -44,12 +44,10 @@
                     <div class="form-group">
                         <label>Дата</label>
 
-                        <div class="input-group">
-                            <div class="input-group-prepend">
-                              <span class="input-group-text">
+                        <div class="input-group"><span class="input-group-text">
                                 <i class="far fa-calendar-alt"></i>
                               </span>
-                            </div>
+
 
                             <input type="text" class="form-control float-right" id="range" disabled="disabled">
                         </div>
@@ -103,9 +101,7 @@
 
             $range.daterangepicker();
 
-            $('.select2').select2({
-                theme: 'bootstrap4'
-            });
+            $('.select2').select2({});
 
             $project.on('change', function() {
                 let id = $(this).val();

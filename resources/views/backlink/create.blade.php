@@ -93,10 +93,10 @@
                     {!! Form::text('anchor_1', null, ['class' => 'form-control backlink','required']) !!}
                 </td>
                 <td>
-                    {!! Form::select('nofollow_1', ['1' => __('Yes'), '0' => __('No')], null, ['class' => 'custom-select rounded-0']) !!}
+                    {!! Form::select('nofollow_1', ['1' => __('Yes'), '0' => __('No')], null, ['class' => 'form-select rounded-0']) !!}
                 </td>
                 <td>
-                    {!! Form::select('noindex_1', ['1' => __('Yes'), '0' => __('No')], null, ['class' => 'custom-select rounded-0']) !!}
+                    {!! Form::select('noindex_1', ['1' => __('Yes'), '0' => __('No')], null, ['class' => 'form-select rounded-0']) !!}
                 </td>
             </tr>
             </tbody>
@@ -156,8 +156,8 @@
                     '<td><input type="text" name="site_donor_' + countRows + '" class="form form-control" required></td>' +
                     '<td><input type="text" name="link_' + countRows + '" class="form form-control" required></td>' +
                     '<td><input type="text" name="anchor_' + countRows + '" class="form form-control" required></td>' +
-                    '<td><select class="custom-select rounded-0" name="nofollow_' + countRows + '" id=""><option value="1">{{ __("Yes") }}</option><option value="0">{{ __("No") }}</option></select></td>' +
-                    '<td><select class="custom-select rounded-0" name="noindex_' + countRows + '" id=""><option value="1">{{ __("Yes") }}</option><option value="0">{{ __("No") }}</option></select></td>' +
+                    '<td><select class="form-select rounded-0" name="nofollow_' + countRows + '" id=""><option value="1">{{ __("Yes") }}</option><option value="0">{{ __("No") }}</option></select></td>' +
+                    '<td><select class="form-select rounded-0" name="noindex_' + countRows + '" id=""><option value="1">{{ __("Yes") }}</option><option value="0">{{ __("No") }}</option></select></td>' +
                     '</tr>'
                 );
             });
@@ -172,7 +172,6 @@
             });
 
             $('.monitoring-options').select2({
-                theme: 'bootstrap4',
                 selectOnClose: true,
                 sorter: function (el) {
                     return el.sort((a, b) => {

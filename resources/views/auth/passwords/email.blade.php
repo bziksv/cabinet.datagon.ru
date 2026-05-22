@@ -20,7 +20,7 @@
 
                     <div class="input-group mb-3">
                         <select id="select-language" name="lang"
-                                class="custom-select flags @error('lang') is-invalid @enderror">
+                                class="form-select flags @error('lang') is-invalid @enderror">
                             @foreach($lang as $l)
                                 <option value="{{ $l }}">
                                     @if($l == 'ru')
@@ -42,11 +42,7 @@
                         <input id="email" type="email" class="form-control @error('email') is-invalid @enderror"
                                name="email" value="{{ old('email') }}" placeholder="{{ __('E-Mail') }}"
                                autocomplete="email" autofocus>
-                        <div class="input-group-append">
-                            <div class="input-group-text">
-                                <span class="fas fa-envelope"></span>
-                            </div>
-                        </div>
+                        <span class="input-group-text"><i class="fas fa-envelope"></i></span>
                         @error('email')
                         <span class="invalid-feedback" role="alert">
                             <strong>{{ $message }}</strong>
@@ -81,8 +77,8 @@
             $('#select-language').val('ru')
         }
 
+        @if(config('app.env') !== 'local')
         $(".flags").select2({
-            theme: 'bootstrap4',
             minimumResultsForSearch: Infinity,
             templateResult: function (state) {
                 if (!state.id) {
@@ -95,6 +91,7 @@
                 return $state;
             }
         });
+        @endif
     </script>
 
     <script>

@@ -66,7 +66,7 @@
                             <div class="card-header">
                                 <h3 class="card-title">{{ __('Analyzer Settings') }}</h3>
                                 <div class="card-tools">
-                                    <button type="button" class="btn btn-tool" data-card-widget="collapse"><i
+                                    <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse"><i
                                             class="fas fa-minus"></i>
                                     </button>
                                 </div>
@@ -81,7 +81,7 @@
                                                     $config->count_sites => $config->count_sites,
                                                     '10' => 10,
                                                     '20' => 20,
-                                                    ]), null, ['class' => 'custom-select rounded-0']) !!}
+                                                    ]), null, ['class' => 'form-select rounded-0']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -150,7 +150,7 @@
                                                     '56' => __('Chelyabinsk'),
                                                     '1104' => __('Cherkessk'),
                                                     '16' => __('Yaroslavl'),
-                                                    ]), null, ['class' => 'custom-select rounded-0']) !!}
+                                                    ]), null, ['class' => 'form-select rounded-0']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -172,7 +172,7 @@
                                                         $config->hide_ignored_domains => $config->hide_ignored_domains,
                                                         'yes' => __('yes'),
                                                         'no' => __('no'),
-                                                ]), null, ['class' => 'custom-select rounded-0 w-25']) !!}
+                                                ]), null, ['class' => 'form-select rounded-0 w-25']) !!}
                                             </div>
 
                                             <div class="mt-3 mb-3">
@@ -181,7 +181,7 @@
                                                         $config->noindex => $config->noindex,
                                                         'yes' => __('yes'),
                                                         'no' => __('no'),
-                                                ]), null, ['class' => 'custom-select rounded-0 w-25']) !!}
+                                                ]), null, ['class' => 'form-select rounded-0 w-25']) !!}
                                             </div>
 
                                             <div class="mt-3 mb-3">
@@ -190,7 +190,7 @@
                                                         $config->meta_tags => $config->meta_tags,
                                                         'yes' => __('yes'),
                                                         'no' => __('no'),
-                                                ]), null, ['class' => 'custom-select rounded-0 w-25']) !!}
+                                                ]), null, ['class' => 'form-select rounded-0 w-25']) !!}
                                             </div>
 
                                             <div class="mt-3 mb-3">
@@ -199,7 +199,7 @@
                                                         $config->parts_of_speech => $config->parts_of_speech,
                                                         'yes' => __('yes'),
                                                         'no' => __('no'),
-                                                ]), null, ['class' => 'custom-select rounded-0 w-25']) !!}
+                                                ]), null, ['class' => 'form-select rounded-0 w-25']) !!}
                                             </div>
 
                                             <div class="mt-3 mb-3">
@@ -211,7 +211,7 @@
                                                         $config->remove_my_list_words => $config->remove_my_list_words,
                                                         'yes' => __('yes'),
                                                         'no' => __('no'),
-                                                ]), null, ['class' => 'custom-select rounded-0 w-25']) !!}
+                                                ]), null, ['class' => 'form-select rounded-0 w-25']) !!}
                                             </div>
 
                                             <div class="form-group required list-words mt-1">
@@ -229,7 +229,7 @@
                                                         '25' => 25,
                                                         '50' => 50,
                                                         '100' => 100,
-                                                ]), null, ['class' => 'custom-select rounded-0 w-25']) !!}
+                                                ]), null, ['class' => 'form-select rounded-0 w-25']) !!}
                                             </div>
 
                                             <div class="mt-3 mb-3">
@@ -240,7 +240,7 @@
                                                         '25' => 25,
                                                         '50' => 50,
                                                         '100' => 100,
-                                                ]), null, ['class' => 'custom-select rounded-0 w-25']) !!}
+                                                ]), null, ['class' => 'form-select rounded-0 w-25']) !!}
                                             </div>
 
                                             <div class="mt-3 mb-3">
@@ -251,7 +251,7 @@
                                                         '25' => 25,
                                                         '50' => 50,
                                                         '100' => 100,
-                                                ]), null, ['class' => 'custom-select rounded-0 w-25']) !!}
+                                                ]), null, ['class' => 'form-select rounded-0 w-25']) !!}
                                             </div>
 
                                             <div class="mt-3 mb-3">
@@ -262,7 +262,7 @@
                                                         '25' => 25,
                                                         '50' => 50,
                                                         '100' => 100,
-                                                ]), null, ['class' => 'custom-select rounded-0 w-25']) !!}
+                                                ]), null, ['class' => 'form-select rounded-0 w-25']) !!}
                                             </div>
                                         </div>
 
@@ -285,7 +285,7 @@
                                 <h3 class="card-title">{{ __('Settings for auto-cleaning results') }}</h3>
 
                                 <div class="card-tools">
-                                    <button type="button" class="btn btn-tool" data-card-widget="collapse"><i
+                                    <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse"><i
                                             class="fas fa-minus"></i>
                                     </button>
                                 </div>

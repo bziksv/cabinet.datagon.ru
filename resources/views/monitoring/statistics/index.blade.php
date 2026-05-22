@@ -2,11 +2,7 @@
 
     @slot('css')
         <!-- DataTables -->
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-buttons/css/buttons.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-select/css/select.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-editor/css/editor.bootstrap4.min.css') }}">
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-css-editor'])
 
         <style>
             .small-box {
@@ -17,7 +13,7 @@
 
     @slot('tools')
         <div class="btn-group">
-            <button type="button" class="btn btn-tool dropdown-toggle" data-toggle="dropdown">
+            <button type="button" class="btn btn-tool dropdown-toggle" data-bs-toggle="dropdown">
                 <i class="fas fa-wrench"></i>
             </button>
             <div class="dropdown-menu dropdown-menu-right" role="menu">
@@ -42,10 +38,10 @@
                     <h3 class="card-title">{{ __('Control panel') }}</h3>
 
                     <div class="card-tools">
-                        <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                        <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse">
                             <i class="fas fa-minus"></i>
                         </button>
-                        <button type="button" class="btn btn-tool" data-card-widget="remove">
+                        <button type="button" class="btn btn-tool" data-lte-toggle="card-remove">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
@@ -101,10 +97,10 @@
                     <h3 class="card-title">{{ __('Chart') }}</h3>
 
                     <div class="card-tools">
-                        <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                        <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse">
                             <i class="fas fa-minus"></i>
                         </button>
-                        <button type="button" class="btn btn-tool" data-card-widget="remove">
+                        <button type="button" class="btn btn-tool" data-lte-toggle="card-remove">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
@@ -150,13 +146,7 @@
         <script src="{{ asset('plugins/chart.js/Chart.min.js') }}"></script>
         <!-- DataTables  & Plugins -->
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-editor/js/datatables_editor.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-select/js/dataTables.select.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min-editor'])
 
         <script>
             // Make the dashboard widgets sortable Using jquery UI

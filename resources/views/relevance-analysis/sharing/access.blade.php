@@ -101,7 +101,7 @@
                                             <h5 class="modal-title" id="removeModalLabel">
                                                 {{ __('Deleting results from a project') }} {{ $item->item->name }}
                                             </h5>
-                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                            <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                                                 <span aria-hidden="true">&times;</span>
                                             </button>
                                         </div>
@@ -122,10 +122,10 @@
                                         </div>
                                         <div class="modal-footer">
                                             <button type="button" class="btn btn-secondary remove-empty-results"
-                                                    data-target="{{ $item->item->id }}" data-dismiss="modal">
+                                                    data-target="{{ $item->item->id }}" data-bs-dismiss="modal">
                                                 {{ __('Remove') }}
                                             </button>
-                                            <button type="button" class="btn btn-default" data-dismiss="modal">
+                                            <button type="button" class="btn btn-default" data-bs-dismiss="modal">
                                                 {{ __('Do not delete') }}
                                             </button>
                                         </div>
@@ -141,7 +141,7 @@
                                                 id="removeWithFiltersModalLabel">
                                                 {{ __('Deleting results from a project') }} {{ $item->item->name }}
                                             </h5>
-                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                            <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                                                 <span aria-hidden="true">&times;</span>
                                             </button>
                                         </div>
@@ -235,7 +235,7 @@
                                                    '56' => __('Chelyabinsk'),
                                                    '1104' => __('Cherkessk'),
                                                    '16' => __('Yaroslavl'),
-                                                   ], null, ['class' => 'custom-select rounded-0 region', 'id' => 'region-filter-'. $item->id]) !!}
+                                                   ], null, ['class' => 'form-select rounded-0 region', 'id' => 'region-filter-'. $item->id]) !!}
 
                                             <label class="mt-3">{{ __('Link') }}</label>
                                             <input type="text" class="form form-control"
@@ -277,11 +277,11 @@
                                         </div>
                                         <div class="modal-footer">
                                             <button type="button" class="btn btn-secondary remove-with-filters"
-                                                    data-dismiss="modal" data-target="{{ $item->item->id }}">
+                                                    data-bs-dismiss="modal" data-target="{{ $item->item->id }}">
                                                 {{ __('Remove') }}
                                             </button>
                                             <button type="button" class="btn btn-default"
-                                                    data-dismiss="modal">{{ __('Do not delete') }}</button>
+                                                    data-bs-dismiss="modal">{{ __('Do not delete') }}</button>
                                         </div>
                                     </div>
                                 </div>
@@ -292,7 +292,7 @@
                                     <div class="modal-content">
                                         <div class="modal-header">
                                             <h5 class="modal-title">{{ __('restart analyzed pages') }} {{ $item->item->name }}</h5>
-                                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                            <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                                                 <span aria-hidden="true">&times;</span>
                                             </button>
                                         </div>
@@ -304,9 +304,9 @@
                                         <div class="modal-footer">
                                             <button data-target="{{ $item->item->id }}" type="button"
                                                     class="btn btn-secondary repeat-scan-unique-sites"
-                                                    data-dismiss="modal">{{ __('Start') }}</button>
+                                                    data-bs-dismiss="modal">{{ __('Start') }}</button>
                                             <button type="button" class="btn btn-default"
-                                                    data-dismiss="modal">{{ __('Close') }}</button>
+                                                    data-bs-dismiss="modal">{{ __('Close') }}</button>
                                         </div>
                                     </div>
                                 </div>
@@ -326,7 +326,7 @@
                                     <i class="fa fa-list project_name_v2"
                                        data-order="{{ $item->item->id }}"
                                        style="opacity: 0.6; cursor:pointer;"></i>
-                                    <i class="fa fa-cogs" id="dropdownMenuButton" data-toggle="dropdown"
+                                    <i class="fa fa-cogs" id="dropdownMenuButton" data-bs-toggle="dropdown"
                                        aria-expanded="false" style="opacity: 0.6; cursor: pointer"></i>
                                     <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
                                             <span class="dropdown-item project_name"
@@ -343,14 +343,14 @@
                                             </span>
                                         <span class="dropdown-item"
                                               style="cursor:pointer;"
-                                              data-toggle="modal" data-target="#removeModal{{ $item->item->id }}">
+                                              data-bs-toggle="modal" data-bs-target="#removeModal{{ $item->item->id }}">
                                                 <i class="fa fa-trash"></i>
                                                 {{ __('Delete results without comments') }}
                                             </span>
                                         <span class="dropdown-item"
                                               style="cursor:pointer;"
-                                              data-toggle="modal"
-                                              data-target="#removeWithFiltersModal{{ $item->item->id }}">
+                                              data-bs-toggle="modal"
+                                              data-bs-target="#removeWithFiltersModal{{ $item->item->id }}">
                                                 <i class="fa fa-trash"></i>
                                                 {{ __('Delete using filters') }}
                                             </span>
@@ -373,8 +373,8 @@
                                 <td class="col-2">
                                     {{ $item->project[0]->count_sites }}
                                     <i class="fa fa-repeat" style="opacity: 0.6; cursor: pointer"
-                                       data-target="#repeatUniqueScan{{ $item->item->id }}"
-                                       data-toggle="modal" data-placement="top"
+                                       data-bs-target="#repeatUniqueScan{{ $item->item->id }}"
+                                       data-bs-toggle="modal" data-bs-placement="top"
                                        title="{{ __('restart analyzed pages') }}"></i>
                                 </td>
                                 <td class="col-2">{{ $item->project[0]->count_checks }}</td>
@@ -399,7 +399,7 @@
                                     <div class="modal-header">
                                         <h5 class="modal-title"
                                             id="staticBackdropLabel">{{ __('Repeat the analysis') }}</h5>
-                                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                                             <span aria-hidden="true">&times;</span>
                                         </button>
                                     </div>
@@ -426,7 +426,7 @@
                                                 <div class="form-group required">
                                                     <label>{{ __('Top 10/20') }}</label>
                                                     <select name="count" id="count"
-                                                            class="custom-select rounded-0 count">
+                                                            class="form-select rounded-0 count">
                                                         <option value="10">10</option>
                                                         <option value="20">20</option>
                                                     </select>
@@ -498,7 +498,7 @@
                                                            '56' => __('Chelyabinsk'),
                                                            '1104' => __('Cherkessk'),
                                                            '16' => __('Yaroslavl'),
-                                                           ]), null, ['class' => 'custom-select rounded-0 region']) !!}
+                                                           ]), null, ['class' => 'form-select rounded-0 region']) !!}
                                                 </div>
 
                                                 <div class="form-group required" id="ignoredDomainsBlock">
@@ -584,10 +584,10 @@
                                     <input type="hidden" id="type">
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-default"
-                                                data-dismiss="modal">{{ __('Close') }}
+                                                data-bs-dismiss="modal">{{ __('Close') }}
                                         </button>
                                         <button type="button" class="btn btn-secondary" id="relevance-repeat-scan"
-                                                data-dismiss="modal">
+                                                data-bs-dismiss="modal">
                                             {{ __('Repeat the analysis') }}
                                         </button>
                                     </div>
@@ -707,11 +707,7 @@
     @slot('js')
         <script src="{{ asset('plugins/bootstrap4-duallistbox/jquery.bootstrap-duallistbox.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/relevance-analysis/history/childHistoryTable.js') }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/history/common.js') }}"></script>
         <script>
@@ -977,7 +973,7 @@
                             if (response.code === 200) {
                                 $('#project-' + response.project.id).append(
                                     '<div style="color: ' + response.tag.color + '" id="tag-' + response.tag.id + '-item-' + response.project.id + '">' + response.tag.name + '' +
-                                    ' <i class="fa fa-trash" style="opacity: 0.5; cursor: pointer" data-toggle="modal"' +
+                                    ' <i class="fa fa-trash" style="opacity: 0.5; cursor: pointer" data-bs-toggle="modal"' +
                                     ' data-target=#removeTagModal' + response.timestamps + '></i>' +
                                     '</div>'
                                 )
@@ -986,7 +982,7 @@
                                     '   <div class="modal-dialog"> ' +
                                     '       <div class="modal-content"> ' +
                                     '           <div class="modal-header"> ' +
-                                    '               <button type="button" class="close" data-dismiss="modal" ' +
+                                    '               <button type="button" class="close" data-bs-dismiss="modal" ' +
                                     '               aria-label="Close"> ' +
                                     '               <span aria-hidden="true">&times;</span> ' +
                                     '               </button> ' +
@@ -997,9 +993,9 @@
                                     '           <button type="button"' +
                                     '               class="btn btn-secondary remove-project-relevance-link"' +
                                     '               data-tag="' + response.tag.id + '" ' +
-                                    '               data-history="' + response.project.id + '" data-dismiss="modal">Отвязать метку от проекта' +
+                                    '               data-history="' + response.project.id + '" data-bs-dismiss="modal">Отвязать метку от проекта' +
                                     '           </button> ' +
-                                    '           <button type="button" class="btn btn-default" data-dismiss="modal">Закрыть' +
+                                    '           <button type="button" class="btn btn-default" data-bs-dismiss="modal">Закрыть' +
                                     '           </button>' +
                                     '           </div>' +
                                     '       </div>' +
@@ -1234,7 +1230,7 @@
 
                                         if (val.state === 1) {
                                             state =
-                                                '<button type="button" class="btn btn-secondary get-history-info" data-order="' + val.id + '" data-toggle="modal" data-target="#staticBackdrop">' +
+                                                '<button type="button" class="btn btn-secondary get-history-info" data-order="' + val.id + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
                                                 '   Повторить анализ' +
                                                 '</button>'
                                                 +
@@ -1251,7 +1247,7 @@
                                             checkAnalyseProgress(val.id)
                                         } else if (val.state === -1) {
                                             state =
-                                                '<button type="button" class="btn btn-secondary get-history-info" data-order="' + val.id + '" data-toggle="modal" data-target="#staticBackdrop">' +
+                                                '<button type="button" class="btn btn-secondary get-history-info" data-order="' + val.id + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
                                                 '   Повторить анализ' +
                                                 '</button>' +
                                                 "<span class='text-muted'>Произошла ошибка, повторите попытку или обратитесь к администратору</span>"

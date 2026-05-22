@@ -124,7 +124,7 @@ function renderStubs(tasks, target) {
     let html = ''
 
     $.each(tasks, function (index, task) {
-        let button = '<button class="btn btn-sm btn-default" data-toggle="collapse" href="#collapse-example-' + index + '" aria-expanded="false" aria-controls="collapse-example-' + index + '" id="heading-example' + index + '"><i class="fa fa-eye"></i></button>'
+        let button = '<button class="btn btn-sm btn-default" data-bs-toggle="collapse" href="#collapse-example-' + index + '" aria-expanded="false" aria-controls="collapse-example-' + index + '" id="heading-example' + index + '"><i class="fa fa-eye"></i></button>'
         let stubType = ''
         if (task.type === 'personal') {
             stubType = '(личный шаблон)'

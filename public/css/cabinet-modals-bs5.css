@@ -1,0 +1,18 @@
+/**
+ * Модалки с legacy .close (BS4) на Bootstrap 5.
+ */
+.modal-header {
+    align-items: center;
+}
+.modal-header .close,
+.modal-header .btn-close {
+    margin-left: auto;
+    padding: calc(var(--bs-modal-header-padding-y) * 0.5) calc(var(--bs-modal-header-padding-x) * 0.5);
+}
+.modal-header .modal-title + .close {
+    margin-left: auto;
+}
+.dtr-bs-modal .modal-header .close {
+    margin: calc(-0.5 * var(--bs-modal-header-padding-y)) calc(-0.5 * var(--bs-modal-header-padding-x))
+        calc(-0.5 * var(--bs-modal-header-padding-y)) auto;
+}

@@ -2,8 +2,7 @@
     @slot('css')
         <link rel="stylesheet" href="{{ asset('plugins/summernote/summernote-bs4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'responsive-core-min'])
         
         <style>
             .history-container {
@@ -190,8 +189,7 @@
         <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
         
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'responsive-core-min'])
 
         <script>
             let historyTable;

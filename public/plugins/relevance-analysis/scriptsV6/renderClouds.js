@@ -74,7 +74,7 @@ $('#coverage-clouds-button').click(function () {
             $.each(tfCompClouds, function (key, value) {
                 let btnGroup =
                     "<div class='btn-group'>" +
-                    "        <button type='button' data-toggle='dropdown' aria-expanded='false' class='text-dark btn btn-tool dropdown-toggle'>" +
+                    "        <button type='button' data-bs-toggle='dropdown' aria-expanded='false' class='text-dark btn btn-tool dropdown-toggle'>" +
                     "            <i class='fas fa-external-link-alt'></i>" +
                     "        </button> " +
                     "       <div role='menu' class='dropdown-menu dropdown-menu-left'>" +

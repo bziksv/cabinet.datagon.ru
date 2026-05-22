@@ -1,25 +1,24 @@
 @if($description)
-    <div class="card card-widget">
-        <div class="card-header">
-            <div class="user-block">
-                <img class="img-circle img-bordered-sm"
-                     src="{{ $description->user->image }}" alt="avatar">
-                <span class="username">
-                    <a href="#">{{ $description->user->name }} {{ $description->user->last_name }}</a></span>
-                <span class="description">{{ __('Publicly') }} - {{ $description->updated_at->diffForHumans() }}</span>
+    <div class="card mb-4 cabinet-module-description">
+        <div class="card-header d-flex align-items-start gap-3">
+            <img class="rounded-circle flex-shrink-0 cabinet-module-description__avatar"
+                 src="{{ $description->user->image }}"
+                 alt="{{ $description->user->name }}">
+            <div class="flex-grow-1 min-w-0">
+                <div class="fw-semibold">
+                    {{ $description->user->name }} {{ $description->user->last_name }}
+                </div>
+                <div class="text-secondary small">{{ __('Publicly') }} — {{ $description->updated_at->diffForHumans() }}</div>
             </div>
-            <!-- /.user-block -->
-            <div class="card-tools">
-                <button type="button" class="btn btn-tool" data-card-widget="collapse">
+            <div class="card-tools flex-shrink-0 ms-auto">
+                <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse">
                     <i class="fas fa-minus"></i>
                 </button>
-                <button type="button" class="btn btn-tool" data-card-widget="remove">
+                <button type="button" class="btn btn-tool" data-lte-toggle="card-remove">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <!-- /.card-tools -->
         </div>
-        <!-- /.card-header -->
         <div class="card-body">{!! $description->description !!}</div>
     </div>
 @endif

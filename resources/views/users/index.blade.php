@@ -3,11 +3,7 @@
 @section('title', __('Users'))
 
 @slot('css')
-    <!-- DataTables -->
-    <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.css') }}">
-    <link rel="stylesheet" href="{{ asset('plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('plugins/datatables-buttons/css/buttons.bootstrap4.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('plugins/datatables-editor/css/editor.bootstrap4.min.css') }}">
+    @include('layouts.partials.vendor-datatables-css', ['bundle' => 'editor'])
     <!-- Toastr -->
     <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
     <!-- Select2 -->
@@ -28,17 +24,17 @@
 
             <div class="card-tools">
                 <div class="btn-group">
-                    <button type="button" class="btn btn-tool dropdown-toggle" data-toggle="dropdown"
+                    <button type="button" class="btn btn-tool dropdown-toggle" data-bs-toggle="dropdown"
                             data-offset="-200" aria-expanded="false">
                         <i class="fas fa-bars"></i>
                     </button>
                     <div class="dropdown-menu" role="menu">
                         <a href="{{ route('get.verified.users', 'xls') }}" class="dropdown-item">Excel</a>
                         <a href="{{ route('get.verified.users', 'csv') }}" class="dropdown-item">CSV</a>
-                        <a type="button" class="dropdown-item" data-toggle="modal" data-target="#exportModal">Фильтр
+                        <a type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#exportModal">Фильтр
                             выгрузки</a>
-                        <a type="button" class="dropdown-item" data-toggle="modal"
-                           data-target="#assignTariffModal">{{ __('Assign tariff')  }}</a>
+                        <a type="button" class="dropdown-item" data-bs-toggle="modal"
+                           data-bs-target="#assignTariffModal">{{ __('Assign tariff')  }}</a>
                         <a href="{{ route('users.statistics') }}"
                            class="dropdown-item">{{ __('General statistics users') }}</a>
                         <a href="{{ route('statistics.modules') }}"
@@ -60,16 +56,8 @@
     <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
     <!-- Select2 -->
     <script src="{{ asset('plugins/select2/js/select2.js') }}"></script>
-    <!-- Bootstrap 4 -->
-    <script src="{{ asset('plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-    <!-- DataTables  & Plugins -->
     <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-    <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-    <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-    <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-    <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-    <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
-    <script src="{{ asset('plugins/datatables-editor/js/datatables_editor.min.js') }}"></script>
+    @include('layouts.partials.vendor-datatables-js', ['bundle' => 'editor'])
     <script>
         $(document).ready(function () {
 
@@ -208,7 +196,7 @@
                                 typeof row.metrics === 'object' && !Array.isArray(row.metrics) && row.metrics !== null ||
                                 typeof row.metrics === 'string'
                             ) {
-                                content += '<a class="' + btnClass + '" data-toggle="collapse" href="#collapseExample' + row.id + '" title="{{ __('utm metrics') }}"><i class="fas fa-share-alt"></i></a>';
+                                content += '<a class="' + btnClass + '" data-bs-toggle="collapse" href="#collapseExample' + row.id + '" title="{{ __('utm metrics') }}"><i class="fas fa-share-alt"></i></a>';
                             }
 
                             content += '<a class="btn btn-danger btn-sm" onclick="deleteUser(' + row.id + ')" title="{{ __('Delete') }}"><i class="fas fa-trash"></i></a>';
@@ -250,7 +238,6 @@
             });
 
             $("#select-users").select2({
-                theme: 'bootstrap4',
                 width: '100%',
                 placeholder: $('#select-users').data('placeholder') || '',
                 allowClear: true,

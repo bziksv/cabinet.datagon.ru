@@ -4,10 +4,7 @@
             <!-- Toastr -->
             <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
             <!-- DataTables -->
-            <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.css') }}">
-            <link rel="stylesheet"
-                  href="{{ asset('plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
-            <link rel="stylesheet" href="{{ asset('plugins/datatables-buttons/css/buttons.bootstrap4.min.css') }}">
+            @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-css'])
             <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/common.css') }}"/>
 
             <!-- daterange picker -->
@@ -35,12 +32,10 @@
                     <div class="d-flex flex-column w-25" style="float: left;">
                         <h3>Фильтр по дате</h3>
                         <div class="form-group">
-                            <div class="input-group">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text">
+                            <div class="input-group"><span class="input-group-text">
                                         <i class="far fa-calendar-alt"></i>
                                     </span>
-                                </div>
+
                                 <input type="text" id="date-range" class="form-control">
                                 <button id="show-actions" class="btn btn-default btn-group"
                                         style="border-top-left-radius: 0px; border-bottom-left-radius: 0px;">
@@ -109,9 +104,7 @@
             <script src="{{ asset('plugins/inputmask/jquery.inputmask.min.js') }}"></script>
             <script src="{{ asset('plugins/daterangepicker/daterangepicker.js') }}"></script>
             <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-            <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-            <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-            <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
+            @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
             <script src="{{ asset('plugins/chart.js/3.9.1/chart.js') }}"></script>
             <script>
                 let startDate = null;

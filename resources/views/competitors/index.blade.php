@@ -92,7 +92,7 @@
                 display: flex;
             }
 
-            .custom-select.custom-select-sm.form-control.form-control-sm {
+            .form-select.form-select-sm.form-control.form-control-sm {
                 margin: 0 5px;
             }
         </style>
@@ -129,7 +129,7 @@
                     {!! Form::select('count', [
                             '10' => 10,
                             '20' => 20,
-                            ], null, ['class' => 'custom-select rounded-0 count']) !!}
+                            ], null, ['class' => 'form-select rounded-0 count']) !!}
                 </div>
                 <div class="form-group required">
                     <label>{{ __('Region') }}</label>
@@ -195,7 +195,7 @@
                             '56' => __('Chelyabinsk'),
                             '1104' => __('Cherkessk'),
                             '16' => __('Yaroslavl'),
-                            ], $region ?? null, ['class' => 'custom-select rounded-0 region']) !!}
+                            ], $region ?? null, ['class' => 'form-select rounded-0 region']) !!}
                 </div>
                 <div class="well well-sm clearfix">
                     <button class="btn btn-secondary pull-left" type="button"
@@ -238,8 +238,8 @@
                     </button>
 
                     <button type="button" class="btn btn-default click_tracking" data-click="Highlight your"
-                            data-toggle="modal"
-                            data-target="#coloredEloquentMyTextModal">
+                            data-bs-toggle="modal"
+                            data-bs-target="#coloredEloquentMyTextModal">
                         {{ __('Highlight your') }}
                     </button>
 
@@ -252,7 +252,7 @@
                                     <h5 class="modal-title" id="coloredEloquentMyTextModalLabel">
                                         {{ __('Highlighting the domains you need') }}
                                     </h5>
-                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                                         <span aria-hidden="true">&times;</span>
                                     </button>
                                 </div>
@@ -265,19 +265,19 @@
                                 <div class="modal-footer">
                                     <button class="btn btn-default colored-button"
                                             id="coloredEloquentMyText"
-                                            data-dismiss="modal">
+                                            data-bs-dismiss="modal">
                                         {{ __('Highlight your') }}
                                     </button>
                                     <button type="button" class="btn btn-secondary"
-                                            data-dismiss="modal">{{ __('Close') }}</button>
+                                            data-bs-dismiss="modal">{{ __('Close') }}</button>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <button type="button" class="btn btn-default click_tracking" data-click="Highlight site aggregators"
-                            data-toggle="modal"
-                            data-target="#coloredAgrigators">
+                            data-bs-toggle="modal"
+                            data-bs-target="#coloredAgrigators">
                         {{ __('Highlight site aggregators') }}
                     </button>
 
@@ -289,7 +289,7 @@
                                 <div class="modal-header">
                                     <h5 class="modal-title"
                                         id="coloredAgrigatorsLabel">{{ __('Highlighting aggregators') }}</h5>
-                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                                         <span aria-hidden="true">&times;</span>
                                     </button>
                                 </div>
@@ -301,11 +301,11 @@
                                 <div class="modal-footer">
                                     <button class="btn btn-default colored-button"
                                             id="coloredAgrigatorsButton"
-                                            data-dismiss="modal">
+                                            data-bs-dismiss="modal">
                                         {{ __('Highlight aggregators') }}
                                     </button>
                                     <button type="button" class="btn btn-secondary"
-                                            data-dismiss="modal">{{ __('Close') }}</button>
+                                            data-bs-dismiss="modal">{{ __('Close') }}</button>
                                 </div>
                             </div>
                         </div>
@@ -411,8 +411,8 @@
             <div class="tag-analysis mt-5" style="display: none">
                 <div class="d-flex flex-row pb-2">
                     <h2>{{ __('Tag Analysis') }}</h2>
-                    <button type="button" class="btn btn-secondary ml-2" data-toggle="modal"
-                            data-target="#recommendationModal">
+                    <button type="button" class="btn btn-secondary ml-2" data-bs-toggle="modal"
+                            data-bs-target="#recommendationModal">
                         {{ __('Get recommendations') }}
                     </button>
                 </div>
@@ -442,7 +442,7 @@
                     <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title" id="recommendationModalLabel"></h5>
-                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                                 <span aria-hidden="true">&times;</span>
                             </button>
                         </div>
@@ -469,7 +469,7 @@
                         </div>
                         <div class="card-footer d-flex justify-content-end click_tracking"
                              data-click="Get recommendations">
-                            <button class="btn btn-secondary" id="getRecommendations" data-dismiss="modal">
+                            <button class="btn btn-secondary" id="getRecommendations" data-bs-dismiss="modal">
                                 {{ __('Get recommendations') }}
                             </button>
                         </div>
@@ -492,11 +492,7 @@
 
     @slot('js')
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables/buttons/jszip.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/html5.min.js') }}"></script>
         <script src="{{ asset('plugins/pdfmake/pdfmake.min.js') }}"></script>
@@ -530,7 +526,7 @@
 
             $('#start-analyse').click(() => {
                 let phrases = $.trim($('.form-control.phrases').val())
-                let count = $('.custom-select.rounded-0.count').val()
+                let count = $('.form-select.rounded-0.count').val()
                 let token = $('meta[name="csrf-token"]').attr('content')
                 let interval = null
                 if (phrases.length > 0) {
@@ -552,7 +548,7 @@
                             _token: token,
                             phrases: phrases,
                             count: count,
-                            region: $('.custom-select.rounded-0.region').val(),
+                            region: $('.form-select.rounded-0.region').val(),
                             pageHash: window.session,
                         },
                         beforeSend: function () {

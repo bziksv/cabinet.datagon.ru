@@ -1,0 +1,24 @@
+/**
+ * tempusdominus-bootstrap-4 на layout с Bootstrap 5.
+ */
+.bootstrap-datetimepicker-widget {
+    z-index: 1060;
+}
+
+.bootstrap-datetimepicker-widget.dropdown-menu {
+    padding: 0.5rem;
+}
+
+.bootstrap-datetimepicker-widget table td,
+.bootstrap-datetimepicker-widget table th {
+    border-radius: var(--bs-border-radius-sm);
+}
+
+.bootstrap-datetimepicker-widget table td.active,
+.bootstrap-datetimepicker-widget table td.active:hover {
+    background-color: var(--bs-primary);
+}
+
+.input-group.date .input-group-text {
+    cursor: pointer;
+}

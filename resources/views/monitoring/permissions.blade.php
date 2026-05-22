@@ -22,7 +22,7 @@
                                 <div class="card card-info">
                                     <div class="card-header">
                                         <h4 class="card-title w-100">
-                                            <a class="d-block w-100" data-toggle="collapse" href="#collapse{{ $role->id }}" aria-expanded="true">
+                                            <a class="d-block w-100" data-bs-toggle="collapse" href="#collapse{{ $role->id }}" aria-expanded="true">
                                                 {{ $role->title }}
                                             </a>
                                         </h4>
@@ -53,7 +53,6 @@
         <!-- Toastr -->
         <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
         <!-- Bootstrap 4 -->
-        <script src="{{ asset('plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 
         <script>
             toastr.options = {

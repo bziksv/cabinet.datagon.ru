@@ -32,7 +32,7 @@
                             <th style="">{{ __('Errors') }}</th>
                             <th style="">{{ __('Compare') }}</th>
                             <th style="">
-                                <span data-toggle="tooltip" data-placement="left" title="{{ __('Select the story you want to follow.') }}">{{ __('Ideal') }} <i class="far fa-question-circle"></i></span>
+                                <span data-bs-toggle="tooltip" data-bs-placement="left" title="{{ __('Select the story you want to follow.') }}">{{ __('Ideal') }} <i class="far fa-question-circle"></i></span>
                             </th>
                             <th style=""></th>
                         </tr>
@@ -112,7 +112,7 @@
 
         <script>
             $(function () {
-                $('[data-toggle="tooltip"]').tooltip()
+                $('[data-bs-toggle="tooltip"]').tooltip()
             });
 
             var tbody = $('.table tbody');

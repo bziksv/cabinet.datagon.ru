@@ -121,9 +121,9 @@
                                 </div>
                                 <div class="d-flex justify-content-between" style="align-items: center">
                                     <span class="__helper-link ui_tooltip_w">
-                                        <i data-toggle="collapse"
+                                        <i data-bs-toggle="collapse"
                                            aria-expanded="true"
-                                           data-target="#{{ preg_replace('/[^a-zA-Zа-яА-Я]/u', '', $key) }}"
+                                           data-bs-target="#{{ preg_replace('/[^a-zA-Zа-яА-Я]/u', '', $key) }}"
                                            aria-controls="{{ preg_replace('/[^a-zA-Zа-яА-Я]/u', '', $key) }}"
                                            class="fa fa-eye pr-2"
                                            data-action="{{ $item['configurationInfo']['show'] }}"
@@ -144,7 +144,7 @@
                                         </span>
                                     </span>
                                     <span class="__helper-link ui_tooltip_w">
-                                        <i data-toggle="modal" data-target="#removeModal" class="fa fa-trash remove-dir"
+                                        <i data-bs-toggle="modal" data-bs-target="#removeModal" class="fa fa-trash remove-dir"
                                            style="color: white"></i>
                                         <span class="ui_tooltip __bottom">
                                             <span class="ui_tooltip_content">
@@ -189,10 +189,10 @@
                 <button class="btn btn-outline-success w-25" id="saveChanges">
                     {{ __('Save Changes') }}
                 </button>
-                <button class="btn btn-outline-primary w-25" data-toggle="modal" data-target="#addNewDir">
+                <button class="btn btn-outline-primary w-25" data-bs-toggle="modal" data-bs-target="#addNewDir">
                     {{ __('Create a group') }}
                 </button>
-                <button class="btn btn-outline-danger w-50" data-toggle="modal" data-target="#resetAllChanges">
+                <button class="btn btn-outline-danger w-50" data-bs-toggle="modal" data-bs-target="#resetAllChanges">
                     {{ __('Return the standard layout') }}
                 </button>
             </div>
@@ -275,7 +275,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="addNewDirLabel">{{ __('Enter the name of the group') }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -284,8 +284,8 @@
                     <input type="text" class="form form-control" name="dir" id="dir">
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Cancel') }}</button>
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal" id="createDirectory">
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="createDirectory">
                         {{ __('Add') }}
                     </button>
                 </div>
@@ -298,7 +298,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="removeModalLabel">{{ __('Deleting a group') }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -306,9 +306,9 @@
                     {{ __('All menu items located in it will be automatically taken out.') }}
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
                     <button id="removeSelectedBlock" type="button" class="btn btn-secondary"
-                            data-dismiss="modal">{{ __('Remove') }}</button>
+                            data-bs-dismiss="modal">{{ __('Remove') }}</button>
                 </div>
             </div>
         </div>
@@ -320,7 +320,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="resetAllChangesLabel">{{ __('You can restore the default values') }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -328,9 +328,9 @@
                     {{ __('If you return the default values, the order of the menu items will be determined by the administrators.') }}
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
                     <button id="restore" type="button" class="btn btn-danger"
-                            data-dismiss="modal">{{ __('Restore standard sorting') }}</button>
+                            data-bs-dismiss="modal">{{ __('Restore standard sorting') }}</button>
                 </div>
             </div>
         </div>
@@ -390,9 +390,9 @@
                         '        </div>' +
                         '        <div class="d-flex justify-content-between" style="align-items: center">' +
                         '                <span class="__helper-link ui_tooltip_w">' +
-                        '                    <i data-toggle="collapse"' +
+                        '                    <i data-bs-toggle="collapse"' +
                         '                       aria-expanded="true"' +
-                        '                       data-target="#' + newDir.val().replaceAll(' ', '_') + '"' +
+                        '                       data-bs-target="#' + newDir.val().replaceAll(' ', '_') + '"' +
                         '                       aria-controls="' + newDir.val().replaceAll(' ', '_') + '"' +
                         '                       class="fa fa-eye pr-2"' +
                         '                       data-action="true"' +

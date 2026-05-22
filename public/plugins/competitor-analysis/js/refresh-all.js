@@ -11,7 +11,7 @@ function refreshAll() {
     $('.render').remove()
 
     $('#dualbox-phrases-block').html('')
-    if ($('.custom-select.rounded-0.count').val() === '20') {
+    if ($('.form-select.rounded-0.count').val() === '20') {
         $('.extra-th').show()
     } else {
         $('.extra-th').hide()

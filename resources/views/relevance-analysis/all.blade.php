@@ -237,7 +237,7 @@
                                     <div class="modal-header">
                                         <h5 class="modal-title"
                                             id="staticBackdropLabel">{{ __('Repeat the analysis') }}</h5>
-                                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                                             <span aria-hidden="true">&times;</span>
                                         </button>
                                     </div>
@@ -326,7 +326,7 @@
                                                        '56' => __('Chelyabinsk'),
                                                        '1104' => __('Cherkessk'),
                                                        '16' => __('Yaroslavl'),
-                                                       ]), null, ['class' => 'custom-select rounded-0 region']) !!}
+                                                       ]), null, ['class' => 'form-select rounded-0 region']) !!}
                                             </div>
 
                                             <div id="key-phrase">
@@ -334,7 +334,7 @@
                                                 <div class="form-group required">
                                                     <label>{{ __('Top 10/20') }}</label>
                                                     <select name="count" id="count"
-                                                            class="custom-select rounded-0 count">
+                                                            class="form-select rounded-0 count">
                                                         <option value="10">10</option>
                                                         <option value="20">20</option>
                                                     </select>
@@ -424,10 +424,10 @@
                                     <input type="hidden" id="type">
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-default"
-                                                data-dismiss="modal">{{ __('Close') }}
+                                                data-bs-dismiss="modal">{{ __('Close') }}
                                         </button>
                                         <button type="button" class="btn btn-secondary" id="relevance-repeat-scan"
-                                                data-dismiss="modal">
+                                                data-bs-dismiss="modal">
                                             {{ __('Repeat the analysis') }}
                                         </button>
                                     </div>
@@ -547,11 +547,7 @@
 
     @slot('js')
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables/buttons/buttons.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/jszip.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/vfs_fonts.min.js') }}"></script>
@@ -679,7 +675,7 @@
                                 '                 <h5 class="modal-title" id="removeModalLabel">' +
                                 '                     {{ __('Deleting results from a project') }} ' + value.name +
                                 '                 </h5>' +
-                                '                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">' +
+                                '                 <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">' +
                                 '                     <span aria-hidden="true">&times;</span>' +
                                 '                 </button>' +
                                 '             </div>' +
@@ -700,10 +696,10 @@
                                 '             </div>' +
                                 '             <div class="modal-footer">' +
                                 '                 <button type="button" class="btn btn-secondary remove-empty-results"' +
-                                '                         data-target="' + value.id + '" data-dismiss="modal">' +
+                                '                         data-target="' + value.id + '" data-bs-dismiss="modal">' +
                                 '                     {{ __('Remove') }}' +
                                 '                 </button>' +
-                                '                 <button type="button" class="btn btn-default" data-dismiss="modal">' +
+                                '                 <button type="button" class="btn btn-default" data-bs-dismiss="modal">' +
                                 '                     {{ __('Do not delete') }}' +
                                 '                 </button>' +
                                 '             </div>' +
@@ -718,7 +714,7 @@
                                 '        <h5 class="modal-title">' +
                                 '        {{ __('Run an analysis of the end-to-end results of the project') }} ' + value.name +
                                 '        </h5>' +
-                                '    <button type="button" class="close" data-dismiss="modal" aria-label="Close">' +
+                                '    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">' +
                                 '        <span aria-hidden="true">&times;</span>' +
                                 '    </button>' +
                                 '</div>' +
@@ -730,10 +726,10 @@
                                 '    <div class="modal-footer">' +
                                 '        <button data-target="' + value.id + '" type="button"' +
                                 '                class="btn btn-secondary start-through-analyse click_tracking"' +
-                                '                data-dismiss="modal"' +
+                                '                data-bs-dismiss="modal"' +
                                 '                data-click="Start through scan">{{ __('Start') }}</button>' +
                                 '        <button type="button" class="btn btn-default"' +
-                                '                data-dismiss="modal">{{ __('Close') }}</button>' +
+                                '                data-bs-dismiss="modal">{{ __('Close') }}</button>' +
                                 '    </div>' +
                                 '</div>' +
                                 '</div>' +
@@ -744,7 +740,7 @@
                                 '        <div class="modal-content">' +
                                 '        <div class="modal-header">' +
                                 '        <h5 class="modal-title">{{ __('restart analyzed pages') }} ' + value.name + '</h5>' +
-                                '    <button type="button" class="close" data-dismiss="modal" aria-label="Close">' +
+                                '    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">' +
                                 '        <span aria-hidden="true">&times;</span>' +
                                 '    </button>' +
                                 '</div>' +
@@ -756,9 +752,9 @@
                                 '    <div class="modal-footer">' +
                                 '        <button data-target="' + value.id + '" type="button"' +
                                 '                class="btn btn-secondary repeat-scan-unique-sites"' +
-                                '                data-dismiss="modal">{{ __('Start') }}</button>' +
+                                '                data-bs-dismiss="modal">{{ __('Start') }}</button>' +
                                 '        <button type="button" class="btn btn-default"' +
-                                '                data-dismiss="modal">{{ __('Close') }}</button>' +
+                                '                data-bs-dismiss="modal">{{ __('Close') }}</button>' +
                                 '    </div>' +
                                 '</div>' +
                                 '</div>' +
@@ -772,7 +768,7 @@
                                 '     id="removeWithFiltersModalLabel">' +
                                 '         {{ __('Deleting results from a project') }} ' + value.name +
                                 '         </h5>' +
-                                '     <button type="button" class="close" data-dismiss="modal" aria-label="Close">' +
+                                '     <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">' +
                                 '         <span aria-hidden="true">&times;</span>' +
                                 '     </button>' +
                                 ' </div>' +
@@ -839,11 +835,11 @@
                                 '     </div>' +
                                 '     <div class="modal-footer">' +
                                 '         <button type="button" class="btn btn-secondary remove-with-filters"' +
-                                '                 data-dismiss="modal" data-target="' + value.id + '">' +
+                                '                 data-bs-dismiss="modal" data-target="' + value.id + '">' +
                                 '             {{ __('Remove') }}' +
                                 '         </button>' +
                                 '         <button type="button" class="btn btn-default"' +
-                                '                 data-dismiss="modal">{{ __('Do not delete') }}</button>' +
+                                '                 data-bs-dismiss="modal">{{ __('Do not delete') }}</button>' +
                                 '     </div>' +
                                 ' </div>' +
                                 ' </div>' +
@@ -1011,7 +1007,7 @@
 
                                             if (val.state === 1) {
                                                 state =
-                                                    '<button type="button" class="btn btn-secondary get-history-info" data-order="' + val.id + '" data-toggle="modal" data-target="#staticBackdrop">' +
+                                                    '<button type="button" class="btn btn-secondary get-history-info" data-order="' + val.id + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
                                                     "{{ __('Repeat the analysis') }}" +
                                                     '</button>'
                                                     +
@@ -1028,7 +1024,7 @@
                                                 checkAnalyseProgress(val.id)
                                             } else if (val.state === -1) {
                                                 state =
-                                                    '<button type="button" class="btn btn-secondary get-history-info" data-order="' + val.id + '" data-toggle="modal" data-target="#staticBackdrop">' +
+                                                    '<button type="button" class="btn btn-secondary get-history-info" data-order="' + val.id + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
                                                     '{{ __("Processed..") }}' +
                                                     '</button>' +
                                                     "<span class='text-muted'>" + '{{ __("An error has occurred, try again or contact the administrator") }}' + "</span>"
@@ -1480,7 +1476,7 @@
                             '       style="opacity: 0.6; cursor:pointer;"></i>' +
                             '</span>' +
                             '<div class="dropdown" style="display: inline">' +
-                            '    <i class="fa fa-cogs" id="dropdownMenuButton" data-toggle="dropdown"' +
+                            '    <i class="fa fa-cogs" id="dropdownMenuButton" data-bs-toggle="dropdown"' +
                             '       aria-expanded="false" style="opacity: 0.6; cursor: pointer"></i>' +
                             '    <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">' +
                             '                   <span class="dropdown-item project_name"' +
@@ -1497,14 +1493,14 @@
                             '                   </span>' +
                             '        <span class="dropdown-item"' +
                             '              style="cursor:pointer;"' +
-                            '              data-toggle="modal" data-target="#removeModal' + row.id + '">' +
+                            '              data-bs-toggle="modal" data-bs-target="#removeModal' + row.id + '">' +
                             '<i class="fa fa-trash"></i>' +
                             '{{ __('Delete results without comments') }}' +
                             '                   </span>' +
                             '        <span class="dropdown-item"' +
                             '              style="cursor:pointer;"' +
-                            '              data-toggle="modal"' +
-                            '              data-target="#removeWithFiltersModal' + row.id + '">' +
+                            '              data-bs-toggle="modal"' +
+                            '              data-bs-target="#removeWithFiltersModal' + row.id + '">' +
                             '<i class="fa fa-trash"></i>' +
                             '{{ __('Delete using filters') }}' +
                             '                   </span>' +
@@ -1523,8 +1519,8 @@
                                 value.name +
                                 '    <i class="fa fa-trash"' +
                                 '       style="opacity: 0.5; cursor: pointer"' +
-                                '       data-toggle="modal"' +
-                                '       data-target="#removeTagModal' + value.id + '' + row.id + '">' +
+                                '       data-bs-toggle="modal"' +
+                                '       data-bs-target="#removeTagModal' + value.id + '' + row.id + '">' +
                                 '    </i>' +
                                 '</div>'
                         })
@@ -1543,8 +1539,8 @@
                     data: function (row) {
                         return '<span class="count-sites-' + row.id + '">' + row.count_sites + '</span>' +
                             '<i class="fa fa-repeat" style="opacity: 0.6; cursor: pointer"' +
-                            '   data-target="#repeatUniqueScan' + row.id + '"' +
-                            '   data-toggle="modal" data-placement="top"' +
+                            '   data-bs-target="#repeatUniqueScan' + row.id + '"' +
+                            '   data-bs-toggle="modal" data-bs-placement="top"' +
                             '   title="{{ __('restart analyzed pages') }}"></i>'
                     },
 
@@ -1575,9 +1571,9 @@
                                 '</div>'
                         } else {
                             return '<div class="btn-group">' +
-                                '     <button class="btn btn-secondary" data-target="#startThroughScan' + row.id + '"' +
-                                '             data-toggle="modal"' +
-                                '             data-placement="top" class="btn btn-secondary">' +
+                                '     <button class="btn btn-secondary" data-bs-target="#startThroughScan' + row.id + '"' +
+                                '             data-bs-toggle="modal"' +
+                                '             data-bs-placement="top" class="btn btn-secondary">' +
                                 '         {{ __('End-to-end analysis') }}' +
                                 '     </button>' +
                                 '     <button type="button" class="btn btn-secondary">' +
@@ -1727,7 +1723,7 @@
             }
 
             function getSelect(id) {
-                return '<select class="custom-select rounded-0 region" id="region-filter-' + id + '">' +
+                return '<select class="form-select rounded-0 region" id="region-filter-' + id + '">' +
                     '    <option value="none">' + "{{ __("Don't search for matches by region") }}" + '</option>' +
                     '    <option value="all">Любой регион</option>' +
                     '    <option value="213">' + "{{ __('Moscow') }}" + '</option>' +

@@ -1,10 +1,7 @@
 @component('component.card', ['title' => __('General statistics modules')])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.css') }}">
-        <link rel="stylesheet"
-              href="{{ asset('plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-buttons/css/buttons.bootstrap4.min.css') }}">
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-css'])
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/common.css') }}"/>
 
         <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
@@ -61,20 +58,18 @@
         <div class="card-header d-flex p-0">
             <div class="p-3" style="width: 60% !important;">
                 <div class="d-flex">
-                    <div class="input-group">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">
+                    <div class="input-group"><span class="input-group-text">
                                 <i class="far fa-calendar-alt"></i>
                             </span>
-                        </div>
+
                         <input type="text" id="date-range" class="form-control float-right">
                     </div>
-                    <select id="step" class="custom-select">
+                    <select id="step" class="form-select">
                         <option value="day">День</option>
                         <option value="week">Неделя</option>
                         <option value="month">Месяц</option>
                     </select>
-                    <select id="action" class="custom-select">
+                    <select id="action" class="form-select">
                         <option value="actions_counter">Действия</option>
                         <option value="refresh_page_counter">Обновления страниц</option>
                         <option value="seconds">Время проведённое в модулях</option>
@@ -90,10 +85,7 @@
 
     @slot('js')
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables-buttons/js/buttons.html5.js') }}"></script>
         <script src="{{ asset('plugins/datatables-buttons/js/buttons.excel.js') }}"></script>
         <script src="{{ asset('plugins/datatables-buttons/js/buttons.print.js') }}"></script>
@@ -101,8 +93,6 @@
         <script src="{{ asset('plugins/moment/moment.min.js') }}"></script>
         <script src="{{ asset('plugins/inputmask/jquery.inputmask.min.js') }}"></script>
         <script src="{{ asset('plugins/daterangepicker/daterangepicker.js') }}"></script>
-
-        <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
         <script src="{{ asset('plugins/chart.js/3.9.1/chart.js') }}"></script>
         <script>
             let chart = undefined
@@ -321,7 +311,7 @@
                     },
                 },
                 drawCallback: function () {
-                    $('#statistics_length > label > select').addClass('custom-select custom-select-sm form-control form-control-sm')
+                    $('#statistics_length > label > select').addClass('form-select form-select-sm form-control form-control-sm')
                     $('#statistics_filter > label > input[type=search]').addClass('form-control form-control-sm')
 
                 }

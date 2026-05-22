@@ -3,12 +3,7 @@
     @slot('css')
         <!-- Toastr -->
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
-        <!-- DataTables -->
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-buttons/css/buttons.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-fixedheader/css/fixedHeader.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-select/css/select.bootstrap4.css') }}">
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'monitoring-index'])
         <!-- Select2 -->
         <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
@@ -119,18 +114,9 @@
     @slot('js')
         <!-- Toastr -->
         <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
-        <!-- Bootstrap 4 -->
         <script src="{{ asset('plugins/bootstrap-modal-form-templates/bootstrap-modal-form-templates.js') }}"></script>
-        <!-- DataTables  & Plugins -->
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-fixedheader/js/dataTables.fixedHeader.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-select/js/dataTables.select.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-select/js/select.bootstrap4.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'monitoring-index'])
         <script src="{{ asset('plugins/datatables/search.js') }}"></script>
         <!-- Moment js -->
         <script src="{{ asset('plugins/moment/moment-with-locales.min.js') }}"></script>
@@ -282,13 +268,13 @@
                     $.each(columns, function(i, col){
                         let column = $(col);
                         column.addClass('text-nowrap');
-                        column.html(column.text() + ' <i class="far fa-question-circle" data-toggle="tooltip" title="{{ __('Percentage of keys in the top') }}"></i>');
+                        column.html(column.text() + ' <i class="far fa-question-circle" data-bs-toggle="tooltip" title="{{ __('Percentage of keys in the top') }}"></i>');
                     });
 
                     let mastered = api.column( 'mastered:name' ).header();
-                    $(mastered).addClass('text-nowrap').html('{{__('Mastered')}}  <i class="far fa-question-circle" data-toggle="tooltip" title="В этом столбце показывается освоенный бюджет за один календарный день на момент снятия последней позиции. Ниже показывается процент освоенности в расчете на 30 каледнарных дней."></i>');
+                    $(mastered).addClass('text-nowrap').html('{{__('Mastered')}}  <i class="far fa-question-circle" data-bs-toggle="tooltip" title="В этом столбце показывается освоенный бюджет за один календарный день на момент снятия последней позиции. Ниже показывается процент освоенности в расчете на 30 каледнарных дней."></i>');
 
-                    $(api.column( 'middle:name' ).header()).addClass('text-nowrap').html('{{ __('Position') }} <i class="far fa-question-circle" data-toggle="tooltip" title="{{ __('Mid-position') }}"></i>');
+                    $(api.column( 'middle:name' ).header()).addClass('text-nowrap').html('{{ __('Position') }} <i class="far fa-question-circle" data-bs-toggle="tooltip" title="{{ __('Mid-position') }}"></i>');
                 },
                 initComplete: function () {
                     let api = this.api();
@@ -384,7 +370,7 @@
 
                         table.row.add(response[0]).draw(false);
 
-                        $('[data-toggle="tooltip"]').tooltip();
+                        $('[data-bs-toggle="tooltip"]').tooltip();
                     },
                 });
             }
@@ -474,12 +460,10 @@
                         });
                     }).then(function () {
 
-                        let group = modal.find('.custom-select[name="monitoring_group_id"]');
+                        let group = modal.find('.form-select[name="monitoring_group_id"]');
                         if (group.length) {
 
-                            group.select2({
-                                theme: 'bootstrap4'
-                            });
+                            group.select2({});
 
                             modal.find('#create-group').click(function () {
                                 let el = $(this);
@@ -714,7 +698,7 @@
             {
                 $('.loader').remove();
 
-                $('[data-toggle="tooltip"]').tooltip({
+                $('[data-bs-toggle="tooltip"]').tooltip({
                     animation: false,
                     trigger: 'hover',
                 });

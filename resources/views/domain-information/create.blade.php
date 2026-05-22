@@ -21,14 +21,14 @@
             {!! Form::select('check_dns', [
                 '1' => __('yes'),
                 '0' => __('no'),
-                ], null, ['class' => 'form-control custom-select rounded-0']) !!}
+                ], null, ['class' => 'form-control form-select rounded-0']) !!}
         </div>
         <div class="form-group required">
             {!! Form::label(__('Check registration Date')) !!}
             {!! Form::select('check_registration_date', [
                 '1' => __('yes'),
                 '0' => __('no'),
-            ], null, ['class' => 'form-control custom-select rounded-0 monitoring']) !!}
+            ], null, ['class' => 'form-control form-select rounded-0 monitoring']) !!}
         </div>
         <div class="pt-1 pb-1 list">
             <a href="#">Добавить домены списком</a>

@@ -134,7 +134,7 @@
                 cursor: pointer;
             }
 
-            #tasks .custom.custom-select {
+            #tasks .form-select {
                 width: 160px;
             }
 
@@ -300,41 +300,41 @@
             <div class="card-header p-0 pt-1 border-bottom-0">
                 <ul class="nav nav-tabs" id="custom-tabs-three-tab" role="tablist">
                     <li class="nav-item">
-                        <a class="nav-link active" id="custom-tabs-three-home-tab" data-toggle="pill"
+                        <a class="nav-link active" id="custom-tabs-three-home-tab" data-bs-toggle="pill"
                            href="#custom-tabs-three-home" role="tab" aria-controls="custom-tabs-three-home"
                            aria-selected="false">Активные</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" id="custom-tabs-three-kanban-tab" data-toggle="pill"
+                        <a class="nav-link" id="custom-tabs-three-kanban-tab" data-bs-toggle="pill"
                            href="#custom-tabs-three-kanban" role="tab" aria-controls="custom-tabs-three-kanban"
                            aria-selected="false">Канбан</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" id="archived-checklists" data-toggle="pill"
+                        <a class="nav-link" id="archived-checklists" data-bs-toggle="pill"
                            href="#custom-tabs-three-profile" role="tab" aria-controls="custom-tabs-three-profile"
                            aria-selected="false">Архив</a>
                     </li>
                     @if(\App\User::isUserAdmin())
                         <li class="nav-item">
-                            <a class="nav-link" id="classic-stubs" data-toggle="pill"
+                            <a class="nav-link" id="classic-stubs" data-bs-toggle="pill"
                                href="#classic-tabs-stub" role="tab" aria-controls="classic-tabs-stub"
                                aria-selected="false">Базовые шаблоны</a>
                         </li>
                     @endif
                     <li class="nav-item">
-                        <a class="nav-link" id="personal-stubs" data-toggle="pill"
+                        <a class="nav-link" id="personal-stubs" data-bs-toggle="pill"
                            href="#personal-tabs-stub" role="tab" aria-controls="personal-tabs-stub"
                            aria-selected="false">Личные шаблоны</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link d-flex align-items-center" id="repeat-tasks" data-toggle="pill"
+                        <a class="nav-link d-flex align-items-center" id="repeat-tasks" data-bs-toggle="pill"
                            href="#repeat-tasks-tab" role="tab" aria-controls="repeat-tasks-tab"
                            aria-selected="false">
                             Повторяющиеся задачи
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link d-flex align-items-center" id="notification" data-toggle="pill"
+                        <a class="nav-link d-flex align-items-center" id="notification" data-bs-toggle="pill"
                            href="#notification-tab" role="tab" aria-controls="notification-tab"
                            aria-selected="false">
                             Уведомления
@@ -357,49 +357,49 @@
                             <div class="card-body row">
                                 <div class="d-flex col-xs-12 col-xl-6 align-items-center"
                                      style="margin-top: 10px;">
-                                    <button class="btn btn-secondary relevance-star mr-1" data-toggle="modal"
-                                            data-target="#exampleModal">
+                                    <button class="btn btn-secondary relevance-star mr-1" data-bs-toggle="modal"
+                                            data-bs-target="#exampleModal">
                                         <i class="fa-regular fa-star"
-                                           data-toggle="tooltip"
-                                           data-placement="top"
+                                           data-bs-toggle="tooltip"
+                                           data-bs-placement="top"
                                            title="Добавить проекты из анализа релевантности"></i>
                                     </button>
-                                    <button class="btn btn-secondary position-star mr-1" data-toggle="modal"
-                                            data-target="#exampleModal">
-                                        <i class="fas fa-chart-line" data-toggle="tooltip" data-placement="top"
+                                    <button class="btn btn-secondary position-star mr-1" data-bs-toggle="modal"
+                                            data-bs-target="#exampleModal">
+                                        <i class="fas fa-chart-line" data-bs-toggle="tooltip" data-bs-placement="top"
                                            title="Добавить проекты из мониторинга позиций"></i>
                                     </button>
-                                    <button class="btn btn-secondary metatag-star mr-1" data-toggle="modal"
-                                            data-target="#exampleModal">
-                                        <i class="fas fa-heading" data-toggle="tooltip" data-placement="top"
+                                    <button class="btn btn-secondary metatag-star mr-1" data-bs-toggle="modal"
+                                            data-bs-target="#exampleModal">
+                                        <i class="fas fa-heading" data-bs-toggle="tooltip" data-bs-placement="top"
                                            title="Добавить проекты из мониторинга метатегов"></i>
                                     </button>
-                                    <button class="btn btn-secondary domain-monitoring-star mr-2" data-toggle="modal"
-                                            data-target="#exampleModal">
-                                        <i class="fas fa-edit" data-toggle="tooltip" data-placement="top"
+                                    <button class="btn btn-secondary domain-monitoring-star mr-2" data-bs-toggle="modal"
+                                            data-bs-target="#exampleModal">
+                                        <i class="fas fa-edit" data-bs-toggle="tooltip" data-bs-placement="top"
                                            title="Добавить проекты из мониторинга сайтов"></i>
                                     </button>
 
-                                    <button class="btn btn-secondary mr-1" data-toggle="modal"
-                                            data-target="#createNewProject"
+                                    <button class="btn btn-secondary mr-1" data-bs-toggle="modal"
+                                            data-bs-target="#createNewProject"
                                             id="add-new-checklist">
                                         Добавить проект
                                     </button>
 
-                                    <button type="button" class="btn btn-secondary mr-1" data-toggle="modal"
-                                            data-target="#modalLabel">
+                                    <button type="button" class="btn btn-secondary mr-1" data-bs-toggle="modal"
+                                            data-bs-target="#modalLabel">
                                         Управление метками
                                     </button>
 
-                                    <button id="create-new-stub" class="btn btn-secondary" data-toggle="modal"
-                                            data-target="#createNewSTub">
+                                    <button id="create-new-stub" class="btn btn-secondary" data-bs-toggle="modal"
+                                            data-bs-target="#createNewSTub">
                                         Добавить шаблон
                                     </button>
                                 </div>
                                 <div class="d-flex col-xs-12 col-xl-6 align-items-center justify-content-between">
                                     <div class="form-group">
                                         <label for="count">Количество проектов</label>
-                                        <select name="count" id="count" class="custom custom-select">
+                                        <select name="count" id="count" class="form-select">
                                             <option value="1">1</option>
                                             <option value="3">3</option>
                                             <option value="5">5</option>
@@ -429,7 +429,7 @@
                                 <div class="modal-content">
                                     <div class="modal-header">
                                         <h5 class="modal-title" id="exampleModalLabel">Добавление проектов</h5>
-                                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                                             <span aria-hidden="true">&times;</span>
                                         </button>
                                     </div>
@@ -441,7 +441,7 @@
                                             Добавить
                                         </button>
                                         <button type="button" class="btn btn-default" id="close-multiply-projects"
-                                                data-dismiss="modal">
+                                                data-bs-dismiss="modal">
                                             Закрыть
                                         </button>
                                     </div>
@@ -598,8 +598,8 @@
                                 <div class="card-body row">
                                     <div class="d-flex col-xs-12 col-xl-6 align-items-center"
                                          style="margin-top: 10px;">
-                                        <button id="create-new-stub" class="btn btn-secondary" data-toggle="modal"
-                                                data-target="#createNewSTub">
+                                        <button id="create-new-stub" class="btn btn-secondary" data-bs-toggle="modal"
+                                                data-bs-target="#createNewSTub">
                                             Добавить шаблон
                                         </button>
                                     </div>
@@ -607,7 +607,7 @@
                                         <div class="form-group">
                                             <label for="count-classic-stub">Количество шаблонов</label>
                                             <select name="count-classic-stub" id="count-classic-stub"
-                                                    class="custom custom-select">
+                                                    class="form-select">
                                                 <option value="1">1</option>
                                                 <option value="3">3</option>
                                                 <option value="5">5</option>
@@ -642,8 +642,8 @@
                             <div class="card-body row">
                                 <div class="d-flex col-xs-12 col-xl-6 align-items-center"
                                      style="margin-top: 10px;">
-                                    <button id="create-new-stub" class="btn btn-secondary" data-toggle="modal"
-                                            data-target="#createNewSTub">
+                                    <button id="create-new-stub" class="btn btn-secondary" data-bs-toggle="modal"
+                                            data-bs-target="#createNewSTub">
                                         Добавить шаблон
                                     </button>
                                 </div>
@@ -651,7 +651,7 @@
                                     <div class="form-group">
                                         <label for="count-personal-stub">Количество шаблонов</label>
                                         <select name="count-personal-stub" id="count-personal-stub"
-                                                class="custom custom-select">
+                                                class="form-select">
                                             <option value="1">1</option>
                                             <option value="3">3</option>
                                             <option value="5">5</option>
@@ -676,8 +676,8 @@
                     </div>
                     <div class="tab-pane fade" id="repeat-tasks-tab" role="tabpanel"
                          aria-labelledby="personal-stubs">
-                        <button id="get-projects" type="button" class="btn btn-secondary mb-3" data-toggle="modal"
-                                data-target="#myModal">Добавить повторяющиеся задачи
+                        <button id="get-projects" type="button" class="btn btn-secondary mb-3" data-bs-toggle="modal"
+                                data-bs-target="#myModal">Добавить повторяющиеся задачи
                         </button>
 
                         <div class="modal" id="myModal">
@@ -686,7 +686,7 @@
 
                                     <div class="modal-header">
                                         <h4 class="modal-title">Добавление повторяющихся задач</h4>
-                                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                                        <button type="button" class="close" data-bs-dismiss="modal">&times;</button>
                                     </div>
 
                                     <div class="modal-body">
@@ -711,7 +711,7 @@
                                         </div>
                                         <div class="form-group">
                                             <label for="weekends">Учитывать выходные?</label>
-                                            <select name="weekends" id="repeat_weekends" class="custom-select">
+                                            <select name="weekends" id="repeat_weekends" class="form-select">
                                                 <option value="1">Да</option>
                                                 <option value="0">Нет</option>
                                             </select>
@@ -732,7 +732,7 @@
                                         <button type="button" class="btn btn-success"
                                                 id="save-new-repeat-task">{{ __('Save') }}</button>
                                         <button type="button" class="btn btn-default" id="close-repeat-modal"
-                                                data-dismiss="modal">{{ __('Close') }}</button>
+                                                data-bs-dismiss="modal">{{ __('Close') }}</button>
                                     </div>
 
                                 </div>
@@ -764,7 +764,7 @@
                                 </th>
                                 <th>
                                     <select name="weekends"
-                                            class="filter-input custom-select" data-index="4">
+                                            class="filter-input form-select" data-index="4">
                                         <option value="1">Да</option>
                                         <option value="0">Нет</option>
                                     </select>
@@ -804,7 +804,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="projectModalLabel">Подтвердите действие</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -813,8 +813,8 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="move-to-archive"
-                            data-dismiss="modal">{{ __('Archive it') }}</button>
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+                            data-bs-dismiss="modal">{{ __('Archive it') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
                 </div>
             </div>
         </div>
@@ -826,7 +826,7 @@
             <div class="modal-content col-9 mr-2">
                 <div class="modal-header">
                     <h5 class="modal-title" id="createNewProjectLabel">Добавление нового проекта</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -842,7 +842,7 @@
                                     </span>
                                 </span>
                             </span>
-                            <select name="dynamic-stub" id="dynamic-stub" class="custom-select">
+                            <select name="dynamic-stub" id="dynamic-stub" class="form-select">
                                 <option value="1">Да</option>
                                 <option value="0" selected>Нет</option>
                             </select>
@@ -882,7 +882,7 @@
                                     </span>
                                 </span>
                             </span>
-                        <select name="save-stub" id="save-stub" class="custom-select">
+                        <select name="save-stub" id="save-stub" class="form-select">
                             <option value="no" selected>Не сохранять шаблон</option>
                             <option value="personal">Личный шаблон</option>
                             @if(\App\User::isUserAdmin())
@@ -893,7 +893,7 @@
                     </div>
                     <div class="form-group">
                         <label for="project-start-date">Запуск проекта</label>
-                        <select name="project-start-date" id="project-start-date" class="custom custom-select">
+                        <select name="project-start-date" id="project-start-date" class="form-select">
                             <option value="now">Сейчас</option>
                             <option value="wait">Отложенный запуск</option>
                         </select>
@@ -906,7 +906,7 @@
                                name="count-wait-days" disabled>
                     </div>
                     <div>
-                        <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+                        <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
                         <button type="button" class="btn btn-success" id="save-new-checklist">
                             {{ __('Save') }}
                         </button>
@@ -917,7 +917,7 @@
             <div class="modal-content col-3">
                 <div class="modal-header">
                     <h5 class="modal-title" id="createNewProjectLabel">Шаблоны</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -936,7 +936,7 @@
             <div class="modal-content col-12">
                 <div class="modal-header">
                     <h5 class="modal-title" id="createNewSTubLabel">Добавление нового шаблона</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -948,7 +948,7 @@
                         </div>
                         <div class="form-group block-from-hide">
                             <label for="save-stub-action">Выбор сохранения</label>
-                            <select name="save-stub-action" id="save-stub-action" class="custom-select">
+                            <select name="save-stub-action" id="save-stub-action" class="form-select">
                                 <option value="personal">Сохранить как личный шаблон</option>
                                 @if(\App\User::isUserAdmin())
                                     <option value="classic" selected>Сохранить как базовый шаблон</option>
@@ -971,7 +971,7 @@
                     <div>
                     </div>
                     <div>
-                        <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+                        <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
                         <button type="button" class="btn btn-success" id="save-new-stubs">
                             {{ __('Save') }}
                         </button>
@@ -987,7 +987,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="removeModalLabel">Подтвердите действие</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -996,7 +996,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="remove">{{ __('Delete') }}</button>
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
                 </div>
             </div>
         </div>
@@ -1007,7 +1007,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="rotateModalLabel">Подтвердите действие</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -1016,7 +1016,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="rotate-checklist">Восстановить</button>
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
                 </div>
             </div>
         </div>
@@ -1029,15 +1029,15 @@
                 <div class="modal-header">
                     <ul class="nav nav-pills">
                         <li class="nav-item">
-                            <a href="#add-to-project" data-toggle="tab" class="nav-link active">
+                            <a href="#add-to-project" data-bs-toggle="tab" class="nav-link active">
                                 Добавить метку к проекту
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="#managing" data-toggle="tab" class="nav-link">Мои метки</a>
+                            <a href="#managing" data-bs-toggle="tab" class="nav-link">Мои метки</a>
                         </li>
                     </ul>
-                    <button type="button" data-dismiss="modal" aria-label="Close" class="close">
+                    <button type="button" data-bs-dismiss="modal" aria-label="Close" class="close">
                         <span aria-hidden="true">×</span></button>
                 </div>
                 <div>
@@ -1062,7 +1062,7 @@
                                     <button type="button" class="btn btn-secondary mr-1" id="create-new-relations">
                                         Сохранить
                                     </button>
-                                    <button type="button" data-dismiss="modal" class="btn btn-default">
+                                    <button type="button" data-bs-dismiss="modal" class="btn btn-default">
                                         Закрыть
                                     </button>
                                 </div>
@@ -1103,7 +1103,7 @@
                                     </div>
                                 </div>
                                 <button id="create-label" class="btn btn-secondary">Создать метку</button>
-                                <button type="button" data-dismiss="modal" class="btn btn-default">Закрыть</button>
+                                <button type="button" data-bs-dismiss="modal" class="btn btn-default">Закрыть</button>
                             </div>
                         </div>
                     </div>
@@ -1118,7 +1118,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="removeRelationModalLabel">Подтвердите действие</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close"
                             id="closeRemoveRelationModal">
                         <span aria-hidden="true">&times;</span>
                     </button>
@@ -1142,7 +1142,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="updateTaskModalLabel">Изменение задачи</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -1153,7 +1153,7 @@
                     </div>
                     <div class="form-group">
                         <label for="change-task-state">Статус задачи</label>
-                        <select id="change-task-state" class="custom custom-select update-task" data-type="status">
+                        <select id="change-task-state" class="form-select update-task" data-type="status">
                             <option value="new">Новая</option>
                             <option value="in_work">В работе</option>
                             <option value="ready">Готово</option>
@@ -1182,7 +1182,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
                 </div>
             </div>
         </div>
@@ -1191,11 +1191,7 @@
     @slot('js')
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables/buttons/buttons.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/jszip.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/vfs_fonts.min.js') }}"></script>
@@ -1294,12 +1290,12 @@
                             ' data-name="' + text + '"' +
                             ' data-target="' + checklistID + '"' +
                             ' data-id="' + labelID + '"' +
-                            ' data-toggle="tooltip"' +
-                            '    data-placement="top" title="' + text + '">' +
+                            ' data-bs-toggle="tooltip"' +
+                            '    data-bs-placement="top" title="' + text + '">' +
                             '         <span class="fas fa-square"' +
                             '               style="color: ' + color + ' !important;"' +
-                            '               data-toggle="modal"' +
-                            '               data-target="#removeRelationModal"></span>' +
+                            '               data-bs-toggle="modal"' +
+                            '               data-bs-target="#removeRelationModal"></span>' +
                             '</li>'
                         )
 
@@ -1498,7 +1494,7 @@
                     '                </div>' +
                     '                <div class="form-group col-4">' +
                     '                    <label>Статус</label>' +
-                    '                    <select data-id="status-' + counter + '-' + subTaskCounter + '" class="custom custom-select">' +
+                    '                    <select data-id="status-' + counter + '-' + subTaskCounter + '" class="form-select">' +
                     '                        <option value="new">Новая</option>' +
                     '                        <option value="in_work">В работе</option>' +
                     '                        <option value="ready">Готово</option>' +
@@ -1512,14 +1508,14 @@
                     '                </div>' +
                     '            </div>' +
                     '            <div style="display: flex; justify-content: center; align-items: center; margin-top: 13px;">' +
-                    '                <button class="btn btn-sm btn-default" data-toggle="collapse"' +
-                    '                        data-target="#collapse' + counter + '-' + subTaskCounter + '"' +
+                    '                <button class="btn btn-sm btn-default" data-bs-toggle="collapse"' +
+                    '                        data-bs-target="#collapse' + counter + '-' + subTaskCounter + '"' +
                     '                        aria-expanded="true" aria-controls="collapse' + counter + '-' + subTaskCounter + '">' +
-                    '                    <i class="fa fa-eye" data-toggle="tooltip" data-placement="top" title="Скрыть - Показать"></i>' +
+                    '                    <i class="fa fa-eye" data-bs-toggle="tooltip" data-bs-placement="top" title="Скрыть - Показать"></i>' +
                     '                </button>' +
                     '                <button class="btn btn-sm btn-default remove-task"' +
-                    '                        data-toggle="tooltip"' +
-                    '                        data-placement="top" title="Удалить">' +
+                    '                        data-bs-toggle="tooltip"' +
+                    '                        data-bs-placement="top" title="Удалить">' +
                     '                    <i class="fa fa-trash"></i>' +
                     '                </button>' +
                     '            </div>' +
@@ -1558,7 +1554,7 @@
                     '            </div>' +
                     '            <div class="form-group col-4">' +
                     '                <label>Статус</label>' +
-                    '                <select data-id="status-' + counter + '" class="custom custom-select">' +
+                    '                <select data-id="status-' + counter + '" class="form-select">' +
                     '                    <option value="new">Новая</option>' +
                     '                    <option value="in_work">В работе</option>' +
                     '                    <option value="expired">Просрочено</option>' +
@@ -1572,15 +1568,15 @@
                     '            </div>' +
                     '        </div>' +
                     '        <div style="display: flex; justify-content: center; align-items: center; margin-top: 13px;">' +
-                    '            <button class="btn btn-sm btn-default" data-toggle="collapse"' +
-                    '                    data-target="#collapse' + counter + '"' +
+                    '            <button class="btn btn-sm btn-default" data-bs-toggle="collapse"' +
+                    '                    data-bs-target="#collapse' + counter + '"' +
                     '                    aria-expanded="true" aria-controls="collapse' + counter + '">' +
-                    '                <i class="fa fa-eye" data-toggle="tooltip" data-placement="top"' +
+                    '                <i class="fa fa-eye" data-bs-toggle="tooltip" data-bs-placement="top"' +
                     '                   title="Скрыть - Показать"></i>' +
                     '            </button>' +
                     '            <button class="btn btn-sm btn-default remove-task"' +
-                    '                    data-toggle="tooltip"' +
-                    '                    data-placement="top" title="Удалить">' +
+                    '                    data-bs-toggle="tooltip"' +
+                    '                    data-bs-placement="top" title="Удалить">' +
                     '                <i class="fa fa-trash"></i>' +
                     '            </button>' +
                     '        </div>' +
@@ -1626,9 +1622,9 @@
                                 $.each(v.labels, function (index, label) {
                                     labels +=
                                         '<li class="checklist-label" data-name="' + label.name + '" data-target="' + v.id + '" data-id="' + label.id + '" ' +
-                                        '    data-toggle="tooltip" data-placement="top" ' +
+                                        '    data-bs-toggle="tooltip" data-bs-placement="top" ' +
                                         '    title="' + label.name + '">' +
-                                        '    <span class="fas fa-square" style="color: ' + label.color + ' !important;" data-toggle="modal" data-target="#removeRelationModal"></span>' +
+                                        '    <span class="fas fa-square" style="color: ' + label.color + ' !important;" data-bs-toggle="modal" data-bs-target="#removeRelationModal"></span>' +
                                         '</li>'
                                 })
 
@@ -1643,12 +1639,12 @@
                                     '            <div class="d-flex align-items-baseline">' +
                                     '                <img src="/storage/' + v.icon + '" alt="fav icon" class="icon mr-2"> ' +
                                     '                <a href="' + v.url + '" target="_blank"' +
-                                    '                    data-toggle="tooltip" data-placement="top"' +
+                                    '                    data-bs-toggle="tooltip" data-bs-placement="top"' +
                                     '                    title="' + v.url + '">' + new URL(v.url)['origin'] + '</a>' +
                                     '            </div>' +
                                     '            <div>' +
-                                    '                <button class="btn btn-default rotate-checklist" data-id="' + v.id + '" data-toggle="modal" data-target="#rotateModal">' +
-                                    '                    <i class="fa-solid fa-rotate-left" data-toggle="tooltip" data-placement="top"' +
+                                    '                <button class="btn btn-default rotate-checklist" data-id="' + v.id + '" data-bs-toggle="modal" data-bs-target="#rotateModal">' +
+                                    '                    <i class="fa-solid fa-rotate-left" data-bs-toggle="tooltip" data-bs-placement="top"' +
                                     '                       title="Восстановить из архива"></i>' +
                                     '                </button>' +
                                     '            </div>' +
@@ -1686,8 +1682,8 @@
                                     '            </div>' +
                                     '            <div class="col-6 d-flex align-items-end justify-content-end">' +
                                     '                <button class="btn btn-flat btn-secondary remove-checklist" ' +
-                                    '                        data-toggle="modal"' +
-                                    '                        data-target="#removeModal" data-id="' + v.id + '">' +
+                                    '                        data-bs-toggle="modal"' +
+                                    '                        data-bs-target="#removeModal" data-id="' + v.id + '">' +
                                     '                            Удалить из архива' +
                                     '                 </button>' +
                                     '            </div>' +
@@ -1962,9 +1958,9 @@
                 return '<div data-id="' + value.id + '" data-deadline="' + value.deadline + '" data-status="' + value.status + '" class="dl-task-info task" draggable="true">' +
                     '<div class="b-task-microcard has-menu">' +
                     '   <div class="task-microcard-project text-size-s text-style-stt d-flex justify-content-between" style="word-break: break-word;">' +
-                    '       <a target="_blank" href="' + value.project.url + '" data-toggle="tooltip" data-placement="top" title="' + value.project.url + '">' +
+                    '       <a target="_blank" href="' + value.project.url + '" data-bs-toggle="tooltip" data-bs-placement="top" title="' + value.project.url + '">' +
                     new URL(value.project.url)['origin'] + '</a>' +
-                    '   <button class="btn btn-default btn-sm get-task-info" data-id="' + value.id + '" type="button" data-toggle="modal" data-target="#updateTaskModal"><i class="fa fa-edit"></i></button>' +
+                    '   <button class="btn btn-default btn-sm get-task-info" data-id="' + value.id + '" type="button" data-bs-toggle="modal" data-bs-target="#updateTaskModal"><i class="fa fa-edit"></i></button>' +
                     '   </div>' +
                     '   <div class="task-microcard-title task-microcard-block-2 tr-taskstatus-color-3377C3 tr-taskstatus-style-0 text-size-l text-style-stb">' +
                     '       <a href="/checklist-tasks/' + value.project.id + '" target="_blank">' + value.name + '</a> ' +
@@ -2094,7 +2090,7 @@
                     '            </div>' +
                     '            <div class="form-group col-4">' +
                     '                <label>Статус</label>' +
-                    '                <select data-id="status-' + counter + '" class="custom custom-select">' +
+                    '                <select data-id="status-' + counter + '" class="form-select">' +
                     '                    <option value="new">Новая</option>' +
                     '                    <option value="in_work">В работе</option>' +
                     '                    <option value="expired">Просроченая</option>' +
@@ -2107,15 +2103,15 @@
                     '            </div>' +
                     '        </div>' +
                     '        <div style="display: flex; justify-content: center; align-items: center; margin-top: 13px;">' +
-                    '            <button class="btn btn-sm btn-default" data-toggle="collapse"' +
-                    '                    data-target="#collapse' + counter + '"' +
+                    '            <button class="btn btn-sm btn-default" data-bs-toggle="collapse"' +
+                    '                    data-bs-target="#collapse' + counter + '"' +
                     '                    aria-expanded="true" aria-controls="collapse' + counter + '">' +
-                    '                <i class="fa fa-eye" data-toggle="tooltip" data-placement="top"' +
+                    '                <i class="fa fa-eye" data-bs-toggle="tooltip" data-bs-placement="top"' +
                     '                   title="Скрыть - Показать"></i>' +
                     '            </button>' +
                     '            <button class="btn btn-sm btn-default remove-task"' +
-                    '                    data-toggle="tooltip"' +
-                    '                    data-placement="top" title="Удалить">' +
+                    '                    data-bs-toggle="tooltip"' +
+                    '                    data-bs-placement="top" title="Удалить">' +
                     '                <i class="fa fa-trash"></i>' +
                     '            </button>' +
                     '        </div>' +
@@ -2265,9 +2261,9 @@
                     $.each(v.labels, function (index, label) {
                         labels +=
                             '<li class="checklist-label" data-name="' + label.name + '" data-target="' + v.id + '" data-id="' + label.id + '" ' +
-                            '    data-toggle="tooltip" data-placement="top" ' +
+                            '    data-bs-toggle="tooltip" data-bs-placement="top" ' +
                             '    title="' + label.name + '">' +
-                            '    <span class="fas fa-square" style="color: ' + label.color + ' !important;" data-toggle="modal" data-target="#removeRelationModal"></span>' +
+                            '    <span class="fas fa-square" style="color: ' + label.color + ' !important;" data-bs-toggle="modal" data-bs-target="#removeRelationModal"></span>' +
                             '</li>'
                     })
 
@@ -2289,12 +2285,12 @@
                         '            <div class="d-flex align-items-center">' +
                         '                <img src="/storage/' + v.icon + '" alt="fav icon" class="icon mr-2"> ' +
                         '                <a href="' + v.url + '" target="_blank"' +
-                        '                    data-toggle="tooltip" data-placement="top" class="edited-site-' + v.id + '"' +
+                        '                    data-bs-toggle="tooltip" data-bs-placement="top" class="edited-site-' + v.id + '"' +
                         '                    title="' + v.url + '">' + new URL(v.url)['origin'] + '</a>' +
                         '            </div>' +
                         '            <div>' +
-                        '                <button class="btn btn-default select-id" data-toggle="modal" data-target="#projectModal"  data-id="' + v.id + '">' +
-                        '                    <i class="fa fa-trash" data-toggle="tooltip" data-placement="top"' +
+                        '                <button class="btn btn-default select-id" data-bs-toggle="modal" data-bs-target="#projectModal"  data-id="' + v.id + '">' +
+                        '                    <i class="fa fa-trash" data-bs-toggle="tooltip" data-bs-placement="top"' +
                         '                       title="{{ __('Archive it') }}"></i>' +
                         '                </button>' +
                         '            </div>' +
@@ -2328,19 +2324,19 @@
                         '            <div class="d-flex col-4 flex-column">' + statistics + '</div>' +
                         '            <div class="d-flex col-2 flex-column align-items-end">' +
                         '                <div>' +
-                        '                    <a target="_blank" href="{{ route('relevance.history') }}" data-target="' + v.url + '" class="fa-regular fa-star text-dark localstorage-item" data-toggle="tooltip" data-placement="top"' +
+                        '                    <a target="_blank" href="{{ route('relevance.history') }}" data-target="' + v.url + '" class="fa-regular fa-star text-dark localstorage-item" data-bs-toggle="tooltip" data-bs-placement="top"' +
                         '                       title="Анализ релевантности"></a>' +
                         '                </div>' +
                         '                <div style="margin-right: 1px">' +
-                        '                    <a target="_blank" href="/monitoring" data-target="' + v.url + '" class="fa fa-chart-line text-dark localstorage-item" data-toggle="tooltip" data-placement="top"' +
+                        '                    <a target="_blank" href="/monitoring" data-target="' + v.url + '" class="fa fa-chart-line text-dark localstorage-item" data-bs-toggle="tooltip" data-bs-placement="top"' +
                         '                       title="Мониторинг позиций"></a>' +
                         '                </div>' +
                         '                <div style="margin-right: 3px">' +
-                        '                    <a target="_blank" href="/meta-tags" data-target="' + v.url + '" class="fa fa-heading text-dark localstorage-item" data-toggle="tooltip" data-placement="top"' +
+                        '                    <a target="_blank" href="/meta-tags" data-target="' + v.url + '" class="fa fa-heading text-dark localstorage-item" data-bs-toggle="tooltip" data-bs-placement="top"' +
                         '                       title="Мониторинг метатегов"></a>' +
                         '                </div>' +
                         '                <div>' +
-                        '                    <a target="_blank" href="{{ route('site.monitoring') }}" data-target="' + v.url + '" class="fa fa-edit text-dark localstorage-item" data-toggle="tooltip" data-placement="top"' +
+                        '                    <a target="_blank" href="{{ route('site.monitoring') }}" data-target="' + v.url + '" class="fa fa-edit text-dark localstorage-item" data-bs-toggle="tooltip" data-bs-placement="top"' +
                         '                       title="Мониторинг сайтов"></a>' +
                         '                </div>' +
                         '            </div>' +
@@ -2364,8 +2360,8 @@
             }
 
             function refreshTooltips() {
-                $('[data-toggle="tooltip"]').tooltip('dispose');
-                $('[data-toggle="tooltip"]').tooltip()
+                $('[data-bs-toggle="tooltip"]').tooltip('dispose');
+                $('[data-bs-toggle="tooltip"]').tooltip()
             }
 
             $('#add-new-stub').on('click', function () {
@@ -2581,7 +2577,7 @@
                     return '<li data-id="' + id + '" class="default d-flex">' +
                         '    <input type="text" class="form form-control hide-border" data-type="name" placeholder="Без названия" data-target="' + id + '">' +
                         '    <div class="tools d-flex" style="float: right">' +
-                        '        <select data-id="status-' + id + '" data-target="' + id + '" class="custom custom-select task-status" data-type="status" data-toggle="tooltip" data-placement="left" title="Статус задачи">' +
+                        '        <select data-id="status-' + id + '" data-target="' + id + '" class="form-select task-status" data-type="status" data-bs-toggle="tooltip" data-bs-placement="left" title="Статус задачи">' +
                         '            <option value="new" selected>Новая</option>' +
                         '            <option value="in_work">В работе</option>' +
                         '            <option value="ready">Готово</option>' +
@@ -2589,17 +2585,17 @@
                         '            <option value="deactivated">Не активная</option>' +
                         '            <option value="repeat">Повторяющаяся</option>' +
                         '        </select>' +
-                        '        <select class="custom custom-select" data-target="' + id + '" data-type="weekends" data-toggle="tooltip" data-placement="left" title="Учитывать выходные дни?" style="display: none">' +
+                        '        <select class="form-select" data-target="' + id + '" data-type="weekends" data-bs-toggle="tooltip" data-bs-placement="left" title="Учитывать выходные дни?" style="display: none">' +
                         '               <option value="1">Да</option>' +
                         '               <option value="0">Нет</option>' +
                         '        </select>' +
-                        '        <input class="form form-control datetime-repeat-counter" type="number" step="1" min="1" data-target="' + id + '" data-type="repeat_after" value="1" data-toggle="tooltip" data-placement="left" title="Повторять каждые N дней" style="display:none; width: 55px">' +
-                        '        <input class="form form-control datetime-counter" type="number" step="1" value="0" min="0" data-target="' + id + '" data-toggle="tooltip" data-placement="left" title="Количество дней на выполнение">' +
-                        '        <input class="form form-control datetime" value="' + date + '" data-type="start" type="datetime-local" data-target="' + id + '" data-toggle="tooltip" data-placement="left" title="Дата начала">' +
-                        '        <input class="form form-control datetime" value="' + date + '" data-type="deadline" type="datetime-local" data-target="' + id + '" data-toggle="tooltip" data-placement="left" title="Дата окончания">' +
-                        '        <input class="form form-control deactivated" data-type="active_after" type="datetime-local" data-target="' + id + '" data-toggle="tooltip" data-placement="left" title="Сделать задачу активной после:" style="display: none">' +
+                        '        <input class="form form-control datetime-repeat-counter" type="number" step="1" min="1" data-target="' + id + '" data-type="repeat_after" value="1" data-bs-toggle="tooltip" data-bs-placement="left" title="Повторять каждые N дней" style="display:none; width: 55px">' +
+                        '        <input class="form form-control datetime-counter" type="number" step="1" value="0" min="0" data-target="' + id + '" data-bs-toggle="tooltip" data-bs-placement="left" title="Количество дней на выполнение">' +
+                        '        <input class="form form-control datetime" value="' + date + '" data-type="start" type="datetime-local" data-target="' + id + '" data-bs-toggle="tooltip" data-bs-placement="left" title="Дата начала">' +
+                        '        <input class="form form-control datetime" value="' + date + '" data-type="deadline" type="datetime-local" data-target="' + id + '" data-bs-toggle="tooltip" data-bs-placement="left" title="Дата окончания">' +
+                        '        <input class="form form-control deactivated" data-type="active_after" type="datetime-local" data-target="' + id + '" data-bs-toggle="tooltip" data-bs-placement="left" title="Сделать задачу активной после:" style="display: none">' +
                         '        <div class="btn-group pl-2">' +
-                        '            <button class="btn btn-sm btn-default" data-toggle="collapse" href="#collapse-description-' + id + '" role="button" aria-expanded="false" aria-controls="collapse-description-' + id + '"><i class="fa fa-eye"></i></button>' +
+                        '            <button class="btn btn-sm btn-default" data-bs-toggle="collapse" href="#collapse-description-' + id + '" role="button" aria-expanded="false" aria-controls="collapse-description-' + id + '"><i class="fa fa-eye"></i></button>' +
                         '            <button class="btn btn-sm btn-default add-new-pre-subtask" data-id="' + id + '"><i class="fa fa-plus"></i></button>' +
                         '            <button class="btn btn-sm btn-default remove-pre-task"><i class="fa fa-trash"></i></button>' +
                         '        </div>' +
@@ -2761,19 +2757,19 @@
                     let $listItem = '<li data-id="' + id + '" class="default d-flex">' +
                         '    <input type="text" class="form form-control hide-border" data-type="name" placeholder="Без названия" data-target="' + id + '">' +
                         '    <div class="tools d-flex" style="float: right">' +
-                        '        <input class="form form-control datetime-counter" type="number" step="1" value="0" min="0" data-target="' + id + '" value="0" data-toggle="tooltip" data-placement="left" title="Количество дней на выполнение">' +
-                        '        <input class="form form-control datetime" value="' + date + '" data-type="start" type="datetime-local" data-target="' + id + '" data-toggle="tooltip" data-placement="left" title="Дата начала">' +
-                        '        <input class="form form-control datetime" value="' + date + '" data-type="deadline" type="datetime-local" data-target="' + id + '" data-toggle="tooltip" data-placement="left" title="Дата окончания">' +
-                        '        <select data-id="status-' + id + '" data-target="' + id + '" class="custom custom-select task-status" data-type="status" data-toggle="tooltip" data-placement="left" title="Статус задачи">' +
+                        '        <input class="form form-control datetime-counter" type="number" step="1" value="0" min="0" data-target="' + id + '" value="0" data-bs-toggle="tooltip" data-bs-placement="left" title="Количество дней на выполнение">' +
+                        '        <input class="form form-control datetime" value="' + date + '" data-type="start" type="datetime-local" data-target="' + id + '" data-bs-toggle="tooltip" data-bs-placement="left" title="Дата начала">' +
+                        '        <input class="form form-control datetime" value="' + date + '" data-type="deadline" type="datetime-local" data-target="' + id + '" data-bs-toggle="tooltip" data-bs-placement="left" title="Дата окончания">' +
+                        '        <select data-id="status-' + id + '" data-target="' + id + '" class="form-select task-status" data-type="status" data-bs-toggle="tooltip" data-bs-placement="left" title="Статус задачи">' +
                         '            <option value="new" selected>Новая</option>' +
                         '            <option value="in_work">В работе</option>' +
                         '            <option value="ready">Готово</option>' +
                         '            <option value="expired">Просрочено</option>' +
                         '            <option value="deactivated">Не активная</option>' +
                         '        </select>' +
-                        '        <input class="form form-control deactivated" style="display: none" data-type="active_after" type="datetime-local" data-target="' + id + '" data-toggle="tooltip" data-placement="left" title="Сделать задачу активной после:">' +
+                        '        <input class="form form-control deactivated" style="display: none" data-type="active_after" type="datetime-local" data-target="' + id + '" data-bs-toggle="tooltip" data-bs-placement="left" title="Сделать задачу активной после:">' +
                         '        <div class="btn-group pl-2">' +
-                        '            <button class="btn btn-sm btn-default" data-toggle="collapse" href="#collapse-description-' + id + '" role="button" aria-expanded="false" aria-controls="collapse-description-' + id + '"><i class="fa fa-eye"></i></button>' +
+                        '            <button class="btn btn-sm btn-default" data-bs-toggle="collapse" href="#collapse-description-' + id + '" role="button" aria-expanded="false" aria-controls="collapse-description-' + id + '"><i class="fa fa-eye"></i></button>' +
                         '            <button class="btn btn-sm btn-default add-new-pre-subtask" data-id="' + id + '"><i class="fa fa-plus"></i></button>' +
                         '            <button class="btn btn-sm btn-default remove-pre-task"><i class="fa fa-trash"></i></button>' +
                         '        </div>' +
@@ -3145,7 +3141,7 @@
                                 description = row.description
                             }
 
-                            return '<button class="btn btn-default btn-sm mb-3" type="button" data-toggle="collapse" data-target="#collapseExample' + row.id + '" aria-expanded="false" aria-controls="collapseExample">' +
+                            return '<button class="btn btn-default btn-sm mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapseExample' + row.id + '" aria-expanded="false" aria-controls="collapseExample">' +
                                 '<i class="fa fa-eye"></i>' +
                                 '</button>' +
                                 '<div class="collapse" id="collapseExample' + row.id + '"> ' +
@@ -3171,12 +3167,12 @@
                         name: 'weekends',
                         data: function (row) {
                             if (row.weekends) {
-                                return '<select class="custom custom-select change-value" data-target="' + row.id + '" data-name="weekends">' +
+                                return '<select class="form-select change-value" data-target="' + row.id + '" data-name="weekends">' +
                                     '    <option value="1" selected>Да</option>' +
                                     '    <option value="0">Нет</option>' +
                                     '</select>'
                             } else {
-                                return '<select class="custom custom-select change-value" data-target="' + row.id + '" data-name="weekends">' +
+                                return '<select class="form-select change-value" data-target="' + row.id + '" data-name="weekends">' +
                                     '    <option value="1">Да</option>' +
                                     '    <option value="0" selected>Нет</option>' +
                                     '</select>'
@@ -3317,13 +3313,13 @@
                     success: function (checklists) {
                         let options = ''
                         $.each(checklists, function (i, item) {
-                            options += '<option value="' + item.id + '" data-toggle="tooltip" data-placement="top" title="' + item.url + '">' +
+                            options += '<option value="' + item.id + '" data-bs-toggle="tooltip" data-bs-placement="top" title="' + item.url + '">' +
                                 new URL(item.url)["host"] +
                                 '</option>'
                         })
 
                         $('#projects-for-repeat-tasks').html(options)
-                        $('#projects-for-repeat-tasks').select2({theme: 'bootstrap4'});
+                        $('#projects-for-repeat-tasks').select2({});
                     },
                     error: function (response) {
                         errorMessage(response.responseJSON.errors)

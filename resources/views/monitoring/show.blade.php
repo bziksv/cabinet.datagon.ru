@@ -4,9 +4,7 @@
         <!-- Toastr -->
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
         <!-- DataTables -->
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-buttons/css/buttons.bootstrap4.min.css') }}">
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-css'])
         <!-- Select2 -->
         <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
@@ -121,7 +119,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="setRelationLabel">Свзязать проекты</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -133,7 +131,7 @@
 
                     <div class="form-group">
                         <label for="checklists">Чеклист</label>
-                        <select name="checklists" id="checklists" class="custom-select">
+                        <select name="checklists" id="checklists" class="form-select">
                             @foreach(\App\Checklist::where('user_id', \Illuminate\Support\Facades\Auth::id())->get() as $checklist)
                                 <option value="{{ $checklist->id }}">{{ $checklist->url }}</option>
                             @endforeach
@@ -142,7 +140,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-success" id="set-relation">{{ __('Save') }}</button>
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">{{ __('Close') }}</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
                 </div>
             </div>
         </div>
@@ -152,15 +150,10 @@
         <!-- Toastr -->
         <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
         <!-- Bootstrap 4 -->
-        <script src="{{ asset('plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
         <script src="{{ asset('plugins/bootstrap-modal-form-templates/bootstrap-modal-form-templates.js') }}"></script>
         <!-- DataTables  & Plugins -->
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <!-- Select2 -->
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <!-- InputMask -->
@@ -566,7 +559,7 @@
                         ];
 
                         let dynamicSelect = $('<select />', {
-                            class: 'custom-select',
+                            class: 'form-select',
                             name: 'dynamics'
                         });
                         $.each(dynamicOptions, function () {
@@ -586,7 +579,7 @@
                         }
 
                         this.closest('.card').find('.card-header label').css('margin-bottom', 0);
-                        $('.dataTables_length').find('select').removeClass('custom-select-sm');
+                        $('.dataTables_length').find('select').removeClass('form-select form-select-sm');
                         this.closest('.card').find('.card-header .card-title').addClass('flex-grow-1').text(PROJECT_NAME);
                     },
                     drawCallback: function () {
@@ -618,7 +611,7 @@
 
                         $('.pagination').addClass('pagination-sm');
 
-                        $('[data-toggle="popover"]').popover({
+                        $('[data-bs-toggle="popover"]').popover({
                             trigger: 'manual',
                             placement: 'right',
                             html: true,
@@ -732,12 +725,10 @@
                     if (request) {
                         request.then(function () {
 
-                            let group = modal.find('.custom-select[name="monitoring_group_id"]');
+                            let group = modal.find('.form-select[name="monitoring_group_id"]');
                             if (group.length) {
 
-                                group.select2({
-                                    theme: 'bootstrap4'
-                                });
+                                group.select2({});
 
                                 modal.find('#create-group').click(function () {
                                     let el = $(this);

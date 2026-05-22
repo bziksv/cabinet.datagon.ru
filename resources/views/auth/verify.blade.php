@@ -27,11 +27,7 @@
                         <input type="text" class="form-control @error('code') is-invalid @enderror" name="code"
                                value="{{ old('code') }}" placeholder="{{ __('Code') }}" autocomplete="email" autofocus
                                required>
-                        <div class="input-group-append">
-                            <div class="input-group-text">
-                                <span class="fas fa-key"></span>
-                            </div>
-                        </div>
+                        <span class="input-group-text"><i class="fas fa-key"></i></span>
                         @error('code')
                         <span class="invalid-feedback" role="alert">
                         <strong>{{ $message }}</strong>

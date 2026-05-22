@@ -4,9 +4,7 @@
         <!-- Toastr -->
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
         <!-- DataTables -->
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-buttons/css/buttons.bootstrap4.min.css') }}">
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-css'])
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/common.css') }}"/>
 
         <!-- daterange picker -->
@@ -88,8 +86,8 @@
         </a>
 
         <div class="btn-group">
-            <button class="btn btn-outline-secondary" id="searchCompetitors" data-toggle="modal"
-                    data-target="#competitorsModal" disabled>
+            <button class="btn btn-outline-secondary" id="searchCompetitors" data-bs-toggle="modal"
+                    data-bs-target="#competitorsModal" disabled>
                 {{ __('Search for competitors') }}
             </button>
             <button type="button" class="btn btn-secondary">
@@ -128,8 +126,8 @@
                                 <button class="btn btn-default remove-competitor-button"
                                         data-id="{{ $competitor['id'] }}"
                                         data-name="{{ $competitor['url'] }}"
-                                        data-toggle="modal"
-                                        data-target="#removeCompetitor">
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#removeCompetitor">
                                     <i class="fa fa-trash"></i>
                                 </button>
                             </div>
@@ -147,7 +145,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="removeCompetitorLabel">Подтвердите действие</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -156,8 +154,8 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="remove-competitor"
-                            data-dismiss="modal">{{ __('Remove') }}</button>
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+                            data-bs-dismiss="modal">{{ __('Remove') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
                 </div>
             </div>
         </div>
@@ -169,13 +167,11 @@
         </div>
         <div class="card-body">
             <div class="d-flex flex-row justify-content-start align-items-center">
-                <div class="input-group col-5 pl-0 ml-0">
-                    <div class="input-group-prepend">
-                                <span class="input-group-text">
+                <div class="input-group col-5 pl-0 ml-0"><span class="input-group-text">
                                     <i class="far fa-calendar-alt"></i>
                                 </span>
-                    </div>
-                    <select name="region" class="custom-select" id="searchEngines">
+
+                    <select name="region" class="form-select" id="searchEngines">
                         @if($project->searchengines->count() > 1)
                             <option value="">{{ __('All search engine and regions') }}</option>
                         @endif
@@ -214,7 +210,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="competitorsModalLabel">{{ __('Adding new competitors') }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -227,8 +223,8 @@
                                   cols="8" rows="8"></textarea>
                     </div>
                     <div class="mt-3">
-                        <button class="btn btn-default mb-3" type="button" data-toggle="collapse"
-                                data-target="#collapseIgnoredDomains" aria-expanded="false"
+                        <button class="btn btn-default mb-3" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#collapseIgnoredDomains" aria-expanded="false"
                                 aria-controls="collapseIgnoredDomains">
                             {{ __('Ignored domains') }}
                         </button>
@@ -247,9 +243,9 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
                     <button type="button" id="add-competitors" class="btn btn-secondary"
-                            data-dismiss="modal">{{ __('Add') }} </button>
+                            data-bs-dismiss="modal">{{ __('Add') }} </button>
                 </div>
             </div>
         </div>
@@ -274,11 +270,7 @@
     @slot('js')
         <!-- DataTables  & Plugins -->
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
 
         <script src="{{ asset('plugins/datatables-buttons/js/buttons.excel.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables-buttons/js/buttons.html5.js') }}"></script>
@@ -419,8 +411,8 @@
                                 '            <button class="btn btn-default remove-competitor-button"' +
                                 '                    data-id="' + competitor.id + '"' +
                                 '                    data-name="' + competitor.url + '"' +
-                                '                    data-toggle="modal"' +
-                                '                    data-target="#removeCompetitor">' +
+                                '                    data-bs-toggle="modal"' +
+                                '                    data-bs-target="#removeCompetitor">' +
                                 '                <i class="fa fa-trash"></i>' +
                                 '            </button>' +
                                 '        </div>' +

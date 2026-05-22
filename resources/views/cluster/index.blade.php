@@ -52,19 +52,19 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="saveUrlsModalLabel"></h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
                     <label
                         for="relevanceUrls">{{ __('Select the url that will be saved for each phrase of this cluster') }}</label>
-                    <select name="relevanceUrls" id="relevanceUrls" class="select custom-select"></select>
+                    <select name="relevanceUrls" id="relevanceUrls" class="select form-select"></select>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="save-cluster-url-button"
-                            data-dismiss="modal">{{ __('Save') }}</button>
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+                            data-bs-dismiss="modal">{{ __('Save') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
                 </div>
             </div>
         </div>
@@ -191,7 +191,7 @@
                                    '56' => __('Chelyabinsk'),
                                    '1104' => __('Cherkessk'),
                                    '16' => __('Yaroslavl'),
-                               ]), null, ['class' => 'custom-select rounded-0', 'id' => 'region']) !!}
+                               ]), null, ['class' => 'form-select rounded-0', 'id' => 'region']) !!}
                             </div>
 
                             <div class="form-group required">
@@ -203,7 +203,7 @@
                                     '30' => 30,
                                     '40' => 40,
                                     '50' => 50,
-                                ]), null, ['class' => 'custom-select rounded-0', 'id' => 'count']) !!}
+                                ]), null, ['class' => 'form-select rounded-0', 'id' => 'count']) !!}
                             </div>
 
                             <div class="form-group required" id="phrases-form-block">
@@ -246,7 +246,7 @@
                                     'soft' => 'soft',
                                     'pre-hard' => 'pre-hard',
                                     'hard' => 'hard',
-                                    ], null, ['class' => 'custom-select rounded-0', 'id' => 'clusteringLevel']) !!}
+                                    ], null, ['class' => 'form-select rounded-0', 'id' => 'clusteringLevel']) !!}
                             </div>
 
                             <div class="form-group required">
@@ -306,7 +306,7 @@
                                             $config->reduction_ratio => $config->reduction_ratio,
                                             'pre-hard' => 'pre-hard',
                                             'soft' => 'soft',
-                                        ], null, ['class' => 'custom-select rounded-0', 'id' => 'reductionRatio']) !!}
+                                        ], null, ['class' => 'form-select rounded-0', 'id' => 'reductionRatio']) !!}
                                     </div>
                                 </div>
                             </div>
@@ -352,7 +352,7 @@
                                         $config->search_engine => $config->search_engine,
                                         'yandex' => 'Yandex',
                                         'google' => 'Google',
-                                    ], null, ['class' => 'custom-select rounded-0', 'id' => 'searchEngine']) !!}
+                                    ], null, ['class' => 'form-select rounded-0', 'id' => 'searchEngine']) !!}
                                 </div>
 
                                 @if(!Auth::user()->telegram_bot_active)
@@ -370,7 +370,7 @@
                                             $config->send_message => $config->send_message,
                                             true => __('Yes'),
                                             false => __('No'),
-                                        ], null, ['class' => 'custom-select rounded-0', 'id' => 'sendMessage']) !!}
+                                        ], null, ['class' => 'form-select rounded-0', 'id' => 'sendMessage']) !!}
                                     </div>
                                 @endif
                             </div>
@@ -409,7 +409,7 @@
                                     $config->save_results => $config->save_results,
                                     '1' => __('Save'),
                                     '0' => __('Do not save'),
-                                ], null, ['class' => 'custom-select rounded-0', 'id' => 'save']) !!}
+                                ], null, ['class' => 'form-select rounded-0', 'id' => 'save']) !!}
                             </div>
                         </div>
 
@@ -480,7 +480,7 @@
                                    '56' => __('Chelyabinsk'),
                                    '1104' => __('Cherkessk'),
                                    '16' => __('Yaroslavl'),
-                               ]), null, ['class' => 'custom-select rounded-0', 'id' => 'region_classic']) !!}
+                               ]), null, ['class' => 'form-select rounded-0', 'id' => 'region_classic']) !!}
                             </div>
 
                             <div class="form-group required" id="phrases-form-block">
@@ -525,7 +525,7 @@
                                     'soft' => 'soft',
                                     'pre-hard' => 'pre-hard',
                                     'hard' => 'hard',
-                                    ], null, ['class' => 'custom-select rounded-0', 'id' => 'clusteringLevel_classic']) !!}
+                                    ], null, ['class' => 'form-select rounded-0', 'id' => 'clusteringLevel_classic']) !!}
                             </div>
 
                             <div class="form-group required" id="extra-block">
@@ -569,7 +569,7 @@
                                         $config_classic->search_engine => $config_classic->search_engine,
                                         'yandex' => 'Yandex',
                                         'google' => 'Google',
-                                    ], null, ['class' => 'custom-select rounded-0', 'id' => 'searchEngine']) !!}
+                                    ], null, ['class' => 'form-select rounded-0', 'id' => 'searchEngine']) !!}
                                 </div>
 
                                 @if(!Auth::user()->telegram_bot_active)
@@ -587,7 +587,7 @@
                                             $config_classic->send_message => $config_classic->send_message,
                                             true => __('Yes'),
                                             false => __('No'),
-                                        ], null, ['class' => 'custom-select rounded-0', 'id' => 'sendMessage_classic']) !!}
+                                        ], null, ['class' => 'form-select rounded-0', 'id' => 'sendMessage_classic']) !!}
                                     </div>
                                 @endif
                             </div>
@@ -626,11 +626,11 @@
                                     $config_classic->save_results => $config_classic->save_results,
                                     '1' => __('Save'),
                                     '0' => __('Do not save'),
-                                ], null, ['class' => 'custom-select rounded-0', 'id' => 'save_classic']) !!}
+                                ], null, ['class' => 'form-select rounded-0', 'id' => 'save_classic']) !!}
                             </div>
                         </div>
 
-                        <input type="button" data-dismiss="modal"
+                        <input type="button" data-bs-dismiss="modal"
                                class="btn btn-secondary" id="start-analyse"
                                data-target="classic" value="{{ __('Analyse') }}">
 
@@ -781,13 +781,9 @@
             }
         </script>
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('/plugins/cluster/js/render-result-table_v2.min.js') }}"></script>
         <script src="{{ asset('plugins/common/js/common.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/buttons.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/jszip.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/vfs_fonts.min.js') }}"></script>

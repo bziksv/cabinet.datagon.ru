@@ -247,11 +247,6 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->monitoringProjects()->with('users');
     }
 
-    public function behaviors()
-    {
-        return $this->hasMany(Behavior::class);
-    }
-
     public function balances()
     {
         return $this->hasMany(Balance::class);

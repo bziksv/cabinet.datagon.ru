@@ -1,7 +1,7 @@
-{{-- Все скрипты layout после jQuery/bootstrap/adminlte — не в sidebar/menu-right (иначе $ is not defined) --}}
+{{-- Скрипты layout после jQuery / AdminLTE 4 --}}
 <script>
 $(function () {
-    $(document).on('click', 'li.folder.has-treeview > a.sidebar-folder-toggle', function (e) {
+    $(document).on('click', 'li.folder .sidebar-folder-toggle', function (e) {
         e.preventDefault();
         e.stopImmediatePropagation();
         var $li = $(this).closest('li.folder');
@@ -10,55 +10,31 @@ $(function () {
             return false;
         }
         if ($li.hasClass('menu-open')) {
-            $li.removeClass('menu-open menu-is-opening');
+            $li.removeClass('menu-open');
             $sub.stop(true, true).slideUp(200);
         } else {
-            $li.addClass('menu-open menu-is-opening');
+            $li.addClass('menu-open');
             $sub.stop(true, true).slideDown(200);
         }
         return false;
     });
 
-    $('.x-input__field.form-control.form-control-sidebar').on('keyup', function () {
-        var input = $(this).val().trim().toLowerCase();
-        if (input !== '') {
-            $('.folder').each(function () {
-                if ($(this).attr('data-action') === 'false') {
-                    $(this).addClass('menu-is-opening menu-open');
-                    $(this).children('ul').eq(0).show();
-                }
-            });
-            $('.nav-item.menu-item.ml-2').children('ul').each(function () {
-                var mainBlock = $(this).parent();
-                var showMain = false;
-                $(this).children('li').each(function () {
-                    var html = $(this).find('.module-name').first().text().trim().toLowerCase();
-                    if (html.indexOf(input) !== -1) {
-                        showMain = true;
-                    }
-                });
-                mainBlock.toggle(showMain);
-            });
-        } else {
-            $('.folder').each(function () {
-                $(this).show();
-                if ($(this).attr('data-action') === 'false') {
-                    $(this).removeClass('menu-is-opening menu-open');
-                    $(this).children('.nav-treeview').hide();
-                }
-            });
-        }
-    });
-
-    $('#header-nav-bar > ul.navbar-nav.ml-auto > div > div > table > tbody > tr').each(function () {
-        if ($(this).css('background-color') === 'rgb(253, 245, 230)') {
-            var limitCell = $(this).children('td').eq(1).html();
-            if ($.trim(limitCell) === 'Без ограничений') {
-                $('#userModuleLimit').html("{{ __('No restrictions') }}");
+    var $limitsHint = $('#cabinet-header-limits-hint');
+    var $used = $('#userModuleUsed');
+    var $limit = $('#userModuleLimit');
+    $('#header-nav-bar .cabinet-header-limits-menu table tbody tr').each(function () {
+        var bg = $(this).css('background-color');
+        if (bg === 'rgb(253, 245, 230)' || bg === 'rgb(255, 243, 205)') {
+            var limitCell = $.trim($(this).children('td').eq(1).text());
+            var leftCell = $.trim($(this).children('td').eq(2).text());
+            if (limitCell === 'Без ограничений' || limitCell === "{{ __('No restrictions') }}") {
+                $limit.text("{{ __('No restrictions') }}");
+                $used.text('');
             } else {
-                $('#userModuleLimit').html("{{ __('from') }} " + limitCell);
-                $('#userModuleUsed').html("{{ __('Left') }} " + $(this).children('td').eq(2).html());
+                $limit.text("{{ __('from') }} " + limitCell);
+                $used.text("{{ __('Left') }} " + leftCell);
             }
+            $limitsHint.removeClass('is-empty');
             return false;
         }
     });

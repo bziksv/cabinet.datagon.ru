@@ -93,7 +93,7 @@ function renderResultTable_v2(data, objectId) {
                                     })
 
                                     relevance = '<div class="d-flex">' +
-                                        '<select style="border-radius: 0 !important;" class="custom-select" id="' + phrase.replaceAll(' ', '-') + '">' + relevance + '</select>' +
+                                        '<select style="border-radius: 0 !important;" class="form-select" id="' + phrase.replaceAll(' ', '-') + '">' + relevance + '</select>' +
                                         '<button style="border-radius: 0 !important;" class="btn btn-secondary save-relevance-url" data-order="' + phrase + '"><i class="fa fa-save" style="color: white"></i></button>' +
                                         '</div>'
 
@@ -105,7 +105,7 @@ function renderResultTable_v2(data, objectId) {
 
                                 if (allRelevanceUrls.length > 0) {
                                     saveUrlButton = '<button class="btn btn-secondary save-all-urls" ' +
-                                        'data-toggle="modal" data-target="#saveUrlsModal">' +
+                                        'data-bs-toggle="modal" data-bs-target="#saveUrlsModal">' +
                                         'Сохранить url' +
                                         '</button>'
                                 }
@@ -156,7 +156,7 @@ function renderResultTable_v2(data, objectId) {
                         })
 
                         let groupButton = copyGroupBool ?
-                            '<p class="copy-group col mr-1 click_tracking" data-click="Copy group" data-target="' + clusterId + '" data-toggle="collapse"><i class="fa fa-copy pr-1"></i>группу</p>'
+                            '<p class="copy-group col mr-1 click_tracking" data-click="Copy group" data-target="' + clusterId + '" data-bs-toggle="collapse"><i class="fa fa-copy pr-1"></i>группу</p>'
                             : ''
 
                         if (addColspan) {
@@ -187,25 +187,25 @@ function renderResultTable_v2(data, objectId) {
                             '</td>' +
                             '<td>' +
                             '<div class="row" style="cursor: pointer">' +
-                            '<p class="copy-cluster-phrases col mr-1 click_tracking" data-click="Copy phrase" data-target="' + clusterId + '" data-toggle="collapse">' +
+                            '<p class="copy-cluster-phrases col mr-1 click_tracking" data-click="Copy phrase" data-target="' + clusterId + '" data-bs-toggle="collapse">' +
                             '<i class="fa fa-copy pr-1"></i>ключевой запрос' +
                             '</p>'
                             + groupButton +
                             '</div>' +
                             '<div class="row" style="cursor: pointer">' +
-                            '<p class="copy-based col click_tracking" data-click="Copy based" data-target="' + clusterId + '" data-toggle="collapse">' +
+                            '<p class="copy-based col click_tracking" data-click="Copy based" data-target="' + clusterId + '" data-bs-toggle="collapse">' +
                             '     <i class="fa fa-copy pr-1"></i>базовую' +
                             '</p>' +
-                            '<p class="copy-phrase col click_tracking" data-click="Copy phrased" data-target="' + clusterId + '" data-toggle="collapse">' +
+                            '<p class="copy-phrase col click_tracking" data-click="Copy phrased" data-target="' + clusterId + '" data-bs-toggle="collapse">' +
                             '     <i class="fa fa-copy pr-1"></i>фразовую' +
                             '</p>' +
-                            '<p class="copy-target col click_tracking" data-click="Copy target" data-target="' + clusterId + '" data-toggle="collapse">' +
+                            '<p class="copy-target col click_tracking" data-click="Copy target" data-target="' + clusterId + '" data-bs-toggle="collapse">' +
                             '     <i class="fa fa-copy pr-1"></i>точную' +
                             '</p>' +
                             '</div>' +
                             '<div class="row" style="cursor: pointer">' +
                             '<div class="col-6"> ' +
-                            '<a class="btn btn-secondary all-competitors click_tracking" data-click="Show competitors" data-action="' + key + '" data-toggle="collapse"' +
+                            '<a class="btn btn-secondary all-competitors click_tracking" data-click="Show competitors" data-action="' + key + '" data-bs-toggle="collapse"' +
                             ' href="#competitors-' + key.replaceAll(' ', '-') + '" role="button" aria-expanded="false"' +
                             ' aria-controls="competitors-' + key.replaceAll(' ', '-') + '">' +
                             ' Конкуренты' +
@@ -342,7 +342,7 @@ function renderAlonePhrases(alone, iterator, colspan) {
                         })
 
                         relevance = '<div class="d-flex">' +
-                            '<select style="border-radius: 0 !important;" class="custom-select" id="' + phrase.replaceAll(' ', '-') + '">' + relevance + '</select>' +
+                            '<select style="border-radius: 0 !important;" class="form-select" id="' + phrase.replaceAll(' ', '-') + '">' + relevance + '</select>' +
                             '<button style="border-radius: 0 !important;" class="btn btn-secondary save-relevance-url" data-order="' + phrase + '"><i class="fa fa-save" style="color: white"></i></button>' +
                             '</div>'
 
@@ -401,7 +401,7 @@ function renderAlonePhrases(alone, iterator, colspan) {
 
         let groupButton = ''
 
-        groupButton = '<p class="copy-group col mr-1 click_tracking" data-click="Copy group" data-target="' + clusterId + '" data-toggle="collapse">' +
+        groupButton = '<p class="copy-group col mr-1 click_tracking" data-click="Copy group" data-target="' + clusterId + '" data-bs-toggle="collapse">' +
             '   <i class="fa fa-copy pr-1"></i>группу' +
             '</p>'
 
@@ -430,19 +430,19 @@ function renderAlonePhrases(alone, iterator, colspan) {
             '   </td>' +
             '   <td>' +
             '       <div class="row" style="cursor: pointer">' +
-            '            <p class="copy-cluster-phrases col mr-1 click_tracking" data-click="Copy phrase" data-target="' + clusterId + '" data-toggle="collapse">' +
+            '            <p class="copy-cluster-phrases col mr-1 click_tracking" data-click="Copy phrase" data-target="' + clusterId + '" data-bs-toggle="collapse">' +
             '                <i class="fa fa-copy pr-1"></i>ключевой запрос' +
             '            </p>' +
             groupButton +
             '       </div>' +
             '       <div class="row" style="cursor: pointer">' +
-            '              <p class="copy-based col click_tracking" data-click="Copy based" data-target="' + clusterId + '" data-toggle="collapse">' +
+            '              <p class="copy-based col click_tracking" data-click="Copy based" data-target="' + clusterId + '" data-bs-toggle="collapse">' +
             '                   <i class="fa fa-copy pr-1"></i>базовую' +
             '              </p>' +
-            '              <p class="copy-phrase col click_tracking" data-click="Copy phrased" data-target="' + clusterId + '" data-toggle="collapse">' +
+            '              <p class="copy-phrase col click_tracking" data-click="Copy phrased" data-target="' + clusterId + '" data-bs-toggle="collapse">' +
             '                   <i class="fa fa-copy pr-1"></i>фразовую' +
             '              </p>' +
-            '              <p class="copy-target col click_tracking" data-click="Copy target" data-target="' + clusterId + '" data-toggle="collapse">' +
+            '              <p class="copy-target col click_tracking" data-click="Copy target" data-target="' + clusterId + '" data-bs-toggle="collapse">' +
             '                   <i class="fa fa-copy pr-1"></i>точную' +
             '              </p>' +
             '       </div>' +

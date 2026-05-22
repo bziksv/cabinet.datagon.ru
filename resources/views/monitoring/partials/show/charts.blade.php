@@ -3,17 +3,17 @@
         <div class="card-title">
             <ul class="nav nav-pills">
                 @if($project->searchengines->count() > 1 && empty(request('region')))
-                    <li class="nav-item"><a class="nav-link active" href="#tab_1" data-toggle="tab">Средняя позиция по регионам</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="#tab_1" data-bs-toggle="tab">Средняя позиция по регионам</a></li>
                 @else
-                    <li class="nav-item"><a class="nav-link active" href="#tab_1" data-toggle="tab">% Ключевых слов в ТОП</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#tab_2" data-toggle="tab">Средняя позиция</a></li>
-                    <li class="nav-item"><a class="nav-link" href="#tab_3" data-toggle="tab">Распределение по ТОП-100</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="#tab_1" data-bs-toggle="tab">% Ключевых слов в ТОП</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#tab_2" data-bs-toggle="tab">Средняя позиция</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#tab_3" data-bs-toggle="tab">Распределение по ТОП-100</a></li>
                 @endif
             </ul>
         </div>
 
         <div class="float-right">
-            <select class="custom-select" id="chartFilterPeriod">
+            <select class="form-select" id="chartFilterPeriod">
                 <option value="days" selected>дням</option>
                 <option value="weeks">неделям</option>
                 <option value="month">месяцам</option>

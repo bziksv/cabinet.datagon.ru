@@ -1,0 +1,30 @@
+/* Тарифы — эталон public/html/pages/pricing.html */
+.cabinet-tariff-page .cabinet-tariff-plan {
+    cursor: pointer;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.cabinet-tariff-page .cabinet-tariff-plan:hover {
+    box-shadow: 0 0.25rem 0.75rem rgba(var(--bs-body-color-rgb), 0.08);
+}
+
+.cabinet-tariff-page .cabinet-tariff-plan.is-selected {
+    border-color: var(--bs-primary) !important;
+    box-shadow: 0 0 0 1px var(--bs-primary);
+}
+
+.cabinet-tariff-page .cabinet-tariff-plan.is-current {
+    border-color: var(--bs-success);
+}
+
+.cabinet-tariff-page .cabinet-tariff-compare tbody tr:hover {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.cabinet-tariff-page .cabinet-tariff-compare .col-highlight {
+    background-color: rgba(var(--bs-primary-rgb), 0.06);
+}
+
+.cabinet-tariff-page .cabinet-tariff-summary th {
+    width: 42%;
+}

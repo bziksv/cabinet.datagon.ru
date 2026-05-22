@@ -5,8 +5,7 @@
 @component('component.card', ['title' => 'История'])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'responsive-core-min'])
     @endslot
 
     <div class="card">
@@ -33,9 +32,7 @@
     @slot('js')
         <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'responsive-core-min'])
 
         <script>
             function format(row) {
@@ -98,7 +95,7 @@
                         render: function(data) {
                             return `
                                 <div class="dropdown">
-                                    <button class="btn btn-sm btn-secondary dropdown-toggle" data-toggle="dropdown">Действия</button>
+                                    <button class="btn btn-sm btn-secondary dropdown-toggle" data-bs-toggle="dropdown">Действия</button>
                                     <div class="dropdown-menu">
                                         <a href="#" class="dropdown-item copy-result">Скопировать результат</a>
                                         <a href="#" class="dropdown-item apply-history-full">Применить конфиг</a>

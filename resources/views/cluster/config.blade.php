@@ -134,7 +134,7 @@
                                                '56' => __('Chelyabinsk'),
                                                '1104' => __('Cherkessk'),
                                                '16' => __('Yaroslavl'),
-                                           ]), null, ['class' => 'custom-select rounded-0', 'id' => 'region']) !!}
+                                           ]), null, ['class' => 'form-select rounded-0', 'id' => 'region']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -146,7 +146,7 @@
                                                 '30' => 30,
                                                 '40' => 40,
                                                 '50' => 50,
-                                            ]), null, ['class' => 'custom-select rounded-0', 'id' => 'count']) !!}
+                                            ]), null, ['class' => 'form-select rounded-0', 'id' => 'count']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -157,7 +157,7 @@
                                                 'soft' => 'soft - 50%',
                                                 'pre-hard' => 'pre-hard - 60%',
                                                 'hard' => 'hard - 70%',
-                                                ], null, ['class' => 'custom-select rounded-0', 'id' => 'clusteringLevel']) !!}
+                                                ], null, ['class' => 'form-select rounded-0', 'id' => 'clusteringLevel']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -166,7 +166,7 @@
                                                     $config->engine_version => $config->engine_version,
                                                     'max_phrases' => 'Фразовый перебор и поиск максимального (13.01)',
                                                     '1501' => 'Фразовый перебор и поиск максимального (15.01)',
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'engineVersion']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'engineVersion']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -189,7 +189,7 @@
                                                     $config->brut_force => $config->brut_force,
                                                     '1' => __('Yes'),
                                                     '0' => __('No'),
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'brut_force']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'brut_force']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -211,7 +211,7 @@
                                                 $config->reduction_ratio => $config->reduction_ratio,
                                                 '0.6' => 'pre-hard',
                                                 '0.5' => 'soft',
-                                            ]), null, ['class' => 'custom-select rounded-0']) !!}
+                                            ]), null, ['class' => 'form-select rounded-0']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -221,7 +221,7 @@
                                                 $config->send_message => $config->send_message,
                                                 true => __('Yes'),
                                                 false => __('No'),
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'send_message']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'send_message']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -230,7 +230,7 @@
                                                 $config->save_results => $config->save_results,
                                                 '1' => __('Save'),
                                                 '0' => __('Do not save'),
-                                                ], null, ['class' => 'custom-select rounded-0', 'id' => 'save_results']) !!}
+                                                ], null, ['class' => 'form-select rounded-0', 'id' => 'save_results']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -240,7 +240,7 @@
                                                 $config->search_relevance => $config->search_relevance,
                                                 '1' => __('Yes'),
                                                 '0' => __('No'),
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'search_relevance']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'search_relevance']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -249,7 +249,7 @@
                                                 $config->search_engine => $config->search_engine,
                                                 'yandex' => 'Yandex',
                                                 'google' => 'Google',
-                                                ], null, ['class' => 'custom-select rounded-0', 'id' => 'search_engine']) !!}
+                                                ], null, ['class' => 'form-select rounded-0', 'id' => 'search_engine']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -258,7 +258,7 @@
                                                 $config->search_base => $config->search_base,
                                                 '1' => __('Yes'),
                                                 '0' => __('No'),
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'search_base']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'search_base']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -267,7 +267,7 @@
                                                 $config->search_phrased => $config->search_phrased,
                                                 '1' => __('Yes'),
                                                 '0' => __('No'),
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'search_phrased']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'search_phrased']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -276,7 +276,7 @@
                                                 $config->search_target => $config->search_target,
                                                 '1' => __('Yes'),
                                                 '0' => __('No'),
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'search_target']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'search_target']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -368,7 +368,7 @@
                                                '56' => __('Chelyabinsk'),
                                                '1104' => __('Cherkessk'),
                                                '16' => __('Yaroslavl'),
-                                           ]), null, ['class' => 'custom-select rounded-0', 'id' => 'region']) !!}
+                                           ]), null, ['class' => 'form-select rounded-0', 'id' => 'region']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -380,7 +380,7 @@
                                                 '30' => 30,
                                                 '40' => 40,
                                                 '50' => 50,
-                                            ]), null, ['class' => 'custom-select rounded-0', 'id' => 'count']) !!}
+                                            ]), null, ['class' => 'form-select rounded-0', 'id' => 'count']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -391,7 +391,7 @@
                                                 'soft' => 'soft - 50%',
                                                 'pre-hard' => 'pre-hard - 60%',
                                                 'hard' => 'hard - 70%',
-                                                ], null, ['class' => 'custom-select rounded-0', 'id' => 'clusteringLevel']) !!}
+                                                ], null, ['class' => 'form-select rounded-0', 'id' => 'clusteringLevel']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -400,7 +400,7 @@
                                                     $config_classic->engine_version => $config_classic->engine_version,
                                                     'max_phrases' => 'Фразовый перебор и поиск максимального (13.01)',
                                                     '1501' => 'Фразовый перебор и поиск максимального (15.01)',
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'engineVersion']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'engineVersion']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -423,7 +423,7 @@
                                                     $config_classic->brut_force => $config_classic->brut_force,
                                                     '1' => __('Yes'),
                                                     '0' => __('No'),
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'brut_force']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'brut_force']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -447,7 +447,7 @@
                                                 $config_classic->reduction_ratio => $config_classic->reduction_ratio,
                                                 '0.6' => 'pre-hard',
                                                 '0.5' => 'soft',
-                                            ]), null, ['class' => 'custom-select rounded-0']) !!}
+                                            ]), null, ['class' => 'form-select rounded-0']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -457,7 +457,7 @@
                                                 $config_classic->send_message => $config_classic->send_message,
                                                 true => __('Yes'),
                                                 false => __('No'),
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'send_message']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'send_message']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -466,7 +466,7 @@
                                                 $config_classic->save_results => $config_classic->save_results,
                                                 '1' => __('Save'),
                                                 '0' => __('Do not save'),
-                                                ], null, ['class' => 'custom-select rounded-0', 'id' => 'save_results']) !!}
+                                                ], null, ['class' => 'form-select rounded-0', 'id' => 'save_results']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -476,7 +476,7 @@
                                                 $config_classic->search_relevance => $config_classic->search_relevance,
                                                 '1' => __('Yes'),
                                                 '0' => __('No'),
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'search_relevance']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'search_relevance']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -485,7 +485,7 @@
                                                 $config_classic->search_engine => $config_classic->search_engine,
                                                 'yandex' => 'Yandex',
                                                 'google' => 'Google',
-                                                ], null, ['class' => 'custom-select rounded-0', 'id' => 'search_engine']) !!}
+                                                ], null, ['class' => 'form-select rounded-0', 'id' => 'search_engine']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -494,7 +494,7 @@
                                                 $config_classic->search_base => $config_classic->search_base,
                                                 '1' => __('Yes'),
                                                 '0' => __('No'),
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'search_base']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'search_base']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -503,7 +503,7 @@
                                                 $config_classic->search_phrased => $config_classic->search_phrased,
                                                 '1' => __('Yes'),
                                                 '0' => __('No'),
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'search_phrased']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'search_phrased']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -512,7 +512,7 @@
                                                 $config_classic->search_target => $config_classic->search_target,
                                                 '1' => __('Yes'),
                                                 '0' => __('No'),
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'search_target']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'search_target']) !!}
                                         </div>
 
                                         <div class="form-group required">

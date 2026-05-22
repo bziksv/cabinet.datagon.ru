@@ -30,7 +30,7 @@
                 '20' => __('every 20 minutes'),
                 '30' => __('every 30 minutes'),
                 '60' => __('every 60 minutes'),
-                ], null, ['class' => 'form-control custom-select rounded-0']) !!}
+                ], null, ['class' => 'form-control form-select rounded-0']) !!}
         </div>
         <div class="form-group required">
             {!! Form::label(__('Response waiting time')) !!}
@@ -38,7 +38,7 @@
             '10' => '10 ' . __("sec"),
             '15' => '15 ' . __("sec"),
             '20' => '20 ' . __("sec"),
-            ], 10, ['class' => 'form-control custom-select rounded-0 monitoring']) !!}
+            ], 10, ['class' => 'form-control form-select rounded-0 monitoring']) !!}
         </div>
         <div id="searchPhrase">
             <div class="form-group required flex-column">

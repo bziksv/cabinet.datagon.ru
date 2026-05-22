@@ -4,7 +4,7 @@ function renderUrlsTable(urls, pageLength) {
         let hideBlock = '<div class="card direct-chat direct-chat-primary collapsed-card pt-2 mb-0" style="background: transparent !important; box-shadow: none; border: none">' +
             '        <div class="card-header ui-sortable-handle" style="padding: 0 !important; border: 0">' +
             '            <div class="d-flex justify-content-between">' +
-            '                <button type="button" class="btn btn-tool" data-card-widget="collapse">' +
+            '                <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse">' +
             '                    <i class="fas fa-eye"></i>' +
             '                </button>' +
             '            </div>' +

@@ -46,7 +46,7 @@
                             <div class="card-header">
                                 <h3 class="card-title">{{ __('Analyzer Settings') }}</h3>
                                 <div class="card-tools">
-                                    <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                                    <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse">
                                         <i class="fas fa-minus"></i>
                                     </button>
                                 </div>
@@ -71,7 +71,7 @@
                                                 '25' => 25,
                                                 '50' => 50,
                                                 '100' => 100,
-                                        ]), null, ['class' => 'custom-select rounded-0 w-25']) !!}
+                                        ]), null, ['class' => 'form-select rounded-0 w-25']) !!}
                                     </div>
 
                                     <div class="mt-3 mb-3">
@@ -84,7 +84,7 @@
                                                 '25' => 25,
                                                 '50' => 50,
                                                 '100' => 100,
-                                        ]), null, ['class' => 'custom-select rounded-0 w-25']) !!}
+                                        ]), null, ['class' => 'form-select rounded-0 w-25']) !!}
                                     </div>
 
                                     <div class="mt-3 mb-3">
@@ -108,7 +108,7 @@
                             <div class="card-header">
                                 <h3 class="card-title">{{ __('General statistics of the module') }}</h3>
                                 <div class="card-tools">
-                                    <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                                    <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse">
                                         <i class="fas fa-minus"></i>
                                     </button>
                                 </div>

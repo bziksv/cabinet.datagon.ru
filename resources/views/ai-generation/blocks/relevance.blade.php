@@ -1,7 +1,7 @@
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <div>Выбор проекта (Анализ релевантности)</div>
-        <button class="btn btn-sm btn-outline-secondary" type="button" data-toggle="collapse" data-target="#project-card-body" aria-expanded="false" aria-controls="project-card-body">
+        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#project-card-body" aria-expanded="false" aria-controls="project-card-body">
             <i class="fa fa-eye"></i>
         </button>
     </div>

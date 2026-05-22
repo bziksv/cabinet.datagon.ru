@@ -90,14 +90,14 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="removePasswordWindowLabel">Подтвердите удаление</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
                     <button type="button"
-                            data-dismiss="modal"
+                            data-bs-dismiss="modal"
                             id="success-remove-password"
                             class="btn btn-secondary">
                         {{ __('Remove') }}
@@ -143,7 +143,7 @@
                             </span>
                         </div>
                         <button class="btn btn-default remove-password click_tracking" data-click="Remove" data-order="{{ $password->id }}"
-                                data-toggle="modal" data-target="#removePasswordWindow">
+                                data-bs-toggle="modal" data-bs-target="#removePasswordWindow">
                             <i aria-hidden="true" class="fa fa-trash"></i>
                         </button>
                     </td>

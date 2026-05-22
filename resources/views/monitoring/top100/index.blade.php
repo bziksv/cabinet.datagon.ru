@@ -1,8 +1,7 @@
 @component('component.card', ['title' => __('Top of the project') . " $project->name"])
 
     @slot('css')
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-buttons/css/buttons.bootstrap4.min.css') }}">
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'buttons-min'])
         <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/toastr/toastr.css') }}"/>
         <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
@@ -147,12 +146,10 @@
                 </div>
                 <div class="form-group col-4">
                     <label>{{ __('Date range') }}:</label>
-                    <div class="input-group">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">
+                    <div class="input-group"><span class="input-group-text">
                                 <i class="far fa-calendar-alt"></i>
                             </span>
-                        </div>
+
                         <input type="text" id="date-range" class="form-control float-right">
                     </div>
                 </div>
@@ -160,7 +157,7 @@
                     <label for="region">{{ __('Region') }}</label>
                     <br>
                     <div class="btn-group w-100">
-                        <select name="region" class="custom-select" id="searchEngines">
+                        <select name="region" class="form-select" id="searchEngines">
                             @if($project->searchengines->count() > 1)
                                 <option value="">{{ __('All search engine and regions') }}</option>
                             @endif
@@ -189,7 +186,7 @@
             <div class="row">
                 <div class="col-4">
                     <label for="top">{{ __('The maximum value of the top') }}</label>
-                    <select name="top" id="top" class="custom-select">
+                    <select name="top" id="top" class="form-select">
                         <option value="100">100</option>
                         <option value="50">50</option>
                         <option value="30">30</option>
@@ -199,7 +196,7 @@
                 </div>
                 <div class="d-flex flex-column col-4">
                     <label>{{ __('Display') }}</label>
-                    <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                    <div class="btn-group btn-group-toggle" data-bs-toggle="buttons">
                         <button class="btn btn-secondary active change-filter-name" data-action="URL" disabled>
                             <input type="radio" name="options" autocomplete="off">
                             URL
@@ -451,7 +448,7 @@
                 }, 2000)
 
                 $(function () {
-                    $('[data-toggle="tooltip"]').tooltip()
+                    $('[data-bs-toggle="tooltip"]').tooltip()
                 })
 
                 $('.copy').unbind().on('click', function () {
@@ -533,11 +530,11 @@
                     }
 
                     kanbanItems +=
-                        '<div class="kanban-item w-100 border-bottom ' + hide + '" data-index="' + v.position + '" data-toggle="tooltip" data-placement="top" title="' + v.url + '">' +
+                        '<div class="kanban-item w-100 border-bottom ' + hide + '" data-index="' + v.position + '" data-bs-toggle="tooltip" data-bs-placement="top" title="' + v.url + '">' +
                         '    <div class="site-position">' + v.position + ' </div>' +
                         '    <div class="col-10 fixed-lines" data-url="' + v.url + '" data-domain="' + new URL(v.url)['origin'] + '">' + url + ' </div>' +
                         '    <div class="dropdown" style="float:left; display: none">' +
-                        '        <i id="dropdownMenuButton" data-toggle="dropdown" aria-expanded="true" class="fa fa-cogs mt-3 ml-2" style="opacity: 0.6; cursor: pointer;"></i>' +
+                        '        <i id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="true" class="fa fa-cogs mt-3 ml-2" style="opacity: 0.6; cursor: pointer;"></i>' +
                         '        <div aria-labelledby="dropdownMenuButton" class="dropdown-menu hide" style="position: absolute; transform: translate3d(0px, 18px, 0px); top: 0px; left: 0px; will-change: transform;" x-placement="bottom-start">' +
                         '            <span class="dropdown-item" style="cursor: pointer;">' +
                         '                <a href="' + v.url + '" target="_blank">Перейти на сайт</a>' +

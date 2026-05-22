@@ -48,7 +48,7 @@
                                             {{__('Delete a project')}}
                                         </a>
                                         <button type="button" class="btn btn-default"
-                                                data-dismiss="modal">{{__('Back')}}</button>
+                                                data-bs-dismiss="modal">{{__('Back')}}</button>
                                     </div>
                                 </div>
                             </div>
@@ -72,8 +72,8 @@
                                     </a>
                                     <a class="fa fa-trash data_click"
                                        data-click="Remove project"
-                                       data-toggle="modal"
-                                       data-target="#remove-project-id-{{$project->id}}">
+                                       data-bs-toggle="modal"
+                                       data-bs-target="#remove-project-id-{{$project->id}}">
                                     </a>
                                 </div>
                             </td>
@@ -100,7 +100,7 @@
                                                             </a>
                                                             <button type="button"
                                                                     class="btn btn-default"
-                                                                    data-dismiss="modal">
+                                                                    data-bs-dismiss="modal">
                                                                 {{__('Back')}}
                                                             </button>
                                                         </div>
@@ -121,8 +121,8 @@
                                                         </a>
                                                         <i class="fa fa-trash mr-2 ml-2 click_tracking"
                                                            data-click="Remove"
-                                                           data-toggle="modal"
-                                                           data-target="#remove-description-id-{{$description->id}}"></i>
+                                                           data-bs-toggle="modal"
+                                                           data-bs-target="#remove-description-id-{{$description->id}}"></i>
                                                     </div>
                                                 </td>
                                             </tr>

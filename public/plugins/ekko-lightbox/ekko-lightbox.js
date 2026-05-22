@@ -97,7 +97,7 @@ var Lightbox = (function ($) {
 			this._isBootstrap3 = $.fn.modal.Constructor.VERSION[0] == 3;
 
 			var h4 = '<h4 class="modal-title">' + (this._config.title || "&nbsp;") + '</h4>';
-			var btn = '<button type="button" class="close" data-dismiss="modal" aria-label="' + this._config.strings.close + '"><span aria-hidden="true">&times;</span></button>';
+			var btn = '<button type="button" class="close" data-bs-dismiss="modal" aria-label="' + this._config.strings.close + '"><span aria-hidden="true">&times;</span></button>';
 
 			var header = '<div class="modal-header' + (this._config.title || this._config.alwaysShowClose ? '' : ' hide') + '">' + (this._isBootstrap3 ? btn + h4 : h4 + btn) + '</div>';
 			var footer = '<div class="modal-footer' + (this._config.footer ? '' : ' hide') + '">' + (this._config.footer || "&nbsp;") + '</div>';

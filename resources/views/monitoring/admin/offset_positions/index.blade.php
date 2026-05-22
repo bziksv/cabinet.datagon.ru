@@ -38,7 +38,7 @@
 
                 </div>
                 <div class="card-footer">
-                    <button type="submit" class="btn btn-default" data-toggle="modal" data-target=".modal">Экспортировать</button>
+                    <button type="submit" class="btn btn-default" data-bs-toggle="modal" data-target=".modal">Экспортировать</button>
                 </div>
             </div>
 
@@ -75,9 +75,7 @@
 
             let $project = $('#project');
 
-            $('.select2').select2({
-                theme: 'bootstrap4'
-            });
+            $('.select2').select2({});
 
             $('.modal').on('show.bs.modal', function (event) {
 
@@ -165,7 +163,7 @@
 
                 let $label = $("<label />").text(options.label);
 
-                let $operator = $("<select />", { "name" : "offset["+ index +"][operator]", "class" : "custom-select mb-2" })
+                let $operator = $("<select />", { "name" : "offset["+ index +"][operator]", "class" : "form-select mb-2" })
                     .append([
                         $("<option />").val("-").text("-"),
                         $("<option />").val("+").text("+")

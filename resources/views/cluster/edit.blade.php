@@ -178,7 +178,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="resetAllChangesLabel">{{ __('Rolling back all changes') }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -189,7 +189,7 @@
                     <span class="text-danger">{{ __('This action cannot be undone.') }}</span>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
                     <button type="button" class="btn btn-secondary"
                             id="confirmResetChanges">{{ __('Roll back changes') }}</button>
                 </div>
@@ -203,7 +203,7 @@
                 <div class="modal-header">
                     <h5 class="modal-title"
                         id="groupModalLabel">{{ __('Download results') }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -213,11 +213,11 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
                     <button type="button" class="btn btn-secondary download-file" data-action="xls"
-                            data-dismiss="modal">{{ __('Download xls') }}</button>
+                            data-bs-dismiss="modal">{{ __('Download xls') }}</button>
                     <button type="button" class="btn btn-secondary download-file" data-action="csv"
-                            data-dismiss="modal">{{ __('Download csv') }}</button>
+                            data-bs-dismiss="modal">{{ __('Download csv') }}</button>
                 </div>
             </div>
         </div>
@@ -228,7 +228,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="exampleModalLabel">{{ __('Moving a phrase') }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -237,7 +237,7 @@
                     <input type="text" name="your-phrase" id="your-phrase" class="form form-control" disabled>
 
                     <label for="clusters-list"></label>
-                    <select name="clusters-list" id="clusters-list" class="custom-select">
+                    <select name="clusters-list" id="clusters-list" class="form-select">
                         @foreach($clusters as $mainPhrase => $items)
                             @if(count($items) === 2)
                                 @continue
@@ -248,8 +248,8 @@
 
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
-                    <button type="button" class="btn btn-secondary" id="save-changes" data-dismiss="modal">
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                    <button type="button" class="btn btn-secondary" id="save-changes" data-bs-dismiss="modal">
                         {{ __('Edit') }}
                     </button>
                 </div>
@@ -262,7 +262,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="addNewGroupLabel">{{ __('Adding a new group') }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -274,9 +274,9 @@
                     </span>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
                     <button type="button" class="btn btn-secondary" id="add-new-group"
-                            data-dismiss="modal">{{ __('Add') }}</button>
+                            data-bs-dismiss="modal">{{ __('Add') }}</button>
                 </div>
             </div>
         </div>
@@ -288,17 +288,17 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="setRelevanceLinkLabel">{{ __('Set relevant page') }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
                     {{ __('Selecting a relevant page') }}
-                    <select class="custom-select" name="relevanceSelect" id="relevanceSelect"></select>
+                    <select class="form-select" name="relevanceSelect" id="relevanceSelect"></select>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal"
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
                             id="setRelevanceUrls">{{ __('Save') }}</button>
                 </div>
             </div>
@@ -311,14 +311,14 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="showPhraseLinksLabel">Ссылки для просмотра</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body" id="phraseLinksBlock">
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
                 </div>
             </div>
         </div>
@@ -353,7 +353,7 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link admin-link" href="#" data-toggle="modal" data-target="#groupModal">
+                    <a class="nav-link admin-link" href="#" data-bs-toggle="modal" data-bs-target="#groupModal">
                         {{ __('Download file') }}
                     </a>
                 </li>
@@ -366,7 +366,7 @@
                 @endif
                 @isset($cluster['default_result'])
                     <li>
-                        <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#resetAllChanges">
+                        <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#resetAllChanges">
                             {{ __('Rolling back all changes') }}
                         </button>
                     </li>
@@ -489,7 +489,7 @@
                                             </div>
                                             <span class="__helper-link ui_tooltip_w hide set-relevance-link">
                                             <button class="btn btn-secondary" style="border-radius: 0 !important;"
-                                                    data-toggle="modal" data-target="#setRelevanceLink">
+                                                    data-bs-toggle="modal" data-bs-target="#setRelevanceLink">
                                                 <i class="fa fa-save" style="color: white;"></i>
                                             </button>
                                             <span class="ui_tooltip __bottom">
@@ -532,24 +532,24 @@
                                                     </div>
                                                     <div class="btn-group">
                                                         <i class="fa fa-ellipsis mr-2"
-                                                           data-toggle="dropdown"
+                                                           data-bs-toggle="dropdown"
                                                            aria-haspopup="true"
                                                            aria-expanded="false"></i>
                                                         <div class="dropdown-menu">
-                                                            <button data-toggle="modal" data-target="#exampleModal"
+                                                            <button data-bs-toggle="modal" data-bs-target="#exampleModal"
                                                                     class="dropdown-item add-to-another"
                                                                     data-action="{{ $phrase }}">
                                                                 {{ __("Add a phrase to another cluster") }}
                                                             </button>
-                                                            <button data-toggle="modal"
+                                                            <button data-bs-toggle="modal"
                                                                     class="dropdown-item select-for-analyse">
                                                                 {{ __('Select phase for analyse') }}
                                                             </button>
-                                                            <button data-toggle="modal"
+                                                            <button data-bs-toggle="modal"
                                                                     class="dropdown-item color-phrases">
                                                                 {{ __('Highlight similar phrases') }}
                                                             </button>
-                                                            <button data-toggle="modal"
+                                                            <button data-bs-toggle="modal"
                                                                     class="dropdown-item set-default-colors">
                                                                 {{ __('Cancel selection') }}
                                                             </button>
@@ -642,24 +642,24 @@
                                                     </div>
                                                     <div class="btn-group">
                                                         <i class="fa fa-ellipsis mr-2"
-                                                           data-toggle="dropdown"
+                                                           data-bs-toggle="dropdown"
                                                            aria-haspopup="true"
                                                            aria-expanded="false"></i>
                                                         <div class="dropdown-menu">
-                                                            <button data-toggle="modal" data-target="#exampleModal"
+                                                            <button data-bs-toggle="modal" data-bs-target="#exampleModal"
                                                                     class="dropdown-item add-to-another"
                                                                     data-action="{{ $phrase }}">
                                                                 {{ __('Add a phrase to another cluster') }}
                                                             </button>
-                                                            <button data-toggle="modal"
+                                                            <button data-bs-toggle="modal"
                                                                     class="dropdown-item select-for-analyse">
                                                                 {{ __("Select phase for analyse") }}
                                                             </button>
-                                                            <button data-toggle="modal"
+                                                            <button data-bs-toggle="modal"
                                                                     class="dropdown-item color-phrases">
                                                                 {{ __('Highlight similar phrases') }}
                                                             </button>
-                                                            <button data-toggle="modal"
+                                                            <button data-bs-toggle="modal"
                                                                     class="dropdown-item set-default-colors">
                                                                 {{ __('Cancel selection') }}
                                                             </button>
@@ -681,7 +681,7 @@
                                 <div class="card-header shadow-none border-0">
                                     <div class="d-flex justify-content-between">
                                         <h3 class="card-title mr-2">{{ __('Phrases for analysis') }}</h3>
-                                        <button type="button" data-card-widget="collapse" class="btn btn-tool">
+                                        <button type="button" data-lte-toggle="card-collapse" class="btn btn-tool">
                                             <i class="fas fa-plus" id="selected-phrases-i"></i>
                                         </button>
                                     </div>
@@ -744,7 +744,7 @@
                             <div>
                                 <div id="addNewGroupButton">
                                     <button class="btn btn-outline-secondary w-100 radius" style="float: left"
-                                            data-toggle="modal" data-target="#addNewGroup">
+                                            data-bs-toggle="modal" data-bs-target="#addNewGroup">
                                         {{ __('Add new group') }}
                                     </button>
                                 </div>
@@ -934,16 +934,16 @@
                                 '            </span>' +
                                 '        </div>' +
                                 '        <div class="btn-group">' +
-                                '            <i data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" class="fa fa-ellipsis mr-2"></i> ' +
+                                '            <i data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" class="fa fa-ellipsis mr-2"></i> ' +
                                 '            <div class="dropdown-menu">' +
-                                '                <button data-toggle="modal" data-target="#exampleModal"' +
+                                '                <button data-bs-toggle="modal" data-bs-target="#exampleModal"' +
                                 '                        class="dropdown-item add-to-another"' +
                                 '                        data-action="' + phrase + '">' + "{{ __('Add a phrase to another cluster') }}" +
                                 '                </button>' +
-                                '                <button data-toggle="modal" class="dropdown-item select-for-analyse">' + "{{ __("Select phase for analyse") }}" + '</button>' +
-                                '                <button data-toggle="modal" class="dropdown-item color-phrases">' + "{{ __('Highlight similar phrases') }}" +
+                                '                <button data-bs-toggle="modal" class="dropdown-item select-for-analyse">' + "{{ __("Select phase for analyse") }}" + '</button>' +
+                                '                <button data-bs-toggle="modal" class="dropdown-item color-phrases">' + "{{ __('Highlight similar phrases') }}" +
                                 '                </button>' +
-                                '                <button data-toggle="modal" class="dropdown-item set-default-colors">' + "{{ __('Cancel selection') }}" +
+                                '                <button data-bs-toggle="modal" class="dropdown-item set-default-colors">' + "{{ __('Cancel selection') }}" +
                                 '                </button>' +
                                 '            </div>' +
                                 '            <i data-target="' + phrase + '" class="fa fa-arrow-right move-phrase"></i>' +

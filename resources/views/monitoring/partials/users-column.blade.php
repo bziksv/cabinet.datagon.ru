@@ -3,7 +3,7 @@
     @foreach ($project->users as $user)
         <li class="list-inline-item position-relative @can('change_user_status_project_monitoring') change-user-status @endcan"
             user-id="{{ $user->id }}" project-id="{{ $project->id }}"
-            data-toggle="tooltip" title="{{ $user->last_name }} {{ $user->name }} - {{ $user->roles()->value('title') }}">
+            data-bs-toggle="tooltip" title="{{ $user->last_name }} {{ $user->name }} - {{ $user->roles()->value('title') }}">
 
             @if ($user->hasRole('admin_monitoring'))
                 <img class="table-avatar img-circle img-bordered-sm admin-monitoring" src="{{ $user->image }}">

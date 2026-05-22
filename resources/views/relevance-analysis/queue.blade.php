@@ -91,7 +91,7 @@
                                     $config->count_sites => $config->count_sites,
                                     '10' => 10,
                                     '20' => 20,
-                            ]), null, ['class' => 'custom-select rounded-0 count']) !!}
+                            ]), null, ['class' => 'form-select rounded-0 count']) !!}
                         </div>
 
                         <div class="form-group required">
@@ -160,7 +160,7 @@
                                    '56' => __('Chelyabinsk'),
                                    '1104' => __('Cherkessk'),
                                    '16' => __('Yaroslavl'),
-                                   ]), null, ['class' => 'custom-select rounded-0 region']) !!}
+                                   ]), null, ['class' => 'form-select rounded-0 region']) !!}
                         </div>
 
                         <div class="form-group required" id="ignoredDomainsBlock">
@@ -270,8 +270,8 @@
                         separator: $('#separator').val(),
                         link: $('.form-control.link').val(),
                         listWords: $('.form-control.listWords').val(),
-                        count: $('.custom-select.rounded-0.count').val(),
-                        region: $('.custom-select.rounded-0.region').val(),
+                        count: $('.form-select.rounded-0.count').val(),
+                        region: $('.form-select.rounded-0.region').val(),
                         ignoredDomains: $('.form-control.ignoredDomains').val(),
 
                         noIndex: $('#switchNoindex').is(':checked'),

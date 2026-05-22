@@ -8,7 +8,7 @@
         @csrf
 
         <label for="type">Тип документа</label>
-        <select name="type" id="type" class="custom-select">
+        <select name="type" id="type" class="form-select">
             <option value="policy_ru">Policy ru</option>
             <option value="policy_en">Policy en</option>
             <option value="terms_ru">Terms ru</option>
@@ -22,8 +22,8 @@
         </div>
 
         <input type="submit" class="btn btn-secondary mr-2" value="{{__('Save Document')}}">
-        <button class="btn btn-default btn-flat mr-2" type="button" data-toggle="modal"
-                data-target="#clear-text">
+        <button class="btn btn-default btn-flat mr-2" type="button" data-bs-toggle="modal"
+                data-bs-target="#clear-text">
             {{__('Clear')}}
         </button>
     </form>

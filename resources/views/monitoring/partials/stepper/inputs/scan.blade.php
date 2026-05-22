@@ -14,7 +14,7 @@
 
                 <div class="form-group">
                     <label>Режимы</label>
-                    <select id="mode-scan" class="custom-select">
+                    <select id="mode-scan" class="form-select">
                         <option value="times">Каждый день</option>
                         <option value="months">Каждый месяц</option>
                         <option value="weeks">По дням</option>

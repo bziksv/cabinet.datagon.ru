@@ -22,7 +22,7 @@
             <div class="card-tools">
                 {{ $tools ?? null }}
                 <!-- This will cause the card to maximize when clicked -->
-                <button type="button" class="btn btn-tool" data-card-widget="maximize">
+                <button type="button" class="btn btn-tool" data-lte-toggle="card-maximize">
                     <i class="fas fa-expand"></i>
                 </button>
             </div>
@@ -52,21 +52,17 @@
 
     <script>
         let name = window.location.pathname;
-        $('.card-widget').on('collapsed.lte.cardwidget', function () {
-            cookies.set(name, 'collapse');
-        });
-        $('.card-widget').on('expanded.lte.cardwidget', function () {
-            cookies.set(name, 'expand');
+        var $moduleCard = $('.app-main .card').first();
+        $moduleCard.on('collapsed.lte.card expanded.lte.card collapsed.lte.card-widget expanded.lte.card-widget', function (e) {
+            var collapsed = e.type === 'collapsed.lte.card' || e.type === 'collapsed.lte.card-widget';
+            cookies.set(name, collapsed ? 'collapse' : 'expand');
         });
 
         try {
-            if (cookies.get(name) == 'collapse') {
-                $('.card-widget').addClass('collapsed-card');
-            } else {
-                $('.card-widget').removeClass('collapsed-card');
+            if (cookies.get(name) === 'collapse') {
+                $moduleCard.addClass('collapsed-card');
             }
         } catch (e) {
-
         }
 
     </script>

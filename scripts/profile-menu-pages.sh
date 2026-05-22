@@ -12,7 +12,6 @@ PATHS=(
   "/competitor-analysis"
   "/text-analyzer"
   "/cluster"
-  "/behavior"
   "/duplicates"
   "/list-comparison"
   "/unique"

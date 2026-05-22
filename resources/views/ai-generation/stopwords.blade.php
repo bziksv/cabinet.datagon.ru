@@ -1,7 +1,6 @@
 @component('component.card', ['title' => 'Управление стоп-словами'])
     @slot('css')
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'responsive-core-min'])
     @endslot
 
     <div class="card">
@@ -12,10 +11,10 @@
         <div class="card-header p-2">
             <ul class="nav nav-pills" id="stopwords-tabs" role="tablist">
                 <li class="nav-item">
-                    <a class="nav-link active" id="tab-words-link" data-toggle="pill" href="#tab-words" role="tab">Слова</a>
+                    <a class="nav-link active" id="tab-words-link" data-bs-toggle="pill" href="#tab-words" role="tab">Слова</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" id="tab-categories-link" data-toggle="pill" href="#tab-categories" role="tab">Категории</a>
+                    <a class="nav-link" id="tab-categories-link" data-bs-toggle="pill" href="#tab-categories" role="tab">Категории</a>
                 </li>
             </ul>
         </div>
@@ -89,7 +88,7 @@
                     @method('PUT')
                     <div class="modal-header">
                         <h5 class="modal-title">Редактировать слово</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -109,7 +108,7 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
                         <button type="submit" class="btn btn-primary">Сохранить</button>
                     </div>
                 </form>
@@ -125,7 +124,7 @@
                     @method('PUT')
                     <div class="modal-header">
                         <h5 class="modal-title">Редактировать категорию</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -136,7 +135,7 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
                         <button type="submit" class="btn btn-primary">Сохранить</button>
                     </div>
                 </form>
@@ -146,8 +145,7 @@
 
     @slot('js')
     <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-    <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-    <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
+    @include('layouts.partials.vendor-datatables-js', ['bundle' => 'responsive-core-min'])
     <script>
     $(document).ready(function() {
         $.ajaxSetup({
@@ -156,7 +154,7 @@
             }
         });
 
-        $('a[data-toggle="pill"]').on('show.bs.tab', function (e) {
+        $('a[data-bs-toggle="pill"]').on('show.bs.tab', function (e) {
             localStorage.setItem('activeStopwordsTab', $(e.target).attr('href'));
         });
         let activeTab = localStorage.getItem('activeStopwordsTab');

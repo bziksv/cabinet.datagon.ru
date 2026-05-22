@@ -7,9 +7,7 @@
         <!-- jQuery ui -->
         <link rel="stylesheet" href="{{ asset('plugins/jquery-ui/jquery-ui.css') }}">
         <!-- DataTables -->
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-buttons/css/buttons.bootstrap4.min.css') }}">
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-min'])
 
         <style>
             .dt-buttons {
@@ -25,9 +23,7 @@
                 <label>{{ __('To check one link') }}</label>
                 <div class="input-group input-group-sm">
                     {!! Form::text('url', request('url', $default = null), ['class' => 'form-control' . ($errors->has('url') ? ' is-invalid' : ''), 'placeholder' => __('URL')]) !!}
-                    <span class="input-group-append">
                     {!! Form::submit(__('Check URL'), ['class' => 'btn btn-secondary btn-flat']) !!}
-                    </span>
                 </div>
                 {!! Form::close() !!}
             </div>
@@ -52,8 +48,7 @@
                     <div class="input-group input-group-sm">
                         <input type="text" id="inputCopy" value="{{ request()->getHost() }}/public/http-headers/{{$id}}?lang={{ $lang }}"
                                class="form-control">
-                        <div class="input-group-append">
-                            <span class="input-group-text" onclick="copy()" style="cursor: pointer"><i class="fas fa-copy"></i></span>
+                        <span class="input-group-text" onclick="copy()" style="cursor: pointer"><i class="fas fa-copy"></i></span>
                         </div>
                     </div>
                 </div>

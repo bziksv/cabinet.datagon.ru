@@ -14,13 +14,13 @@
                 background-color: rgba(0,0,0,.075);
             }
 
-            [data-toggle=collapse] i.expandable-accordion-caret {
+            [data-bs-toggle=collapse] i.expandable-accordion-caret {
                 transition: -webkit-transform .3s linear;
                 transition: transform .3s linear;
                 transition: transform .3s linear,-webkit-transform .3s linear;
             }
 
-            [data-toggle=collapse][aria-expanded=true] i.expandable-accordion-caret[class*=right] {
+            [data-bs-toggle=collapse][aria-expanded=true] i.expandable-accordion-caret[class*=right] {
                 -webkit-transform: rotate(
                         90deg);
                 transform: rotate(
@@ -40,7 +40,7 @@
 
             <div class="form-group">
                 <label for="filter">{{ __('Filter') }}</label>
-                <select class="custom-select" id="filter">
+                <select class="form-select" id="filter">
                     <option value="all">{{ __('All') }}</option>
                     @foreach($filter as $f)
                         <option value="{{$f}}">{{$f}}</option>
@@ -57,7 +57,7 @@
                     >
                         <div class="card-header">
                             <h4 class="card-title ">
-                                <a class="d-block w-100 collapsed accordion-title" data-toggle="collapse" href="#collapse{{$loop->index}}" aria-expanded="false">
+                                <a class="d-block w-100 collapsed accordion-title" data-bs-toggle="collapse" href="#collapse{{$loop->index}}" aria-expanded="false">
                                     <i class="expandable-accordion-caret fas fa-caret-right fa-fw"></i> {{ $url }}
                                 </a>
                             </h4>

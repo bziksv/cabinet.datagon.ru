@@ -14,13 +14,13 @@
                 background-color: rgba(0, 0, 0, .075);
             }
 
-            [data-toggle=collapse] i.expandable-accordion-caret {
+            [data-bs-toggle=collapse] i.expandable-accordion-caret {
                 transition: -webkit-transform .3s linear;
                 transition: transform .3s linear;
                 transition: transform .3s linear, -webkit-transform .3s linear;
             }
 
-            [data-toggle=collapse][aria-expanded=true] i.expandable-accordion-caret[class*=right] {
+            [data-bs-toggle=collapse][aria-expanded=true] i.expandable-accordion-caret[class*=right] {
                 -webkit-transform: rotate(
                     90deg);
                 transform: rotate(
@@ -34,7 +34,7 @@
         </style>
     @endslot
 
-    <meta-tags :meta="{{ $meta }}" :lang="{{ $lang }}"></meta-tags>
+    <meta-tags :lang='@json($lang)'></meta-tags>
 
     <div class="row">
         <div class="col-12">

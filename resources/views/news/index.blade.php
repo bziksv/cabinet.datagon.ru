@@ -1,339 +1,254 @@
 @component('component.card', ['title' => __('News and updates')])
-    @slot('css')
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/scroll/style.css') }}"/>
-    @endslot
-
     @if(\App\User::isUserAdmin())
-        <a href="{{ route('create.news') }}" class="btn btn-secondary mb-3" style="margin-left: 7.5px">
-            {{ __('Add News') }}
-        </a>
+        @slot('tools')
+            <a href="{{ route('create.news') }}" class="btn btn-sm btn-secondary">
+                <i class="fas fa-plus me-1"></i>{{ __('Add News') }}
+            </a>
+        @endslot
     @endif
 
+    @slot('css')
+        <link rel="stylesheet" href="{{ asset('plugins/scroll/style.css') }}"/>
+        <link rel="stylesheet" href="{{ asset('css/cabinet-news.css') }}"/>
+    @endslot
+
     @isset($news[0])
-        <div class="scroll-to d-flex flex-column">
-            <a href="#header-nav-bar" class="fa fa-arrow-circle-up scroll_arrow text-muted"></a>
-            <a href="#main-footer" class="fa fa-arrow-circle-down scroll_arrow text-muted"></a>
-        </div>
-        <div class="col-lg-8 col-md-12 pb-3">
-            <div class="card">
-                <div class="card-body">
-                    <div class="tab-content">
-                        @foreach($news as $item)
-                            <div class="post" id="news-{{ $item->id }}">
-                                <div class="user-block">
-                                    <img class="img-circle img-bordered-sm"
-                                         src="{{ $item->user->image }}" alt="avatar">
-                                    <span class="username">
-                                        <span>{{ $item->user->name }}</span>
-                                            @if($item->user_id === \Illuminate\Support\Facades\Auth::id() || $admin)
-                                            <a class="float-right btn-tool"
-                                               data-toggle="modal"
-                                               data-target="#remove-news-{{ $item->id }}">
-                                                <i class="fas fa-times"></i>
-                                            </a>
-                                            <a class="float-right btn-tool mr-4"
-                                               href="{{ route('edit.news', $item->id) }}">
-                                                <i class="fa fa-edit"></i>
-                                            </a>
-                                        @endif
-                                    </span>
-                                    <span class="description">{{ $item->created_at->diffForHumans() }}</span>
-                                </div>
-                                <div>{!! $item->content !!}</div>
-                                <div>
-                                <span class="link-black text-sm like-news @isset($item->like) text-danger @endisset"
-                                      data-target="{{ $item->id }}">
-                                    <i class="far fa-thumbs-up mr-1"></i>
-                                    <span class="number-of-likes">{{ $item->number_of_likes }}</span>
-                                </span>
-                                    <span class="float-right">
-                                    <span class="link-black text-sm comments" style="cursor:pointer">
-                                        <i class="far fa-comments mr-1"></i>
-                                        <span>{{ __('Comments') }}</span>
-                                        (<span>{{ count($item->comments) }}</span>)
-                                    </span>
-                                </span>
-                                </div>
-                                <div id="comments-{{$item->id}}" class="mt-3 comments-block" style="display: none;">
-                                    <div class="input-group input-group-sm mb-0">
-                                        <input type="hidden" name="news_id" value="{{ $item->id }}">
-                                        <textarea name="comment" class="form-control" rows="3" required></textarea>
-                                        <div class="input-group-append">
-                                            <button type="submit"
-                                                    class="btn btn-secondary send-comment">{{ __('Send') }}</button>
-                                        </div>
-                                    </div>
-                                    <div class="mt-3 ml-2 news-comments">
-                                        @foreach($item->comments as $comment)
-                                            <div class="direct-chat-msg" id="comment-{{$comment->id}}">
-                                                <div class="direct-chat-infos clearfix">
-                                                    <div class="direct-chat-name float-left">
-                                                        {{ $comment->user->name }}
-                                                        (<span
-                                                            class="text-info">@if($admin){{ __('Admin') }}@else{{ __('User') }}@endif</span>)
-                                                        <span class="text-muted font-weight-normal ml-2">
-                                                            {{ $comment->created_at->diffForHumans() }}
-                                                        </span>
-                                                    </div>
-                                                    <span class="float-right">
-                                                        @if($comment->user_id === \Illuminate\Support\Facades\Auth::id() || $admin)
-                                                            <span><i class="fa fa-edit btn-tool"></i></span>
-                                                            <span data-toggle="modal"
-                                                                  class="remove-comment btn-tool"
-                                                                  data-target="{{ $comment->id }}">
-                                                                <i class="fas fa-times"></i>
-                                                            </span>
-                                                        @endif
-                                                </span>
-                                                </div>
-                                                <img class="direct-chat-img"
-                                                     src="{{ $comment->user->image}}"
-                                                     alt="avatar">
-                                                <div class="direct-chat-text">
-                                                    <span>{{ $comment->comment }}</span>
-                                                    <textarea rows="5" class="form form-control"
-                                                              data-target="{{ $comment->id }}"
-                                                              style="display: none">{{ $comment->comment }}</textarea>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                                <div class="modal fade" id="remove-news-{{ $item->id }}" tabindex="-1" role="dialog"
-                                     aria-hidden="true">
-                                    <div class="modal-dialog w-25" role="document">
-                                        <div class="modal-content">
-                                            <div class="modal-body">
-                                                <p>{{__('Delete a news item')}}</p>
-                                                <p>{{__('Are you sure?')}}</p>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button class="btn btn-secondary remove-news"
-                                                        data-dismiss="modal"
-                                                        target="{{ $item->id }}">
-                                                    {{ __('Remove') }}
-                                                </button>
-                                                <button class="btn btn-default btn-flat"
-                                                        data-dismiss="modal">
-                                                    {{__('Back')}}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+        <div class="cabinet-news-feed position-relative">
+            <div class="scroll-to d-flex flex-column">
+                <a href="#header-nav-bar" class="fa fa-arrow-circle-up scroll_arrow text-muted" aria-label="Up"></a>
+                <a href="#main-footer" class="fa fa-arrow-circle-down scroll_arrow text-muted" aria-label="Down"></a>
+            </div>
+
+            @foreach($news as $item)
+                <article class="cabinet-news-post d-flex gap-3 pb-4 mb-4 border-bottom" id="news-{{ $item->id }}">
+                    <img class="rounded-circle flex-shrink-0 cabinet-news-post__avatar"
+                         src="{{ $item->user->image }}"
+                         alt="{{ $item->user->name }}">
+
+                    <div class="flex-grow-1 min-w-0">
+                        <div class="d-flex justify-content-between align-items-start gap-2">
+                            <div>
+                                <h4 class="h6 mb-0">{{ $item->user->name }}</h4>
+                                <small class="text-secondary">{{ $item->created_at->diffForHumans() }}</small>
                             </div>
-                        @endforeach
+                            @if($item->user_id === \Illuminate\Support\Facades\Auth::id() || $admin)
+                                <div class="btn-group btn-group-sm flex-shrink-0">
+                                    <a href="{{ route('edit.news', $item->id) }}"
+                                       class="btn btn-outline-secondary btn-sm"
+                                       title="{{ __('Edit') }}">
+                                        <i class="fa fa-edit"></i>
+                                    </a>
+                                    <button type="button"
+                                            class="btn btn-outline-secondary btn-sm"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#remove-news-{{ $item->id }}"
+                                            title="{{ __('Remove') }}">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+
+                        <div class="cabinet-news-post__content mt-2 mb-3">{!! $item->content !!}</div>
+
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-secondary like-news @isset($item->like) text-danger @endisset"
+                                    data-news-id="{{ $item->id }}">
+                                <i class="far fa-thumbs-up me-1"></i>
+                                <span class="number-of-likes">{{ $item->number_of_likes }}</span>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary comments-toggle">
+                                <i class="far fa-comments me-1"></i>
+                                {{ __('Comments') }}
+                                (<span class="comment-count">{{ count($item->comments) }}</span>)
+                            </button>
+                        </div>
+
+                        <div id="comments-{{ $item->id }}" class="cabinet-news-comments mt-3" style="display: none;">
+                            <div class="input-group input-group-sm mb-3">
+                                <input type="hidden" name="news_id" value="{{ $item->id }}">
+                                <textarea name="comment" class="form-control" rows="2" required
+                                          placeholder="{{ __('Comment') }}"></textarea>
+                                <button type="button" class="btn btn-secondary send-comment">{{ __('Send') }}</button>
+                            </div>
+                            <ul class="list-unstyled mb-0 news-comments-list">
+                                @foreach($item->comments as $comment)
+                                    <li class="d-flex gap-2 mb-3 cabinet-news-comment" id="comment-{{ $comment->id }}">
+                                        <img class="rounded-circle flex-shrink-0 cabinet-news-comment__avatar"
+                                             src="{{ $comment->user->image }}"
+                                             alt="{{ $comment->user->name }}">
+                                        <div class="flex-grow-1 min-w-0">
+                                            <div class="d-flex justify-content-between align-items-start gap-2">
+                                                <span class="small fw-semibold">
+                                                    {{ $comment->user->name }}
+                                                    <span class="text-info fw-normal">
+                                                        @if($admin){{ __('Admin') }}@else{{ __('User') }}@endif
+                                                    </span>
+                                                </span>
+                                                <small class="text-secondary flex-shrink-0">
+                                                    {{ $comment->created_at->diffForHumans() }}
+                                                </small>
+                                            </div>
+                                            @if($comment->user_id === \Illuminate\Support\Facades\Auth::id() || $admin)
+                                                <div class="float-end ms-2">
+                                                    <button type="button" class="btn btn-link btn-sm p-0 text-secondary edit-comment-btn" title="{{ __('Edit') }}">
+                                                        <i class="fa fa-edit"></i>
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-link btn-sm p-0 text-secondary remove-comment"
+                                                            data-comment-id="{{ $comment->id }}"
+                                                            title="{{ __('Remove') }}">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            @endif
+                                            <p class="mb-0 small cabinet-news-comment__text mt-1">{{ $comment->comment }}</p>
+                                            <textarea rows="3"
+                                                      class="form-control form-control-sm mt-1 d-none edit-comment-field"
+                                                      data-comment-id="{{ $comment->id }}">{{ $comment->comment }}</textarea>
+                                        </div>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    </div>
+                </article>
+
+                <div class="modal fade" id="remove-news-{{ $item->id }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-sm modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-body">
+                                <p class="mb-1">{{ __('Delete a news item') }}</p>
+                                <p class="mb-0 text-secondary">{{ __('Are you sure?') }}</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Back') }}</button>
+                                <button type="button" class="btn btn-danger remove-news" data-bs-dismiss="modal"
+                                        data-news-id="{{ $item->id }}">{{ __('Remove') }}</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
+            @endforeach
         </div>
     @endisset
 
     @slot('js')
         <script>
-            $(".scroll_arrow").on("click", function (e) {
-                e.preventDefault();
-                var anchor = $(this).attr('href');
-                $('html, body').stop().animate({
-                    scrollTop: $(anchor).offset().top - 60
-                }, 800);
-            });
+            (function ($) {
+                var roleLabel = @json($admin ? __('Admin') : __('User'));
 
-            $(document).ready(function () {
-                $('html').height($('.col-lg-8.col-md-12.pb-3').height() + 200)
-            });
-
-            $('.btn.btn-secondary.remove-news').click(function () {
-                var id = $(this).attr('target')
-                $.ajax({
-                    type: "post",
-                    dataType: "json",
-                    url: "{{ route('remove.news') }}",
-                    data: {
-                        id: id,
-                        _token: $('meta[name="csrf-token"]').attr('content')
-                    },
-                    success: function () {
-                        $('#news-' + id).remove()
-                        $('.modal-backdrop.fade.show').remove()
-                        $('html').css({
-                            'overflow': 'auto',
-                            'height': 'auto',
-                        })
-                    }
+                $('.scroll_arrow').on('click', function (e) {
+                    e.preventDefault();
+                    var anchor = $(this).attr('href');
+                    $('html, body').stop().animate({scrollTop: $(anchor).offset().top - 60}, 800);
                 });
-            })
 
-            $('.remove-comment.btn-tool').click(function () {
-                var item = $(this)
-                var id = item.attr('data-target')
-                $.ajax({
-                    type: "post",
-                    dataType: "json",
-                    url: "{{ route('remove.comment') }}",
-                    data: {
+                $('.remove-news').on('click', function () {
+                    var id = $(this).data('news-id');
+                    $.post("{{ route('remove.news') }}", {
                         id: id,
                         _token: $('meta[name="csrf-token"]').attr('content')
-                    },
-                    success: function () {
-                        let span = item.parent().parent().parent().parent().parent()
-                            .parent().children('div').eq(2).children('span').eq(1)
-                            .children().children('span').eq(1)
-                        let number = Number(span.text())
-                        span.text(number - 1)
-                        $('#comment-' + id).hide(300)
-                    }
+                    }, function () {
+                        $('#news-' + id).remove();
+                        $('.modal-backdrop').remove();
+                        $('body').removeClass('modal-open').css('overflow', '');
+                    }, 'json');
                 });
-            })
 
-            $('.link-black.text-sm.like-news').click(function () {
-                var id = $(this).attr('data-target')
-                var item = $(this)
-                $.ajax({
-                    type: "post",
-                    dataType: "json",
-                    url: "{{ route('like') }}",
-                    data: {
+                $('.cabinet-news-feed').on('click', '.remove-comment', function () {
+                    var $btn = $(this);
+                    var id = $btn.data('comment-id');
+                    var $post = $btn.closest('.cabinet-news-post');
+                    $.post("{{ route('remove.comment') }}", {
                         id: id,
                         _token: $('meta[name="csrf-token"]').attr('content')
-                    },
-                    success: function (response) {
-                        let number = Number(item.children('span').text())
+                    }, function () {
+                        $post.find('.comment-count').text(function (i, n) {
+                            return Math.max(0, parseInt(n, 10) - 1);
+                        });
+                        $('#comment-' + id).remove();
+                    }, 'json');
+                });
+
+                $('.cabinet-news-feed').on('click', '.like-news', function () {
+                    var $btn = $(this);
+                    var id = $btn.data('news-id');
+                    $.post("{{ route('like') }}", {
+                        id: id,
+                        _token: $('meta[name="csrf-token"]').attr('content')
+                    }, function (response) {
+                        var $count = $btn.find('.number-of-likes');
+                        var n = parseInt($count.text(), 10) || 0;
                         if (response[0] === 'like') {
-                            item.children('span').text(number + 1)
-                            item.addClass(' text-danger')
+                            $count.text(n + 1);
+                            $btn.addClass('text-danger');
                         } else {
-                            item.children('span').text(number - 1)
-                            item.removeClass('text-danger')
+                            $count.text(Math.max(0, n - 1));
+                            $btn.removeClass('text-danger');
                         }
-                    }
+                    }, 'json');
                 });
 
-            })
-
-            $('.btn.btn-secondary.send-comment').click(function () {
-                var elem = $(this)
-                var textarea = $(this).parent().parent().children('textarea')
-                $.ajax({
-                    type: "post",
-                    dataType: "json",
-                    url: "{{ route('create.comment') }}",
-                    data: {
-                        news_id: $(this).parent().parent().children('input').val(),
+                $('.cabinet-news-feed').on('click', '.send-comment', function () {
+                    var $btn = $(this);
+                    var $block = $btn.closest('.cabinet-news-comments');
+                    var $post = $btn.closest('.cabinet-news-post');
+                    var textarea = $block.find('textarea[name="comment"]');
+                    var newsId = $block.find('input[name="news_id"]').val();
+                    $.post("{{ route('create.comment') }}", {
+                        news_id: newsId,
                         comment: textarea.val(),
                         _token: $('meta[name="csrf-token"]').attr('content')
-                    },
-                    success: function (response) {
-                        textarea.val("")
-                        let span = elem.parent().parent().parent().parent().children('div').eq(2).children('span').eq(1).children('span').children('span').eq(1)
-                        let number = Number(span.text())
-                        span.text(number + 1)
-                        let comments = elem.parent().parent().parent().children('div').eq(1)
-
-                        comments.append(
-                            "<div id='comment-" + response.commentId + "' class='direct-chat-msg'> " +
-                            "<div class='direct-chat-infos clearfix'>" +
-                            "<div class='direct-chat-name float-left'>" + response.userName + "(<span class='text-info'>" + role + "</span>)" +
-                            "<span class='text-muted font-weight-normal ml-2'>{{__('Just now')}}</span></div>" +
-                            "<span class='float-right'> " +
-                            "<span><i class='fa fa-edit btn-tool' onclick='editComment(this)'></i> " +
-                            "</span> " +
-                            "<span data-toggle='modal' data-target='" + response.commentId + "' class='remove-comment btn-tool' onclick='removeComment(this)'> " +
-                            "<i class='fas fa-times'></i> " +
-                            "</span></span></div> " +
-                            "<img src='" + response.avatar + "' alt='avatar' class='direct-chat-img'>" +
-                            "<div class='direct-chat-text'> " +
-                            "<span>" + response.comment + "</span> " +
-                            "<textarea rows='5' data-target='" + response.commentId + "' class='form form-control' style='display: none;'>" + response.comment + "</textarea>" +
-                            "</div>" +
-                            "</div>"
+                    }, function (response) {
+                        textarea.val('');
+                        $post.find('.comment-count').text(function (i, n) {
+                            return parseInt(n, 10) + 1;
+                        });
+                        $block.find('.news-comments-list').append(
+                            '<li class="d-flex gap-2 mb-3 cabinet-news-comment" id="comment-' + response.commentId + '">' +
+                            '<img class="rounded-circle flex-shrink-0 cabinet-news-comment__avatar" src="' + response.avatar + '" alt="">' +
+                            '<div class="flex-grow-1 min-w-0">' +
+                            '<div class="d-flex justify-content-between align-items-start gap-2">' +
+                            '<span class="small fw-semibold">' + response.userName +
+                            ' <span class="text-info fw-normal">' + roleLabel + '</span></span>' +
+                            '<small class="text-secondary flex-shrink-0">{{ __('Just now') }}</small></div>' +
+                            '<div class="float-end ms-2">' +
+                            '<button type="button" class="btn btn-link btn-sm p-0 text-secondary edit-comment-btn"><i class="fa fa-edit"></i></button>' +
+                            '<button type="button" class="btn btn-link btn-sm p-0 text-secondary remove-comment" data-comment-id="' + response.commentId + '">' +
+                            '<i class="fas fa-times"></i></button></div>' +
+                            '<p class="mb-0 small cabinet-news-comment__text mt-1">' + $('<div>').text(response.comment).html() + '</p>' +
+                            '<textarea rows="3" class="form-control form-control-sm mt-1 d-none edit-comment-field" data-comment-id="' + response.commentId + '">' +
+                            $('<div>').text(response.comment).html() + '</textarea></div></li>'
                         );
-                    }
+                    }, 'json');
                 });
-            })
 
-            $('.comments').click(function () {
-                let comments = $(this).parent().parent().parent().children('div').eq(3);
-                if (comments.is(':visible')) {
-                    comments.slideUp(300);
-                    $('html').height($('html').height() - $(this).parent().parent().parent().children('div').eq(3).height())
-                } else {
-                    $('html').height($('html').height() + $(this).parent().parent().parent().children('div').eq(3).height())
-                    comments.slideDown(300);
-                }
-            });
+                $('.cabinet-news-feed').on('click', '.comments-toggle', function () {
+                    $(this).closest('.cabinet-news-post').find('.cabinet-news-comments').slideToggle(300);
+                });
 
-            function removeComment(elem) {
-                let item = $(elem)
-                var id = item.attr('data-target')
-                $.ajax({
-                    type: "post",
-                    dataType: "json",
-                    url: "{{ route('remove.comment') }}",
-                    data: {
-                        id: id,
+                $('.cabinet-news-feed').on('click', '.edit-comment-btn', function () {
+                    var $li = $(this).closest('.cabinet-news-comment');
+                    $li.find('.cabinet-news-comment__text').addClass('d-none');
+                    $li.find('.edit-comment-field').removeClass('d-none').focus();
+                });
+
+                $('.cabinet-news-feed').on('blur', '.edit-comment-field', function () {
+                    var $field = $(this);
+                    var $li = $field.closest('.cabinet-news-comment');
+                    var $text = $li.find('.cabinet-news-comment__text');
+                    $.post("{{ route('edit.comment') }}", {
+                        id: $field.data('comment-id'),
+                        comment: $field.val(),
                         _token: $('meta[name="csrf-token"]').attr('content')
-                    },
-                    success: function () {
-                        let span = item.parent().parent().parent().parent().parent().parent().children('div').eq(2).children('span').eq(1)
-                            .children().children('span').eq(1)
-                        let number = Number(span.text())
-                        span.text(number - 1)
-                        $('#comment-' + id).hide(300)
-                    }
+                    }, function () {
+                        $text.text($field.val()).removeClass('d-none');
+                        $field.addClass('d-none');
+                    }, 'json');
                 });
-            }
-
-            function editComment(elem) {
-                let item = $(elem)
-                let span = item.parent().parent().parent().parent().children('div').eq(1).children('span').eq(0)
-                let textarea = item.parent().parent().parent().parent().children('div').eq(1).children('textarea').eq(0)
-                span.hide()
-                textarea.show()
-
-                textarea.blur(function () {
-                    $.ajax({
-                        type: "post",
-                        dataType: "json",
-                        url: "{{ route('edit.comment') }}",
-                        data: {
-                            id: textarea.attr('data-target'),
-                            comment: textarea.val(),
-                            _token: $('meta[name="csrf-token"]').attr('content')
-                        },
-                        success: function () {
-                            span.text(textarea.val())
-                            span.show()
-                            textarea.hide()
-                        }
-                    });
-                })
-            }
-
-            $('.fa.fa-edit.btn-tool').click(function () {
-                let span = $(this).parent().parent().parent().parent().children('div').eq(1).children('span').eq(0)
-                let textarea = $(this).parent().parent().parent().parent().children('div').eq(1).children('textarea').eq(0)
-                span.hide()
-                textarea.show()
-
-                textarea.blur(function () {
-                    $.ajax({
-                        type: "post",
-                        dataType: "json",
-                        url: "{{ route('edit.comment') }}",
-                        data: {
-                            id: textarea.attr('data-target'),
-                            comment: textarea.val(),
-                            _token: $('meta[name="csrf-token"]').attr('content')
-                        },
-                        success: function () {
-                            span.text(textarea.val())
-                            span.show()
-                            textarea.hide()
-                        }
-                    });
-                })
-            })
+            })(jQuery);
         </script>
     @endslot
 @endcomponent

@@ -4,12 +4,12 @@
             <div class="card-header p-0 border-bottom-0">
                 <ul class="nav nav-tabs" role="tablist">
                     <li class="nav-item">
-                        <a class="nav-link active px-4 py-3 position-relative" data-toggle="pill" href="#yandex" role="tab" aria-selected="true">
+                        <a class="nav-link active px-4 py-3 position-relative" data-bs-toggle="pill" href="#yandex" role="tab" aria-selected="true">
                             <i class="fab fa-yandex fa-lg"></i>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link px-4 py-3 position-relative" data-toggle="pill" href="#google" role="tab" aria-selected="false">
+                        <a class="nav-link px-4 py-3 position-relative" data-bs-toggle="pill" href="#google" role="tab" aria-selected="false">
                             <i class="fab fa-google"></i>
                         </a>
                     </li>

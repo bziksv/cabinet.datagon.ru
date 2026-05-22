@@ -9,9 +9,7 @@
         <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
         <!-- DataTables -->
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-buttons/css/buttons.bootstrap4.min.css') }}">
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-min'])
 
         <style>
             .pg-loading-screen .pg-loading-html {
@@ -89,14 +87,9 @@
         <!-- Papa parse -->
         <script src="{{ asset('plugins/papaparse/papaparse.min.js') }}"></script>
         <!-- Bootstrap 4 -->
-        <script src="{{ asset('plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
         <!-- DataTables  & Plugins -->
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables-editor/js/datatables_editor.min.js') }}"></script>
         <!-- InputMask -->
         <script src="{{ asset('plugins/inputmask/jquery.inputmask.bundle.js') }}"></script>
@@ -312,9 +305,7 @@
                         placeholder: 'Время снятия (24 Hr)',
                     }).attr('data-id', data.id);
 
-                    let icon = $('<div />', {
-                        class: 'input-group-append'
-                    }).append($('<span />', {class: 'input-group-text time-reset'}).append($('<i />', {class: 'far fa-times-circle'})));
+                    let icon = $('<span />', {class: 'input-group-text time-reset'}).append($('<i />', {class: 'far fa-times-circle'}));
 
                     return group.append(input, icon);
                 },
@@ -766,7 +757,6 @@
             });
 
             $( REGIONS_CLASS ).select2({
-                theme: 'bootstrap4',
                 placeholder: 'Select a regions',
                 minimumInputLength: 2,
                 language: {
@@ -931,7 +921,7 @@
                     options.push(new Option(response.data, response.data, false, false));
                 }
 
-                keywordSelect2.select2({ theme: 'bootstrap4' });
+                keywordSelect2.select2({});
 
                 keywordSelect2.append(options).trigger('change');
             }).catch(function (error) {

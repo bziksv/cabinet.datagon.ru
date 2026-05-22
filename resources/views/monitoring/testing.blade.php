@@ -8,17 +8,11 @@
 <div class="form-group">
     <label>[Year-month-day] Date range:</label>
     <div class="input-group">
-        <div class="input-group-prepend">
-              <span class="input-group-text">
-                  <i class="far fa-calendar-alt"></i>
-              </span>
-        </div>
-
-        <input type="text" name="date" class="form-control float-right" id="reservation">
-
-        <span class="input-group-append">
-                <button type="submit" class="btn btn-info btn-flat">Вставить позиции.</button>
-            </span>
+        <span class="input-group-text">
+            <i class="far fa-calendar-alt"></i>
+        </span>
+        <input type="text" name="date" class="form-control float-end" id="reservation">
+        <button type="submit" class="btn btn-info btn-flat">Вставить позиции.</button>
     </div>
     <!-- /.input group -->
 </div>

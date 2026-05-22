@@ -6,9 +6,7 @@
         <!-- Toastr -->
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
         <!-- DataTables -->
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-buttons/css/buttons.bootstrap4.min.css') }}">
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-min'])
 
     @endslot
 
@@ -40,7 +38,7 @@
                             <div class="form-group">
                                 {!! Form::label('user', __('User')) !!}
                                 {!! Form::select('user', [], null, [
-                                    'class' => 'custom-select',
+                                    'class' => 'form-select',
                                     'id' => 'stat-delete-user',
                                     'data-placeholder' => 'Email (мин. 2 символа)',
                                 ]) !!}
@@ -49,7 +47,7 @@
                         <div class="col-6">
                             <div class="form-group">
                                 {!! Form::label('project', __('Project')) !!}
-                                {!! Form::select('project', $sites, null, ['class' => 'custom-select', 'placeholder' => 'Выберите проект']) !!}
+                                {!! Form::select('project', $sites, null, ['class' => 'form-select', 'placeholder' => 'Выберите проект']) !!}
                             </div>
                         </div>
                     </div>
@@ -96,14 +94,9 @@
         <!-- Toastr -->
         <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
         <!-- Bootstrap 4 -->
-        <script src="{{ asset('plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
         <!-- DataTables  & Plugins -->
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
 
         <script>
             toastr.options = {
@@ -112,7 +105,6 @@
             };
 
             $('#stat-delete-user').select2({
-                theme: 'bootstrap4',
                 width: '100%',
                 placeholder: $('#stat-delete-user').data('placeholder') || '',
                 allowClear: true,

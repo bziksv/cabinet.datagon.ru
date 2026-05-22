@@ -85,7 +85,7 @@
                             <a href="{{ route('delete.domain.information', $project->id) }}" class="btn btn-secondary">
                                 {{__('Delete a domain')}}
                             </a>
-                            <button type="button" class="btn btn-default" data-dismiss="modal">{{__('Back')}}</button>
+                            <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{__('Back')}}</button>
                         </div>
                     </div>
                 </div>
@@ -170,8 +170,8 @@
                             </button>
                     </form>
 
-                    <button class="btn btn-default __helper-link ui_tooltip_w d-inline" data-toggle="modal"
-                            data-target="#remove-project-id-{{$project->id}}">
+                    <button class="btn btn-default __helper-link ui_tooltip_w d-inline" data-bs-toggle="modal"
+                            data-bs-target="#remove-project-id-{{$project->id}}">
                         <i class="fa fa-trash"></i>
                         <span class="ui_tooltip __left __l">
                             <span class="ui_tooltip_content" style="width: 250px !important;">
@@ -195,11 +195,7 @@
     @slot('js')
         <script src="{{ asset('plugins/common/js/common.js') }}"></script>
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables/buttons/buttons.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/jszip.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/vfs_fonts.min.js') }}"></script>

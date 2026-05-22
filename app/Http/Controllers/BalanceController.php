@@ -19,9 +19,11 @@ class BalanceController extends Controller
     public function index($response = null)
     {
         $user = Auth::user();
-        $balances = $user->balances()->orderBy('id', 'desc')->get();
+        $balances = $user->balances()->orderBy('id', 'desc')->paginate(10);
+        $topUpsCount = $user->balances()->where('status', 1)->count();
+        $lastTopUp = $user->balances()->where('status', 1)->orderBy('id', 'desc')->first();
 
-        return view('balance.index', compact('balances', 'response'));
+        return view('balance.index', compact('balances', 'response', 'topUpsCount', 'lastTopUp'));
     }
 
     /**

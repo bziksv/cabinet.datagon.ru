@@ -111,7 +111,7 @@
             let close = $('<button />', {
                 type: 'button',
                 class: 'close',
-                "data-dismiss": 'model',
+                "data-bs-dismiss": 'modal',
                 "aria-label": 'Close',
             }).append($('<span />').attr('aria-hidden', true).text('×'));
 
@@ -139,7 +139,7 @@
             let close = $('<button />', {
                 type: 'button',
                 class: 'btn btn-default',
-                "data-dismiss": 'modal',
+                "data-bs-dismiss": 'modal',
             }).text('Закрыть');
 
             close.click(() => modal.modal('hide'));
@@ -225,7 +225,7 @@
             let container = $('<div />');
 
             let check = $('<select />', {
-                class: 'custom-select',
+                class: 'form-select',
                 name: f.name,
             });
 

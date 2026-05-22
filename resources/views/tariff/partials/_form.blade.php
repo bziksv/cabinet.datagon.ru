@@ -1,19 +1,19 @@
-
-<div class="form-group">
-    {!! Form::label('tariff', 'Тариф') !!}
-    {!! Form::select('tariff', $select['tariffs'], null, ['class' => 'form-control']) !!}
-    @error('tariff') <span class="error invalid-feedback">{{ $message }}</span> @enderror
-    <span class="valid-feedback d-block">Выберите тариф.</span>
+<div class="mb-3">
+    {!! Form::label('tariff', __('Tariff'), ['class' => 'form-label']) !!}
+    {!! Form::select('tariff', $select['tariffs'], null, ['class' => 'form-select', 'id' => 'tariff']) !!}
+    @error('tariff')
+        <div class="invalid-feedback d-block">{{ $message }}</div>
+    @enderror
 </div>
 
-<div class="form-group">
-    {!! Form::label('period', 'Период') !!}
-    <select name="period" id="period" class="form-control">
+<div class="mb-0">
+    {!! Form::label('period', __('Period'), ['class' => 'form-label']) !!}
+    <select name="period" id="period" class="form-select">
         @foreach($select['periods'] as $key => $value)
-            <option value="{{ $key }}"> {{ __($value) }}</option>
+            <option value="{{ $key }}">{{ __($value) }}</option>
         @endforeach
     </select>
-    @error('period') <span class="error invalid-feedback">{{ $message }}</span> @enderror
-    <span class="valid-feedback d-block">Выберите период.</span>
+    @error('period')
+        <div class="invalid-feedback d-block">{{ $message }}</div>
+    @enderror
 </div>
-

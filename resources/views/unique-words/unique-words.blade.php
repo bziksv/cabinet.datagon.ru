@@ -30,7 +30,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <p>{{ __('Your file is ready, you can download it') }}</p>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">×</span>
                     </button>
                 </div>
@@ -39,7 +39,7 @@
                         @csrf
                         <input class="file-path-input" type="hidden" name="fileName" value="">
                         <input class="btn btn-secondary" type="submit" value="{{ __('Download') }}">
-                        <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+                        <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
                     </form>
                 </div>
             </div>
@@ -154,8 +154,8 @@
                     </span>
                     <button class="btn btn-default mt-2 __helper-link ui_tooltip_w click_tracking"
                             data-click="Upload as a file"
-                            data-toggle="modal"
-                            data-target="#modal-default"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modal-default"
                             onclick="confirmTextForDownload()">
                         <i aria-hidden="true" class="fa fa-download"></i>
                         <span class="ui_tooltip __right __l">
@@ -287,8 +287,8 @@
             function createDownloadIcon(key) {
                 let span = document.createElement('span')
                 span.className = '__helper-link ui_tooltip_w btn btn-default'
-                span.setAttribute('data-toggle', 'modal');
-                span.setAttribute('data-target', '#modal-default');
+                span.setAttribute('data-bs-toggle', 'modal');
+                span.setAttribute('data-bs-target', '#modal-default');
                 span.id = key
                 span.onclick = function () {
                     $.ajax({

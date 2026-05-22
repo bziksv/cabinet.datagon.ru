@@ -9,19 +9,19 @@
         <thead>
         <tr>
             <th>ID</th>
-            <th data-toggle="tooltip" data-placement="top" title="Необязательное название свойства.">
+            <th data-bs-toggle="tooltip" data-bs-placement="top" title="Необязательное название свойства.">
                 Name
                 <i class="fas fa-question-circle"></i>
             </th>
-            <th data-toggle="tooltip" data-placement="top" title="Свойство которое мы будем использовать в коде.">
+            <th data-bs-toggle="tooltip" data-bs-placement="top" title="Свойство которое мы будем использовать в коде.">
                 Code
                 <i class="fas fa-question-circle"></i>
             </th>
-            <th data-toggle="tooltip" data-placement="top" title="Необязательное описание свойства.">
+            <th data-bs-toggle="tooltip" data-bs-placement="top" title="Необязательное описание свойства.">
                 Description
                 <i class="fas fa-question-circle"></i>
             </th>
-            <th data-toggle="tooltip" data-placement="top" title="Необязательное сообщение для пользователя. - {TARIFF} = Название тарифа. - {VALUE} = Значение переменной.">
+            <th data-bs-toggle="tooltip" data-bs-placement="top" title="Необязательное сообщение для пользователя. - {TARIFF} = Название тарифа. - {VALUE} = Значение переменной.">
                 Message
                 <i class="fas fa-question-circle"></i>
             </th>
@@ -44,15 +44,15 @@
                 <td>
                     <table width="100%" style="width: 365px">
                         <tr>
-                            <th data-toggle="tooltip" data-placement="top" title="Тариф для которого нужно значение">
+                            <th data-bs-toggle="tooltip" data-bs-placement="top" title="Тариф для которого нужно значение">
                                 Tariff
                                 <i class="fas fa-question-circle"></i>
                             </th>
-                            <th data-toggle="tooltip" data-placement="top" title="Значение тарифа">
+                            <th data-bs-toggle="tooltip" data-bs-placement="top" title="Значение тарифа">
                                 Value
                                 <i class="fas fa-question-circle"></i>
                             </th>
-                            <th data-toggle="tooltip" data-placement="top" title="Удаление значения для тарифа">
+                            <th data-bs-toggle="tooltip" data-bs-placement="top" title="Удаление значения для тарифа">
                                 Delete
                                 <i class="fas fa-question-circle"></i>
                             </th>
@@ -113,7 +113,7 @@
                 toastr.success('Copied successfully!');
             });
 
-            $('[data-toggle="tooltip"]').tooltip();
+            $('[data-bs-toggle="tooltip"]').tooltip();
 
         </script>
     @endslot

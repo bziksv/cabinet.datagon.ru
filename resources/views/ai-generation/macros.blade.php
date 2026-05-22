@@ -1,7 +1,6 @@
 @component('component.card', ['title' => 'Управление макросами'])
     @slot('css')
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'responsive-core-min'])
     @endslot
 
     <div class="card">
@@ -12,7 +11,7 @@
         <div class="card-body">
 
             <div class="alert alert-secondary alert-dismissible mb-4 shadow-sm">
-                <button type="button" class="close" data-dismiss="alert" aria-hidden="true">×</button>
+                <button type="button" class="close" data-bs-dismiss="alert" aria-hidden="true">×</button>
                 <h5 class="mb-1"><i class="icon fas fa-info-circle mr-2"></i> Как использовать макросы</h5>
                 Чтобы использовать макрос в промпте, вам необходимо написать 
                 <code class="bg-white px-2 py-1 rounded text-info font-weight-bold mx-1 border border-info">--название макроса--</code>
@@ -74,7 +73,7 @@
                     @method('PUT')
                     <div class="modal-header">
                         <h5 class="modal-title">Редактировать макрос</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -99,7 +98,7 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Отмена</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
                         <button type="submit" class="btn btn-primary">Сохранить изменения</button>
                     </div>
                 </form>
@@ -109,8 +108,7 @@
 
     @slot('js')
     <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-    <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-    <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
+    @include('layouts.partials.vendor-datatables-js', ['bundle' => 'responsive-core-min'])
     <script>
     $(document).ready(function() {
         $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });

@@ -35,7 +35,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="removeGroupModalLabel">{{ __('Deleting a group') }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -43,9 +43,9 @@
                     {{ __('If you delete a group, then all related partners will also be deleted') }}
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
                     <button id="removeGroupButton" type="button" class="btn btn-secondary"
-                            data-dismiss="modal">{{ __('Remove') }}</button>
+                            data-bs-dismiss="modal">{{ __('Remove') }}</button>
                 </div>
             </div>
         </div>
@@ -57,7 +57,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="removeItemModalLabel">{{ __('Delete partner') }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -65,9 +65,9 @@
                     {{ __('Confirm the action.') }}
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
                     <button id="removeItemButton" type="button" class="btn btn-secondary"
-                            data-dismiss="modal">{{ __('Remove') }}</button>
+                            data-bs-dismiss="modal">{{ __('Remove') }}</button>
                 </div>
             </div>
         </div>
@@ -95,8 +95,8 @@
                             <i class="fa fa-edit ml-2 mr-2"></i>
                         </a>
 
-                        <i class="fa fa-trash remove-group" data-toggle="modal" style="padding-top: 3px"
-                           data-target="#removeGroupModal"></i>
+                        <i class="fa fa-trash remove-group" data-bs-toggle="modal" style="padding-top: 3px"
+                           data-bs-target="#removeGroupModal"></i>
                     </div>
                 </div>
                 <div>
@@ -151,8 +151,8 @@
                                     </a>
                                     <i class="fa fa-trash remove-item"
                                        data-id="{{ $item['id'] }}"
-                                       data-toggle="modal"
-                                       data-target="#removeItemModal"></i>
+                                       data-bs-toggle="modal"
+                                       data-bs-target="#removeItemModal"></i>
                                 </td>
                             </tr>
                         @endforeach

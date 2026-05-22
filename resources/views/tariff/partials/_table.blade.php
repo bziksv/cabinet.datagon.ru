@@ -1,11 +1,11 @@
-<div class="table-responsive">
-    <table class="table" id="{{ $id }}">
+<div class="table-responsive cabinet-tariff-summary">
+    <table class="table table-sm align-middle mb-0" id="{{ $id }}">
         <tbody>
         @foreach($total as $t)
-        <tr>
-            <th style="width:50%">{{ $t['title'] }}:</th>
-            <td>{{ $t['value'] }}</td>
-        </tr>
+            <tr>
+                <th class="text-secondary fw-normal">{{ $t['title'] }}</th>
+                <td class="fw-semibold text-end">{{ $t['value'] }}</td>
+            </tr>
         @endforeach
         </tbody>
     </table>

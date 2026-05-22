@@ -11,7 +11,7 @@
                         <div class="col-4">
                             <div class="form-group">
                                 <label>{{ __('Search engine') }}:</label>
-                                <select name="region" class="custom-select" id="searchengines" onchange="this.form.submit()">
+                                <select name="region" class="form-select" id="searchengines" onchange="this.form.submit()">
                                     @if($project->searchengines->count() > 1)
                                         <option value="">{{ __('All search engine and regions') }}</option>
                                     @endif
@@ -34,13 +34,10 @@
                     <div class="col-4">
                         <div class="form-group">
                             <label>{{ __('Date range') }}:</label>
-                            <div class="input-group">
-
-                                <div class="input-group-prepend">
-                                      <span class="input-group-text">
+                            <div class="input-group"><span class="input-group-text">
                                         <i class="far fa-calendar-alt"></i>
                                       </span>
-                                </div>
+
 
                                 <input type="text" class="form-control float-right" id="date-range">
                             </div>
@@ -57,7 +54,7 @@
                         <div class="col-4">
                             <div class="form-group">
                                 <label>{{ __('Groups') }}:</label>
-                                {{ Form::select('group', $project->groups->prepend(collect(['name' => __('Selected group'), 'id' => null]))->pluck('name', 'id'), request('group', null), ['class' => 'custom-select']) }}
+                                {{ Form::select('group', $project->groups->prepend(collect(['name' => __('Selected group'), 'id' => null]))->pluck('name', 'id'), request('group', null), ['class' => 'form-select']) }}
                             </div>
                         </div>
                     </form>

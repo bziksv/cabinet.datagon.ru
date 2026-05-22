@@ -19,10 +19,8 @@
                             @else
                                 {!! Form::text($field['name'], $settings['request'][$field['name']], ['class' => 'form-control', 'placeholder' => $field['placeholder']]) !!}
                             @endif
-                            <div class="input-group-append">
-                                <a href="{{ route('monitoring.admin.settings.delete', $field['name']) }}"
-                                   class="input-group-text"><i class="fas fa-trash"></i></a>
-                            </div>
+                            <a href="{{ route('monitoring.admin.settings.delete', $field['name']) }}"
+                               class="input-group-text"><i class="fas fa-trash"></i></a>
                         </div>
                     </div>
                 </div>

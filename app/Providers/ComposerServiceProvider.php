@@ -35,10 +35,10 @@ class ComposerServiceProvider extends ServiceProvider
         view()->composer('component.card', DescriptionComposer::class);
         view()->composer('users.panel', UserPanelComposer::class);
         view()->composer('users.panel', AdminSettingsMenuComposer::class);
-        view()->composer('navigation.menu-right', UserPanelComposer::class);
-        view()->composer('navigation.menu-right', LimitsComposer::class);
+        view()->composer('layouts.partials.app-header', UserPanelComposer::class);
+        view()->composer('layouts.partials.app-header', LimitsComposer::class);
+        view()->composer('layouts.partials.app-header', CountUnreadNewsComposer::class);
         view()->composer('navigation.sidebar', MenuComposer::class);
-        view()->composer('navigation.menu', CountUnreadNewsComposer::class);
         view()->composer('layouts.app', StatisticsComposer::class);
     }
 }

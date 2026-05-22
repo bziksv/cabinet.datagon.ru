@@ -29,8 +29,11 @@ class MonitoringDomainController extends Controller
      */
     public function index()
     {
-        $projects = DomainMonitoring::where('user_id', '=', Auth::id())->get();
-        $countProjects = count($projects);
+        $projects = DomainMonitoring::query()
+            ->where('user_id', Auth::id())
+            ->orderByDesc('id')
+            ->get();
+        $countProjects = $projects->count();
         if ($countProjects === 0) {
             return $this->createView();
         }

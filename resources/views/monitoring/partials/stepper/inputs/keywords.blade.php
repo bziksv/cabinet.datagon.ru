@@ -28,7 +28,7 @@
 
                         <div class="form-group">
                             <label>CSV разделитель</label>
-                            <select class="custom-select" id="csv-delimiter">
+                            <select class="form-select" id="csv-delimiter">
                                 <option value=";">Точка с запятой ( ; )</option>
                                 <option value=",">Запятая ( , )</option>
                             </select>
@@ -41,7 +41,7 @@
 
                         <div class="form-group">
                             <label>Цель</label>
-                            <select class="custom-select" name="target">
+                            <select class="form-select" name="target">
                                 <option value="1">1</option>
                                 <option value="3">3</option>
                                 <option value="5">5</option>
@@ -66,9 +66,7 @@
 
                         <div class="input-group mb-3">
                             <input type="text" class="form-control" placeholder="Название группы">
-                            <div class="input-group-append">
-                                <button type="button" class="btn btn-success" id="create-group">Добавить новую группу</button>
-                            </div>
+                            <button type="button" class="btn btn-success" id="create-group">Добавить новую группу</button>
                         </div>
                     </div>
                     <!-- /.card-body -->

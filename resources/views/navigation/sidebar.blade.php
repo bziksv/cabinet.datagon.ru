@@ -1,44 +1,39 @@
-<nav class="mt-2">
-    <div class="js-toggle x-drop-down" data-qaid="dd_widget">
-        <div class="x-drop-down__dropped">
-            <div class="x-drop-down__list js-dropdown">
-                <div class="x-drop-down__search">
-                    <div class="x-input x-input_size_s">
-                        <div class="input-group">
-                            <input type="text"
-                                   class="x-input__field form-control form-control-sidebar"
-                                   autocomplete="off"
-                                   placeholder="{{ __('Search') }}"
-                                   value="">
-                            <div class="input-group-append">
-                                <button class="btn btn-sidebar">
-                                    <i class="fas fa-search fa-fw"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+<nav class="mt-2" role="navigation" aria-label="{{ __('Modules') }}">
+    <div class="pb-2 cabinet-sidebar-search">
+        <div class="input-group input-group-sm">
+            <input type="text"
+                   class="form-control cabinet-sidebar-search__input"
+                   autocomplete="off"
+                   placeholder="{{ __('Search') }}"
+                   value="">
+            <button type="button" class="btn btn-outline-secondary" tabindex="-1" aria-hidden="true">
+                <i class="bi bi-search"></i>
+            </button>
         </div>
     </div>
-    <ul class="nav nav-pills nav-sidebar flex-column mt-3 cabinet-sidebar-menu" role="menu" style="min-height: 70vh; overflow-x: hidden; overflow-y: auto; padding-bottom: 50px;">
+
+    <ul class="nav sidebar-menu flex-column cabinet-sidebar-menu"
+        data-lte-toggle="treeview"
+        role="menu"
+        data-accordion="false">
         @if(isset($modules))
             @foreach($modules as $key => $module)
                 @if(!array_key_exists('configurationInfo', $module))
                     <li class="nav-item menu-item" data-id="{{ $module['id'] }}">
                         <a class="nav-link search-link" href="{{ $module['link'] }}">
-                            <span>{!! $module['icon'] !!}
-                                <span class="module-name">{{ $module['title'] }}
-                                </span>
-                            </span>
+                            <span class="nav-icon cabinet-sidebar-menu__icon">{!! $module['icon'] !!}</span>
+                            <p class="module-name mb-0">{{ $module['title'] }}</p>
                         </a>
                     </li>
                 @elseif(count($module) > 1)
-                    <li class="folder nav-item has-treeview menu-item @if($module['configurationInfo']['show'] == 'true') menu-is-opening menu-open @endif"
+                    <li class="nav-item folder menu-item @if($module['configurationInfo']['show'] == 'true') menu-open @endif"
                         data-action="{{ $module['configurationInfo']['show'] }}">
                         <a href="#" class="nav-link sidebar-folder-toggle">
-                            <i class="fa-solid fa-folder"></i>
-                            <p> {{ $key }} </p>
+                            <i class="nav-icon bi bi-folder-fill"></i>
+                            <p class="mb-0">
+                                {{ $key }}
+                                <i class="nav-arrow bi bi-chevron-right"></i>
+                            </p>
                         </a>
                         <ul class="nav nav-treeview"
                             @if($module['configurationInfo']['show'] == 'false') style="display: none;" @endif>
@@ -48,9 +43,8 @@
                                 @endif
                                 <li class="nav-item" data-id="{{ $elem['id'] }}">
                                     <a class="nav-link search-link" href="{{ $elem['link'] }}">
-                                        <span>{!! $elem['icon'] !!}
-                                            <span class="module-name">{{ $elem['title'] }}</span>
-                                        </span>
+                                        <span class="nav-icon cabinet-sidebar-menu__icon">{!! $elem['icon'] !!}</span>
+                                        <p class="module-name mb-0">{{ $elem['title'] }}</p>
                                     </a>
                                 </li>
                             @endforeach
@@ -60,22 +54,17 @@
             @endforeach
             <li class="nav-item menu-item">
                 <a class="nav-link search-link" href="{{ route('partners') }}">
-                    <span>
-                        <i class="fa fa-handshake" style="color: white"></i>
-                        <span class="module-name"> {{ __('Partners') }}</span>
-                    </span>
+                    <i class="nav-icon bi bi-handshake"></i>
+                    <p class="module-name mb-0">{{ __('Partners') }}</p>
                 </a>
             </li>
         @else
             <li class="nav-item menu-item">
-                <a class="nav-link search-link" href="/login">
-                    <span>
-                        <i class="fa fa-users"></i>
-                        <span class="module-name"> {{ __('Login page') }}</span>
-                    </span>
+                <a class="nav-link search-link" href="{{ route('login') }}">
+                    <i class="nav-icon bi bi-box-arrow-in-right"></i>
+                    <p class="module-name mb-0">{{ __('Login page') }}</p>
                 </a>
             </li>
         @endif
-        {{-- Контроллер с CRUD DescriptionProjectForAdminController--}}
     </ul>
 </nav>

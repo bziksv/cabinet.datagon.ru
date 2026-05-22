@@ -132,7 +132,6 @@
         });
 
         $('#stopword-category-select').select2({
-            theme: 'bootstrap4',
             language: 'ru'
         });
 

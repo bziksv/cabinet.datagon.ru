@@ -251,16 +251,24 @@
         },
         props: {
             meta: {
-                type: [Object, Array]
+                type: [Object, Array],
+                default: () => [],
             },
             lang: {
                 type: [Object, Array]
             }
         },
         created() {
-            this.metas = this.meta;
-
             var app = this;
+            if (this.meta && this.meta.length) {
+                this.metas = this.meta;
+            } else {
+                axios.get('/meta-tags/projects')
+                    .then(function (response) {
+                        app.metas = response.data || [];
+                    });
+            }
+
             axios.get('/meta-tags/getTariffMetaTagsPages')
                 .then(function (response) {
                     app.TariffMetaTagsPages = response.data;

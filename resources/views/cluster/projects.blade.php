@@ -122,8 +122,8 @@
                                             {{ __('Hands editor') }}
                                         </a>
                                         <button type="button"
-                                                data-toggle="modal"
-                                                data-target="#repeat-scan"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#repeat-scan"
                                                 data-order="{{ $project->id }}"
                                                 class="btn btn-secondary mb-2 repeat-scan">
                                             {{ __('Repeat analysis') }}
@@ -150,7 +150,7 @@
                             <div class="modal-content">
                                 <div class="modal-header">
                                     <h5 class="modal-title" id="repeat-scanLabel"></h5>
-                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                                         <span aria-hidden="true">&times;</span>
                                     </button>
                                 </div>
@@ -221,7 +221,7 @@
                                                '56' => __('Chelyabinsk'),
                                                '1104' => __('Cherkessk'),
                                                '16' => __('Yaroslavl'),
-                                           ]), null, ['class' => 'custom-select rounded-0', 'id' => 'region']) !!}
+                                           ]), null, ['class' => 'form-select rounded-0', 'id' => 'region']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -232,7 +232,7 @@
                                                 '30' => 30,
                                                 '40' => 40,
                                                 '50' => 50,
-                                            ]), null, ['class' => 'custom-select rounded-0', 'id' => 'count']) !!}
+                                            ]), null, ['class' => 'form-select rounded-0', 'id' => 'count']) !!}
                                         </div>
 
                                         <div class="form-group required" id="phrases-form-block">
@@ -263,7 +263,7 @@
                                                 'soft' => 'soft',
                                                 'pre-hard' => 'pre-hard',
                                                 'hard' => 'hard',
-                                                ], null, ['class' => 'custom-select rounded-0', 'id' => 'clusteringLevel']) !!}
+                                                ], null, ['class' => 'form-select rounded-0', 'id' => 'clusteringLevel']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -300,7 +300,7 @@
                                                     {!! Form::select('reductionRatio', [
                                                         'pre-hard' => 'pre-hard',
                                                         'soft' => 'soft',
-                                                    ], null, ['class' => 'custom-select rounded-0', 'id' => 'reductionRatio']) !!}
+                                                    ], null, ['class' => 'form-select rounded-0', 'id' => 'reductionRatio']) !!}
                                                 </div>
                                             </div>
                                         </div>
@@ -344,7 +344,7 @@
                                                 {!! Form::select('searchEngine', [
                                                     'yandex' => 'Yandex',
                                                     'google' => 'Google',
-                                                ], null, ['class' => 'custom-select rounded-0', 'id' => 'searchEngine']) !!}
+                                                ], null, ['class' => 'form-select rounded-0', 'id' => 'searchEngine']) !!}
                                             </div>
 
                                             @if(!Auth::user()->telegram_bot_active)
@@ -361,7 +361,7 @@
                                                     {!! Form::select('sendMessage', [
                                                         true => __('Yes'),
                                                         false => __('No'),
-                                                    ], null, ['class' => 'custom-select rounded-0', 'id' => 'sendMessage']) !!}
+                                                    ], null, ['class' => 'form-select rounded-0', 'id' => 'sendMessage']) !!}
                                                 </div>
                                             @endif
                                         </div>
@@ -397,7 +397,7 @@
                                             {!! Form::select('save', [
                                                 '1' => __('Save'),
                                                 '0' => __('Do not save'),
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'save']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'save']) !!}
                                         </div>
                                     </div>
 
@@ -467,7 +467,7 @@
                                                '56' => __('Chelyabinsk'),
                                                '1104' => __('Cherkessk'),
                                                '16' => __('Yaroslavl'),
-                                           ]), null, ['class' => 'custom-select rounded-0', 'id' => 'region_classic']) !!}
+                                           ]), null, ['class' => 'form-select rounded-0', 'id' => 'region_classic']) !!}
                                         </div>
 
                                         <div class="form-group required" id="phrases-form-block">
@@ -482,7 +482,7 @@
                                                 'soft' => 'soft',
                                                 'pre-hard' => 'pre-hard',
                                                 'hard' => 'hard',
-                                                ], null, ['class' => 'custom-select rounded-0', 'id' => 'clusteringLevel_classic']) !!}
+                                                ], null, ['class' => 'form-select rounded-0', 'id' => 'clusteringLevel_classic']) !!}
                                         </div>
 
                                         <div class="form-group required" id="extra-block">
@@ -526,7 +526,7 @@
                                                 {!! Form::select('searchEngine_classic', [
                                                     'yandex' => 'Yandex',
                                                     'google' => 'Google',
-                                                ], null, ['class' => 'custom-select rounded-0', 'id' => 'searchEngine']) !!}
+                                                ], null, ['class' => 'form-select rounded-0', 'id' => 'searchEngine']) !!}
                                             </div>
 
                                             @if(!Auth::user()->telegram_bot_active)
@@ -543,7 +543,7 @@
                                                     {!! Form::select('sendMessage', [
                                                         true => __('Yes'),
                                                         false => __('No'),
-                                                    ], null, ['class' => 'custom-select rounded-0', 'id' => 'sendMessage_classic']) !!}
+                                                    ], null, ['class' => 'form-select rounded-0', 'id' => 'sendMessage_classic']) !!}
                                                 </div>
                                             @endif
                                         </div>
@@ -579,11 +579,11 @@
                                             {!! Form::select('save_classic', [
                                                 '1' => __('Save'),
                                                 '0' => __('Do not save'),
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'save_classic']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'save_classic']) !!}
                                         </div>
                                     </div>
 
-                                    <input type="button" data-dismiss="modal"
+                                    <input type="button" data-bs-dismiss="modal"
                                            class="btn btn-secondary" id="start-analyse" value="{{ __('Analyse') }}">
                                 </div>
                             </div>
@@ -599,11 +599,7 @@
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
 
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables/buttons/buttons.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/jszip.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/vfs_fonts.min.js') }}"></script>
@@ -877,7 +873,7 @@
                                     8: '<div class="d-flex flex-column">' +
                                         '<a href="/show-cluster-result/' + cluster['id'] + '" target="_blank" class="btn btn-secondary mb-2">{{ __('View results') }}</a> ' +
                                         '<a href="/edit-clusters/' + cluster['id'] + '" class="btn btn-secondary mb-2">{{ __('Redistribute clusters') }}</a>' +
-                                        '<button type="button" data-toggle="modal" data-target="#repeat-scan" data-order="' + cluster['id'] + '" class="btn btn-secondary mb-2 repeat-scan">{{ __('Repeat the analysis') }}</button> ' +
+                                        '<button type="button" data-bs-toggle="modal" data-bs-target="#repeat-scan" data-order="' + cluster['id'] + '" class="btn btn-secondary mb-2 repeat-scan">{{ __('Repeat the analysis') }}</button> ' +
                                         '<button class="btn btn-secondary mb-2">{{ __('Download csv') }}</button>' +
                                         '<button class="btn btn-secondary">{{ __('Download xls') }}</button></div>'
                                 });

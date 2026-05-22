@@ -27,8 +27,8 @@ function getHistoryInfo() {
                 $('.form-control.phrase').val(history.phrase)
                 $('#type').val(history.type)
                 $('#hiddenId').val(id)
-                $(".custom-select#count").val(history.count).change();
-                $(".custom-select.rounded-0.region").val(history.region).change();
+                $(".form-select#count").val(history.count).change();
+                $(".form-select.rounded-0.region").val(history.region).change();
                 $(".form-control.ignoredDomains").val(history.ignoredDomains);
                 $("#separator").val(history.separator);
 
@@ -143,7 +143,7 @@ function format(data) {
         let state
         if (value['state'] === 1) {
             state =
-                '<button type="button" class="btn btn-secondary get-history-info" data-order="' + value['id'] + '" data-toggle="modal" data-target="#staticBackdrop">' +
+                '<button type="button" class="btn btn-secondary get-history-info" data-order="' + value['id'] + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
                 '   Повторить анализ' +
                 '</button>' +
                 "<a href='/show-history/" + value['id'] + "' target='_blank' class='btn btn-secondary mt-3'> Подробная информация</a>"
@@ -159,7 +159,7 @@ function format(data) {
             checkAnalyseProgress(value['id'])
         } else if (value['state'] === -1) {
             state =
-                '<button type="button" class="btn btn-secondary get-history-info" data-order="' + value['id'] + '" data-toggle="modal" data-target="#staticBackdrop">' +
+                '<button type="button" class="btn btn-secondary get-history-info" data-order="' + value['id'] + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop">' +
                 '   Повторить анализ' +
                 '</button>' +
                 "<span class='text-muted'>Произошла ошибка, повторите попытку или обратитесь к администратору</span>"
@@ -325,8 +325,8 @@ function repeatScan() {
                 siteList: $('#siteList').val(),
                 link: $('.form-control.link').val(),
                 phrase: $('.form-control.phrase').val(),
-                count: $(".custom-select#count").val(),
-                region: $(".custom-select.rounded-0.region").val(),
+                count: $(".form-select#count").val(),
+                region: $(".form-select.rounded-0.region").val(),
                 ignoredDomains: $(".form-control.ignoredDomains").val(),
                 separator: $("#separator").val(),
                 noIndex: $('#switchNoindex').is(':checked'),
@@ -383,14 +383,14 @@ function checkAnalyseProgress(id) {
             } else if (response.message === 'error') {
                 $('#history-state-' + id).html(
                     '<button type="button" class="btn btn-secondary get-history-info" data-order="' + id + '"' +
-                    '        data-toggle="modal" data-target="#staticBackdrop"> Повторить анализ' +
+                    '        data-bs-toggle="modal" data-bs-target="#staticBackdrop"> Повторить анализ' +
                     '</button>' +
                     '<span class="text-muted">Произошла ошибка, повторите попытку или обратитесь к администратору</span>'
                 );
             } else if (response.message === 'success') {
                 $('#history-state-' + id).html(
                     '<button type="button" class="btn btn-secondary get-history-info" data-order="' + id + '"' +
-                    '   data-toggle="modal" data-target="#staticBackdrop"> Повторить анализ' +
+                    '   data-bs-toggle="modal" data-bs-target="#staticBackdrop"> Повторить анализ' +
                     '</button>' +
                     '<a href="/show-history/' + id + '" target="_blank" class="btn btn-secondary mt-3"> Подробная информация</a>'
                 );
@@ -420,7 +420,7 @@ function checkAnalyseProgress(id) {
                         '    </div>' +
                         '</div>',
                     12: '<div id="history-state-' + newObject['id'] + '">' +
-                        '       <button type="button" class="btn btn-secondary get-history-info" data-order="' + newObject['id'] + '" data-toggle="modal" data-target="#staticBackdrop"> Повторить анализ </button>' +
+                        '       <button type="button" class="btn btn-secondary get-history-info" data-order="' + newObject['id'] + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop"> Повторить анализ </button>' +
                         '       <a href="/show-history/' + newObject['id'] + '" target="_blank" class="btn btn-secondary mt-3"> Подробная информация</a>' +
                         '</div>'
                 });

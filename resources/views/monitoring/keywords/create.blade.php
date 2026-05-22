@@ -4,7 +4,7 @@
 
     <div class="modal-header">
         <h4 class="modal-title">{{__('Add keyword')}}</h4>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
             <span aria-hidden="true">&times;</span>
         </button>
     </div>
@@ -21,13 +21,8 @@
             </div>
 
             <div class="input-group">
-                <div class="custom-file">
-                    <input type="file" class="custom-file-input" id="upload">
-                    <label class="custom-file-label" for="upload">{{ __('Upload CSV file') }}</label>
-                </div>
-                <div class="input-group-append">
-                    <button type="button" class="btn btn-success" id="upload-queries">{{ __('Upload') }}</button>
-                </div>
+                <input type="file" class="form-control" id="upload" aria-label="{{ __('Upload CSV file') }}">
+                <button type="button" class="btn btn-success" id="upload-queries">{{ __('Upload') }}</button>
             </div>
 
             <p class="text-sm text-muted">
@@ -45,22 +40,19 @@
         @can('form_target_monitoring')
             <div class="form-group">
                 <label class="col-form-label">{{ __('Target') }}:</label>
-                {{ Form::select('target', [1 => 1, 3 => 3, 5 => 5, 10 => 10, 50 => 50, 100 => 100], 10, ['class' => 'custom-select']) }}
+                {{ Form::select('target', [1 => 1, 3 => 3, 5 => 5, 10 => 10, 50 => 50, 100 => 100], 10, ['class' => 'form-select']) }}
             </div>
         @endcan
 
         @can('form_group_monitoring')
             <div class="form-group">
                 <label class="col-form-label">{{ __('Groups') }}:</label>
-                {{ Form::select('monitoring_group_id', $project->groups->pluck('name', 'id'), null, ['class' => 'custom-select']) }}
+                {{ Form::select('monitoring_group_id', $project->groups->pluck('name', 'id'), null, ['class' => 'form-select']) }}
             </div>
 
             <div class="input-group mb-3">
                 <input type="text" data-id="{{ $project->id }}" placeholder="{{ __('Name of group') }}" class="form-control">
-
-                <div class="input-group-append">
-                    <button type="button" class="btn btn-success" id="create-group">{{ __('Create a new group') }}</button>
-                </div>
+                <button type="button" class="btn btn-success" id="create-group">{{ __('Create a new group') }}</button>
                 <div class="invalid-feedback monitoring_group_id">
                     {{ __('Please add a group') }}
                 </div>
@@ -69,7 +61,7 @@
     </div>
 
     <div class="modal-footer justify-content-between">
-        <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+        <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
         <button type="button" class="btn btn-success save-modal">{{ __('Save') }}</button>
     </div>
 

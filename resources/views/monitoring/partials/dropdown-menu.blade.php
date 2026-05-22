@@ -1,5 +1,5 @@
 <div class="btn-group">
-    <button type="button" data-toggle="dropdown" data-offset="-170" class="btn btn-info dropdown-toggle" aria-expanded="false"><i class="fas fa-bars"></i></button>
+    <button type="button" data-bs-toggle="dropdown" data-offset="-170" class="btn btn-info dropdown-toggle" aria-expanded="false"><i class="fas fa-bars"></i></button>
 
     <div class="dropdown-menu" style="">
         <a class="dropdown-item" href="{{ route('monitoring.show', $project->id) }}">
@@ -17,13 +17,13 @@
         </a>
 
         @can('export_report_monitoring')
-            <a class="dropdown-item click_tracking" data-click="Export project" data-toggle="modal" data-target=".modal" data-type="export-edit" data-id="{{ $project->id }}">
+            <a class="dropdown-item click_tracking" data-click="Export project" data-bs-toggle="modal" data-target=".modal" data-type="export-edit" data-id="{{ $project->id }}">
                 <i class="fas fa-file-download mr-2"></i>Экспорт отчета
             </a>
         @endcan
 
         @can('create_query_monitoring')
-            <a class="dropdown-item" data-toggle="modal" data-target=".modal" data-type="create_keywords" data-id="{{ $project->id }}">
+            <a class="dropdown-item" data-bs-toggle="modal" data-target=".modal" data-type="create_keywords" data-id="{{ $project->id }}">
                 <i class="far fa-plus-square mr-2"></i>Добавить запрос
             </a>
         @endcan

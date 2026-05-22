@@ -12,7 +12,7 @@
 
             <div class="form-group required">
                 <label>{{ __('Group Name') }}</label>
-                <select name="partners_groups_id" id="partners_groups_id" class="custom-select">
+                <select name="partners_groups_id" id="partners_groups_id" class="form-select">
                     <option value="{{ $item->partner->id }}">
                         {{ $item->partner->name_ru }}/ {{ $item->partner->name_en }}
                     </option>

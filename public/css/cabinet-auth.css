@@ -1,0 +1,33 @@
+/* Auth pages — AdminLTE 4 (examples/login-v2.html) */
+.login-page .login-box,
+.login-page .register-box {
+    width: 420px;
+    max-width: 96vw;
+}
+
+.login-page .register-box {
+    width: 480px;
+}
+
+.login-page .card-header h1 {
+    font-size: 1.35rem;
+    margin: 0;
+}
+
+.login-page .login-box-msg {
+    margin-bottom: 1rem;
+}
+
+.login-page .form-select.flags {
+    width: 100%;
+}
+
+.login-page .btn-block {
+    width: 100%;
+}
+
+.login-page .img-flag {
+    width: 1.25rem;
+    margin-right: 0.35rem;
+    vertical-align: middle;
+}

@@ -8,7 +8,7 @@
                 <div class="card-tools">
                     <span class="badge bg-success">{{ __('Region code') }}: {{ $engine->lr }}</span>
                     <span class="badge bg-success">{{ __('Region ID') }}: {{ $engine->id }}</span>
-                    <button type="button" class="btn btn-tool" data-card-widget="collapse">
+                    <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse">
                         <i class="fas fa-minus"></i>
                     </button>
                 </div>

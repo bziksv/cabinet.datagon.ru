@@ -2,7 +2,7 @@
 
     <div class="modal-header">
         <h4 class="modal-title">{{__('Export')}}</h4>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
             <span aria-hidden="true">&times;</span>
         </button>
     </div>
@@ -14,9 +14,7 @@
             <label>Начальная дата:</label>
             <div class="input-group date" id="startDatePicker" data-target-input="nearest">
                 <input type="text" name="startDate" class="form-control datetimepicker-input" data-target="#startDatePicker" data-toggle="datetimepicker" value="{{ Carbon::now()->startOfMonth()->isoFormat('DD.MM.YYYY') }}"/>
-                <div class="input-group-append">
-                    <div class="input-group-text"><i class="fa fa-calendar"></i></div>
-                </div>
+                <span class="input-group-text"><i class="fa fa-calendar"></i></span>
             </div>
         </div>
 
@@ -25,15 +23,13 @@
             <label>Конечная дата:</label>
             <div class="input-group date" id="endDatePicker" data-target-input="nearest">
                 <input type="text" name="endDate" class="form-control datetimepicker-input" data-target="#endDatePicker" data-toggle="datetimepicker" value="{{ Carbon::now()->isoFormat('DD.MM.YYYY') }}"/>
-                <div class="input-group-append">
-                    <div class="input-group-text"><i class="fa fa-calendar"></i></div>
-                </div>
+                <span class="input-group-text"><i class="fa fa-calendar"></i></span>
             </div>
         </div>
 
         <div class="form-group">
             <label>Тип</label>
-            <select class="custom-select" name="mode">
+            <select class="form-select" name="mode">
                 <option value="range">Все дни</option>
                 <option value="finance">Финансовый</option>
                 <option value="datesFind">Две даты (фиксированные)</option>
@@ -45,7 +41,7 @@
 
         <div class="form-group">
             <label>Регион</label>
-            <select class="custom-select" name="region">
+            <select class="form-select" name="region">
                 @foreach($project['searchengines'] as $searchengines)
                 <option value="{{ $searchengines['id'] }}">{{ $searchengines['location']['name'] }} [{{ $searchengines['lr'] }}]</option>
                 @endforeach
@@ -54,7 +50,7 @@
 
         <div class="form-group">
             <label>Группа</label>
-            <select multiple class="custom-select" name="group[]">
+            <select multiple class="form-select" name="group[]">
                 @foreach($project['groups'] as $groups)
                     <option value="{{ $groups['id'] }}">{{ $groups['name'] }}</option>
                 @endforeach
@@ -63,7 +59,7 @@
 
         <div class="form-group">
             <label>Формат</label>
-            <select class="custom-select" name="format">
+            <select class="form-select" name="format">
                 <option value="pdf">PDF</option>
                 <option value="xls">Excel</option>
                 <option value="html">HTML</option>
@@ -75,14 +71,14 @@
             <label>Сортировка</label>
             <div class="row">
                 <div class="col-6">
-                    <select class="custom-select" name="order[column]">
+                    <select class="form-select" name="order[column]">
                         <option value="{{ \App\Http\Controllers\MonitoringExportsController::GROUP_INDEX }}">Группа</option>
                         <option value="{{ \App\Http\Controllers\MonitoringExportsController::QUERY_INDEX }}">Запрос</option>
                         <option value="{{ \App\Http\Controllers\MonitoringExportsController::CREATED_AT_INDEX }}">Дата добавления запроса</option>
                     </select>
                 </div>
                 <div class="col-6">
-                    <select class="custom-select" name="order[dir]">
+                    <select class="form-select" name="order[dir]">
                         <option value="asc">По возрастанию</option>
                         <option value="desc">По убыванию</option>
                     </select>
@@ -178,7 +174,7 @@
     </div>
 
     <div class="modal-footer justify-content-between">
-        <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+        <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
         <button type="submit" class="btn btn-success save-modal">{{ __('Export') }}</button>
     </div>
 

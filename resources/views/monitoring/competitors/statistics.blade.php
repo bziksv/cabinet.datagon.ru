@@ -3,9 +3,7 @@
         <!-- Toastr -->
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
         <!-- DataTables -->
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-buttons/css/buttons.bootstrap4.min.css') }}">
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-css'])
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/common.css') }}"/>
         <!-- daterange picker -->
         <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
@@ -155,7 +153,7 @@
                         <div class="col-5 mr-3">
                             <div class="form-group">
                                 <label>{{ __('Search engine') }}:</label>
-                                <select name="region" class="custom-select" id="searchEngines">
+                                <select name="region" class="form-select" id="searchEngines">
                                     @foreach($searchEngines as $search)
                                         @if($search->id == request('region'))
                                             <option value="{{ $search->id }}"
@@ -211,7 +209,7 @@
     <div id="statistics-table" class="mt-5" style="display: none">
         <div class="d-flex flex-column">
             <button class="btn btn-outline-secondary col-2 mb-2 collapsed chart-button" type="button"
-                    data-toggle="collapse" data-target="#avgCollapse"
+                    data-bs-toggle="collapse" data-bs-target="#avgCollapse"
                     aria-expanded="false" aria-controls="avgCollapse">
                 {{ __('Average position') }}
             </button>
@@ -235,7 +233,7 @@
             </div>
 
             <button class="btn btn-outline-secondary col-2 mb-2 collapsed chart-button" type="button"
-                    data-toggle="collapse" data-target="#top3Collapse"
+                    data-bs-toggle="collapse" data-bs-target="#top3Collapse"
                     aria-expanded="false" aria-controls="top3Collapse">
                 {{ __('Percentage of getting into the top') }} 3
             </button>
@@ -259,7 +257,7 @@
             </div>
 
             <button class="btn btn-outline-secondary col-2 mb-2 collapsed chart-button" type="button"
-                    data-toggle="collapse" data-target="#top10Collapse"
+                    data-bs-toggle="collapse" data-bs-target="#top10Collapse"
                     aria-expanded="false" aria-controls="top10Collapse">
                 {{ __('Percentage of getting into the top') }} 10
             </button>
@@ -283,7 +281,7 @@
             </div>
 
             <button class="btn btn-outline-secondary col-2 mb-2 collapsed chart-button" type="button"
-                    data-toggle="collapse" data-target="#top100Collapse"
+                    data-bs-toggle="collapse" data-bs-target="#top100Collapse"
                     aria-expanded="false" aria-controls="top100Collapse">
                 {{ __('Percentage of getting into the top') }} 100
             </button>
@@ -312,12 +310,10 @@
         <h3>{{ __('Changes by top and date') }}</h3>
         <div class="card mt-3">
             <div class="card-header d-flex flex-row justify-content-start align-items-center">
-                <div class="input-group col-5 pl-0 ml-0">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text">
+                <div class="input-group col-5 pl-0 ml-0"><span class="input-group-text">
                             <i class="far fa-calendar-alt"></i>
                         </span>
-                    </div>
+
                     <input type="text" class="form-control" id="date-range">
                     <button id="competitors-history-positions" class="btn btn-default"
                             style="border-top-left-radius: 0; border-bottom-left-radius: 0">
@@ -397,11 +393,7 @@
     @slot('js')
         <!-- DataTables  & Plugins -->
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <!-- Charts -->
         <script src="{{ asset('plugins/chart.js/2.7.3/chart.min.js') }}"></script>
         <!-- InputMask -->

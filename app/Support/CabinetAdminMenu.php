@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\MainProject;
+use App\User;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -31,7 +32,7 @@ class CabinetAdminMenu
         apply_global_team_permissions();
         Auth::user()->loadMissing('roles');
 
-        return Auth::user()->hasRole(['admin', 'Super Admin']);
+        return Auth::user()->hasRole(['admin', 'Super Admin']) || User::isUserAdmin();
     }
 
     /**
@@ -39,12 +40,12 @@ class CabinetAdminMenu
      */
     public static function items(): array
     {
-        if (self::$itemsCache !== null) {
-            return self::$itemsCache;
+        if (! self::canAccess()) {
+            return [];
         }
 
-        if (! self::canAccess()) {
-            return self::$itemsCache = [];
+        if (self::$itemsCache !== null) {
+            return self::$itemsCache;
         }
 
         $ids = implode(',', array_map('intval', self::PROJECT_IDS));

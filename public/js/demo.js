@@ -16,7 +16,7 @@
 
   function createSkinBlock(colors, callback, noneSelected) {
     var $block = $('<select />', {
-      class: noneSelected ? 'custom-select mb-3 border-0' : 'custom-select mb-3 text-light border-0 ' + colors[0].replace(/accent-|navbar-/, 'bg-')
+      class: noneSelected ? 'form-select mb-3 border-0' : 'form-select mb-3 text-light border-0 ' + colors[0].replace(/accent-|navbar-/, 'bg-')
     })
 
     if (noneSelected) {

@@ -38,7 +38,7 @@
                     @if($user::isUserAdmin())
                         <div class="form-group">
                             {!! Form::label('statistic', __('Track statistic')) !!}
-                            <select name="statistic" id="statistic" class="custom custom-select">
+                            <select name="statistic" id="statistic" class="form-select">
                                 <option value="1" @if($user->statistic) selected @endif>{{ __('Yes') }}</option>
                                 <option value="0" @if(!$user->statistic) selected @endif>{{ __('No') }}</option>
                             </select>
@@ -58,13 +58,13 @@
 
                     <div class="form-group">
                         {!! Form::label('role', __('Roles')) !!}
-                        {!! Form::select('role[]', $role, null, ['class' => 'custom-select' . ($errors->has('role') ? ' is-invalid' : ''), 'multiple']) !!}
+                        {!! Form::select('role[]', $role, null, ['class' => 'form-select' . ($errors->has('role') ? ' is-invalid' : ''), 'multiple']) !!}
                         @error('role') <span class="error invalid-feedback">{{ $message }}</span> @enderror
                     </div>
 
                     <div class="form-group">
                         {!! Form::label('lang', __('Interface language')) !!}
-                        {!! Form::select('lang', $lang, null, ['class' => 'custom-select flags' . ($errors->has('lang') ? ' is-invalid' : '')]) !!}
+                        {!! Form::select('lang', $lang, null, ['class' => 'form-select flags' . ($errors->has('lang') ? ' is-invalid' : '')]) !!}
                         @error('lang') <span class="error invalid-feedback">{{ $message }}</span> @enderror
                     </div>
 
@@ -96,7 +96,6 @@
     <script>
         $(function () {
             $(".flags").select2({
-                theme: 'bootstrap4',
                 minimumResultsForSearch: Infinity,
                 templateResult: function (state) {
                     if (!state.id) {

@@ -13,10 +13,10 @@
                         </div>
                         <div class="modal-footer">
                             <input type="reset" class="btn btn-default ml-1" value="{{__('Clear')}}"
-                                   data-dismiss="modal">
+                                   data-bs-dismiss="modal">
                             <button type="button"
                                     class="btn btn-default"
-                                    data-dismiss="modal">
+                                    data-bs-dismiss="modal">
                                 {{__('Back')}}
                             </button>
                         </div>
@@ -32,8 +32,8 @@
                 <input type="submit" class="btn btn-secondary mr-2" value="{{__('Save')}}">
                 <button class="btn btn-default btn-flat mr-2"
                         type="button"
-                        data-toggle="modal"
-                        data-target="#clear-text">{{__('Clear')}}
+                        data-bs-toggle="modal"
+                        data-bs-target="#clear-text">{{__('Clear')}}
                 </button>
                 <a href="{{ route('news') }}" class="btn btn-default btn-flat">{{ __('Back') }}</a>
             </div>

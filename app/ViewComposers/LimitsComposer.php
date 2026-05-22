@@ -204,12 +204,6 @@ class LimitsComposer
                     'position' => 19,
                 ];
 
-            case 'behavior':
-                return [
-                    'count' => $user->behaviors()->count(),
-                    'position' => 20
-                ];
-
             case 'HttpHeaders':
                 return [
                     'count' => __('Restrictions are not tracked'),
@@ -261,9 +255,6 @@ class LimitsComposer
 
             case 'MetaTagsPages':
                 return 8;
-
-            case 'behavior':
-                return 9;
 
             case 'BacklinkProject':
                 return 11;

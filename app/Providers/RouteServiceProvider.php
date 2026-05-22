@@ -2,8 +2,6 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 
@@ -27,8 +25,8 @@ class RouteServiceProvider extends ServiceProvider
     {
         parent::boot();
 
-        Route::bind('behavior', function($url){
-            return Auth::user()->behaviors()->findOrFail($url);
+        Route::bind('ticket', function ($value) {
+            return \App\SupportTicket::findOrFail($value);
         });
 
         Route::model('user', \App\User::class);

@@ -3,7 +3,7 @@
         <h3 class="card-title">Клики по кнопкам</h3>
 
         <div class="card-tools">
-            <button type="button" class="btn btn-tool" data-card-widget="collapse" title="Collapse">
+            <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse" title="Collapse">
                 <i class="fas fa-minus"></i>
             </button>
         </div>
@@ -34,7 +34,7 @@
                 </th>
                 <th class="col-2">
                     <label for="role">Тарифы</label>
-                    <select name="role" id="role" class="custom-select filter-input" data-index="1">
+                    <select name="role" id="role" class="form-select filter-input" data-index="1">
                         <option value="Любой">Любой</option>
                         <option value="Maximum">Максимальный</option>
                         <option value="Ultimate">Ultimate</option>
@@ -44,7 +44,7 @@
                 </th>
                 <th>
                     <label for="url">URL</label>
-                    <select name="url" id="filter-url" class="custom-select filter-input" data-index="2"></select>
+                    <select name="url" id="filter-url" class="form-select filter-input" data-index="2"></select>
                 </th>
                 @php($i = 3)
                 @if(is_array($columns))

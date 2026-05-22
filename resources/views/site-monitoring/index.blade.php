@@ -79,7 +79,7 @@
                             <a href="{{ route('delete.site.monitoring', $project->id) }}" class="btn btn-secondary">
                                 {{__('Delete a project')}}
                             </a>
-                            <button type="button" class="btn btn-default" data-dismiss="modal">{{__('Back')}}</button>
+                            <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{__('Back')}}</button>
                         </div>
                     </div>
                 </div>
@@ -110,14 +110,14 @@
                     '30' => __('30 minutes'),
                     '60' => __('60 minutes')],
                      $project->timing,
-                     ['class' => 'form-control custom-select rounded-0 monitoring']) !!}
+                     ['class' => 'form-control form-select rounded-0 monitoring']) !!}
                 </td>
                 <td data-order="{{ $project->waiting_time }}">
                     {!! Form::select('waiting_time', [
                     '10' => '10 ' . __("sec"),
                     '15' => '15 ' . __("sec"),
                     '20' => '20 ' . __("sec")
-                    ], $project->waiting_time, ['class' => 'form-control custom-select rounded-0 monitoring']) !!}
+                    ], $project->waiting_time, ['class' => 'form-control form-select rounded-0 monitoring']) !!}
                 </td>
                 <td data-order="{{ $project->broken }}">
                     @isset($project->code)
@@ -159,8 +159,8 @@
                             </span>
                         </span>
                     </button>
-                    <button class="btn btn-default __helper-link ui_tooltip_w d-inline" data-toggle="modal"
-                            data-target="#remove-project-id-{{$project->id}}">
+                    <button class="btn btn-default __helper-link ui_tooltip_w d-inline" data-bs-toggle="modal"
+                            data-bs-target="#remove-project-id-{{$project->id}}">
                         <i class="fa fa-trash"></i>
                         <span class="ui_tooltip __left __l">
                             <span class="ui_tooltip_content" style="width: 250px !important;">
@@ -184,11 +184,7 @@
     @slot('js')
         <script src="{{ asset('plugins/common/js/common.js') }}"></script>
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables/buttons/buttons.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/jszip.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/vfs_fonts.min.js') }}"></script>

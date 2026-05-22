@@ -46,7 +46,7 @@ function renderTopSitesV2(analysedSites, messages) {
     $.each(analysedSites, function (phrase, sites) {
         let newTable = '' +
             '<div class="card render mt-3" style="width: 300px; flex-shrink: 0">' +
-            '   <div class="card-header separate-header border" data-toggle="tooltip" data-placement="top" title="' + phrase + '"><h3>' + phrase + '</h3></div>' +
+            '   <div class="card-header separate-header border" data-bs-toggle="tooltip" data-bs-placement="top" title="' + phrase + '"><h3>' + phrase + '</h3></div>' +
             '   <div class="card-body p-0 d-flex flex-column">' +
             '       <div class="fixed-color d-flex p-2 border">' +
             '           <div class="font-weight-bold pr-2">#</div>' +
@@ -97,7 +97,7 @@ function renderTopSitesV2(analysedSites, messages) {
 
     $exportButton.unbind().click(() => exportAnalysedSitesToExcel(analysedSites, filename));
 
-    $('[data-toggle="tooltip"]').tooltip()
+    $('[data-bs-toggle="tooltip"]').tooltip()
 }
 
 function getStub(host, btnGroup, html, showBlock = false) {
@@ -107,7 +107,7 @@ function getStub(host, btnGroup, html, showBlock = false) {
             '        <div class="card-header ui-sortable-handle" style="padding: 0 !important; border: 0">' +
             '            <div class="d-flex justify-content-between">' +
             '<div>' + host + btnGroup + '</div>' +
-            '                <button type="button" class="btn btn-tool" data-card-widget="collapse">' +
+            '                <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse">' +
             '                    <i class="fas fa-minus"></i>' +
             '                </button>' +
             '            </div>' +
@@ -122,7 +122,7 @@ function getStub(host, btnGroup, html, showBlock = false) {
         '        <div class="card-header ui-sortable-handle" style="padding: 0 !important; border: 0">' +
         '            <div class="d-flex justify-content-between">' +
         '<div>' + host + btnGroup + '</div>' +
-        '                <button type="button" class="btn btn-tool" data-card-widget="collapse">' +
+        '                <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse">' +
         '                    <i class="fas fa-plus"></i>' +
         '                </button>' +
         '            </div>' +
@@ -135,7 +135,7 @@ function getStub(host, btnGroup, html, showBlock = false) {
 
 function getBtnGroup(url, messages) {
     return '<div class="btn-group pl-1 p-0">' +
-        '   <button type="button" data-toggle="dropdown" aria-expanded="false" class="btn btn-tool dropdown-toggle p-0" style="color: black;">' +
+        '   <button type="button" data-bs-toggle="dropdown" aria-expanded="false" class="btn btn-tool dropdown-toggle p-0" style="color: black;">' +
         '   <i class="fas fa-external-link-alt"></i>' +
         '   </button>' +
         '       <div role="menu" class="dropdown-menu dropdown-menu-left">' +

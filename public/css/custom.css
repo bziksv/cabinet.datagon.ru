@@ -1,56 +1,33 @@
-/* Сайдбар: лого и аватар — один размер, один левый отступ */
+/* --- AdminLTE 4: кабинет поверх html/ эталона --- */
 :root {
+    --lte-sidebar-width: 265px;
     --cabinet-sidebar-inset: 0.75rem;
+    --cabinet-sidebar-inner-pad: 0.5rem; /* = padding .sidebar-wrapper (AdminLTE 4) */
     --cabinet-sidebar-icon: 40px;
-    /* AdminLTE .sidebar { padding-left: 0.5rem } — компенсируем у блока профиля */
-    --cabinet-sidebar-inner-pad: 0.5rem;
-    /* AdminLTE по умолчанию 250px — +15px для длинных подписей меню */
-    --cabinet-sidebar-width: 265px;
 }
 
-/* Ширина сайдбара и отступ контента (вместо 250px в AdminLTE) */
-@media (min-width: 768px) {
-    .main-sidebar,
-    .main-sidebar::before {
-        width: var(--cabinet-sidebar-width) !important;
-    }
+/* Шапка (разметка из public/html/index.html) */
+#header-nav-bar.cabinet-header .navbar-badge {
+    position: static;
+    margin-left: 0.25rem;
+}
 
-    .layout-fixed .brand-link,
-    .layout-fixed .main-sidebar .cabinet-brand {
-        width: var(--cabinet-sidebar-width) !important;
-        max-width: var(--cabinet-sidebar-width) !important;
-    }
+.cabinet-header-limits-hint.is-empty {
+    display: none !important;
+}
 
-    body:not(.sidebar-mini-md):not(.sidebar-mini-xs):not(.layout-top-nav):not(.sidebar-collapse) .content-wrapper,
-    body:not(.sidebar-mini-md):not(.sidebar-mini-xs):not(.layout-top-nav):not(.sidebar-collapse) .main-footer,
-    body:not(.sidebar-mini-md):not(.sidebar-mini-xs):not(.layout-top-nav):not(.sidebar-collapse) .main-header {
-        margin-left: var(--cabinet-sidebar-width) !important;
-    }
+.cabinet-header-limits-menu__table-wrap {
+    max-height: 18rem;
+}
 
-    body.sidebar-mini.sidebar-collapse .main-sidebar:hover,
-    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused,
-    body.sidebar-mini.sidebar-collapse .main-sidebar:hover::before,
-    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused::before {
-        width: var(--cabinet-sidebar-width) !important;
-    }
+#header-nav-bar .cabinet-header-limits-menu .dropdown-header {
+    font-weight: 600;
+}
 
-    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .brand-link,
-    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .brand-link,
-    body.sidebar-mini.sidebar-collapse.layout-fixed .main-sidebar:hover .brand-link,
-    body.sidebar-mini.sidebar-collapse.layout-fixed .main-sidebar.sidebar-focused .brand-link {
-        width: var(--cabinet-sidebar-width) !important;
-    }
-
-    .sidebar-collapse.sidebar-mini .main-sidebar.sidebar-focused .nav-link,
-    .sidebar-collapse.sidebar-mini .main-sidebar:hover .nav-link,
-    .sidebar-collapse.sidebar-mini .main-sidebar.sidebar-focused .nav-child-indent .nav-link,
-    .sidebar-collapse.sidebar-mini .main-sidebar:hover .nav-child-indent .nav-link {
-        width: calc(var(--cabinet-sidebar-width) - 1rem) !important;
-    }
-
-    .sidebar-collapse.sidebar-mini .main-sidebar.sidebar-focused .nav-legacy .nav-link,
-    .sidebar-collapse.sidebar-mini .main-sidebar:hover .nav-legacy .nav-link {
-        width: var(--cabinet-sidebar-width) !important;
+/* Ширина сайдбара — через переменную AdminLTE 4 */
+@media (min-width: 992px) {
+    .sidebar-expand-lg.layout-fixed .app-wrapper {
+        --lte-sidebar-width: 265px;
     }
 }
 
@@ -60,11 +37,21 @@
     }
 }
 
-/* Бренд сайдбара — Датагон */
+/* Бренд — AdminLTE 4 по умолчанию center; выравниваем как профиль */
+.cabinet-sidebar > .sidebar-brand {
+    justify-content: flex-start;
+    height: auto;
+    min-height: 3.5rem;
+    padding: 0;
+    overflow: visible;
+}
+
 .cabinet-brand {
     display: flex;
     align-items: center;
+    justify-content: flex-start;
     gap: 0.5rem;
+    width: 100%;
     padding: 0.75rem var(--cabinet-sidebar-inset) !important;
     min-height: calc(var(--cabinet-sidebar-icon) + 1.25rem);
 }
@@ -93,14 +80,23 @@
     line-height: 1.2;
 }
 
-/* Профиль: отменяем padding .sidebar, чтобы левый край = как у лого */
-.main-sidebar .sidebar > .cabinet-user-panel {
-    align-items: center;
-    gap: 0.5rem;
+/* Профиль: левый край = как у лого (компенсация padding .sidebar-wrapper) */
+.app-sidebar .sidebar-wrapper > .sidebar-user-panel {
     margin-left: calc(-1 * var(--cabinet-sidebar-inner-pad));
     margin-right: calc(-1 * var(--cabinet-sidebar-inner-pad));
-    padding-left: var(--cabinet-sidebar-inset) !important;
-    padding-right: var(--cabinet-sidebar-inset) !important;
+    padding: 0.5rem var(--cabinet-sidebar-inset) 0.75rem !important;
+    position: relative;
+    z-index: 1045;
+    overflow: visible;
+}
+
+.cabinet-user-panel .d-flex {
+    justify-content: flex-start;
+}
+
+.cabinet-admin-gear {
+    position: relative;
+    flex-shrink: 0;
 }
 
 .cabinet-user-panel .image {
@@ -114,6 +110,7 @@
     justify-content: center;
 }
 
+.cabinet-user-panel__avatar,
 .cabinet-user-panel img {
     width: var(--cabinet-sidebar-icon) !important;
     height: var(--cabinet-sidebar-icon) !important;
@@ -140,32 +137,62 @@
     justify-content: center;
     width: 2rem;
     height: 2rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
     color: rgba(255, 255, 255, 0.85);
     border-radius: 0.25rem;
     line-height: 1;
+    cursor: pointer;
 }
 
 .cabinet-admin-gear__toggle:hover,
-.cabinet-admin-gear.show .cabinet-admin-gear__toggle {
+.cabinet-admin-gear.is-open .cabinet-admin-gear__toggle {
     color: #fff;
     background: rgba(255, 255, 255, 0.12);
-    text-decoration: none;
 }
 
 .cabinet-admin-gear__menu {
+    display: none;
+    position: fixed;
     min-width: 17rem;
     max-width: 22rem;
+    margin: 0;
+    padding: 0.35rem 0;
+    z-index: 2050;
+    background-color: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 0.25rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.175);
 }
 
-.cabinet-admin-gear__menu .dropdown-item {
-    white-space: normal;
+.cabinet-admin-gear.is-open .cabinet-admin-gear__menu {
+    display: block;
+}
+
+.cabinet-admin-gear__link {
+    display: block;
+    padding: 0.45rem 1rem;
+    color: #212529 !important;
+    font-size: 0.875rem;
     line-height: 1.35;
-    padding-top: 0.45rem;
-    padding-bottom: 0.45rem;
+    white-space: normal;
+    text-decoration: none;
+}
+
+.cabinet-admin-gear__link:hover,
+.cabinet-admin-gear__link:focus {
+    color: #16181b !important;
+    background-color: #f8f9fa;
+    text-decoration: none;
+}
+
+.app-sidebar {
+    overflow: visible;
 }
 
 /* Поиск и меню — тот же левый отступ, что у лого и аватара (без padding .sidebar + ml-2) */
-.main-sidebar .sidebar > nav.mt-2 {
+.app-sidebar .sidebar-wrapper > nav {
     margin-left: calc(-1 * var(--cabinet-sidebar-inner-pad));
     margin-right: calc(-1 * var(--cabinet-sidebar-inner-pad));
     padding-left: var(--cabinet-sidebar-inset);
@@ -188,15 +215,26 @@
     padding-left: 0 !important;
 }
 
-/* Подписи пунктов меню — до 2 строк, без «…» в одну линию */
+/* Пункты меню: иконка + текст в одну строку (не flex:1 на span — иначе текст уезжает вниз) */
+.cabinet-sidebar-menu.sidebar-menu > .nav-item,
+.cabinet-sidebar-menu.sidebar-menu > .folder,
+.cabinet-sidebar-menu.sidebar-menu > li.menu-item {
+    margin-bottom: 0 !important;
+}
+
 .cabinet-sidebar-menu .nav-item > .nav-link,
 .cabinet-sidebar-menu .folder > .nav-link,
 .cabinet-sidebar-menu .nav-treeview .nav-link {
-    align-items: flex-start !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 0.5rem;
     height: auto !important;
-    min-height: 2.35rem;
-    padding-top: 0.45rem;
-    padding-bottom: 0.45rem;
+    min-height: 0;
+    padding: 0.45rem 0 !important;
+    margin-bottom: 0.1rem !important;
+    line-height: 1.35;
 }
 
 .cabinet-sidebar-menu > .nav-item > .nav-link,
@@ -216,48 +254,138 @@
     margin-left: 0 !important;
 }
 
-.cabinet-sidebar-menu .nav-link > span {
-    display: flex !important;
-    align-items: flex-start;
-    gap: 0.5rem;
-    flex: 1;
-    min-width: 0;
-    line-height: 1.3;
+.cabinet-sidebar-menu .nav-link > .nav-icon,
+.cabinet-sidebar-menu .nav-link > span.nav-icon {
+    flex: 0 0 1.5rem;
+    width: 1.5rem;
+    min-width: 1.5rem;
+    max-width: 1.5rem;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    line-height: 1;
 }
 
-.cabinet-sidebar-menu .nav-link > span > i,
-.cabinet-sidebar-menu .nav-link > span > svg,
-.cabinet-sidebar-menu .nav-link > span > img,
-.cabinet-sidebar-menu .folder > .nav-link > i:first-child {
-    flex-shrink: 0;
-    margin-top: 0.1rem;
+.cabinet-sidebar-menu .nav-link > span.nav-icon > i,
+.cabinet-sidebar-menu .nav-link > span.nav-icon > svg,
+.cabinet-sidebar-menu .nav-link > span.nav-icon > img,
+.cabinet-sidebar-menu .nav-link > .nav-icon,
+.cabinet-sidebar-menu .folder > .nav-link > .nav-icon {
+    flex: 0 0 auto;
     width: 1.25rem;
-    min-width: 1.25rem;
-    text-align: center;
-}
-
-.cabinet-sidebar-menu .folder > .nav-link {
-    display: flex !important;
-    align-items: flex-start;
-    gap: 0.5rem;
+    height: 1.25rem;
+    max-width: 1.25rem;
+    max-height: 1.25rem;
+    margin: 0;
+    object-fit: contain;
+    font-size: 1rem;
+    line-height: 1;
 }
 
 .cabinet-sidebar-menu .module-name,
 .cabinet-sidebar-menu .nav-link > p {
+    flex: 1 1 auto;
+    margin: 0 !important;
+    padding: 0 !important;
     white-space: normal !important;
-    line-height: 1.3;
+    line-height: 1.35 !important;
+    overflow: hidden;
+    word-break: break-word;
+    min-width: 0;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+}
+
+.cabinet-sidebar-search {
+    margin-left: calc(-1 * var(--cabinet-sidebar-inner-pad));
+    margin-right: calc(-1 * var(--cabinet-sidebar-inner-pad));
+    padding-left: var(--cabinet-sidebar-inset);
+    padding-right: var(--cabinet-sidebar-inset);
+}
+
+/* user-block (описание модуля, старые виджеты) — в LTE4 нет размеров у img */
+.user-block {
     overflow: hidden;
-    word-break: break-word;
-    flex: 1;
-    min-width: 0;
-    max-width: 100%;
+}
+.user-block img,
+.user-block .img-circle,
+.card-header .user-block img,
+.card-widget .user-block img {
+    float: left;
+    width: 40px !important;
+    height: 40px !important;
+    max-width: 40px;
+    max-height: 40px;
+    object-fit: cover;
+}
+.user-block .username,
+.user-block .description {
+    display: block;
+    margin-left: 50px;
+}
+.cabinet-module-description__avatar {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+}
+.cabinet-module-description .card-header .card-tools {
+    margin-left: auto;
+}
+
+/* Новости — посты LTE3 */
+.post .user-block {
+    margin-bottom: 15px;
+    width: 100%;
+    overflow: hidden;
+}
+
+.post .user-block img,
+.post .user-block .img-circle {
+    float: left;
+    width: 40px !important;
+    height: 40px !important;
+    max-width: 40px;
+    max-height: 40px;
+    object-fit: cover;
+}
+
+.post .user-block .username,
+.post .user-block .description {
+    display: block;
+    margin-left: 50px;
+}
+
+.post .user-block .username {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.post .user-block .description {
+    color: var(--bs-secondary-color);
+    font-size: 0.8125rem;
+}
+
+.img-bordered-sm {
+    border: 2px solid var(--bs-border-color);
+    padding: 2px;
+}
+
+.direct-chat-img {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
 }
 
 /* --- Свёрнутый сайдбар (sidebar-mini + sidebar-collapse) --- */
 @media (min-width: 768px) {
+    body.sidebar-mini.sidebar-collapse .app-sidebar,
+    body.sidebar-mini.sidebar-collapse .app-sidebar .sidebar-wrapper {
+        overflow-x: hidden;
+    }
+
     /* Подписи: clip, без display:none — иконки не смещаются при hover (как AdminLTE для .nav-link p) */
     body.sidebar-mini.sidebar-collapse .cabinet-brand .brand-text,
     body.sidebar-mini.sidebar-collapse .cabinet-user-panel .info,
@@ -287,13 +415,31 @@
         overflow: hidden;
     }
 
-    body.sidebar-mini.sidebar-collapse .main-sidebar .sidebar > .cabinet-user-panel {
-        justify-content: flex-start;
+    body.sidebar-mini.sidebar-collapse .app-sidebar .sidebar-wrapper > .sidebar-user-panel {
+        justify-content: center;
         margin-left: calc(-1 * var(--cabinet-sidebar-inner-pad)) !important;
         margin-right: calc(-1 * var(--cabinet-sidebar-inner-pad)) !important;
-        padding-left: 0.65rem !important;
-        padding-right: 0.5rem !important;
+        padding-left: 0.35rem !important;
+        padding-right: 0.35rem !important;
         overflow: hidden;
+        z-index: 1;
+    }
+
+    body.sidebar-mini.sidebar-collapse .cabinet-user-panel .d-flex {
+        justify-content: center;
+        width: 100%;
+        gap: 0;
+    }
+
+    /* В узком сайдбаре — только аватар; шестерёнка и имя при hover */
+    body.sidebar-mini.sidebar-collapse .cabinet-admin-gear {
+        max-width: 0;
+        overflow: hidden;
+        opacity: 0;
+        visibility: hidden;
+        margin: 0 !important;
+        padding: 0 !important;
+        flex: 0 0 auto;
     }
 
     body.sidebar-mini.sidebar-collapse .cabinet-sidebar-menu > .nav-item > .nav-link,
@@ -303,14 +449,11 @@
         text-align: left !important;
     }
 
-    body.sidebar-mini.sidebar-collapse .cabinet-sidebar-menu .nav-link > span {
-        display: inline-flex !important;
-        align-items: center;
-        justify-content: flex-start !important;
-        gap: 0.5rem;
-        margin-left: 0 !important;
-        width: 100%;
-        min-width: 0;
+    body.sidebar-mini.sidebar-collapse .cabinet-sidebar-menu .nav-link > span.nav-icon {
+        flex: 0 0 1.5rem;
+        width: 1.5rem;
+        min-width: 1.5rem;
+        max-width: 1.5rem;
     }
 
     body.sidebar-mini.sidebar-collapse .cabinet-sidebar-menu .nav-link .ml-2,
@@ -326,37 +469,64 @@
     }
 
     /* При наведении AdminLTE расширяет сайдбар — только подписи, без сдвига иконок */
-    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .cabinet-brand,
-    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .cabinet-brand {
+    body.sidebar-mini.sidebar-collapse .app-sidebar:hover .cabinet-brand,
+    body.sidebar-mini.sidebar-collapse .app-sidebar.sidebar-focused .cabinet-brand {
         padding: 0.75rem var(--cabinet-sidebar-inset) !important;
         gap: 0.5rem;
     }
 
-    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .cabinet-brand .brand-text,
-    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .cabinet-brand .brand-text,
-    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .cabinet-user-panel .info,
-    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .cabinet-user-panel .info,
-    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .cabinet-sidebar-menu .module-name,
-    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .cabinet-sidebar-menu .module-name,
-    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .cabinet-sidebar-menu .nav-link > p,
-    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .cabinet-sidebar-menu .nav-link > p,
-    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .cabinet-sidebar-menu .js-toggle.x-drop-down,
-    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .cabinet-sidebar-menu .js-toggle.x-drop-down {
+    body.sidebar-mini.sidebar-collapse .app-sidebar:hover .cabinet-brand .brand-text,
+    body.sidebar-mini.sidebar-collapse .app-sidebar.sidebar-focused .cabinet-brand .brand-text,
+    body.sidebar-mini.sidebar-collapse .app-sidebar:hover .cabinet-user-panel .info,
+    body.sidebar-mini.sidebar-collapse .app-sidebar.sidebar-focused .cabinet-user-panel .info,
+    body.sidebar-mini.sidebar-collapse .app-sidebar:hover .cabinet-admin-gear,
+    body.sidebar-mini.sidebar-collapse .app-sidebar.sidebar-focused .cabinet-admin-gear {
+        max-width: none;
+        opacity: 1;
+        visibility: visible;
+        overflow: visible;
+        flex-shrink: 0;
+    }
+
+    body.sidebar-mini.sidebar-collapse .app-sidebar:hover .cabinet-user-panel .d-flex,
+    body.sidebar-mini.sidebar-collapse .app-sidebar.sidebar-focused .cabinet-user-panel .d-flex {
+        justify-content: flex-start;
+        gap: 0.5rem;
+    }
+
+    body.sidebar-mini.sidebar-collapse .app-sidebar:hover .cabinet-sidebar-menu .module-name,
+    body.sidebar-mini.sidebar-collapse .app-sidebar.sidebar-focused .cabinet-sidebar-menu .module-name,
+    body.sidebar-mini.sidebar-collapse .app-sidebar:hover .cabinet-sidebar-menu .nav-link > p,
+    body.sidebar-mini.sidebar-collapse .app-sidebar.sidebar-focused .cabinet-sidebar-menu .nav-link > p,
+    body.sidebar-mini.sidebar-collapse .app-sidebar:hover .cabinet-sidebar-menu .js-toggle.x-drop-down,
+    body.sidebar-mini.sidebar-collapse .app-sidebar.sidebar-focused .cabinet-sidebar-menu .js-toggle.x-drop-down {
         max-width: calc(var(--cabinet-sidebar-width) - 3.25rem);
         white-space: normal !important;
         opacity: 1;
         visibility: visible;
     }
 
-    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .sidebar > .cabinet-user-panel,
-    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .sidebar > .cabinet-user-panel {
+    body.sidebar-mini.sidebar-collapse .app-sidebar:hover .sidebar-wrapper > .sidebar-user-panel,
+    body.sidebar-mini.sidebar-collapse .app-sidebar.sidebar-focused .sidebar-wrapper > .sidebar-user-panel {
+        justify-content: flex-start;
         padding-left: var(--cabinet-sidebar-inset) !important;
         padding-right: var(--cabinet-sidebar-inset) !important;
+        overflow: visible;
+        z-index: 1045;
+    }
+
+    body.sidebar-mini.sidebar-collapse .app-sidebar:hover .cabinet-brand .brand-text,
+    body.sidebar-mini.sidebar-collapse .app-sidebar.sidebar-focused .cabinet-brand .brand-text,
+    body.sidebar-mini.sidebar-collapse .app-sidebar:hover .cabinet-user-panel .info,
+    body.sidebar-mini.sidebar-collapse .app-sidebar.sidebar-focused .cabinet-user-panel .info {
+        max-width: calc(var(--cabinet-sidebar-width) - 5rem);
+        white-space: nowrap;
+        text-overflow: ellipsis;
     }
 
     /* Подменю только у раскрытых папок, не все сразу */
-    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .cabinet-sidebar-menu li.folder.menu-open > .nav-treeview,
-    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .cabinet-sidebar-menu li.folder.menu-open > .nav-treeview {
+    body.sidebar-mini.sidebar-collapse .app-sidebar:hover .cabinet-sidebar-menu li.folder.menu-open > .nav-treeview,
+    body.sidebar-mini.sidebar-collapse .app-sidebar.sidebar-focused .cabinet-sidebar-menu li.folder.menu-open > .nav-treeview {
         display: block !important;
     }
 }

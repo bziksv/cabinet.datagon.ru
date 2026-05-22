@@ -100,7 +100,7 @@
 
                     <div class="form-group">
                         {!! Form::label('lang', __('Lang')) !!}
-                        {!! Form::select('lang', $lang, null, ['class' => 'custom-select flags' . ($errors->has('lang') ? ' is-invalid' : '')]) !!}
+                        {!! Form::select('lang', $lang, null, ['class' => 'form-select flags' . ($errors->has('lang') ? ' is-invalid' : '')]) !!}
                         @error('lang') <span class="error invalid-feedback">{{ $message }}</span> @enderror
                     </div>
 
@@ -134,8 +134,7 @@
                         {!! Form::label('password', __('New password')) !!}
                         <div class="input-group">
                             {!! Form::password('password', ['id' => 'password', 'class' => 'form-control' . ($errors->has('password') ? ' is-invalid' : ''), 'placeholder' => __('New password')]) !!}
-                            <div class="input-group-append">
-                                <span class="input-group-text" id="generate">{{ __('Generate password') }}</span>
+                            <span class="input-group-text" id="generate">{{ __('Generate password') }}</span>
                             </div>
                             @error('password') <span class="error invalid-feedback">{{ $message }}</span> @enderror
                         </div>
@@ -210,7 +209,6 @@
             });
 
             $(".flags").select2({
-                theme: 'bootstrap4',
                 minimumResultsForSearch: Infinity,
                 templateResult: function (state) {
                     if (!state.id) {

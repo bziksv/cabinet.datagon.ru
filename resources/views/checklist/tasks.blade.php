@@ -210,7 +210,7 @@
                 cursor: pointer;
             }
 
-            #tasks .custom.custom-select {
+            #tasks .form-select {
                 width: 100px;
             }
 
@@ -297,17 +297,17 @@
                 <li class="checklist-label mr-2"
                     data-target="{{ $checklist[0]['id'] }}"
                     data-id="{{ $label['id'] }}"
-                    data-toggle="tooltip"
-                    data-placement="top" title="{{ $label['name'] }}">
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top" title="{{ $label['name'] }}">
                      <span class="fas fa-square"
                            style="color: {{ $label['color'] }}"
-                           data-toggle="modal"
-                           data-target="#removeRelationModal"></span>
+                           data-bs-toggle="modal"
+                           data-bs-target="#removeRelationModal"></span>
                 </li>
             @endforeach
         </ol>
-        <a href="#" data-toggle="modal"
-           data-target="#addRelationModal">
+        <a href="#" data-bs-toggle="modal"
+           data-bs-target="#addRelationModal">
             <u>
                 Добавить метку
             </u>
@@ -320,7 +320,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="removeRelationModalLabel">Подтвердите действие</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -330,7 +330,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="removeRelation">{{ __('Remove') }}</button>
                     <button type="button" class="btn btn-default" id="closeRemoveRelationModal"
-                            data-dismiss="modal">{{ __('Close') }}</button>
+                            data-bs-dismiss="modal">{{ __('Close') }}</button>
                 </div>
             </div>
         </div>
@@ -342,7 +342,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="addRelationModalLabel">Добавить метку к проекту</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -360,7 +360,7 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="add-relation">{{ __('Add') }}</button>
                     <button type="button" class="btn btn-default" id="closeRemoveRelationModal"
-                            data-dismiss="modal">{{ __('Close') }}</button>
+                            data-bs-dismiss="modal">{{ __('Close') }}</button>
                 </div>
             </div>
         </div>
@@ -378,7 +378,7 @@
             <div class="d-flex col-8">
                 <div class="form-group mr-3">
                     <label for="count">Количество задач</label>
-                    <select name="count" id="count" class="custom custom-select">
+                    <select name="count" id="count" class="form-select">
                         <option value="1">1</option>
                         <option value="3">3</option>
                         <option value="5">5</option>
@@ -396,7 +396,7 @@
                 </div>
                 <div class="form-group mr-3">
                     <label for="sort">Сортировка</label>
-                    <select name="sort" id="sort" class="custom custom-select">
+                    <select name="sort" id="sort" class="form-select">
                         <option value="all" selected>Любые</option>
                         <option value="new-sort">Сначала новые</option>
                         <option value="old-sort">Сначала старые</option>
@@ -410,8 +410,8 @@
                 </div>
             </div>
             <div class="d-flex col-4 justify-content-end align-items-center">
-                <button class="btn btn-secondary" data-toggle="modal"
-                        data-target="#createNewProject"
+                <button class="btn btn-secondary" data-bs-toggle="modal"
+                        data-bs-target="#createNewProject"
                         style="height: 38px"
                         id="add-new-tasks">
                     Добавление задач к текущему проекту
@@ -436,7 +436,7 @@
                 <div class="modal-header">
                     <h5 class="modal-title" id="createNewProjectLabel">Добавление новых задач к
                         проекту {{ $checklist[0]['url'] }}</h5>
-                    <button type="button" class="close close-modal" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close close-modal" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -457,7 +457,7 @@
                     <div></div>
                     <div>
                         <button type="button" class="btn btn-default" id="close-create-tasks-modal"
-                                data-dismiss="modal">{{ __('Close') }}</button>
+                                data-bs-dismiss="modal">{{ __('Close') }}</button>
                         <button type="button" class="btn btn-success" id="save-new-tasks">
                             {{ __('Save') }}
                         </button>
@@ -468,7 +468,7 @@
             <div class="modal-content col-3">
                 <div class="modal-header">
                     <h5 class="modal-title" id="createNewProjectLabel">Шаблоны</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -488,7 +488,7 @@
                 <div class="modal-header">
                     <h5 class="modal-title" id="addNewSubtasksLabel">Добавление новых подзадач к
                         проекту {{ $checklist[0]['url'] }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -510,7 +510,7 @@
                     <div></div>
                     <div>
                         <button type="button" class="btn btn-default" id="close-create-sub-tasks-modal"
-                                data-dismiss="modal">{{ __('Close') }}</button>
+                                data-bs-dismiss="modal">{{ __('Close') }}</button>
                         <button type="button" class="btn btn-success" id="save-new-sub-tasks">
                             {{ __('Save') }}
                         </button>
@@ -522,7 +522,7 @@
             <div class="modal-content col-3">
                 <div class="modal-header">
                     <h5 class="modal-title">Шаблоны</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -541,7 +541,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="projectModalLabel">Подтвердите действие</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -550,8 +550,8 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="move-to-archive"
-                            data-dismiss="modal">{{ __('Archive it') }}</button>
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+                            data-bs-dismiss="modal">{{ __('Archive it') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
                 </div>
             </div>
         </div>
@@ -661,19 +661,19 @@
                     let $listItem = '<li data-id="' + id + '" class="default d-flex">' +
                         '    <input type="text" class="form form-control hide-border" data-type="name" placeholder="Без названия" data-target="' + id + '">' +
                         '    <div class="tools d-flex" style="float: right">' +
-                        '        <input class="form form-control datetime-counter" type="number" step="1" value="0" min="0" data-target="' + id + '" value="0" data-toggle="tooltip" data-placement="left" title="Количество дней на выполнение">' +
-                        '        <input class="form form-control datetime" value="' + date + '" data-type="start" type="datetime-local" data-target="' + id + '" data-toggle="tooltip" data-placement="left" title="Дата начала">' +
-                        '        <input class="form form-control datetime" value="' + date + '" data-type="deadline" type="datetime-local" data-target="' + id + '" data-toggle="tooltip" data-placement="left" title="Дата окончания">' +
-                        '        <select data-id="status-' + id + '" data-target="' + id + '" class="custom custom-select task-status" data-type="status" data-toggle="tooltip" data-placement="left" title="Статус задачи" style="width: 135px">' +
+                        '        <input class="form form-control datetime-counter" type="number" step="1" value="0" min="0" data-target="' + id + '" value="0" data-bs-toggle="tooltip" data-bs-placement="left" title="Количество дней на выполнение">' +
+                        '        <input class="form form-control datetime" value="' + date + '" data-type="start" type="datetime-local" data-target="' + id + '" data-bs-toggle="tooltip" data-bs-placement="left" title="Дата начала">' +
+                        '        <input class="form form-control datetime" value="' + date + '" data-type="deadline" type="datetime-local" data-target="' + id + '" data-bs-toggle="tooltip" data-bs-placement="left" title="Дата окончания">' +
+                        '        <select data-id="status-' + id + '" data-target="' + id + '" class="form-select task-status" data-type="status" data-bs-toggle="tooltip" data-bs-placement="left" title="Статус задачи" style="width: 135px">' +
                         '            <option value="new" selected>Новая</option>' +
                         '            <option value="in_work">В работе</option>' +
                         '            <option value="ready">Готово</option>' +
                         '            <option value="expired">Просрочено</option>' +
                         '            <option value="deactivated">Отложенная</option>' +
                         '        </select>' +
-                        '        <input class="form form-control deactivated" data-type="active_after" type="datetime-local" data-target="' + id + '" data-toggle="tooltip" data-placement="left" title="Сделать задачу активной после:">' +
+                        '        <input class="form form-control deactivated" data-type="active_after" type="datetime-local" data-target="' + id + '" data-bs-toggle="tooltip" data-bs-placement="left" title="Сделать задачу активной после:">' +
                         '        <div class="btn-group pl-2">' +
-                        '            <button class="btn btn-sm btn-default" data-toggle="collapse" href="#collapse-description-' + id + '" role="button" aria-expanded="false" aria-controls="collapse-description-' + id + '"><i class="fa fa-eye"></i></button>' +
+                        '            <button class="btn btn-sm btn-default" data-bs-toggle="collapse" href="#collapse-description-' + id + '" role="button" aria-expanded="false" aria-controls="collapse-description-' + id + '"><i class="fa fa-eye"></i></button>' +
                         '            <button class="btn btn-sm btn-default add-new-pre-subtask" data-id="' + id + '"><i class="fa fa-plus"></i></button>' +
                         '            <button class="btn btn-sm btn-default remove-pre-task"><i class="fa fa-trash"></i></button>' +
                         '        </div>' +
@@ -857,25 +857,25 @@
 
                 if (task.status === 'repeat') {
                     if (task.weekends) {
-                        html = '<select class="custom custom-select" data-target="' + task.id + '" data-type="weekends" data-toggle="tooltip" data-placement="left" title="Учитывать выходные дни?">' +
+                        html = '<select class="form-select" data-target="' + task.id + '" data-type="weekends" data-bs-toggle="tooltip" data-bs-placement="left" title="Учитывать выходные дни?">' +
                             '       <option value="1" selected>Да</option>' +
                             '       <option value="0">Нет</option>' +
                             '</select>'
                     } else {
-                        html = '<select class="custom custom-select" data-target="' + task.id + '" data-type="weekends" data-toggle="tooltip" data-placement="left" title="Учитывать выходные дни?">' +
+                        html = '<select class="form-select" data-target="' + task.id + '" data-type="weekends" data-bs-toggle="tooltip" data-bs-placement="left" title="Учитывать выходные дни?">' +
                             '       <option value="1">Да</option>' +
                             '       <option value="0" selected>Нет</option>' +
                             '</select>'
                     }
 
-                    html += '<input class="form form-control datetime-repeat-counter" type="number" step="1" min="1" data-target="' + task.id + '" data-type="repeat_after" value="1" data-toggle="tooltip" data-placement="left" title="Повторять каждые N дней" style="width: 55px">'
-                    html += '<input class="form form-control datetime-counter" type="number" step="1" value="' + task.repeat_every + '" min="0" data-target="' + task.id + '" data-toggle="tooltip" data-placement="left" title="Количество дней на выполнение" style="width: 75px;">'
-                    html += '<input class="form form-control hide-border edit-checklist" data-type="date_start" type="datetime-local" data-target="' + task.id + '" value="' + start + '" data-toggle="tooltip" data-placement="top" title="Дата следующего запуска задачи">'
+                    html += '<input class="form form-control datetime-repeat-counter" type="number" step="1" min="1" data-target="' + task.id + '" data-type="repeat_after" value="1" data-bs-toggle="tooltip" data-bs-placement="left" title="Повторять каждые N дней" style="width: 55px">'
+                    html += '<input class="form form-control datetime-counter" type="number" step="1" value="' + task.repeat_every + '" min="0" data-target="' + task.id + '" data-bs-toggle="tooltip" data-bs-placement="left" title="Количество дней на выполнение" style="width: 75px;">'
+                    html += '<input class="form form-control hide-border edit-checklist" data-type="date_start" type="datetime-local" data-target="' + task.id + '" value="' + start + '" data-bs-toggle="tooltip" data-bs-placement="top" title="Дата следующего запуска задачи">'
                 } else {
                     html = '<input class="form form-control hide-border edit-checklist" data-type="date_start" type="datetime-local" data-target="' + task.id + '" value="' + start + '" ' +
-                        'data-toggle="tooltip" data-placement="top" title="Дата начала">' +
+                        'data-bs-toggle="tooltip" data-bs-placement="top" title="Дата начала">' +
                         '<input class="form form-control hide-border edit-checklist" data-type="deadline" type="datetime-local" data-target="' + task.id + '" value="' + end + '" ' +
-                        'data-toggle="tooltip" data-placement="top" title="Дата окончания">'
+                        'data-bs-toggle="tooltip" data-bs-placement="top" title="Дата окончания">'
                 }
 
                 let button = ''
@@ -883,7 +883,7 @@
                     '<li data-id="' + task.id + '" class="' + task.status + '" class="d-flex">' + button +
                     '    <input type="text" class="form form-control hide-border d-inline edit-checklist w-auto" data-type="name" data-target="' + task.id + '" value="' + task.name + '">' +
                     '    <div class="tools d-flex" style="float: right">' +
-                    '       <select data-id="status-' + task.id + '" data-target="' + task.id + '" class="custom custom-select edit-checklist" data-type="status" style="width: 170px">' +
+                    '       <select data-id="status-' + task.id + '" data-target="' + task.id + '" class="form-select edit-checklist" data-type="status" style="width: 170px">' +
                     newState +
                     work +
                     ready +
@@ -893,8 +893,8 @@
                     '       </select>' +
                     html +
                     '       <div class="btn-group pl-2">' +
-                    '           <button class="btn btn-sm btn-default" data-toggle="collapse" href="#collapse-description-' + task.id + '" role="button" aria-expanded="false" aria-controls="collapse-description-' + task.id + '"><i class="fa fa-eye"></i></button>' +
-                    '           <button class="btn btn-sm btn-default add-new-subtasks" data-toggle="modal" data-target="#addNewSubtasks" data-id="' + task.id + '"><i class="fa fa-plus"></i></button>' +
+                    '           <button class="btn btn-sm btn-default" data-bs-toggle="collapse" href="#collapse-description-' + task.id + '" role="button" aria-expanded="false" aria-controls="collapse-description-' + task.id + '"><i class="fa fa-eye"></i></button>' +
+                    '           <button class="btn btn-sm btn-default add-new-subtasks" data-bs-toggle="modal" data-bs-target="#addNewSubtasks" data-id="' + task.id + '"><i class="fa fa-plus"></i></button>' +
                     '           <button class="btn btn-sm btn-default remove-real-task" data-id="' + task.id + '"><i class="fa fa-trash"></i></button>' +
                     '       </div>' +
                     '    </div>' +
@@ -917,8 +917,8 @@
             }
 
             function refreshTooltips() {
-                $('[data-toggle="tooltip"]').tooltip('dispose');
-                $('[data-toggle="tooltip"]').tooltip()
+                $('[data-bs-toggle="tooltip"]').tooltip('dispose');
+                $('[data-bs-toggle="tooltip"]').tooltip()
 
                 $('.description').summernote({
                     callbacks: {
@@ -1146,7 +1146,7 @@
                         let checklist = response.checklist[0]
 
                         $("#checklist-icon").html('<img src="/storage/' + checklist.icon + '" alt="' + checklist.icon + '" class="icon mr-2">')
-                        $("#checklist-name").html('<a href="' + checklist.url + '" target="_blank" data-toggle="tooltip" data-placement="top" title="' + checklist.url + '">' + new URL(checklist.url)['host'] + '</a>')
+                        $("#checklist-name").html('<a href="' + checklist.url + '" target="_blank" data-bs-toggle="tooltip" data-bs-placement="top" title="' + checklist.url + '">' + new URL(checklist.url)['host'] + '</a>')
                         $("#checklist-counter").html(checklist.tasks_total ?? checklist.tasks.length)
                         $("#checklist-new").html(checklist.new)
                         $("#checklist-work").html(checklist.work)
@@ -1211,7 +1211,7 @@
 
                 return '<li data-id="' + id + '" class="default d-flex">' +
                     '    <input type="text" class="form form-control hide-border" data-type="name" placeholder="Без названия" data-target="' + id + '">' +
-                    '    <select data-id="status-' + id + '" data-target="' + id + '" class="custom custom-select task-status" data-type="status" style="width: 160px" data-toggle="tooltip" data-placement="left" title="Статус задачи">' +
+                    '    <select data-id="status-' + id + '" data-target="' + id + '" class="form-select task-status" data-type="status" style="width: 160px" data-bs-toggle="tooltip" data-bs-placement="left" title="Статус задачи">' +
                     '        <option value="new" selected>Новая</option>' +
                     '        <option value="in_work">В работе</option>' +
                     '        <option value="ready">Готово</option>' +
@@ -1219,18 +1219,18 @@
                     '        <option value="deactivated">Отложенная</option>' +
                     '        <option value="repeat">Повторяющаяся</option>' +
                     '    </select>' +
-                    '    <select class="custom custom-select" data-target="' + id + '" data-type="weekends" data-toggle="tooltip" data-placement="left" title="Учитывать выходные дни?" style="width: 61px; display: none">' +
+                    '    <select class="form-select" data-target="' + id + '" data-type="weekends" data-bs-toggle="tooltip" data-bs-placement="left" title="Учитывать выходные дни?" style="width: 61px; display: none">' +
                     '           <option value="1">Да</option>' +
                     '           <option value="0">Нет</option>' +
                     '    </select>' +
                     '    <div class="tools d-flex" style="float: right">' +
-                    '        <input class="form form-control datetime-repeat-counter" type="number" step="1" min="1" data-target="' + id + '" data-type="repeat_after" value="1" data-toggle="tooltip" data-placement="left" title="Повторять каждые N дней" style="width: 55px; display: none">' +
-                    '        <input class="form form-control datetime-counter" type="number" step="1" value="0" min="0" data-target="' + id + '" value="0" data-toggle="tooltip" data-placement="left" title="Количество дней на выполнение">' +
-                    '        <input class="form form-control datetime" value="' + date + '" data-type="start" type="datetime-local" data-target="' + id + '" data-toggle="tooltip" data-placement="left" title="Дата начала">' +
-                    '        <input class="form form-control datetime" value="' + date + '" data-type="deadline" type="datetime-local" data-target="' + id + '" data-toggle="tooltip" data-placement="left" title="Дата окончания">' +
-                    '        <input class="form form-control deactivated datetime-after" data-type="active_after" type="datetime-local" data-target="' + id + '" data-toggle="tooltip" data-placement="left" title="Сделать задачу активной после:" style="display: none">' +
+                    '        <input class="form form-control datetime-repeat-counter" type="number" step="1" min="1" data-target="' + id + '" data-type="repeat_after" value="1" data-bs-toggle="tooltip" data-bs-placement="left" title="Повторять каждые N дней" style="width: 55px; display: none">' +
+                    '        <input class="form form-control datetime-counter" type="number" step="1" value="0" min="0" data-target="' + id + '" value="0" data-bs-toggle="tooltip" data-bs-placement="left" title="Количество дней на выполнение">' +
+                    '        <input class="form form-control datetime" value="' + date + '" data-type="start" type="datetime-local" data-target="' + id + '" data-bs-toggle="tooltip" data-bs-placement="left" title="Дата начала">' +
+                    '        <input class="form form-control datetime" value="' + date + '" data-type="deadline" type="datetime-local" data-target="' + id + '" data-bs-toggle="tooltip" data-bs-placement="left" title="Дата окончания">' +
+                    '        <input class="form form-control deactivated datetime-after" data-type="active_after" type="datetime-local" data-target="' + id + '" data-bs-toggle="tooltip" data-bs-placement="left" title="Сделать задачу активной после:" style="display: none">' +
                     '        <div class="btn-group pl-2">' +
-                    '            <button class="btn btn-sm btn-default" data-toggle="collapse" href="#collapse-description-' + id + '" role="button" aria-expanded="false" aria-controls="collapse-description-' + id + '"><i class="fa fa-eye"></i></button>' +
+                    '            <button class="btn btn-sm btn-default" data-bs-toggle="collapse" href="#collapse-description-' + id + '" role="button" aria-expanded="false" aria-controls="collapse-description-' + id + '"><i class="fa fa-eye"></i></button>' +
                     '            <button class="btn btn-sm btn-default add-new-pre-subtask" data-id="' + id + '"><i class="fa fa-plus"></i></button>' +
                     '            <button class="btn btn-sm btn-default remove-pre-task"><i class="fa fa-trash"></i></button>' +
                     '        </div>' +
@@ -1345,12 +1345,12 @@
                     success: function (label) {
                         successMessage('Метка добавлена к проекту')
                         $('#project-labels').append(
-                            '<li class="checklist-label mr-2" data-target="' + checklistID + '" data-id="' + labelID + '" data-toggle="tooltip"' +
-                            '    data-placement="top" title="' + label.name + '">' +
+                            '<li class="checklist-label mr-2" data-target="' + checklistID + '" data-id="' + labelID + '" data-bs-toggle="tooltip"' +
+                            '    data-bs-placement="top" title="' + label.name + '">' +
                             '         <span class="fas fa-square"' +
                             '               style="color: ' + label.color + ' !important;"' +
-                            '               data-toggle="modal"' +
-                            '               data-target="#removeRelationModal"></span>' +
+                            '               data-bs-toggle="modal"' +
+                            '               data-bs-target="#removeRelationModal"></span>' +
                             '</li>'
                         )
 

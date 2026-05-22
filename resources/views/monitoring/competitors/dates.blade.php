@@ -3,9 +3,7 @@
         <!-- Toastr -->
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
         <!-- DataTables -->
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/datatables-buttons/css/buttons.bootstrap4.min.css') }}">
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-css'])
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/common.css') }}"/>
         <!-- daterange picker -->
         <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
@@ -61,14 +59,12 @@
         <h3>{{ __('Changes by top and date') }}</h3>
         <div class="card mt-3">
             <div class="card-header d-flex flex-row justify-content-start align-items-center">
-                <div class="input-group col-8 pl-0 ml-0">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text">
+                <div class="input-group col-8 pl-0 ml-0"><span class="input-group-text">
                             <i class="far fa-calendar-alt"></i>
                         </span>
-                    </div>
+
                     <input type="text" class="form-control" id="date-range">
-                    <select name="region" class="custom-select" id="searchEngines">
+                    <select name="region" class="form-select" id="searchEngines">
                         @foreach($searchEngines as $search)
                             @if($search->id == request('region'))
                                 <option value="{{ $search->id }}"

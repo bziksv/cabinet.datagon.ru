@@ -34,9 +34,6 @@ Route::post('email/verify/code', 'Auth\VerificationController@verifyCode')->name
 
 //Public method
 Route::get('public/http-headers/{id}', 'PublicController@httpHeaders');
-Route::get('public/behavior/{id}/check', 'PublicController@checkBehavior')->name('behavior.check');
-Route::post('public/behavior/verify', 'PublicController@verifyBehavior')->name('behavior.verify');
-Route::get('public/behavior/{site}/code', 'PublicController@codeBehavior')->name('behavior.code');
 Route::post('/balance-add/result', 'BalanceAddController@result')->name('balance.add.result');
 Route::get('/personal-data/ru', 'AccessController@getRuPersonalData');
 Route::get('/personal-data/en', 'AccessController@getEnPersonalData');
@@ -93,25 +90,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/meta-tags/history/{id}/data', 'MetaTagsController@historyData')->name('meta.history.data');
     Route::get('/meta-tags/history/{id}', 'MetaTagsController@showHistory');
     Route::get('/meta-tags/getTariffMetaTagsPages', 'MetaTagsController@getTariffMetaTagsPages');
+    Route::get('/meta-tags/projects', 'MetaTagsController@projectsForUser')->name('meta-tags.projects');
     Route::get('/meta-tags/settings', 'MetaTagsController@settings')->name('meta-tags.settings')->middleware(['role:Super Admin|admin']);
     Route::get('/meta-tags/statistic', 'MetaTagsController@statistic')->name('meta-tags.statistic')->middleware(['role:Super Admin|admin']);
     Route::resource('meta-tags', 'MetaTagsController');
-
-    Route::get('behavior/{behavior}/unique', 'BehaviorController@uniquePhrases')->name('behavior.unique.phrases');
-    Route::get('behavior/{behavior}/sort-mixed', 'BehaviorController@sortMixed')->name('behavior.sort.mixed');
-    Route::get('behavior/{behavior}/edit-project', 'BehaviorController@editProject')->name('behavior.edit_project');
-    Route::patch('behavior/{behavior}/update-project', 'BehaviorController@updateProject')->name('behavior.update_project');
-
-    Route::post('behavior/phrase/{phrase}/sort', 'BehaviorController@phraseSortUpdate')->name('behavior.phrase.sort.update');
-    Route::delete('behavior/phrase/{phrase}', 'BehaviorController@phraseDestroy')->name('behavior.phrase.destroy');
-    Route::delete('behavior/phrases/{behavior}', 'BehaviorController@destroyPhrases')->name('behavior.phrases.destroy');
-
-    Route::resource('behavior', 'BehaviorController');
 
     Route::get('profile/', 'ProfilesController@index')->name('profile.index');
     Route::post('profile/', 'ProfilesController@update')->name('profile.update');
     Route::patch('profile/', 'ProfilesController@password')->name('profile.password');
     Route::get('test-telegram-notify', 'ProfilesController@testTelegramNotify')->name('profile.test-telegram-notify');
+
+    Route::get('support', 'SupportTicketController@index')->name('support.index');
+    Route::get('support/create', 'SupportTicketController@create')->name('support.create');
+    Route::post('support', 'SupportTicketController@store')->name('support.store');
+    Route::get('support/{ticket}', 'SupportTicketController@show')->name('support.show');
+    Route::post('support/{ticket}/messages', 'SupportTicketController@storeMessage')->name('support.messages.store');
+    Route::patch('support/{ticket}/close', 'SupportTicketController@close')->name('support.close');
 
     Route::get('description/{description}/edit/{position?}', 'DescriptionController@edit')->name('description.edit');
     Route::patch('description/{description}', 'DescriptionController@update')->name('description.update');

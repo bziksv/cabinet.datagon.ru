@@ -7,11 +7,11 @@
 
     <div class="btn-group">
 
-        <a href="{{ route('monitoring.create') }}" class="btn btn-default btn-sm" data-toggle="tooltip" title="{{ __('Create project') }}">
+        <a href="{{ route('monitoring.create') }}" class="btn btn-default btn-sm" data-bs-toggle="tooltip" title="{{ __('Create project') }}">
             <i class="fas fa-plus"></i>
         </a>
 
-        <button type="button" class="btn btn-default btn-sm checkbox-delete" data-toggle="tooltip" title="{{ __('Delete') }}">
+        <button type="button" class="btn btn-default btn-sm checkbox-delete" data-bs-toggle="tooltip" title="{{ __('Delete') }}">
             <i class="far fa-trash-alt"></i>
         </button>
     </div>
@@ -32,12 +32,12 @@
             ['name' => 'budget', 'text' => __('Budget')],
             ['name' => 'mastered', 'text' => __('Mastered')],
         ] as $col)
-            <a href="javascript:void(0)" class="btn btn-default btn-sm column-visible click_tracking" data-click="{{ $col['text'] }}" data-toggle="tooltip" data-column="{{ $col['name'] }}" title="Скрыть/Показать столбец">{{ $col['text'] }}</a>
+            <a href="javascript:void(0)" class="btn btn-default btn-sm column-visible click_tracking" data-click="{{ $col['text'] }}" data-bs-toggle="tooltip" data-column="{{ $col['name'] }}" title="Скрыть/Показать столбец">{{ $col['text'] }}</a>
         @endforeach
     </div>
 
     <div class="btn-group">
-        <select id="filter-user-status" class="custom-select custom-select-sm form-control form-control-sm">
+        <select id="filter-user-status" class="form-select form-select-sm">
             <option value="">{{ __('Show all users status') }}</option>
             @foreach(\App\Http\Controllers\MonitoringProjectUserStatusController::getOptions() as $option)
                 <option value="{{ $option['val'] }}">{{ $option['text'] }}</option>

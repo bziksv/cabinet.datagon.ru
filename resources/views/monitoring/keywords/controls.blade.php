@@ -6,13 +6,13 @@
 
 <div class="btn-group queries-controls">
     @can('create_query_monitoring')
-        <button type="button" class="btn btn-default btn-sm tooltip-on" data-toggle="modal" data-target=".modal" data-type="create_keywords" title="Добавить запрос">
+        <button type="button" class="btn btn-default btn-sm tooltip-on" data-bs-toggle="modal" data-target=".modal" data-type="create_keywords" title="Добавить запрос">
             <i class="fas fa-plus"></i>
         </button>
     @endcan
 
     @can('edit_query_monitoring')
-        <button type="button" class="btn btn-default btn-sm tooltip-on" data-toggle="modal" data-target=".modal" data-type="edit_plural" title="Редактировать запросы">
+        <button type="button" class="btn btn-default btn-sm tooltip-on" data-bs-toggle="modal" data-target=".modal" data-type="edit_plural" title="Редактировать запросы">
             <i class="fas fa-pen"></i>
         </button>
     @endcan
@@ -51,7 +51,7 @@
             ['name' => 'phrasal', 'text' => __('YW') . ' "[]"', 'default' => 'off'],
             ['name' => 'exact', 'text' => __('YW') . ' "[!]"', 'default' => 'off'],
         ] as $col)
-        <a href="javascript:void(0)" class="btn btn-default btn-sm tooltip-on column-visible" data-toggle="tooltip" data-default="{{ $col['default'] }}" data-column="{{ $col['name'] }}" title="Скрыть/Показать столбец">{{ $col['text'] }}</a>
+        <a href="javascript:void(0)" class="btn btn-default btn-sm tooltip-on column-visible" data-bs-toggle="tooltip" data-default="{{ $col['default'] }}" data-column="{{ $col['name'] }}" title="Скрыть/Показать столбец">{{ $col['text'] }}</a>
     @endforeach
 </div>
 

@@ -178,7 +178,17 @@ class MetaTagsController extends Controller
 
     public function index()
     {
-        $meta = Auth::user()->metaTags()
+        $lang = $this->lang();
+
+        return view('meta-tags.index', compact('lang'));
+    }
+
+    /**
+     * Список проектов мета-тегов (AJAX — не встраивать в HTML).
+     */
+    public function projectsForUser()
+    {
+        $projects = Auth::user()->metaTags()
             ->latest()
             ->get([
                 'id',
@@ -198,9 +208,7 @@ class MetaTagsController extends Controller
                 'updated_at',
             ]);
 
-        $lang = $this->lang();
-
-        return view('meta-tags.index', compact('meta', 'lang'));
+        return response()->json($projects);
     }
 
     /**
@@ -502,15 +510,23 @@ class MetaTagsController extends Controller
     {
         $response = [];
 
-        $history = MetaTagsHistory::query()
-            ->with(['project:id,user_id,name'])
-            ->findOrFail($id);
-        $history_compare = MetaTagsHistory::query()
-            ->with(['project:id,user_id,name'])
-            ->findOrFail($id_compare);
+        $history = MetaTagsHistory::query()->findOrFail($id);
+        $history_compare = MetaTagsHistory::query()->findOrFail($id_compare);
 
-        if ($history->project->user_id != Auth::id() || $history_compare->project->user_id != Auth::id())
-            throw new ErrorException('User not valid');
+        $projectIds = collect([$history->meta_tag_id, $history_compare->meta_tag_id])
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $owns = MetaTag::query()
+            ->where('user_id', Auth::id())
+            ->whereIn('id', $projectIds)
+            ->count();
+
+        if ($owns < count($projectIds)) {
+            abort(403);
+        }
 
         $this->createCompareArray($history, 'card', $response);
         $this->createCompareArray($history_compare, 'card_compare', $response);

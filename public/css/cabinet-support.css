@@ -1,0 +1,38 @@
+/* Служба поддержки — по образцу public/html/mailbox/ */
+.cabinet-support-page .cabinet-support-sidebar .nav-link {
+    border-radius: 0;
+}
+
+.cabinet-support-page .cabinet-support-list .list-group-item {
+    transition: background-color 0.15s ease;
+}
+
+.cabinet-support-page .cabinet-support-list .list-group-item:hover {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.cabinet-support-page .cabinet-support-list .list-group-item.is-active {
+    background-color: var(--bs-primary-bg-subtle);
+}
+
+.cabinet-support-page .cabinet-support-thread .cabinet-support-bubble {
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+}
+
+.cabinet-support-page .cabinet-support-bubble--staff {
+    background-color: var(--bs-primary-bg-subtle);
+    border: 1px solid var(--bs-primary-border-subtle);
+}
+
+.cabinet-support-page .cabinet-support-bubble--user {
+    background-color: var(--bs-secondary-bg);
+    border: 1px solid var(--bs-border-color);
+}
+
+.cabinet-support-page .cabinet-support-preview {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}

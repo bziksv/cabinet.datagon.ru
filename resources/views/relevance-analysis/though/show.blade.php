@@ -87,7 +87,7 @@
                 <br>
 
                 <div class="btn-group col-lg-3 col-md-5 pl-0">
-                    <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#rescanModal">
+                    <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#rescanModal">
                         {{ __('Reshoot all cleaned projects') }}
                     </button>
                     <button type="button" class="btn btn-secondary col-2">
@@ -109,7 +109,7 @@
                             <div class="modal-header">
                                 <h5 class="modal-title"
                                     id="rescanModalLabel">{{ __('Reshoot all cleaned projects') }}</h5>
-                                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                                     <span aria-hidden="true">&times;</span>
                                 </button>
                             </div>
@@ -118,10 +118,10 @@
                                 <div id="targetIds" data-target="{{ $though->cleaning_projects }}"></div>
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-dismiss="modal"
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"
                                         id="rescanProjects">{{ __('Reshoot') }}</button>
                                 <button type="button" class="btn btn-default"
-                                        data-dismiss="modal">{{ __('Close') }}</button>
+                                        data-bs-dismiss="modal">{{ __('Close') }}</button>
                             </div>
                         </div>
                     </div>
@@ -158,7 +158,7 @@
                     </td>
                     <td>{{ $key }}</td>
                     <td>
-                        <a data-toggle="collapse" href="#collapseExample{{ $key }}"
+                        <a data-bs-toggle="collapse" href="#collapseExample{{ $key }}"
                            role="button" aria-expanded="false" aria-controls="collapseExample{{ $key }}">
                             {{ __('show') }}
                         </a>
@@ -200,10 +200,7 @@
 
     @slot('js')
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables/buttons/buttons.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/jszip.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/vfs_fonts.min.js') }}"></script>
@@ -277,7 +274,7 @@
                             })
 
                             let ChildTable = '<td> ' +
-                                '<a data-toggle="collapse" href="#collapseExample' + key + '" role="button" aria-expanded="false" aria-controls="collapseExample' + key + '">' +
+                                '<a data-bs-toggle="collapse" href="#collapseExample' + key + '" role="button" aria-expanded="false" aria-controls="collapseExample' + key + '">' +
                                 'Посмотреть таблицу </a> ' +
                                 '<div class="collapse" id="collapseExample' + key + '"> ' +
                                 '<table class="child-table"> ' +
@@ -363,7 +360,7 @@
                                 '   <td class="remove-child" data-target="' + target + '"> <i class="fa fa-minus" ></i></td>' +
                                 '   <td>' + key + '</td>' +
                                 '   <td>' +
-                                '       <a data-toggle="collapse" href="#childTable' + key + '" role="button" aria-expanded="false" aria-controls="childTable' + key + '">' +
+                                '       <a data-bs-toggle="collapse" href="#childTable' + key + '" role="button" aria-expanded="false" aria-controls="childTable' + key + '">' +
                                 '           Посмотреть таблицу </a>' +
                                 '       <div class="collapse" id="childTable' + key + '">' +
                                 childTable +

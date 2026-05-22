@@ -16,7 +16,7 @@
                 <div class="card-body">
                     <div class="form-group">
                         {!! Form::label('position', __('Position')) !!}
-                        {!! Form::select('position', ['top' => __('Top'), 'bottom' => __('Bottom')], null, ['id' => 'description-position', 'class' => 'custom-select rounded-0']) !!}
+                        {!! Form::select('position', ['top' => __('Top'), 'bottom' => __('Bottom')], null, ['id' => 'description-position', 'class' => 'form-select rounded-0']) !!}
                         @error('position') <span class="error invalid-feedback">{{ $message }}</span> @enderror
                     </div>
                     <div class="form-group">

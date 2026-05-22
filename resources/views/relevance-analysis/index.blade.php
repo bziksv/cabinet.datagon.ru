@@ -120,7 +120,7 @@
                             {!! Form::select('type', [
                                 'phrase' => __('Keyword'),
                                 'list' => __('List of scanned sites'),
-                                ], null, ['class' => 'custom-select rounded-0', 'id' => 'check-type']) !!}
+                                ], null, ['class' => 'form-select rounded-0', 'id' => 'check-type']) !!}
                         </div>
 
                         <div class="form-group required">
@@ -194,7 +194,7 @@
                                    '56' => __('Chelyabinsk'),
                                    '1104' => __('Cherkessk'),
                                    '16' => __('Yaroslavl'),
-                                   ]), null, ['class' => 'custom-select rounded-0 region']) !!}
+                                   ]), null, ['class' => 'form-select rounded-0 region']) !!}
                         </div>
 
                         <div id="site-list" style="display: none">
@@ -212,7 +212,7 @@
                                         $config->count_sites => $config->count_sites,
                                         '10' => 10,
                                         '20' => 20,
-                                        ]), null, ['class' => 'custom-select rounded-0 count']) !!}
+                                        ]), null, ['class' => 'form-select rounded-0 count']) !!}
                             </div>
 
                             <div class="form-group required" id="ignoredDomainsBlock">
@@ -970,11 +970,7 @@
     @slot('js')
         <script src="{{ asset('plugins/common/js/common.js') }}"></script>
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables/buttons/buttons.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/jszip.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/vfs_fonts.min.js') }}"></script>
@@ -1411,8 +1407,8 @@
                     phrase: $('.form-control.phrase').val(),
                     noIndex: $('#switchNoindex').is(':checked'),
                     listWords: $('.form-control.listWords').val(),
-                    count: $('.custom-select.rounded-0.count').val(),
-                    region: $('.custom-select.rounded-0.region').val(),
+                    count: $('.form-select.rounded-0.count').val(),
+                    region: $('.form-select.rounded-0.region').val(),
                     hiddenText: $('#switchAltAndTitle').is(':checked'),
                     _token: $('meta[name="csrf-token"]').attr('content'),
                     ignoredDomains: $('.form-control.ignoredDomains').val(),

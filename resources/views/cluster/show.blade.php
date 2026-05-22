@@ -95,17 +95,17 @@
                 <div class="modal-header">
                     <h5 class="modal-title"
                         id="saveUrlsModalLabel">{{ __('Select the url that will be saved for each phrase of this cluster') }}</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <select name="relevanceUrls" id="relevanceUrls" class="select custom-select"></select>
+                    <select name="relevanceUrls" id="relevanceUrls" class="select form-select"></select>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="save-cluster-url-button"
-                            data-dismiss="modal">{{ __('Save') }}</button>
-                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ __('Close') }}</button>
+                            data-bs-dismiss="modal">{{ __('Save') }}</button>
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
                 </div>
             </div>
         </div>
@@ -183,8 +183,8 @@
                                 </div>
                                 <div type="button" class="btn btn-secondary"
                                      id="fastScanButton"
-                                     data-toggle="modal"
-                                     data-target="#fastScan">
+                                     data-bs-toggle="modal"
+                                     data-bs-target="#fastScan">
                                     {{ __('Rebuild') }}
                                 </div>
                             @endif
@@ -231,8 +231,8 @@
                         <button class="btn btn-secondary mt-5"
                                 type="button"
                                 id="fastScanButton"
-                                data-toggle="modal"
-                                data-target="#fastScan">
+                                data-bs-toggle="modal"
+                                data-bs-target="#fastScan">
                             {{ __('Rebuild') }}
                         </button>
                         <div class="modal fade" id="fastScan" tabindex="-1" aria-labelledby="fastScanLabel"
@@ -243,7 +243,7 @@
                                         <h5 class="modal-title" id="fastScanLabel">
                                             {{ __('Rebuild the cluster based on previously received data') }}
                                         </h5>
-                                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                                             <span aria-hidden="true">&times;</span>
                                         </button>
                                     </div>
@@ -255,14 +255,14 @@
                                                 'soft' => 'soft',
                                                 'pre-hard' => 'pre-hard',
                                                 'hard' => 'hard',
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'clusteringLevelFast']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'clusteringLevelFast']) !!}
                                         </div>
                                         <div class="form-group required">
                                             <label>{{ __('Merging Clusters') }}</label>
                                             {!! Form::select('engineVersion', [
                                                     'max_phrases' => 'Фразовый перебор и поиск максимального (13.01)',
                                                     '1501' => 'Фразовый перебор и поиск максимального (15.01)',
-                                            ], null, ['class' => 'custom-select rounded-0', 'id' => 'engineVersionFast']) !!}
+                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'engineVersionFast']) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -316,7 +316,7 @@
                                                     {{ __('Minimum multiplier') }}
                                                 </label>
                                                 <select name="reductionRatio" id="reductionRatio"
-                                                        class="select custom-select">
+                                                        class="select form-select">
                                                     <option value="pre-hard">pre-hard</option>
                                                     <option value="soft">soft</option>
                                                 </select>
@@ -326,11 +326,11 @@
                                         <div class="form-group required d-flex justify-content-end">
                                             <button type="button" class="btn btn-secondary mr-2 click_tracking"
                                                     data-click="Rebuild"
-                                                    data-dismiss="modal"
+                                                    data-bs-dismiss="modal"
                                                     id="brutForceFast">
                                                 {{ __('Rebuild') }}
                                             </button>
-                                            <button type="button" class="btn btn-default" data-dismiss="modal">
+                                            <button type="button" class="btn btn-default" data-bs-dismiss="modal">
                                                 {{ __('Close') }}
                                             </button>
                                         </div>
@@ -487,11 +487,7 @@
         <script src="{{ asset('/plugins/cluster/js/render-hidden-fast.min.js') }}"></script>
         <script src="{{ asset('plugins/common/js/common.js') }}"></script>
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables/buttons/buttons.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/jszip.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/vfs_fonts.min.js') }}"></script>

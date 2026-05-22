@@ -23,6 +23,7 @@ PATHS=(
   "/edit-news/45"
   "/edit-project/3"
   "/meta-tags/history/7317"
+  "/meta-tags/history/9451/compare/9448"
   "/main-projects/statistics/37"
   "/http-headers/settings"
   "/cluster-projects"

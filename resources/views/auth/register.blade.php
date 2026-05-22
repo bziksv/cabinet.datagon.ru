@@ -3,7 +3,6 @@
 @section('title', __('Register page'))
 
 @section('content')
-    <meta name="csrf-token" content="{{ csrf_token() }}">
     <div class="register-box">
         <div class="card card-outline card-primary">
             <div class="card-header text-center">
@@ -18,7 +17,7 @@
 
                     <div class="input-group mb-3">
                         <select id="select-language" name="lang"
-                                class="custom-select flags @error('lang') is-invalid @enderror">
+                                class="form-select flags @error('lang') is-invalid @enderror">
                             @foreach($lang as $l)
                                 <option value="{{ $l }}">
                                     @if($l == 'ru')
@@ -43,11 +42,7 @@
                         <input id="name" type="text" class="form-control @error('name') is-invalid @enderror"
                                name="name" value="{{ old('name') }}" placeholder="{{ __('Name') }}" autocomplete="name"
                                autofocus required>
-                        <div class="input-group-append">
-                            <div class="input-group-text">
-                                <span class="fas fa-user"></span>
-                            </div>
-                        </div>
+                        <span class="input-group-text"><i class="fas fa-user"></i></span>
                         @error('name')
                         <span class="invalid-feedback" role="alert">
                             <strong>{{ $message }}</strong>
@@ -59,11 +54,7 @@
                         <input id="last_name" type="text" class="form-control @error('last_name') is-invalid @enderror"
                                name="last_name" value="{{ old('last_name') }}" placeholder="{{ __('Last name') }}"
                                autocomplete="last_name" autofocus required>
-                        <div class="input-group-append">
-                            <div class="input-group-text">
-                                <span class="fas fa-user"></span>
-                            </div>
-                        </div>
+                        <span class="input-group-text"><i class="fas fa-user"></i></span>
                         @error('last_name')
                         <span class="invalid-feedback" role="alert">
                             <strong>{{ $message }}</strong>
@@ -75,11 +66,7 @@
                         <input id="email" type="email" class="form-control @error('email') is-invalid @enderror"
                                name="email" value="{{ old('email') }}" placeholder="{{ __('E-Mail') }}"
                                autocomplete="email" required>
-                        <div class="input-group-append">
-                            <div class="input-group-text">
-                                <span class="fas fa-envelope"></span>
-                            </div>
-                        </div>
+                        <span class="input-group-text"><i class="fas fa-envelope"></i></span>
                         @error('email')
                         <span class="invalid-feedback" role="alert">
                             <strong>{{ $message }}</strong>
@@ -92,11 +79,7 @@
                                class="form-control @error('password') is-invalid @enderror" name="password"
                                placeholder="{{ __('Password') }}" autocomplete="new-password" required pattern=".{8,}"
                                title="the password must be at least 8 characters long">
-                        <div class="input-group-append">
-                            <div class="input-group-text">
-                                <span class="fas fa-lock"></span>
-                            </div>
-                        </div>
+                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
                         @error('password')
                         <span class="invalid-feedback" role="alert">
                             <strong>{{ $message }}</strong>
@@ -107,19 +90,15 @@
                         <input id="password-confirm" type="password" class="form-control" name="password_confirmation"
                                placeholder="{{ __('Confirm Password') }}" autocomplete="new-password" required
                                pattern=".{8,}" title="the password must be at least 8 characters long">
-                        <div class="input-group-append">
-                            <div class="input-group-text">
-                                <span class="fas fa-lock"></span>
-                            </div>
-                        </div>
+                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
                     </div>
                     <ul id="validate-messages">
                     </ul>
                     <div class="row">
                         <div class="col-12">
-                            <div class="icheck-primary">
-                                <input type="checkbox" id="agreeTerms" name="terms" value="agree" required>
-                                <label for="agreeTerms">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="agreeTerms" name="terms" value="agree" required>
+                                <label class="form-check-label" for="agreeTerms">
                                     <span>{{ __('I give my consent to the processing') }}</span>
                                     <a href="/personal-data/ru" target="_blank">{{ __('personal data') }}</a>
 
@@ -171,8 +150,8 @@
             $('body > div > div > div.card-body > form > div.row > div:nth-child(1) > div > label > a:nth-child(2)').attr('href', '/personal-data/ru')
         }
 
+        @if(config('app.env') !== 'local')
         $(".flags").select2({
-            theme: 'bootstrap4',
             minimumResultsForSearch: Infinity,
             templateResult: function (state) {
                 if (!state.id) {
@@ -185,6 +164,7 @@
                 return $state;
             }
         });
+        @endif
 
         $(document).ready(function () {
             $('#select-language').on('change', function () {

@@ -1,186 +1,331 @@
-@php use Illuminate\Support\Str; @endphp
-@extends('layouts.app')
+@php
+    use Illuminate\Support\Str;
 
-@slot('css')
-    <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
-    <style>
-        #app > div > div > div.col-md-12.d-flex.flex-row.flex-wrap > div:nth-child(n) > div.card-body > div:nth-child(n):hover {
-            background: oldlace;
-            cursor: pointer;
+    $currentTariffName = $actual->isNotEmpty() ? ($actual['info'][0]['value'] ?? null) : null;
+    $selectedCode = array_key_first($select['tariffs']);
+
+    $plans = [];
+    foreach ($tariffsArray as $tariff) {
+        $code = array_search($tariff['name'], $select['tariffs'], true);
+        if ($code === false) {
+            continue;
         }
+        $priceSetting = collect($tariff['settings'])->first(function ($s) {
+            $name = $s['name'] ?? '';
+            return $name === 'Цена тарифа' || Str::contains($name, 'Цена');
+        });
+        $plans[] = [
+            'code' => $code,
+            'name' => $tariff['name'],
+            'settings' => $tariff['settings'],
+            'price' => $priceSetting['value'] ?? 0,
+            'is_current' => $currentTariffName && $currentTariffName === $tariff['name'],
+            'is_popular' => Str::contains(mb_strtolower($tariff['name']), 'ультимат')
+                || Str::contains(mb_strtolower($tariff['name']), 'ultimate'),
+        ];
+    }
 
-        .tariff-item:hover {
-            cursor: pointer
+    $featureRows = [];
+    foreach ($tariffsArray as $tariff) {
+        foreach ($tariff['settings'] as $setting) {
+            $name = $setting['name'] ?? '';
+            if ($name === '' || $name === 'Цена тарифа') {
+                continue;
+            }
+            if (!isset($featureRows[$name])) {
+                $featureRows[$name] = [
+                    'slug' => Str::limit(md5($name), 10, ''),
+                    'values' => [],
+                ];
+            }
         }
-    </style>
-@endslot
+    }
+    foreach ($plans as $plan) {
+        foreach ($featureRows as $featureName => &$row) {
+            $match = collect($plan['settings'])->firstWhere('name', $featureName);
+            $row['values'][$plan['code']] = $match ?? null;
+        }
+        unset($row);
+    }
+@endphp
 
-@section('content')
-    <div class="row">
+@component('component.card', ['title' => __('Tariff')])
+    @slot('css')
+        <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
+        <link rel="stylesheet" href="{{ asset('css/cabinet-tariff.css') }}">
+    @endslot
 
-        @if (session('info'))
-            <div class="col-md-12">
-                <div class="alert alert-info alert-dismissible">
-                    <button type="button" class="close" data-dismiss="alert" aria-hidden="true">×</button>
-                    <h5><i class="icon fas fa-ban"></i> {{ __('info') }}!</h5>
-                    {{ session('info') }}
-                </div>
+    <div class="cabinet-tariff-page">
+        @if(session('info'))
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                <i class="bi bi-info-circle me-2"></i>{{ session('info') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ __('Close') }}"></button>
             </div>
         @endif
 
-        <div class="col-md-6">
-            <div class="card card-primary">
-                <div class="card-header">
-                    <h3 class="card-title">{{ __('Tariff') }}</h3>
-                </div>
-
-                {!! Form::open(['method' => 'POST', 'route' => ['tariff.store']]) !!}
-
-                <div class="card-body">
-
-                    @if (session('error'))
-                        <div class="callout callout-danger callout-dismissible">
-                            <h5 class="mb-0">{{ session('error') }}</h5>
-                        </div>
-                    @endif
-
-                    @include('tariff.partials._form')
-
-                    @include('tariff.partials._table', ['id' => 'total'])
-                </div>
-
-                <div class="card-footer">
-                    {!! Form::submit('Купить', ['class' => 'btn btn-success']) !!}
-                </div>
-                {!! Form::close() !!}
-            </div>
+        <div class="text-center mb-4">
+            <p class="text-secondary mb-0">
+                {{ __('Choose a plan for your team. Prices depend on the billing period.') }}
+            </p>
         </div>
 
-        @if($actual->isNotEmpty())
-            <div class="col-md-6">
-                @include('tariff.subscribe')
-            </div>
-        @endif
-
-        <div class="col-md-12 d-flex flex-row flex-wrap justify-content-between">
-            @foreach ($tariffsArray as $tariff)
-                <div class="card p-0" style="width: 24.5%">
-                    <div class="card-header bg-primary">
-                        Тариф: {{ $tariff['name'] }}
-                    </div>
-                    <div>
-                        @foreach ($tariff['settings'] as $module)
-                            @if($module['name'] !== 'Цена тарифа')
-                                @if($module['value'] !== 0)
-                                    <div class="tariff-item pl-3 pr-3 pt-2 pb-1"
-                                         data-target="{{ Str::limit(md5($module['name']), 10) }}">
-                                        {{ $module['name'] }}:
-                                        @if($module['value'] === 1000000)
-                                            <b><i class="fas fa-infinity"></i></b>
-                                        @else
-                                            <b>{{ $module['value'] }}</b>
-                                        @endif
-                                    </div>
+        <div class="row g-4 row-cols-1 row-cols-sm-2 row-cols-xl-{{ min(count($plans), 4) }} mb-4">
+            @foreach($plans as $plan)
+                <div class="col">
+                    <div class="card cabinet-tariff-plan h-100 {{ $plan['is_current'] ? 'is-current border-success' : '' }} {{ $selectedCode === $plan['code'] ? 'is-selected border-primary shadow-sm' : '' }} {{ $plan['is_popular'] && !$plan['is_current'] ? 'border-primary' : '' }}"
+                         data-tariff-code="{{ $plan['code'] }}"
+                         role="button"
+                         tabindex="0">
+                        @if($plan['is_popular'])
+                            <span class="badge text-bg-primary position-absolute top-0 start-50 translate-middle">
+                                {{ __('Popular') }}
+                            </span>
+                        @endif
+                        @if($plan['is_current'])
+                            <span class="badge text-bg-success position-absolute top-0 end-0 m-2">
+                                {{ __('Your tariff') }}
+                            </span>
+                        @endif
+                        <div class="card-body p-4">
+                            <h5 class="fw-semibold mb-1">{{ $plan['name'] }}</h5>
+                            <div class="mb-3">
+                                @if((int) $plan['price'] === 0)
+                                    <span class="display-6 fw-bold">0</span>
+                                    <span class="text-secondary">₽</span>
                                 @else
-                                    <div class="tariff-item pl-3 pr-3 pt-2 pb-1"
-                                         data-target="{{ Str::limit(md5($module['name']), 10) }}">
-                                        {{ $module['name'] }}: <b>{{ __('Not available') }}</b>
-                                    </div>
+                                    <span class="display-6 fw-bold">{{ number_format((int) $plan['price'], 0, '.', ' ') }}</span>
+                                    <span class="text-secondary">₽ / {{ __('day') }}</span>
                                 @endif
-                            @endif
-                        @endforeach
+                            </div>
+                            <button type="button"
+                                    class="btn {{ $selectedCode === $plan['code'] ? 'btn-primary' : 'btn-outline-primary' }} w-100 btn-select-tariff"
+                                    data-tariff-code="{{ $plan['code'] }}">
+                                {{ __('Select') }}
+                            </button>
+                            <ul class="list-unstyled small mb-0 mt-3">
+                                @foreach(collect($plan['settings'])->take(5) as $setting)
+                                    @php $fname = $setting['name'] ?? ''; @endphp
+                                    @if($fname !== '' && $fname !== 'Цена тарифа')
+                                        <li class="mb-2 d-flex align-items-start gap-2">
+                                            @if(($setting['value'] ?? 0) == 0)
+                                                <i class="bi bi-dash-circle text-secondary flex-shrink-0" aria-hidden="true"></i>
+                                                <span class="text-secondary">{{ $fname }}</span>
+                                            @elseif((int) $setting['value'] === 1000000)
+                                                <i class="bi bi-check-circle-fill text-success flex-shrink-0" aria-hidden="true"></i>
+                                                <span>{{ $fname }}: <i class="bi bi-infinity" title="{{ __('Unlimited') }}"></i></span>
+                                            @else
+                                                <i class="bi bi-check-circle-fill text-success flex-shrink-0" aria-hidden="true"></i>
+                                                <span>{{ $fname }}: <strong>{{ $setting['value'] }}</strong></span>
+                                            @endif
+                                        </li>
+                                    @endif
+                                @endforeach
+                            </ul>
+                        </div>
                     </div>
                 </div>
             @endforeach
         </div>
 
+        <div class="row g-4 mb-4">
+            <div class="col-lg-{{ $actual->isNotEmpty() ? '5' : '12' }}">
+                <div class="card card-outline card-primary h-100">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">
+                            <i class="bi bi-cart-plus me-1"></i>{{ __('Purchase tariff') }}
+                        </h3>
+                    </div>
+                    {!! Form::open(['method' => 'POST', 'route' => ['tariff.store']]) !!}
+                    <div class="card-body">
+                        @if(session('error'))
+                            <div class="alert alert-danger" role="alert">{{ session('error') }}</div>
+                        @endif
+
+                        @include('tariff.partials._form')
+                        <hr class="my-4">
+                        <h6 class="text-secondary text-uppercase small fw-semibold mb-3">{{ __('Order summary') }}</h6>
+                        @include('tariff.partials._table', ['id' => 'total'])
+                    </div>
+                    <div class="card-footer d-grid gap-2">
+                        {!! Form::submit(__('Buy'), ['class' => 'btn btn-success btn-lg']) !!}
+                        <a href="{{ route('balance.index') }}" class="btn btn-link btn-sm text-center">
+                            {{ __('Top up your balance') }}
+                        </a>
+                    </div>
+                    {!! Form::close() !!}
+                </div>
+            </div>
+            @if($actual->isNotEmpty())
+                <div class="col-lg-7">
+                    @include('tariff.subscribe')
+                </div>
+            @endif
+        </div>
+
+        @if(count($featureRows) > 0)
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">
+                        <i class="bi bi-table me-1"></i>{{ __('Compare features') }}
+                    </h3>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0 cabinet-tariff-compare">
+                            <thead class="table-light">
+                            <tr>
+                                <th scope="col" style="min-width: 12rem">{{ __('Feature') }}</th>
+                                @foreach($plans as $plan)
+                                    <th scope="col" class="text-center text-nowrap">{{ $plan['name'] }}</th>
+                                @endforeach
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach($featureRows as $featureName => $row)
+                                <tr data-feature="{{ $row['slug'] }}">
+                                    <td class="fw-medium">{{ $featureName }}</td>
+                                    @foreach($plans as $plan)
+                                        @php $cell = $row['values'][$plan['code']] ?? null; @endphp
+                                        <td class="text-center col-tariff-{{ $plan['code'] }} {{ $selectedCode === $plan['code'] ? 'col-highlight' : '' }}">
+                                            @if(!$cell || (int) ($cell['value'] ?? 0) === 0)
+                                                <span class="text-secondary">
+                                                    <i class="bi bi-x-lg" aria-hidden="true"></i>
+                                                    <span class="visually-hidden">{{ __('Not available') }}</span>
+                                                </span>
+                                            @elseif((int) $cell['value'] === 1000000)
+                                                <i class="bi bi-infinity text-success" title="{{ __('Unlimited') }}"></i>
+                                            @else
+                                                <strong>{{ $cell['value'] }}</strong>
+                                            @endif
+                                        </td>
+                                    @endforeach
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        @endif
     </div>
-@stop
 
-@section('js')
-    <script>
-        document.title = "{{ __('Tariff') }}";
+    @slot('js')
+        <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
+        <script>
+            document.title = @json(__('Tariff'));
 
-        $(document).ready(function () {
-            $('.tariff-item').hover(function () {
-                let target = $(this).attr('data-target')
-                $('[data-target="' + target + '"]').css({
-                    'background': 'rgba(184,184,184, 0.3)',
-                    'transition': 'background-color 0s',
-                    'cursor': 'pointer'
-                })
-            })
+            (function () {
+                var $tariff = $('#tariff');
+                var $period = $('#period');
 
-            $('.tariff-item').mouseleave(function () {
-                let target = $(this).attr('data-target')
-                $('[data-target="' + target + '"]').css({
-                    'background': 'white',
-                    'transition': 'background-color 0.6s',
-                })
-            })
-        });
-    </script>
+                function highlightPlan(code) {
+                    document.querySelectorAll('.cabinet-tariff-plan').forEach(function (el) {
+                        var match = el.getAttribute('data-tariff-code') === code;
+                        el.classList.toggle('is-selected', match);
+                        el.classList.toggle('border-primary', match);
+                        el.classList.toggle('shadow-sm', match);
+                        var btn = el.querySelector('.btn-select-tariff');
+                        if (btn) {
+                            btn.classList.toggle('btn-primary', match);
+                            btn.classList.toggle('btn-outline-primary', !match);
+                        }
+                    });
+                    document.querySelectorAll('.cabinet-tariff-compare .col-highlight').forEach(function (el) {
+                        el.classList.remove('col-highlight');
+                    });
+                    document.querySelectorAll('.col-tariff-' + code).forEach(function (el) {
+                        el.classList.add('col-highlight');
+                    });
+                }
 
-    <!-- Toastr -->
-    <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
-    <script>
+                function selectTariff(code) {
+                    if (!code || !$tariff.length) {
+                        return;
+                    }
+                    $tariff.val(code);
+                    highlightPlan(code);
+                    $tariff.trigger('change');
+                }
 
-        toastr.options = {
-            "preventDuplicates": true,
-            "timeOut": "1500"
-        };
-
-        $('#tariff, #period').change(function () {
-            let tariff = $('#tariff').val();
-            let period = $('#period').val();
-
-            axios.request({
-                url: "/tariff/total",
-                method: "POST",
-                data: {
-                    name: tariff,
-                    period: period,
-                },
-            }).then(function (response) {
-                let total = $('#total tbody');
-
-                total.find('tr').remove();
-                $.each(response.data, function (i, val) {
-                    let tr = $('<tr />');
-                    tr.append($('<th />').css('width', '50%').text(val.title), $('<td />').text(val.value));
-                    total.append(tr);
+                document.querySelectorAll('.cabinet-tariff-plan, .btn-select-tariff').forEach(function (el) {
+                    el.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var code = el.getAttribute('data-tariff-code')
+                            || el.closest('[data-tariff-code]')?.getAttribute('data-tariff-code');
+                        selectTariff(code);
+                    });
+                    el.addEventListener('keydown', function (e) {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            var code = el.getAttribute('data-tariff-code');
+                            selectTariff(code);
+                        }
+                    });
                 });
-            }).catch(function (error) {
-                if (error.response) {
-                    toastr.error(error.response.data.message);
-                }
-            });
-        });
 
-        $('#unsubscribe').click(function () {
-            axios.request({
-                url: "{{ route('tariff.unsubscribe', ['confirm']) }}",
-                method: "GET",
-            }).then(function (response) {
-                let msg = `Вам будет начислено ${response.data.prices.priceWithDiscount} баллов за ${response.data.active_days} дней, по текущей ставке тарифа ${response.data.prices.percent}%. Вы уверены, что хотите отписаться от тарифа?`;
-                let result = confirm(msg);
-                if (result) {
-                    axios.get("{{ route('tariff.unsubscribe', ['canceled']) }}")
-                        .then(function () {
-                            window.location.reload();
-                        })
-                        .catch(function (error) {
-                            if (error.response) {
-                                toastr.error(error.response.data.message);
-                            }
+                toastr.options = {preventDuplicates: true, timeOut: 1500};
+
+                function loadTotal() {
+                    axios.request({
+                        url: '/tariff/total',
+                        method: 'POST',
+                        data: {
+                            name: $tariff.val(),
+                            period: $period.val(),
+                        },
+                    }).then(function (response) {
+                        var total = $('#total tbody');
+                        total.find('tr').remove();
+                        $.each(response.data, function (i, val) {
+                            var tr = $('<tr />');
+                            tr.append(
+                                $('<th />').addClass('text-secondary fw-normal').text(val.title),
+                                $('<td />').addClass('fw-semibold text-end').text(val.value)
+                            );
+                            total.append(tr);
                         });
+                    }).catch(function (error) {
+                        if (error.response) {
+                            toastr.error(error.response.data.message);
+                        }
+                    });
                 }
-            }).catch(function (error) {
-                if (error.response) {
-                    toastr.error(error.response.data.message);
-                }
-            });
-        });
-    </script>
 
-@endsection
+                $tariff.add($period).on('change', function () {
+                    highlightPlan($tariff.val());
+                    loadTotal();
+                });
+
+                highlightPlan($tariff.val());
+            })();
+
+            $('#unsubscribe').on('click', function () {
+                axios.request({
+                    url: @json(route('tariff.unsubscribe', ['confirm'])),
+                    method: 'GET',
+                }).then(function (response) {
+                    var msg = 'Вам будет начислено ' + response.data.prices.priceWithDiscount
+                        + ' баллов за ' + response.data.active_days
+                        + ' дней, по текущей ставке тарифа ' + response.data.prices.percent
+                        + '%. Вы уверены, что хотите отписаться от тарифа?';
+                    if (confirm(msg)) {
+                        axios.get(@json(route('tariff.unsubscribe', ['canceled'])))
+                            .then(function () {
+                                window.location.reload();
+                            })
+                            .catch(function (error) {
+                                if (error.response) {
+                                    toastr.error(error.response.data.message);
+                                }
+                            });
+                    }
+                }).catch(function (error) {
+                    if (error.response) {
+                        toastr.error(error.response.data.message);
+                    }
+                });
+            });
+        </script>
+    @endslot
+@endcomponent

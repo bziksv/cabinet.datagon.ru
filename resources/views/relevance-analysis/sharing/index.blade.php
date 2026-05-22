@@ -77,12 +77,12 @@
         <div class="card-body">
             <div class="tab-content">
                 <div class="tab-pane active" id="tab_1">
-                    <button type="button" class="btn btn-secondary mb-3" data-toggle="modal"
-                            data-target="#accessModal">
+                    <button type="button" class="btn btn-secondary mb-3" data-bs-toggle="modal"
+                            data-bs-target="#accessModal">
                         {{ __('Granting access') }}
                     </button>
-                    <button type="button" class="btn btn-secondary mb-3" data-toggle="modal"
-                            data-target="#offAccessModal">
+                    <button type="button" class="btn btn-secondary mb-3" data-bs-toggle="modal"
+                            data-bs-target="#offAccessModal">
                         {{ __('Take access rights') }}
                     </button>
 
@@ -196,7 +196,7 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="accessModalLabel">{{ __('Granting access') }}</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -226,7 +226,7 @@
                         <button class="set-access-button btn btn-secondary click_tracking" data-click="Give access">
                             {{ __('Give access') }}
                         </button>
-                        <button type="button" class="btn btn-default" data-dismiss="modal">
+                        <button type="button" class="btn btn-default" data-bs-dismiss="modal">
                             {{ __('Close') }}
                         </button>
                     </div>
@@ -240,7 +240,7 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="offAccessModalLabel">{{ __('Take access rights') }}</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -265,7 +265,7 @@
                                 data-click="Take access rights">
                             {{ __('Take access rights') }}
                         </button>
-                        <button type="button" class="btn btn-default" data-dismiss="modal">
+                        <button type="button" class="btn btn-default" data-bs-dismiss="modal">
                             {{ __('Close') }}
                         </button>
                     </div>
@@ -277,11 +277,7 @@
     @slot('js')
         <script src="{{ asset('plugins/bootstrap4-duallistbox/jquery.bootstrap-duallistbox.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-bs4/js/dataTables.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/dataTables.responsive.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-responsive/js/responsive.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/dataTables.buttons.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables-buttons/js/buttons.bootstrap4.min.js') }}"></script>
+        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables-editor/js/datatables_editor.min.js') }}"></script>
         <script>
             let words = {

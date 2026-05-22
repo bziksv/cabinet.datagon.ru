@@ -18,16 +18,6 @@ class OptimalTariff extends Tariff
         parent::__construct(new ThreeMonthsTariff());
 
         $this->name = __('Optimal');
-
-        $settings = $this->settings()->get();
-        if(array_key_exists('price', $settings)){
-            $this->setPrice($settings['price']['value']);
-        }
-    }
-
-    private function setPrice(int $price)
-    {
-        $this->price = $price;
     }
 
     /**

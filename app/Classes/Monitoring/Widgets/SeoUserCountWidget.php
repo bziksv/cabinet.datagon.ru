@@ -5,8 +5,6 @@ namespace App\Classes\Monitoring\Widgets;
 
 
 use App\Http\Controllers\MonitoringProjectUserStatusController;
-use App\User;
-use Illuminate\Support\Facades\Auth;
 
 class SeoUserCountWidget extends WidgetsAbstract
 {
@@ -19,17 +17,9 @@ class SeoUserCountWidget extends WidgetsAbstract
 
     public function generateTitle(): string
     {
-        /** @var User $user */
-        $user = Auth::user();
-        $projects = $user->monitoringProjects()->get();
-
-        $status = MonitoringProjectUserStatusController::getIdStatusByCode(MonitoringProjectUserStatusController::STATUS_SEO);
-
-        $filtered = $projects->pluck('users')->flatten()->filter(function ($val) use ($status) {
-            return $val['pivot']['status'] === $status;
-        })->unique('id');
-
-        return $filtered->count();
+        return (string) MonitoringWidgetUserCounts::countByStatus(
+            MonitoringProjectUserStatusController::STATUS_SEO
+        );
     }
 
     public function generateDesc(): string

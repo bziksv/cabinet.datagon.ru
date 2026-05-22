@@ -30,20 +30,39 @@ window.currencyFormatter = require('currency-formatter');
  * allows your team to easily build robust real-time web applications.
  */
 
-import Echo from 'laravel-echo';
+/**
+ * Заглушка Echo — страницы с .listen() не падают без websocket-сервера.
+ */
+function echoStub() {
+    const noop = () => ({ listen: () => noop });
+    return { private: noop, channel: noop, leave: () => {}, disconnect: () => {} };
+}
 
-window.Pusher = require('pusher-js');
+const echoEnabled = typeof window !== 'undefined'
+    && !window.__DISABLE_LARAVEL_ECHO__
+    && (window.__LARAVEL_ECHO_PORT__ || '').length > 0;
 
-window.Echo = new Echo({
-    broadcaster: "pusher",
-    key: "local",
-    wsHost: window.location.hostname,
-    wsPort: 443,
-    wssPort: 443,
-    forceTLS: true,
-    disableStats: true,
-    enabledTransports: ["ws", "wss"],
-});
+if (echoEnabled) {
+    const Echo = require('laravel-echo');
+
+    window.Pusher = require('pusher-js');
+
+    const port = Number(window.__LARAVEL_ECHO_PORT__);
+    const useTls = window.__LARAVEL_ECHO_TLS__ === true || window.__LARAVEL_ECHO_TLS__ === 'true';
+
+    window.Echo = new Echo({
+        broadcaster: 'pusher',
+        key: window.__LARAVEL_ECHO_KEY__ || 'local',
+        wsHost: window.location.hostname,
+        wsPort: port,
+        wssPort: port,
+        forceTLS: useTls,
+        disableStats: true,
+        enabledTransports: useTls ? ['wss'] : ['ws'],
+    });
+} else {
+    window.Echo = echoStub();
+}
 
 window.XLSX = require('xlsx-js-style');
 

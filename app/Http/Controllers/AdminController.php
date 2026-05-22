@@ -38,16 +38,14 @@ class AdminController extends Controller
         }
 
         $firstDay = new Carbon('first day of this month');
-        $projects = ProjectRelevanceHistory::with('though:id,updated_at')->get();
 
         return view('relevance-analysis.all', [
-            'projects' => $projects,
             'config' => RelevanceAnalysisConfig::first(),
             'usersJobs' => $this->userJobs(),
             'statistics' => [
                 'toDay' => RelevanceStatistics::where('date', '=', Carbon::now()->toDateString())->first(),
                 'month' => RelevanceStatistics::where('created_at', '>=', $firstDay->toDateString())->sum('count_checks'),
-                'countProjects' => count($projects),
+                'countProjects' => ProjectRelevanceHistory::count(),
                 'countSavedResults' => RelevanceHistory::count(),
                 'pages' => RelevanceUniquePages::count(),
                 'domains' => RelevanceUniqueDomains::count(),
@@ -187,7 +185,12 @@ class AdminController extends Controller
     public function getUserJobs(): JsonResponse
     {
         return response()->json([
-            'jobs' => UsersJobs::where('count_jobs', '>', 0)->with('user')->get()
+            'jobs' => UsersJobs::query()
+                ->where('count_jobs', '>', 0)
+                ->with(['user' => static function ($query) {
+                    $query->select(['id', 'name', 'last_name', 'email']);
+                }])
+                ->get(['id', 'user_id', 'count_jobs']),
         ]);
     }
 

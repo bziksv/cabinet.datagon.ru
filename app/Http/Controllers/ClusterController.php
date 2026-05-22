@@ -184,6 +184,15 @@ class ClusterController extends Controller
         ]);
 
         if (($cluster->user_id == Auth::id() || User::isUserAdmin()) && $cluster->show === 1) {
+            $compressed = isset($cluster->default_result) ? $cluster->default_result : $cluster->result;
+            $maxCompressedBytes = 40 * 1024 * 1024;
+            if ($compressed !== null && strlen($compressed) > $maxCompressedBytes) {
+                return view('cluster.too-large', [
+                    'clusterId' => $cluster->id,
+                    'countPhrases' => (int) $cluster->count_phrases,
+                    'countClusters' => (int) $cluster->count_clusters,
+                ]);
+            }
 
             $cluster->result = isset($cluster->default_result)
                 ? Common::uncompressArray($cluster->default_result, false)

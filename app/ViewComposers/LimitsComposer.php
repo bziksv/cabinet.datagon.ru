@@ -11,15 +11,24 @@ use App\ProjectTracking;
 use App\RelevanceHistory;
 use App\SearchCompetitors;
 use App\TextAnalyzer;
+use App\LinkTracking;
 use App\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class LimitsComposer
 {
     public function compose(View $view)
     {
+        // Local + удалённая БД: десятки запросов лимитов на каждую страницу → зависание serve.
+        if (app()->environment('local') || env('SKIP_HEAVY_WEB_MIDDLEWARE', false)) {
+            $view->with('limitsStatistics', []);
+
+            return;
+        }
+
         if (Auth::check()) {
             /** @var User $user */
             $user = Auth::user();
@@ -112,21 +121,21 @@ class LimitsComposer
                 ];
 
             case 'MetaTagsPages':
-                $metaTagsProjects = MetaTag::where('user_id', '=', Auth::id())->get();
-
-                $metaTagsHistoriesCount = 0;
-                foreach ($metaTagsProjects as $metaTagsProject) {
-                    $metaTagsHistoriesCount += $metaTagsProject->histories()->where('id', '>', 0)->count();
-                }
                 return [
-                    'count' => $metaTagsHistoriesCount,
-                    'position' => 8
+                    'count' => (int) DB::table('meta_tags_histories')
+                        ->whereIn('meta_tag_id', function ($query) use ($user) {
+                            $query->select('id')
+                                ->from('meta_tags')
+                                ->where('user_id', $user->id);
+                        })
+                        ->count(),
+                    'position' => 8,
                 ];
 
             case 'monitoring':
                 return [
-                    'count' => (new PositionLimit(Auth::id()))->getCounter(),
-                    'position' => 9
+                    'count' => (new PositionLimit($user))->getCounter(),
+                    'position' => 9,
                 ];
 
             case 'PasswordGenerator':
@@ -184,16 +193,15 @@ class LimitsComposer
                 ];
 
             case 'BacklinkLinks':
-                $projectTracking = ProjectTracking::where('user_id', '=', $user->id)->with('link')->get();
-
-                $projectTrackingLinks = 0;
-                foreach ($projectTracking as $item) {
-                    $projectTrackingLinks += count($item->link);
-                }
-
                 return [
-                    'count' => $projectTrackingLinks,
-                    'position' => 19
+                    'count' => (int) LinkTracking::query()
+                        ->whereIn('project_tracking_id', function ($query) use ($user) {
+                            $query->select('id')
+                                ->from('project_tracking')
+                                ->where('user_id', $user->id);
+                        })
+                        ->count(),
+                    'position' => 19,
                 ];
 
             case 'behavior':

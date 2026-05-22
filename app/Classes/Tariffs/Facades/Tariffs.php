@@ -76,24 +76,28 @@ class Tariffs
 
     public function getTariffByUser(User $user)
     {
-        if(!$user)
-            throw new ClassNotFoundException("Auth class not found!", Auth::class);
+        if (!$user) {
+            throw new ClassNotFoundException('Auth class not found!', Auth::class);
+        }
 
         app(PermissionRegistrar::class)->setPermissionsTeamId(1);
 
-        $user->unsetRelation('roles');
+        $user->loadMissing('roles');
+        $roles = $user->getRoleNames();
 
         /** @var Tariff $tariff */
-        foreach ($this->getTariffs() as $tariff){
-            if($user->hasRole($tariff->code())){
+        foreach ($this->getTariffs() as $tariff) {
+            if ($roles->contains($tariff->code())) {
                 $tariff->setUser($user);
+
                 return $tariff;
             }
         }
 
-        if($user->hasRole('Free')){
+        if ($roles->contains('Free')) {
             $free = new FreeTariff();
             $free->setUser($user);
+
             return $free;
         }
 

@@ -16,6 +16,10 @@ class LastOnline
             return $next($request);
         }
 
+        if (app()->environment('local') || env('SKIP_HEAVY_WEB_MIDDLEWARE', false)) {
+            return $next($request);
+        }
+
         $user = Auth::user();
         if ($user->last_online_at->diffInMinutes(now()) >= 10) {
             DB::table('users')

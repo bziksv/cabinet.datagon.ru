@@ -26,6 +26,10 @@ class DeleteTariffByUsers
      */
     public function handle($request, Closure $next)
     {
+        if (app()->environment('local') || env('SKIP_HEAVY_WEB_MIDDLEWARE', false)) {
+            return $next($request);
+        }
+
         $tariffs = $this->tariff->active()->where('active_to', '<', \Carbon\Carbon::now())->get();
 
         foreach ($tariffs as $tariff){

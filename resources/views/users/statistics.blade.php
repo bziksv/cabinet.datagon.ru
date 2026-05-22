@@ -1,4 +1,7 @@
 @component('component.card', ['title' =>  __('General statistics users') ])
+    @isset($limit)
+        <p class="text-muted small mb-3">Показаны топ-{{ $limit }} пользователей по суммарному времени в модулях (полный список — через <code>?limit=</code>, макс. 2000).</p>
+    @endisset
     @slot('css')
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/datatables-bs4/css/dataTables.bootstrap4.css') }}">

@@ -26,8 +26,16 @@
                 border-radius: 0;
                 position: sticky;
                 top: 15px;
-                max-height: 80vh;
+                max-height: 85vh;
                 overflow: auto;
+            }
+
+            .menu-extras-panel .card-header {
+                font-size: 0.95rem;
+            }
+
+            .menu-extras-panel code {
+                font-size: 0.8em;
             }
 
             .emptySpace {
@@ -188,6 +196,77 @@
                     {{ __('Return the standard layout') }}
                 </button>
             </div>
+
+            @php
+                $hasMenuExtras = $unpublishedModules->isNotEmpty()
+                    || $moduleExtraPages->isNotEmpty()
+                    || $outsideCatalog->isNotEmpty();
+            @endphp
+
+            @if($hasMenuExtras)
+                <div class="mt-4 menu-extras-panel">
+                    @if($unpublishedModules->isNotEmpty())
+                        <h5 class="mb-2">{{ __('Unpublished modules') }}</h5>
+                        <p class="text-muted small mb-3">
+                            {{ __('Modules hidden from regular users (show=0). You can open related pages directly.') }}
+                        </p>
+                        @foreach($unpublishedModules as $entry)
+                            @php($project = $entry['project'])
+                            <div class="card mb-2">
+                                <div class="card-header py-2">
+                                    <strong>{{ __($project->title) }}</strong>
+                                </div>
+                                <ul class="list-group list-group-flush small">
+                                    @foreach($entry['pages'] as $page)
+                                        @include('positions.partials.menu-extra-link', ['page' => $page])
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endforeach
+                    @endif
+
+                    @if($moduleExtraPages->isNotEmpty())
+                        <h5 class="mb-2 mt-4">{{ __('Module pages not in sidebar') }}</h5>
+                        <p class="text-muted small mb-3">
+                            {{ __('Published modules: extra routes from controller or subpaths (e.g. history, queue).') }}
+                        </p>
+                        @foreach($moduleExtraPages as $entry)
+                            @php($project = $entry['project'])
+                            <div class="card mb-2">
+                                <div class="card-header py-2">
+                                    <strong>{{ __($project->title) }}</strong>
+                                    <span class="text-muted small ml-1">({{ __('in menu') }})</span>
+                                </div>
+                                <ul class="list-group list-group-flush small">
+                                    @foreach($entry['pages'] as $page)
+                                        @include('positions.partials.menu-extra-link', ['page' => $page])
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endforeach
+                    @endif
+
+                    @if($outsideCatalog->isNotEmpty())
+                        <h5 class="mb-2 mt-4">{{ __('Not in module catalog') }}</h5>
+                        <p class="text-muted small mb-3">
+                            {{ __('No entry in main_projects: header links, admin tools, subpages without catalog binding.') }}
+                        </p>
+                        @foreach($outsideCatalog as $group)
+                            <div class="card mb-2">
+                                <div class="card-header py-2">
+                                    <strong>{{ $group['label'] }}</strong>
+                                    <span class="text-muted small">({{ count($group['pages']) }})</span>
+                                </div>
+                                <ul class="list-group list-group-flush small">
+                                    @foreach($group['pages'] as $page)
+                                        @include('positions.partials.menu-extra-link', ['page' => $page])
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endforeach
+                    @endif
+                </div>
+            @endif
         </div>
     </div>
 

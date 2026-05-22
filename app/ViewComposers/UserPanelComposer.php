@@ -15,6 +15,16 @@ class UserPanelComposer
             /** @var User $user */
             $user = Auth::user();
 
+            if (cabinet_skip_heavy_web()) {
+                $view->with([
+                    'user' => $user,
+                    'name' => null,
+                    'tariffs' => [],
+                ]);
+
+                return;
+            }
+
             $tariff = $user->tariff();
             $name = ($tariff) ? $tariff->name() : null;
 

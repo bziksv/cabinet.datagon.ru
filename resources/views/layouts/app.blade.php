@@ -2,6 +2,7 @@
     <!DOCTYPE html>
 <html lang="en">
 <head>
+    @if(config('app.env') !== 'local')
     <!-- Google Tag Manager -->
     <script>(function (w, d, s, l, i) {
             w[l] = w[l] || [];
@@ -17,6 +18,7 @@
             f.parentNode.insertBefore(j, f);
         })(window, document, 'script', 'dataLayer', 'GTM-PS4GF7H');</script>
     <!-- End Google Tag Manager -->
+    @endif
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
@@ -49,20 +51,21 @@
             width: 1rem !important;
         }
 
-        .main-sidebar.sidebar-dark-primary.elevation-4:hover .module-name {
-            display: inline !important;
-        }
     </style>
     <link rel="stylesheet" href="{{ asset('css/custom.css') }}">
+    {{-- jQuery в head: sidebar/menu-right и др. inline-скрипты в body иначе падают с "$ is not defined" --}}
+    <script src="{{ asset('plugins/jquery/jquery.min.js') }}"></script>
 </head>
 
-<body class="hold-transition sidebar-mini">
+<body class="@if(config('app.env') === 'local')sidebar-mini @else hold-transition sidebar-mini @endif">
+@if(config('app.env') !== 'local')
 <!-- Google Tag Manager (noscript) -->
 <noscript>
     <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PS4GF7H"
             height="0" width="0" style="display:none;visibility:hidden"></iframe>
 </noscript>
 <!-- End Google Tag Manager (noscript) -->
+@endif
 <div class="wrapper">
     <nav class="main-header navbar navbar-expand navbar-white navbar-light" id="header-nav-bar">
         @include('navigation.menu')
@@ -81,8 +84,9 @@
         </ul>
     </nav>
     <aside class="main-sidebar sidebar-dark-primary elevation-4">
-        <a href="{{ route('home') }}" class="brand-link">
-            <img src="/img/logo.svg" alt="RedBox" class="brand-image">
+        <a href="{{ route('home') }}" class="brand-link cabinet-brand">
+            <img src="{{ asset('img/logo-icon.svg') }}" alt="" class="brand-image cabinet-brand__icon">
+            <span class="brand-text">Датагон</span>
         </a>
         <div class="sidebar">
             @auth
@@ -106,17 +110,12 @@
     <!-- /.content-wrapper -->
     <!-- Main Footer -->
     <footer class="main-footer" id="main-footer">
-        <strong>Copyright &copy; 2021-{{ date('Y') }} <a href="https://redbox.su/">redbox.su</a>.</strong>
-        All rights reserved.
+        <strong>&copy; 2021&ndash;{{ date('Y') }} <a href="https://datagon.ru/">Датагон</a>. Все права защищены.</strong>
     </footer>
 </div>
 <!-- ./wrapper -->
 
 <!-- REQUIRED SCRIPTS -->
-
-<!-- jQuery -->
-{{--  connect in views/navigation/menu-right.blade.php  --}}
-{{--<script src="{{ asset('plugins/jquery/jquery.min.js') }}"></script>--}}
 <!-- Bootstrap -->
 <script src="{{ asset('plugins/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 
@@ -179,12 +178,27 @@
 
 <!-- app -->
 @unless(request()->path() == 'utm-marks' || request()->path() == 'all-projects')
-    <script src="{{ mix('js/app.js') }}"></script>
+    @if(config('app.env') === 'local')
+        <script>window.__DISABLE_LARAVEL_ECHO__ = true;</script>
+        <script src="{{ asset('js/echo-disable-pre.js') }}"></script>
+    @else
+        <script>
+            window.__LARAVEL_ECHO_KEY__ = @json(config('broadcasting.connections.pusher.key'));
+            window.__LARAVEL_ECHO_PORT__ = @json(env('LARAVEL_WEBSOCKETS_PORT', 6001));
+            window.__LARAVEL_ECHO_TLS__ = @json(filter_var(env('PUSHER_APP_TLS', true), FILTER_VALIDATE_BOOLEAN));
+        </script>
+    @endif
+    @if(config('app.env') === 'local')
+        <script src="{{ asset('js/app.js') }}?v=no-ws-{{ @filemtime(public_path('js/app.js')) }}"></script>
+    @else
+        <script src="{{ mix('js/app.js') }}"></script>
+    @endif
 @endunless
 <!-- AdminLTE -->
 <script src="{{ asset('js/adminlte.js') }}"></script>
+@include('partials.cabinet-layout-scripts')
 
-@if(\App\User::find(Auth::id())['statistic'])
+@if(optional(Auth::user())->statistic && ! cabinet_skip_heavy_web())
     <script>
         let secondsTrackingRedbox = 0;
         let timeTrackingRedboxInterval
@@ -234,8 +248,9 @@
 <!-- OPTIONAL SCRIPTS -->
 {{--<script src="{{ asset('plugins/chart.js/Chart.min.js') }}"></script>--}}
 
-<!-- AdminLTE for demo purposes -->
+@if(config('app.env') !== 'local')
 <script src="{{ asset('js/demo.js') }}"></script>
+@endif
 @yield('js')
 
 <span class="click_tracking another_action"></span>

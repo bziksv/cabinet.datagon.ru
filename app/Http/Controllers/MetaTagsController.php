@@ -178,7 +178,25 @@ class MetaTagsController extends Controller
 
     public function index()
     {
-        $meta = Auth::user()->metaTags()->latest()->get();
+        $meta = Auth::user()->metaTags()
+            ->latest()
+            ->get([
+                'id',
+                'user_id',
+                'status',
+                'name',
+                'period',
+                'links',
+                'timeout',
+                'title_min',
+                'title_max',
+                'description_min',
+                'description_max',
+                'keywords_min',
+                'keywords_max',
+                'created_at',
+                'updated_at',
+            ]);
 
         $lang = $this->lang();
 
@@ -427,25 +445,48 @@ class MetaTagsController extends Controller
     public function showHistory($id)
     {
 
-        $history = MetaTagsHistory::findOrFail($id);
+        $history = MetaTagsHistory::query()
+            ->select(['id', 'meta_tag_id', 'quantity', 'created_at'])
+            ->with(['project:id,user_id,name'])
+            ->findOrFail($id);
 
-        if ($history->project->user_id != Auth::id())
+        if ($history->project->user_id != Auth::id()) {
             throw new ErrorException('User not valid');
+        }
 
         $project = $history->project;
-        $data = collect(json_decode($history->data));
-
+        $historyId = (int) $history->id;
         $lang = $this->lang();
 
-        return view('meta-tags.history', compact('data', 'project', 'lang'));
+        return view('meta-tags.history', compact('project', 'lang', 'historyId'));
+    }
+
+    /**
+     * JSON истории мета-тегов (не встраивать data в HTML — может быть >2 MB).
+     */
+    public function historyData($id)
+    {
+        $history = MetaTagsHistory::query()
+            ->with(['project:id,user_id,name'])
+            ->findOrFail($id);
+
+        if ($history->project->user_id != Auth::id()) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        return response()->json(json_decode($history->data, true) ?? []);
     }
 
     public function showHistoryCompare($id, $id_compare)
     {
         $response = [];
 
-        $history = MetaTagsHistory::findOrFail($id);
-        $history_compare = MetaTagsHistory::findOrFail($id_compare);
+        $history = MetaTagsHistory::query()
+            ->with(['project:id,user_id,name'])
+            ->findOrFail($id);
+        $history_compare = MetaTagsHistory::query()
+            ->with(['project:id,user_id,name'])
+            ->findOrFail($id_compare);
 
         if ($history->project->user_id != Auth::id() || $history_compare->project->user_id != Auth::id())
             throw new ErrorException('User not valid');
@@ -588,7 +629,9 @@ class MetaTagsController extends Controller
 
     public function destroyHistory($id)
     {
-        $history = MetaTagsHistory::findOrFail($id);
+        $history = MetaTagsHistory::query()
+            ->with(['project:id,user_id,name'])
+            ->findOrFail($id);
 
         if ($history->project->user_id != Auth::id())
             throw new ErrorException('User not valid');

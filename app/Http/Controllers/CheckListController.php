@@ -35,10 +35,17 @@ class CheckListController extends Controller
 
     public function tasks(Checklist $checklist)
     {
-        $host = parse_url($checklist->url)['host'];
+        $checklist->load([
+            'labels',
+            'tasks' => function ($query) {
+                $query->select('id', 'project_id', 'status', 'active_after');
+            },
+        ]);
+
+        $host = parse_url($checklist->url, PHP_URL_HOST) ?: $checklist->url;
         $labels = $checklist->labels->toArray();
-        $checklist = $this->confirmArray([$checklist]);
-        $allLabels = CheckListsLabels::where('user_id', Auth::id())->get()->toArray();
+        $checklist = $this->confirmArray([$checklist->toArray()]);
+        $allLabels = CheckListsLabels::where('user_id', Auth::id())->get(['id', 'name', 'color'])->toArray();
 
         return view('checklist.tasks', compact('checklist', 'host', 'labels', 'allLabels'));
     }
@@ -222,22 +229,45 @@ class CheckListController extends Controller
             $sql->where('url', 'like', "%$request->url%");
         }
 
+        $countOnPage = (int) $request->input('countOnPage', 3) ?: 3;
+        $total = (clone $sql)->count();
+
         $lists = $sql->skip($request->input('skip', 0))
-            ->take($request->input('countOnPage', 3))
+            ->take($countOnPage)
             ->with('tasks:project_id,status,active_after')
             ->with('labels')
             ->get(['icon', 'url', 'id'])
             ->toArray();
 
-        $user = Auth::user();
-        foreach ($lists as $key => $list) {
-            $project = $user->monitoringProjects()->where('url', parse_url($list['url'])['host'])->first();
-            if ($project) {
-                $lists[$key]['statistics'] = MonitoringDataTableColumnsProject::find($project->id);
+        $hosts = [];
+        foreach ($lists as $list) {
+            $host = parse_url($list['url'], PHP_URL_HOST);
+            if ($host) {
+                $hosts[] = $host;
             }
         }
 
-        $paginate = (int)ceil($sql->count() / $request->countOnPage);
+        if ($hosts !== []) {
+            $monitoringByHost = Auth::user()->monitoringProjects()
+                ->whereIn('url', array_unique($hosts))
+                ->get(['id', 'url'])
+                ->keyBy('url');
+
+            $statsByProjectId = MonitoringDataTableColumnsProject::query()
+                ->whereIn('monitoring_project_id', $monitoringByHost->pluck('id'))
+                ->get()
+                ->keyBy('monitoring_project_id');
+
+            foreach ($lists as $key => $list) {
+                $host = parse_url($list['url'], PHP_URL_HOST);
+                $monitoring = $host ? $monitoringByHost->get($host) : null;
+                if ($monitoring && $statsByProjectId->has($monitoring->id)) {
+                    $lists[$key]['statistics'] = $statsByProjectId->get($monitoring->id);
+                }
+            }
+        }
+
+        $paginate = (int) ceil($total / $countOnPage);
 
         return response()->json([
             'lists' => $this->confirmArray($lists),
@@ -247,71 +277,67 @@ class CheckListController extends Controller
 
     public function getChecklistsKanban(Request $request): JsonResponse
     {
-        $ids = Checklist::where('user_id', Auth::id())->pluck('id');
+        $projectIds = Checklist::where('user_id', Auth::id())
+            ->where('archive', 0)
+            ->pluck('id');
 
-        $tasks = ChecklistTasks::where('status', '!=', 'ready')
-            ->where('status', '!=', 'repeat')
-            ->whereIn('project_id', $ids)
-            ->whereHas('project', function ($query) {
-                $query->where('archive', 0);
-            })
-            ->with('project')
+        if ($projectIds->isEmpty()) {
+            return response()->json($this->emptyKanbanPayload());
+        }
+
+        $allTasks = ChecklistTasks::whereIn('project_id', $projectIds)
+            ->with(['project:id,url,icon,user_id,archive'])
             ->orderBy('id', 'desc')
             ->get();
 
-        $expired = ChecklistTasks::where('status', 'expired')
-            ->whereIn('project_id', $ids)
-            ->whereHas('project', function ($query) {
-                $query->where('archive', 0);
-            })
-            ->with('project')->get();
+        $notReadyOrRepeat = static function (ChecklistTasks $task): bool {
+            return !in_array($task->status, ['ready', 'repeat'], true);
+        };
 
-        $toDayTasks = ChecklistTasks::where('status', '!=', 'ready')
-            ->where('status', '!=', 'repeat')
-            ->where('status', '!=', 'expired')
-            ->whereIn('project_id', $ids)
-            ->where('deadline', 'like', "%" . Carbon::now()->toDateString() . "%")
-            ->whereHas('project', function ($query) {
-                $query->where('archive', 0);
-            })->with('project')
-            ->orderBy('id', 'desc')
-            ->get();
+        $activeForDayBuckets = static function (ChecklistTasks $task): bool {
+            return !in_array($task->status, ['ready', 'repeat', 'expired'], true);
+        };
 
-        $tomorrowTasks = ChecklistTasks::where('status', '!=', 'ready')
-            ->where('status', '!=', 'repeat')
-            ->where('status', '!=', 'expired')
-            ->whereIn('project_id', $ids)
-            ->where('deadline', 'like', "%" . Carbon::now()->addDay()->toDateString() . "%")
-            ->whereHas('project', function ($query) {
-                $query->where('archive', 0);
-            })->with('project')
-            ->orderBy('id', 'desc')
-            ->get();
+        $dateContains = static function ($value, string $needle): bool {
+            if ($value === null || $value === '') {
+                return false;
+            }
 
-        $today = $todayDate = Carbon::now();
-        $tomorrowDate = $todayDate->addDay()->format('d.m.Y');
+            return strpos((string) $value, $needle) !== false;
+        };
 
+        $todayStr = Carbon::now()->toDateString();
+        $tomorrowStr = Carbon::now()->copy()->addDay()->toDateString();
+
+        $tasks = $allTasks->filter($notReadyOrRepeat)->values();
+        $expired = $allTasks->where('status', 'expired')->values();
+
+        $toDayTasks = $allTasks->filter(function (ChecklistTasks $task) use ($activeForDayBuckets, $todayStr, $dateContains) {
+            return $activeForDayBuckets($task) && $dateContains($task->deadline, $todayStr);
+        })->values();
+
+        $tomorrowTasks = $allTasks->filter(function (ChecklistTasks $task) use ($activeForDayBuckets, $tomorrowStr, $dateContains) {
+            return $activeForDayBuckets($task) && $dateContains($task->deadline, $tomorrowStr);
+        })->values();
+
+        $today = Carbon::now();
+        $tomorrowDate = Carbon::now()->copy()->addDay()->format('d.m.Y');
         $dayOfWeek = strtolower($today->englishDayOfWeek);
         $nextDays = [];
 
         for ($i = 1; $i <= 7; $i++) {
             $nextDay = $today->copy()->next($dayOfWeek);
-            $nextDays[$dayOfWeek] = ChecklistTasks::where('status', '!=', 'ready')
-                ->where('status', '!=', 'repeat')
-                ->where('status', '!=', 'expired')
-                ->whereIn('project_id', $ids)
-                ->where('deadline', 'like', "%{$nextDay->toDateString()}%")
-                ->orWhere('date_start', 'like', "%{$nextDay->toDateString()}%")
-                ->whereHas('project', function ($query) {
-                    $query->where('archive', 0);
-                })
-                ->with('project')
-                ->orderBy('id', 'desc')
-                ->get();
+            $dayKey = strtolower($nextDay->englishDayOfWeek);
+            $dayStr = $nextDay->toDateString();
 
-            $nextDays[$dayOfWeek . 'Date'] = $nextDay->format('d.m.Y');
+            $nextDays[$dayKey] = $allTasks->filter(function (ChecklistTasks $task) use ($activeForDayBuckets, $dayStr, $dateContains) {
+                return $activeForDayBuckets($task)
+                    && ($dateContains($task->deadline, $dayStr) || $dateContains($task->date_start, $dayStr));
+            })->values();
 
-            $dayOfWeek = strtolower($nextDay->addDay()->englishDayOfWeek);
+            $nextDays[$dayKey . 'Date'] = $nextDay->format('d.m.Y');
+
+            $dayOfWeek = strtolower($nextDay->copy()->addDay()->englishDayOfWeek);
         }
 
         return response()->json([
@@ -321,22 +347,52 @@ class CheckListController extends Controller
             'todayDate' => Carbon::now()->format('d.m.Y'),
             'tomorrow' => $tomorrowTasks,
             'tomorrowDate' => $tomorrowDate,
-            'monday' => $nextDays['monday'],
-            'mondayDate' => $nextDays['mondayDate'],
-            'mondayDateDate' => $nextDays['mondayDate'],
-            'tuesday' => $nextDays['tuesday'],
-            'tuesdayDate' => $nextDays['tuesdayDate'],
-            'wednesday' => $nextDays['wednesday'],
-            'wednesdayDate' => $nextDays['wednesdayDate'],
-            'thursday' => $nextDays['thursday'],
-            'thursdayDate' => $nextDays['thursdayDate'],
-            'friday' => $nextDays['friday'],
-            'fridayDate' => $nextDays['fridayDate'],
-            'saturday' => $nextDays['saturday'],
-            'saturdayDate' => $nextDays['saturdayDate'],
-            'sunday' => $nextDays['sunday'],
-            'sundayDate' => $nextDays['sundayDate'],
+            'monday' => $nextDays['monday'] ?? collect(),
+            'mondayDate' => $nextDays['mondayDate'] ?? '',
+            'mondayDateDate' => $nextDays['mondayDate'] ?? '',
+            'tuesday' => $nextDays['tuesday'] ?? collect(),
+            'tuesdayDate' => $nextDays['tuesdayDate'] ?? '',
+            'wednesday' => $nextDays['wednesday'] ?? collect(),
+            'wednesdayDate' => $nextDays['wednesdayDate'] ?? '',
+            'thursday' => $nextDays['thursday'] ?? collect(),
+            'thursdayDate' => $nextDays['thursdayDate'] ?? '',
+            'friday' => $nextDays['friday'] ?? collect(),
+            'fridayDate' => $nextDays['fridayDate'] ?? '',
+            'saturday' => $nextDays['saturday'] ?? collect(),
+            'saturdayDate' => $nextDays['saturdayDate'] ?? '',
+            'sunday' => $nextDays['sunday'] ?? collect(),
+            'sundayDate' => $nextDays['sundayDate'] ?? '',
         ]);
+    }
+
+    private function emptyKanbanPayload(): array
+    {
+        $todayDate = Carbon::now()->format('d.m.Y');
+        $tomorrowDate = Carbon::now()->copy()->addDay()->format('d.m.Y');
+
+        return [
+            'tasks' => [],
+            'expired' => [],
+            'toDay' => [],
+            'todayDate' => $todayDate,
+            'tomorrow' => [],
+            'tomorrowDate' => $tomorrowDate,
+            'monday' => [],
+            'mondayDate' => '',
+            'mondayDateDate' => '',
+            'tuesday' => [],
+            'tuesdayDate' => '',
+            'wednesday' => [],
+            'wednesdayDate' => '',
+            'thursday' => [],
+            'thursdayDate' => '',
+            'friday' => [],
+            'fridayDate' => '',
+            'saturday' => [],
+            'saturdayDate' => '',
+            'sunday' => [],
+            'sundayDate' => '',
+        ];
     }
 
     public function saveChecklistsKanban(Request $request): JsonResponse
@@ -503,14 +559,19 @@ class CheckListController extends Controller
 
     public function getTasks(Request $request): array
     {
-        $sql = ChecklistTasks::where('project_id', $request->input('id'));
+        $projectId = (int) $request->input('id');
+        $perPage = (int) $request->input('count', 3) ?: 3;
+        $skip = (int) $request->input('skip', 0);
+        $hasSearch = isset($request->search) && $request->search !== '';
+
+        $sql = ChecklistTasks::where('project_id', $projectId);
 
         if ($request->sort === 'deactivated') {
             $sql->whereDate('active_after', '<=', Carbon::now());
         }
 
-        if (isset($request->search)) {
-            $sql->where('name', 'like', "%$request->search%");
+        if ($hasSearch) {
+            $sql->where('name', 'like', '%' . $request->search . '%');
         }
 
         if ($request->sort === 'new-sort') {
@@ -521,22 +582,34 @@ class CheckListController extends Controller
             $sql->where('status', $request->sort);
         }
 
-        $tasks = $sql->get()->toArray();
+        $checklistModel = Checklist::where('id', $projectId)
+            ->where('user_id', Auth::id())
+            ->first(['id', 'icon', 'url']);
 
-        if (empty($request->search)) {
-            $tasks = $this->buildTaskStructure($tasks);
+        if ($checklistModel === null) {
+            return [
+                'checklist' => [],
+                'tasks' => [],
+                'paginate' => 0,
+            ];
         }
 
-        $paginate = (int)ceil(
-            $sql->where('subtask', 0)->count() / $request->count
+        if ($hasSearch) {
+            $paginate = (int) ceil((clone $sql)->count() / $perPage);
+            $tasks = $sql->skip($skip)->take($perPage)->get()->toArray();
+        } else {
+            [$tasks, $paginate] = $this->paginatedTaskTree($sql, $projectId, $skip, $perPage);
+        }
+
+        $checklistPayload = array_merge(
+            $checklistModel->toArray(),
+            $this->checklistTaskStats($projectId)
         );
 
         return [
-            'checklist' => $this->confirmArray([
-                Checklist::where('id', $request->id)->where('user_id', Auth::id())->with('tasks')->first()
-            ]),
-            'tasks' => array_slice($tasks, $request->input('skip', 0), $request->input('count', 3)),
-            'paginate' => $paginate
+            'checklist' => [$checklistPayload],
+            'tasks' => $tasks,
+            'paginate' => $paginate,
         ];
     }
 
@@ -966,6 +1039,10 @@ class CheckListController extends Controller
     private function confirmArray($lists): array
     {
         foreach ($lists as $key => $list) {
+            if (isset($list['tasks_total'])) {
+                continue;
+            }
+
             $deactivated = 0;
             $expired = 0;
             $repeat = 0;
@@ -973,7 +1050,7 @@ class CheckListController extends Controller
             $ready = 0;
             $new = 0;
 
-            foreach ($list['tasks'] as $task) {
+            foreach ($list['tasks'] ?? [] as $task) {
                 if ($task['status'] === 'in_work') {
                     $inWork++;
                 } else if ($task['status'] === 'ready') {
@@ -995,9 +1072,59 @@ class CheckListController extends Controller
             $lists[$key]['ready'] = $ready;
             $lists[$key]['work'] = $inWork;
             $lists[$key]['new'] = $new;
+            $lists[$key]['tasks_total'] = count($list['tasks'] ?? []);
         }
 
         return $lists;
+    }
+
+    private function checklistTaskStats(int $projectId): array
+    {
+        $counts = ChecklistTasks::where('project_id', $projectId)
+            ->selectRaw('status, COUNT(*) as cnt')
+            ->groupBy('status')
+            ->pluck('cnt', 'status');
+
+        return [
+            'inactive' => (int) ($counts['deactivated'] ?? 0),
+            'expired' => (int) ($counts['expired'] ?? 0),
+            'repeat' => (int) ($counts['repeat'] ?? 0),
+            'ready' => (int) ($counts['ready'] ?? 0),
+            'work' => (int) ($counts['in_work'] ?? 0),
+            'new' => (int) ($counts['new'] ?? 0),
+            'tasks_total' => (int) $counts->sum(),
+        ];
+    }
+
+    private function paginatedTaskTree($baseQuery, int $projectId, int $skip, int $perPage): array
+    {
+        $rootQuery = (clone $baseQuery)->where('subtask', 0);
+        $paginate = (int) ceil((clone $rootQuery)->count() / $perPage);
+
+        $roots = (clone $rootQuery)->skip($skip)->take($perPage)->get()->toArray();
+
+        if ($roots === []) {
+            return [[], $paginate];
+        }
+
+        $flat = $roots;
+        $parentIds = array_column($roots, 'id');
+
+        while ($parentIds !== []) {
+            $children = ChecklistTasks::where('project_id', $projectId)
+                ->whereIn('task_id', $parentIds)
+                ->get()
+                ->toArray();
+
+            if ($children === []) {
+                break;
+            }
+
+            $flat = array_merge($flat, $children);
+            $parentIds = array_column($children, 'id');
+        }
+
+        return [$this->buildTaskStructure($flat), $paginate];
     }
 
     private function buildTaskStructure($tasks, $parentId = null): array

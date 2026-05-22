@@ -35,7 +35,7 @@
 
     @endslot
 
-    <meta-tags-history :history="{{ $data }}" :lang="{{ $lang }}"></meta-tags-history>
+    <meta-tags-history :history-id="{{ $historyId }}" :lang='@json($lang)'></meta-tags-history>
 
     @slot('js')
         <!-- Toastr -->

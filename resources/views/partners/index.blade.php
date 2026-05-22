@@ -44,7 +44,7 @@
                 <h2 class="text-muted w-100 text-center">{{ $elem['name_'. $lang] }}</h2>
                 @foreach($elem['items'] as $item)
                     <div class="card @if(count($elem['items']) > 1) mr-3 @endif" style="width: 20rem;">
-                        <img class="card-img-top" src="storage/{{ $item['image'] }}" alt="image">
+                        <img class="card-img-top" src="{{ cabinet_storage_url($item['image']) }}" alt="{{ $item['name_'. $lang] }}">
                         <div class="card-footer d-flex flex-column h-100">
                             <div class="h-100 d-flex flex-column">
                                 <div class="d-flex flex-column justify-content-start">

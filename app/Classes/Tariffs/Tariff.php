@@ -14,6 +14,7 @@ abstract class Tariff
     protected $price = 0;
     protected $period;
     protected $user = null;
+    protected $priceBootstrapped = false;
 
     public function __construct(Period $period)
     {
@@ -43,7 +44,26 @@ abstract class Tariff
 
     public function priceForDay()
     {
+        $this->bootstrapPriceFromSettings();
+
         return $this->price;
+    }
+
+    /**
+     * Раньше вызывалось в __construct() каждого тарифа → 3× N+1 к tariff_settings на любой странице.
+     */
+    protected function bootstrapPriceFromSettings(): void
+    {
+        if ($this->priceBootstrapped) {
+            return;
+        }
+
+        $settings = $this->settings()->get();
+        if (array_key_exists('price', $settings)) {
+            $this->price = (int) $settings['price']['value'];
+        }
+
+        $this->priceBootstrapped = true;
     }
 
     abstract protected function settings(): Settings;

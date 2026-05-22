@@ -31,7 +31,7 @@ class AiController extends Controller
         if (!$isAllHistory) {
             $query->where('user_id', Auth::id());
         } else {
-            $query->with('user');
+            $query->with(['user:id,name,email']);
         }
 
         if ($searchValue = $request->input('search.value')) {
@@ -44,15 +44,17 @@ class AiController extends Controller
             });
         }
 
-        $totalData = $query->count();
-        
-        $limit = $request->input('length');
-        $start = $request->input('start');
-        
-        $items = $query->orderBy('created_at', 'desc')
-                    ->offset($start)
-                    ->limit($limit)
-                    ->get();
+        $recordsTotal = (clone $query)->count();
+        $recordsFiltered = $recordsTotal;
+
+        $limit = (int) $request->input('length', 10);
+        $start = (int) $request->input('start', 0);
+
+        $items = (clone $query)
+            ->orderBy('created_at', 'desc')
+            ->offset($start)
+            ->limit($limit)
+            ->get(['id', 'user_id', 'used_tokens', 'status', 'prompt', 'result', 'parrameters', 'created_at']);
 
         $data = $items->map(function($item) use ($isAllHistory) {
             return [
@@ -76,8 +78,8 @@ class AiController extends Controller
 
         return response()->json([
             "draw"            => intval($request->input('draw')),
-            "recordsTotal"    => $totalData,
-            "recordsFiltered" => $totalData,
+            "recordsTotal"    => $recordsTotal,
+            "recordsFiltered" => $recordsFiltered,
             "data"            => $data
         ]);
     }

@@ -53,10 +53,34 @@ class UsersController extends Controller
         if ($request->ajax())
             return $this->getDataTable($request);
 
-        $users = User::all();
         $tariffSelect = $this->tariffSelectData();
 
-        return view('users.index', compact('users', 'tariffSelect'));
+        return view('users.index', compact('tariffSelect'));
+    }
+
+    /**
+     * Select2 AJAX: поиск email для модалки «Назначить тариф» (мин. 2 символа).
+     */
+    public function searchEmails(Request $request): JsonResponse
+    {
+        $q = trim((string) $request->get('q', ''));
+        if (strlen($q) < 2) {
+            return response()->json(['results' => []]);
+        }
+
+        $users = User::query()
+            ->select(['id', 'email'])
+            ->without(['pay', 'roles'])
+            ->where('email', 'like', $q . '%')
+            ->orderBy('email')
+            ->limit(30)
+            ->get();
+
+        return response()->json([
+            'results' => $users->map(static function (User $user) {
+                return ['id' => $user->id, 'text' => $user->email];
+            })->values(),
+        ]);
     }
 
     protected function getDataTable(Request $request)
@@ -67,24 +91,27 @@ class UsersController extends Controller
         $length = $request->get('length');
         $page = ($length) ? ($start / $length) + 1 : false;
 
-        $user = new User();
+        $query = User::query()->without(['pay', 'roles']);
 
         $search = $request->get('search');
-        if ($search = $search['value'])
-            $user = $user->where('email', 'like', $search . '%');
+        if ($search = $search['value']) {
+            $query->where('email', 'like', $search . '%');
+        }
 
         if ($order = Arr::first($request->get('order'))) {
             $columns = $request->get('columns');
-            $user = $user->orderBy($columns[$order['column']]['name'], $order['dir']);
+            $query->orderBy($columns[$order['column']]['name'], $order['dir']);
         }
 
-        $users = $user->paginate($length, ['*'], 'page', $page);
+        $users = $query->with(['pay' => function ($payQuery) {
+            $payQuery->where('status', true);
+        }])->paginate($length, ['*'], 'page', $page);
 
         $users->transform(function ($user) {
 
             // Tariff
             $user->tariff = collect([]);
-            if ($pay = $user->pay->where('status', true)->first()) {
+            if ($pay = $user->pay->first()) {
                 $user->tariff->put('name', $user->tariff()->name());
                 $user->tariff->put('active_to', $pay->active_to->format('d.m.Y H:i'));
                 $user->tariff->put('active_to_diffForHumans', $pay->active_to->diffForHumans());
@@ -453,43 +480,42 @@ class UsersController extends Controller
         if (!User::isUserAdmin()) {
             return abort(403);
         }
-        $users = User::where('statistic', 1)->with('roles')->get(['id', 'name', 'last_name', 'email', 'metrics']);
-        $usersIds = $users->pluck('id')->toArray();
-        $users = $users->groupBy('id')->toArray();
-        $statistics = VisitStatistic::whereIn('user_id', $usersIds)->get()->groupBy('user_id');
+        $limit = min(max((int) request('limit', 500), 50), 2000);
+
+        $aggregated = VisitStatistic::query()
+            ->selectRaw('user_id, SUM(actions_counter) as actions_counter, SUM(refresh_page_counter) as refresh_page_counter, SUM(seconds) as seconds')
+            ->groupBy('user_id')
+            ->orderByRaw('SUM(seconds) DESC')
+            ->limit($limit)
+            ->get()
+            ->keyBy('user_id');
+
+        $users = User::whereIn('id', $aggregated->keys())
+            ->with('roles:id,name')
+            ->get(['id', 'name', 'last_name', 'email', 'metrics']);
+
         $results = [];
 
-        foreach ($statistics as $userId => $statistic) {
-            foreach ($statistic as $info) {
-                if (isset($results[$userId]['stat']['actions_counter'])) {
-                    $results[$userId]['stat']['actions_counter'] += $info['actions_counter'];
-                } else {
-                    $results[$userId]['stat']['actions_counter'] = $info['actions_counter'];
-                }
-
-                if (isset($results[$userId]['stat']['refresh_page_counter'])) {
-                    $results[$userId]['stat']['refresh_page_counter'] += $info['refresh_page_counter'];
-                } else {
-                    $results[$userId]['stat']['refresh_page_counter'] = $info['refresh_page_counter'];
-                }
-
-                if (isset($results[$userId]['stat']['seconds'])) {
-                    $results[$userId]['stat']['seconds'] += $info['seconds'];
-                } else {
-                    $results[$userId]['stat']['seconds'] = $info['seconds'];
-                }
-
-                if (empty($results[$userId]['userInfo'])) {
-                    $results[$userId]['userInfo'] = $info['user']->toArray();
-                }
-
-                if (empty($results[$userId]['userInfo']['tariff'])) {
-                    $results[$userId]['userInfo']['tariff'] = self::getRoles($users[$userId][0]['roles']);
-                }
-            }
+        foreach ($users as $user) {
+            $stat = $aggregated->get($user->id);
+            $results[$user->id] = [
+                'stat' => [
+                    'actions_counter' => (int) $stat->actions_counter,
+                    'refresh_page_counter' => (int) $stat->refresh_page_counter,
+                    'seconds' => (int) $stat->seconds,
+                ],
+                'userInfo' => array_merge(
+                    $user->only(['id', 'name', 'last_name', 'email', 'metrics']),
+                    ['tariff' => self::getRoles($user->roles->toArray())]
+                ),
+            ];
         }
 
-        return view('users.statistics', compact('results'));
+        uasort($results, static function (array $a, array $b) {
+            return $b['stat']['seconds'] <=> $a['stat']['seconds'];
+        });
+
+        return view('users.statistics', compact('results', 'limit'));
     }
 
     public static function getRoles(array $array): array

@@ -20,8 +20,8 @@ class ManageAccessController extends Controller
      */
     public function index()
     {
-        $roles = Role::all();
-        $permissions = Permission::all();
+        $roles = Role::with('permissions')->orderBy('name')->get();
+        $permissions = Permission::orderBy('name')->get();
 
         return view('manage-access.index', compact('roles', 'permissions'));
     }

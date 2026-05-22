@@ -40,6 +40,33 @@ class HistoryRelevanceController extends Controller
         ]);
     }
 
+    /**
+     * Eager load для списка проектов (без longText result — иначе OOM на DataTables).
+     *
+     * @return array
+     */
+    private function historyListRelations(): array
+    {
+        return [
+            'relevanceTags',
+            'story' => function ($query) {
+                $query->select('id', 'project_relevance_history_id', 'last_check');
+            },
+            'though' => function ($query) {
+                $query->select([
+                    'id',
+                    'project_relevance_history_id',
+                    'state',
+                    'stage',
+                    'though_words',
+                    'word_worms',
+                    'created_at',
+                    'updated_at',
+                ]);
+            },
+        ];
+    }
+
     private function prepareData($records, $totalRecords, $request, $owner = false)
     {
         $aaData = [];
@@ -87,15 +114,21 @@ class HistoryRelevanceController extends Controller
         $columnName = $request->input('columns.' . $columnIndex . '.name');
         $search = $request->input('search.value');
 
-        $totalRecords = ProjectRelevanceHistory::where('name', 'like', "%$search%")->count();
+        $query = ProjectRelevanceHistory::query();
 
-        $records = ProjectRelevanceHistory::orderBy($columnName, $columnSortOrder)
-            ->with('user')
-            ->whereHas('user', function ($query) use ($search) {
-                $query->where('email', 'like', "%$search%");
-            })
-            ->orWhere('name', 'like', "%$search%")
-            ->with(['relevanceTags', 'though'])
+        if ($search !== null && $search !== '') {
+            $query->where(function ($builder) use ($search) {
+                $builder->where('name', 'like', '%' . $search . '%')
+                    ->orWhereHas('user', function ($userQuery) use ($search) {
+                        $userQuery->where('email', 'like', '%' . $search . '%');
+                    });
+            });
+        }
+
+        $totalRecords = (clone $query)->count();
+
+        $records = $query->orderBy($columnName, $columnSortOrder)
+            ->with(array_merge(['user:id,email,name'], $this->historyListRelations()))
             ->paginate($request->input('length'), ['*'], 'page', $pageNumber);
 
         return $this->prepareData($records, $totalRecords, $request, true);
@@ -118,7 +151,7 @@ class HistoryRelevanceController extends Controller
         $records = ProjectRelevanceHistory::orderBy($columnName, $columnSortOrder)
             ->where('user_id', '=', Auth::id())
             ->where('name', 'like', "%$search%")
-            ->with(['relevanceTags', 'though'])
+            ->with($this->historyListRelations())
             ->paginate($request->input('length'), ['*'], 'page', $pageNumber);
 
         return $this->prepareData($records, $totalRecords, $request);
@@ -189,9 +222,16 @@ class HistoryRelevanceController extends Controller
     public function show(int $id)
     {
         $admin = User::isUserAdmin();
-        $object = RelevanceHistory::where('id', '=', $id)->first();
-        $access = RelevanceSharing::where('user_id', '=', Auth::id())
-            ->where('project_id', '=', $object->project_relevance_history_id)
+        $object = RelevanceHistory::with('projectRelevanceHistory:id,user_id,name')
+            ->where('id', $id)
+            ->first();
+
+        if ($object === null) {
+            abort(404);
+        }
+
+        $access = RelevanceSharing::where('user_id', Auth::id())
+            ->where('project_id', $object->project_relevance_history_id)
             ->first();
 
         if (!isset($access) && $object->projectRelevanceHistory->user_id != Auth::id() && !$admin) {
@@ -425,7 +465,7 @@ class HistoryRelevanceController extends Controller
 
     public function getHistoryInfoV2(Request $request): JsonResponse
     {
-        $projects = RelevanceHistory::where('project_relevance_history_id', '=', $request->historyId)->latest('id')
+        $projects = RelevanceHistory::where('project_relevance_history_id', $request->historyId)->latest('id')
             ->get([
                 'id',
                 'created_at',

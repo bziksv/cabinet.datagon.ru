@@ -19,16 +19,6 @@ class MaximumTariff extends Tariff
         parent::__construct(new ThreeMonthsTariff());
 
         $this->name = __('Maximum');
-
-        $settings = $this->settings()->get();
-        if(array_key_exists('price', $settings)){
-            $this->setPrice($settings['price']['value']);
-        }
-    }
-
-    private function setPrice(int $price)
-    {
-        $this->price = $price;
     }
 
     public function name(): string

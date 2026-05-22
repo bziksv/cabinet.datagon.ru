@@ -12,6 +12,7 @@ use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\LastOnline;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\RoleMiddleware;
+use App\Http\Middleware\EnsureTeamPermissionMiddleware;
 use App\Http\Middleware\SetTeamContext;
 use App\Http\Middleware\VisitStatistics;
 use \Spatie\Permission\Middlewares\PermissionMiddleware;
@@ -22,7 +23,7 @@ use App\Http\Middleware\TrustProxies;
 use App\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Auth\Middleware\AuthenticateWithBasicAuth;
 use Illuminate\Auth\Middleware\Authorize;
-use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
+use App\Http\Middleware\EnsureEmailIsVerified;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull;
@@ -99,7 +100,7 @@ class Kernel extends HttpKernel
         'throttle' => ThrottleRequests::class,
         'verified' => EnsureEmailIsVerified::class,
         'role' => RoleMiddleware::class,
-        'permission' => PermissionMiddleware::class,
+        'permission' => EnsureTeamPermissionMiddleware::class,
         'role_or_permission' => RoleOrPermissionMiddleware::class,
     ];
 

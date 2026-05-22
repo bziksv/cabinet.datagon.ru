@@ -35,8 +35,19 @@ class MonitoringAdminController extends Controller
 
         $statistics = $this->getStatCollection();
 
-        $users = $this->users->all()->pluck('fullName', 'id');
-        $sites = $this->projects->all()->pluck('url', 'url');
+        $users = User::query()
+            ->select('id', 'name', 'last_name', 'email')
+            ->orderBy('email')
+            ->get()
+            ->mapWithKeys(function (User $user) {
+                return [$user->id => trim($user->name . ' ' . $user->last_name)];
+            });
+
+        $sites = MonitoringProject::query()
+            ->select('url')
+            ->distinct()
+            ->orderBy('url')
+            ->pluck('url', 'url');
 
         return view('monitoring.admin.stat', compact('statistics', 'users', 'sites'));
     }

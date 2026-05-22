@@ -8,6 +8,7 @@ use App\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 
@@ -47,9 +48,28 @@ class BehaviorController extends Controller
      */
     public function index()
     {
-        $behaviors = Auth::user()->behaviors()->get();
+        $behaviors = Auth::user()->behaviors()
+            ->withCount([
+                'phrases',
+                'phrases as phrases_success_count' => function ($query) {
+                    $query->where('status', true);
+                },
+                'phrases as phrases_fail_count' => function ($query) {
+                    $query->where('status', false);
+                },
+            ])
+            ->get();
 
-        return view('behavior.index', compact('behaviors'));
+        $uniquePhraseCounts = collect();
+        if ($behaviors->isNotEmpty()) {
+            $uniquePhraseCounts = DB::table('behaviors_phrases')
+                ->select('behavior_id', DB::raw('COUNT(DISTINCT phrase) as unique_count'))
+                ->whereIn('behavior_id', $behaviors->pluck('id'))
+                ->groupBy('behavior_id')
+                ->pluck('unique_count', 'behavior_id');
+        }
+
+        return view('behavior.index', compact('behaviors', 'uniquePhraseCounts'));
     }
 
     /**

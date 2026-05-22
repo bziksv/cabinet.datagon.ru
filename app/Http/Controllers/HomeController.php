@@ -24,6 +24,10 @@ class HomeController extends Controller
      */
     public function index()
     {
+        if (! Auth::check()) {
+            return redirect('/login');
+        }
+
         $result = $this->getProjects();
 
         return view('home', compact('result'));
@@ -31,10 +35,30 @@ class HomeController extends Controller
 
     protected function getProjects(): array
     {
+        if (cabinet_skip_heavy_web()) {
+            $cached = session('cabinet_home_projects');
+            if (is_array($cached)) {
+                return $cached;
+            }
+        }
+
         if (User::isUserAdmin()) {
             $result = MainProject::all()->toArray();
         } else {
             $result = MainProject::where('show', '=', 1)->get()->toArray();
+        }
+
+        if (app()->environment('local')) {
+            foreach ($result as &$row) {
+                if (isset($row['link'])) {
+                    $row['link'] = localize_cabinet_url($row['link']);
+                }
+            }
+            unset($row);
+        }
+
+        if (cabinet_skip_heavy_web()) {
+            session(['cabinet_home_projects' => $result]);
         }
 
         return $result;

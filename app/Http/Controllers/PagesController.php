@@ -98,6 +98,46 @@ class PagesController extends Controller
      */
     public function roiCalculator()
     {
-        return view('pages.roi');
+        return view('pages.roi', [
+            'arRoi' => self::roiCalculatorMetrics(),
+            'arRoiTraff' => self::roiTrafficForecastMetrics(),
+        ]);
+    }
+
+    /**
+     * ROI calculator metric cards (ROI tab).
+     *
+     * @return array<int, array<string, string>>
+     */
+    private static function roiCalculatorMetrics(): array
+    {
+        return [
+            ['id_name' => 'bg-change-roi', 'id_value' => 'rez-roi-roi', 'theme' => 'danger', 'name' => 'ROI', 'text' => __('Return on investment'), 'type' => '%'],
+            ['id_name' => 'bg-change-ctr', 'id_value' => 'rez-roi-ctr', 'theme' => 'danger', 'name' => 'CTR', 'text' => __('From impressions to clicks'), 'type' => '%'],
+            ['id_name' => 'bg-change-ctc', 'id_value' => 'rez-roi-ctc', 'theme' => 'danger', 'name' => 'CTC', 'text' => __('From clicks to actions'), 'type' => '%'],
+            ['id_name' => 'bg-change-ctb', 'id_value' => 'rez-roi-ctb', 'theme' => 'danger', 'name' => 'CTB', 'text' => __('From impressions to purchases'), 'type' => '%'],
+            ['id_name' => 'bg-change-cpm', 'id_value' => 'rez-roi-cpm', 'theme' => 'warning', 'name' => 'CPM', 'text' => __('Price per 1000 impressions'), 'type' => '₽'],
+            ['id_name' => 'bg-change-cpc', 'id_value' => 'rez-roi-cpc', 'theme' => 'warning', 'name' => 'CPC', 'text' => __('Price per click'), 'type' => '₽'],
+            ['id_name' => 'bg-change-cpa', 'id_value' => 'rez-roi-cpa', 'theme' => 'warning', 'name' => 'CPA', 'text' => __('Price per action'), 'type' => '₽'],
+            ['id_name' => 'bg-change-cps', 'id_value' => 'rez-roi-cps', 'theme' => 'warning', 'name' => 'CPS', 'text' => __('Price per sale'), 'type' => '₽'],
+            ['id_name' => 'bg-change-apv', 'id_value' => 'rez-roi-apv', 'theme' => 'success', 'name' => 'APV', 'text' => __('Average check for 1 purchase'), 'type' => '₽'],
+            ['id_name' => 'bg-change-apc', 'id_value' => 'rez-roi-apc', 'theme' => 'success', 'name' => 'APC', 'text' => __('Average check for 1 visit'), 'type' => '₽'],
+        ];
+    }
+
+    /**
+     * Traffic forecast metric cards.
+     *
+     * @return array<int, array<string, string>>
+     */
+    private static function roiTrafficForecastMetrics(): array
+    {
+        return [
+            ['id_name' => 'bg-change-prcli', 'id_value' => 'perclicks', 'theme' => 'danger', 'name' => 'CLI', 'text' => __('Clicks'), 'type' => ' '],
+            ['id_name' => 'bg-change-pract', 'id_value' => 'peractions', 'theme' => 'danger', 'name' => 'ACT', 'text' => __('Targeted actions'), 'type' => ' '],
+            ['id_name' => 'bg-change-prsal', 'id_value' => 'persales', 'theme' => 'danger', 'name' => 'SAL', 'text' => __('Sales'), 'type' => ' '],
+            ['id_name' => 'bg-change-prrev', 'id_value' => 'perrevenue', 'theme' => 'danger', 'name' => 'REV', 'text' => __('Income'), 'type' => '₽'],
+            ['id_name' => 'bg-change-prroi', 'id_value' => 'perroi', 'theme' => 'warning', 'name' => 'ROI', 'text' => __('Return on investment'), 'type' => '%'],
+        ];
     }
 }

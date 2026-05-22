@@ -20,8 +20,6 @@ class MonitoringSearchengine extends Model
         'weekdays' => 'array',
     ];
 
-    protected $with = ['location'];
-
     public function location()
     {
         return $this->hasOne(Location::class, 'lr', 'lr');

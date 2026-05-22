@@ -19,7 +19,9 @@ class TariffSettingsController extends Controller
      */
     public function index()
     {
-        $settings = (new TariffSetting)->orderBy('name')->get();
+        $settings = TariffSetting::with(['fields' => function ($query) {
+            $query->orderBy('sort');
+        }])->orderBy('name')->get();
         return view('tariff-settings.index', compact('settings'));
     }
 

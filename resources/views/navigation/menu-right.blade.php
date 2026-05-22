@@ -62,21 +62,4 @@
         </li>
 
     @endif
-    <script src="{{ asset('plugins/jquery/jquery.min.js') }}"></script>
-    <script>
-        $(document).ready(function () {
-            $.each($('#header-nav-bar > ul.navbar-nav.ml-auto > div > div > table > tbody > tr'), function (key, value) {
-                if ($(this).css('background-color') === 'rgb(253, 245, 230)') {
-                    if (($(this).children('td').eq(1).html()).trim() === 'Без ограничений') {
-                        $('#userModuleLimit').html("{{ __('No restrictions') }}")
-                    } else {
-                        $('#userModuleLimit').html("{{ __('from') }} " + $(this).children('td').eq(1).html())
-                        $('#userModuleUsed').html("{{ __('Left') }} " + $(this).children('td').eq(2).html())
-                    }
-                    return;
-                }
-            });
-        })
-    </script>
 @endif
-<script src="{{ asset('plugins/jquery/jquery.min.js') }}"></script>

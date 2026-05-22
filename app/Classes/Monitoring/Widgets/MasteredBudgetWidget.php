@@ -21,7 +21,11 @@ class MasteredBudgetWidget extends WidgetsAbstract
     {
         $projects = ProjectsStatisticFacade::getTodayProjects();
 
-        return $projects->pluck('mastered')->sum();
+        if ($projects === null) {
+            return '0';
+        }
+
+        return (string) $projects->pluck('mastered')->sum();
     }
 
     public function generateDesc(): string

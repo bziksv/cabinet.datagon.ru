@@ -1,0 +1,10 @@
+AdminLTE 4.0.0
+Tag: v4.0.0
+Source: https://github.com/ColorlibHQ/AdminLTE/releases/tag/v4.0.0
+Installed: 2026-05-22 (full local bundle)
+Payload: release zip (dist/) + public/html/npm/ (all CDN deps vendored)
+Files: ~120 demo + ~14700 npm (bootstrap, icons, charts, calendar, …)
+Images: 34 under assets/img/ (avatars, products, logos, …)
+No cdn.jsdelivr.net in HTML — works offline / on server without external CDN
+Update: ./scripts/sync-lte-html.sh --force
+URL: http://localhost:3002/html/

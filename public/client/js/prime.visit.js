@@ -1,5 +1,7 @@
 class Visit {
-	url = 'https://lk.redbox.su';
+	url = (typeof window !== 'undefined' && window.location && window.location.origin)
+        ? window.location.origin
+        : 'https://lk.redbox.su';
     style = {
         'showVisCode' : {
             width: '100%',

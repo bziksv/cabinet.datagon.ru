@@ -408,7 +408,10 @@ class MonitoringController extends Controller
         $user = $this->user;
 
         /** @var MonitoringProject $project */
-        $project = $user->monitoringProjects()->findOrFail($id);
+        $project = $user->monitoringProjects()
+            ->withCount('competitors')
+            ->with(['backlinks:id,monitoring_project_id,total_link,total_broken_link'])
+            ->findOrFail($id);
         $navigations = $this->navigations($project);
 
         $length = $this->getLength($project->id);
@@ -421,8 +424,9 @@ class MonitoringController extends Controller
     {
         $lengthMenu = '[10,20,30,50]';
 
-        if ($global = (new MonitoringSettings())->getValue('pagination_items'))
+        if ($global = $this->globalMonitoringSetting('pagination_items')) {
             $lengthMenu = '[' . $global . ']';
+        }
 
         return $lengthMenu;
     }
@@ -431,13 +435,30 @@ class MonitoringController extends Controller
     {
         $lengthDefault = 100;
 
-        if ($global = (new MonitoringSettings())->getValue('pagination_query'))
-            $lengthDefault = $global;
+        if ($global = $this->globalMonitoringSetting('pagination_query')) {
+            $lengthDefault = (int) $global;
+        }
 
-        if ($length = $this->getSetting($projectId, 'length'))
+        if ($length = $this->getSetting($projectId, 'length')) {
             $lengthDefault = $length->value;
+        }
 
         return $lengthDefault;
+    }
+
+    private static $globalMonitoringSettings;
+
+    private function globalMonitoringSetting(string $name)
+    {
+        if (self::$globalMonitoringSettings === null) {
+            self::$globalMonitoringSettings = MonitoringSettings::query()
+                ->whereIn('name', ['pagination_items', 'pagination_query'])
+                ->pluck('value', 'name');
+        }
+
+        $value = self::$globalMonitoringSettings->get($name);
+
+        return $value !== null && $value !== '' ? $value : false;
     }
 
     public function getColumnSettings()
@@ -541,14 +562,13 @@ class MonitoringController extends Controller
 
     public function monitoringCompetitors(MonitoringProject $project)
     {
-        $countQuery = count($project->keywords);
-        $navigations = $this->navigations($project);
-        $ignoredDomains = MonitoringSettings::where('name', '=', 'ignored_domains')->first('value');
-        $competitors = $project->competitors->toArray();
+        apply_team_permissions($project->id);
 
-        if (isset($ignoredDomains)) {
-            $ignoredDomains = $ignoredDomains['value'];
-        }
+        $project->loadCount('competitors');
+        $countQuery = $project->keywords()->count();
+        $navigations = $this->navigations($project);
+        $ignoredDomains = MonitoringSettings::where('name', 'ignored_domains')->value('value');
+        $competitors = $project->competitors()->get()->toArray();
 
         return view('monitoring.competitors.index', compact(
             'navigations',
@@ -798,7 +818,10 @@ class MonitoringController extends Controller
     public function resultChangesDatesState(MonitoringChangesDate $project)
     {
         $request = json_decode($project->request, true);
-        $request['region'] = MonitoringSearchengine::where('id', $request['region'])->first()->location->name;
+        $engine = MonitoringSearchengine::with('location:id,lr,name')
+            ->where('id', $request['region'])
+            ->first();
+        $request['region'] = $engine && $engine->location ? $engine->location->name : '';
 
         return view('monitoring.competitors.dates-results', compact('project', 'request'));
     }

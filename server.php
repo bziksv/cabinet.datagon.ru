@@ -1,5 +1,9 @@
 <?php
 
+// artisan serve не наследует php -d; удалённая БД — запросы >60s
+@ini_set('max_execution_time', '300');
+@ini_set('default_socket_timeout', '120');
+
 /**
  * Laravel - A PHP Framework For Web Artisans
  *

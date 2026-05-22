@@ -24,6 +24,10 @@ class CompetitorButton extends Buttons
 
     private function getCount()
     {
-        return $this->project->competitors->count();
+        if (isset($this->project->competitors_count)) {
+            return $this->project->competitors_count;
+        }
+
+        return $this->project->competitors()->count();
     }
 }

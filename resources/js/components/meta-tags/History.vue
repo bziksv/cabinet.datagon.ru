@@ -3,71 +3,76 @@
     <div class="row">
         <div class="col-md-12">
 
-            <meta-filter :seen="seenCard" :metaTags="history" :lang="lang"></meta-filter>
+            <div v-if="loading" class="text-muted py-3">{{ lang.loading || 'Загрузка…' }}</div>
+            <div v-else-if="loadError" class="alert alert-danger">{{ loadError }}</div>
 
-            <div id="accordion">
+            <template v-else>
+                <meta-filter :seen="seenCard" :metaTags="history" :lang="lang"></meta-filter>
 
-                <div class="card" v-for="(item, index) in history" v-show="!seenCard.length || seenCard[index] === 1">
-                    <div class="card-header card-header-accordion">
-                        <h4 class="card-title">
-                            <a class="d-block w-100 collapsed accordion-title" data-toggle="collapse" :href="'#collapse' + index" aria-expanded="false">
-                                <i class="expandable-accordion-caret fas fa-caret-right fa-fw"></i> {{ item.title }}
-                            </a>
-                        </h4>
+                <div id="accordion">
 
-                        <div class="card-tools">
-                            <div class="btn-group">
-                                <button type="button" class="btn btn-tool dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
-                                    <i class="fas fa-external-link-alt"></i>
-                                </button>
+                    <div class="card" v-for="(item, index) in history" v-show="!seenCard.length || seenCard[index] === 1">
+                        <div class="card-header card-header-accordion">
+                            <h4 class="card-title">
+                                <a class="d-block w-100 collapsed accordion-title" data-toggle="collapse" :href="'#collapse' + index" aria-expanded="false">
+                                    <i class="expandable-accordion-caret fas fa-caret-right fa-fw"></i> {{ item.title }}
+                                </a>
+                            </h4>
 
-                                <div class="dropdown-menu dropdown-menu-right" role="menu" style="">
-                                    <a :href="item.title" target="_blank" class="dropdown-item">
+                            <div class="card-tools">
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-tool dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
                                         <i class="fas fa-external-link-alt"></i>
-                                        {{ lang.go_to_site }}
-                                    </a>
-                                    <a href="#" class="dropdown-item" @click.prevent="Analyzer(item.title)">
-                                        <i class="fas fa-chart-pie"></i>
-                                        {{ lang.text_analysis }}
-                                    </a>
+                                    </button>
+
+                                    <div class="dropdown-menu dropdown-menu-right" role="menu" style="">
+                                        <a :href="item.title" target="_blank" class="dropdown-item">
+                                            <i class="fas fa-external-link-alt"></i>
+                                            {{ lang.go_to_site }}
+                                        </a>
+                                        <a href="#" class="dropdown-item" @click.prevent="Analyzer(item.title)">
+                                            <i class="fas fa-chart-pie"></i>
+                                            {{ lang.text_analysis }}
+                                        </a>
+                                    </div>
                                 </div>
+
+                                <span v-for="error_badge in item.error.badge" v-if="error_badge.length" v-html="error_badge.join('')"></span>
                             </div>
+                        </div>
 
-                            <span v-for="error_badge in item.error.badge" v-if="error_badge.length" v-html="error_badge.join('')"></span>
+                        <div :id="'collapse' + index" class="collapse" data-parent="#accordion" style="">
+                            <div class="card-body">
+                                <table class="table table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 150px;">{{ lang.tag }}</th>
+                                            <th>{{ lang.content }}</th>
+                                            <th style="width: 40px">{{ lang.count }}</th>
+                                            <th style="width: 150px">{{ lang.main_problems }}</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+                                        <tr v-for="(value, tag) in item.data">
+                                            <td><span class="badge badge-success">< {{ tag }} ></span></td>
+                                            <td>
+                                                <span v-if="value.length"><textarea class="form-control">{{ value.join( ', \r\n' ) }}</textarea></span>
+                                                <span v-else class="badge badge-danger">{{ value }}</span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-warning">{{ value.length }}</span>
+                                            </td>
+                                            <td v-html="item.error.main[tag].join(' <br />')"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
 
-                    <div :id="'collapse' + index" class="collapse" data-parent="#accordion" style="">
-                        <div class="card-body">
-                            <table class="table table-bordered">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 150px;">{{ lang.tag }}</th>
-                                        <th>{{ lang.content }}</th>
-                                        <th style="width: 40px">{{ lang.count }}</th>
-                                        <th style="width: 150px">{{ lang.main_problems }}</th>
-                                    </tr>
-                                </thead>
-
-                                <tbody>
-                                    <tr v-for="(value, tag) in item.data">
-                                        <td><span class="badge badge-success">< {{ tag }} ></span></td>
-                                        <td>
-                                            <span v-if="value.length"><textarea class="form-control">{{ value.join( ', \r\n' ) }}</textarea></span>
-                                            <span v-else class="badge badge-danger">{{ value }}</span>
-                                        </td>
-                                        <td>
-                                            <span class="badge bg-warning">{{ value.length }}</span>
-                                        </td>
-                                        <td v-html="item.error.main[tag].join(' <br />')"></td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
                 </div>
-
-            </div>
+            </template>
 
         </div>
 
@@ -84,13 +89,31 @@
             MetaFilter
         },
         props: {
-            history: [Object, Array],
+            historyId: {
+                type: [Number, String],
+                required: true,
+            },
             lang: [Object, Array],
         },
         data() {
             return {
+                history: [],
+                loading: true,
+                loadError: null,
                 seenCard: [],
             }
+        },
+        mounted() {
+            axios.get('/meta-tags/history/' + this.historyId + '/data')
+                .then((response) => {
+                    this.history = Array.isArray(response.data) ? response.data : [];
+                })
+                .catch(() => {
+                    this.loadError = this.lang.error_load || 'Не удалось загрузить историю';
+                })
+                .finally(() => {
+                    this.loading = false;
+                });
         },
         methods: {
             Analyzer(link) {

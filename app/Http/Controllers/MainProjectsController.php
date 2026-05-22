@@ -17,13 +17,21 @@ use Spatie\Permission\Models\Role;
 
 class MainProjectsController extends Controller
 {
+    /** @var \Illuminate\Support\Collection|null */
     protected $roles;
 
     public function __construct()
     {
         $this->middleware(['permission:Main projects']);
+    }
 
-        $this->roles = Role::all()->pluck('name', 'name');
+    protected function roleOptions()
+    {
+        if ($this->roles === null) {
+            $this->roles = Role::all()->pluck('name', 'name');
+        }
+
+        return $this->roles;
     }
 
     public function index()
@@ -35,7 +43,7 @@ class MainProjectsController extends Controller
 
     public function create()
     {
-        $roles = $this->roles;
+        $roles = $this->roleOptions();
 
         return view('main-projects.create', compact('roles'));
     }
@@ -66,7 +74,8 @@ class MainProjectsController extends Controller
     public function edit($id)
     {
         $data = MainProject::find($id);
-        $roles = $this->roles;
+        $roles = $this->roleOptions();
+
         return view('main-projects.edit', compact('data', 'roles'));
     }
 
@@ -100,13 +109,28 @@ class MainProjectsController extends Controller
         return response()->json([], 200);
     }
 
-    public function statistics(MainProject $project)
+    public function statistics(MainProject $project, Request $request)
     {
         $usersIds = User::where('statistic', 1)->pluck('id')->toArray();
 
+        $from = Carbon::now()->subDays(30)->startOfDay();
+        $to = Carbon::now()->endOfDay();
+
+        if ($request->filled('from') && $request->filled('to')) {
+            $from = Carbon::parse($request->get('from'))->startOfDay();
+            $to = Carbon::parse($request->get('to'))->endOfDay();
+        }
+
+        $dateFrom = $from->format('Y-m-d');
+        $dateTo = $to->format('Y-m-d');
+
         $statistics = VisitStatistic::where('project_id', $project->id)
             ->whereIn('user_id', $usersIds)
-            ->with('user')
+            ->whereBetween('date', [$dateFrom, $dateTo])
+            ->with(['user' => static function ($query) {
+                $query->select(['id', 'name', 'last_name', 'email']);
+            }])
+            ->orderBy('date', 'desc')
             ->get(['date', 'user_id', 'actions_counter', 'refresh_page_counter', 'seconds'])
             ->groupBy('date');
 
@@ -134,34 +158,41 @@ class MainProjectsController extends Controller
 
         $result = $result->map(function ($info) {
             $info['time'] = Common::secondsToDate($info['time']);
+
             return $info;
         });
 
-        return view('main-projects.statistics', compact('result', 'project'));
+        return view('main-projects.statistics', compact('result', 'project', 'dateFrom', 'dateTo'));
     }
 
     public function moduleVisitStatistics()
     {
-        $projects = MainProject::with('statistics')->get()->toArray();
+        $aggregated = VisitStatistic::query()
+            ->selectRaw('project_id, SUM(actions_counter) as actions_counter, SUM(refresh_page_counter) as refresh_page_counter, SUM(seconds) as seconds')
+            ->groupBy('project_id')
+            ->get()
+            ->keyBy('project_id');
 
-        foreach ($projects as $key => $project) {
-            $sumActions = 0;
-            $sumRefresh = 0;
-            $countSeconds = 0;
+        $projects = MainProject::query()
+            ->orderBy('position')
+            ->get(['id', 'title', 'link', 'color'])
+            ->map(static function (MainProject $project) use ($aggregated) {
+                $stat = $aggregated->get($project->id);
 
-            foreach ($project['statistics'] as $statistic) {
-                $sumActions += $statistic['actions_counter'];
-                $sumRefresh += $statistic['refresh_page_counter'];
-                $countSeconds += $statistic['seconds'];
-            }
-
-            $projects[$key]['statistics'] = [
-                'actions_counter' => $sumActions,
-                'refresh_page_counter' => $sumRefresh,
-                'seconds' => $countSeconds,
-            ];
-
-        }
+                return [
+                    'id' => $project->id,
+                    'title' => $project->title,
+                    'link' => $project->link,
+                    'color' => $project->color,
+                    'statistics' => [
+                        'actions_counter' => $stat ? (int) $stat->actions_counter : 0,
+                        'refresh_page_counter' => $stat ? (int) $stat->refresh_page_counter : 0,
+                        'seconds' => $stat ? (int) $stat->seconds : 0,
+                    ],
+                ];
+            })
+            ->values()
+            ->all();
 
         return view('main-projects.statistics-modules', [
             'projects' => $projects,

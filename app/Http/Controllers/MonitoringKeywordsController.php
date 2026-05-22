@@ -78,7 +78,15 @@ class MonitoringKeywordsController extends Controller
         $id = $this->getProjectID();
         $this->project = $this->user->monitoringProjects()->find($id);
         $this->regions = $this->project->searchengines()->with('location')->orderBy('id', 'asc')->get();
-        $this->queries = $this->project->keywords()->select('monitoring_keywords.*', 'monitoring_groups.name as ' . self::GROUP_NAME)->joinGroup();
+        $this->queries = $this->project->keywords()
+            ->select('monitoring_keywords.*', 'monitoring_groups.name as ' . self::GROUP_NAME)
+            ->joinGroup()
+            ->with([
+                'group' => function ($query) {
+                    $query->without('users');
+                },
+                'prices',
+            ]);
     }
 
     public function showDataTable(Request $request, $id)
@@ -161,7 +169,10 @@ class MonitoringKeywordsController extends Controller
             $lastPosition = collect([]);
             foreach ($regions as $reg) {
 
-                $model = $item->positions()->where('monitoring_searchengine_id', $reg->id)->latest()->get();
+                $model = $item->positions
+                    ->where('monitoring_searchengine_id', $reg->id)
+                    ->sortByDesc('created_at')
+                    ->values();
                 $col = 'engine_' . $reg->lr;
 
                 if ($model->isNotEmpty()) {
@@ -172,7 +183,7 @@ class MonitoringKeywordsController extends Controller
                     else
                         $monitoringPosition->diffPosition = null;
 
-                    $lastPosition->put($col, $model->first());
+                    $lastPosition->put($col, $monitoringPosition);
                 }
 
                 $city = stristr($reg->location->name, ',', true);
@@ -250,17 +261,19 @@ class MonitoringKeywordsController extends Controller
 
         $top1 = $top3 = $top5 = $top10 = $top20 = $top50 = $top100 = 0;
 
-        if ($keyword->price && $this->regions->isNotEmpty()) {
+        if ($this->regions->isNotEmpty()) {
+            $engineID = $this->regions->pluck('id')->first();
+            $priceRow = $keyword->prices->firstWhere('monitoring_searchengine_id', $engineID);
 
-            $engineID = $this->regions->pluck("id")->first();
-
-            $top1 = $keyword->price()->where("monitoring_searchengine_id", $engineID)->value('top1');
-            $top3 = $keyword->price()->where("monitoring_searchengine_id", $engineID)->value('top3');
-            $top5 = $keyword->price()->where("monitoring_searchengine_id", $engineID)->value('top5');
-            $top10 = $keyword->price()->where("monitoring_searchengine_id", $engineID)->value('top10');
-            $top20 = $keyword->price()->where("monitoring_searchengine_id", $engineID)->value('top20');
-            $top50 = $keyword->price()->where("monitoring_searchengine_id", $engineID)->value('top50');
-            $top100 = $keyword->price()->where("monitoring_searchengine_id", $engineID)->value('top100');
+            if ($priceRow) {
+                $top1 = $priceRow->top1;
+                $top3 = $priceRow->top3;
+                $top5 = $priceRow->top5;
+                $top10 = $priceRow->top10;
+                $top20 = $priceRow->top20;
+                $top50 = $priceRow->top50;
+                $top100 = $priceRow->top100;
+            }
         }
 
         $columns = $this->columns;
@@ -582,10 +595,24 @@ class MonitoringKeywordsController extends Controller
 
     private function setOccurrence()
     {
-        $collection = $this->regions;
-        $this->queries->transform(function ($item) use ($collection) {
-            foreach ($collection as $region) {
-                $occurrence = MonitoringOccurrence::where(['monitoring_keyword_id' => $item->id, 'monitoring_searchengine_id' => $region['id']])->first();
+        $keywordIds = $this->queries->pluck('id');
+        $regionIds = $this->regions->pluck('id');
+
+        $occurrencesByKey = collect();
+        if ($keywordIds->isNotEmpty() && $regionIds->isNotEmpty()) {
+            $occurrencesByKey = MonitoringOccurrence::query()
+                ->whereIn('monitoring_keyword_id', $keywordIds)
+                ->whereIn('monitoring_searchengine_id', $regionIds)
+                ->get()
+                ->keyBy(function (MonitoringOccurrence $occurrence) {
+                    return $occurrence->monitoring_keyword_id . ':' . $occurrence->monitoring_searchengine_id;
+                });
+        }
+
+        $regions = $this->regions;
+        $this->queries->transform(function ($item) use ($regions, $occurrencesByKey) {
+            foreach ($regions as $region) {
+                $occurrence = $occurrencesByKey->get($item->id . ':' . $region['id']);
                 if ($occurrence) {
                     $item->base += $occurrence->base;
                     $item->phrasal += $occurrence->phrasal;
@@ -624,16 +651,18 @@ class MonitoringKeywordsController extends Controller
 
     private function loadPositions($dates)
     {
-        $region = $this->regions->first();
-        $this->queries->load(['positions' => function ($query) use ($region, $dates) {
+        $regionIds = $this->regions->pluck('id')->filter();
 
-            if (isset($region->id))
-                $query->where('monitoring_searchengine_id', $region->id);
+        $this->queries->load(['positions' => function ($query) use ($regionIds, $dates) {
+            if ($regionIds->isNotEmpty()) {
+                $query->whereIn('monitoring_searchengine_id', $regionIds);
+            }
 
-            if ($this->mode === "datesFind")
+            if ($this->mode === 'datesFind') {
                 $query->dateFind($dates);
-            else
+            } else {
                 $query->dateRange($dates);
+            }
         }]);
     }
 
@@ -704,14 +733,14 @@ class MonitoringKeywordsController extends Controller
 
     private function updateDynamics()
     {
-        $queries = $this->queries;
-        foreach ($queries as $keyword) {
+        foreach ($this->queries as $keyword) {
             $dynamics = 0;
             $model = $keyword->positions_view;
-            if ($model && $model->count() > 1)
-                $dynamics = ($model->last()->position - $model->first()->position);
-
-            MonitoringKeyword::where('id', $keyword->id)->update(['dynamic' => $dynamics]);
+            if ($model && $model->count() > 1) {
+                $dynamics = $model->last()->position - $model->first()->position;
+            }
+            // Только для отображения в строке; фильтр dynamics — до paginate, по колонке в БД.
+            $keyword->setAttribute('dynamic', $dynamics);
         }
 
         return $this;

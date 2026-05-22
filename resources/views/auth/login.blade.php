@@ -10,7 +10,7 @@
                 <h1><b id="auth-header">{{ __('Log in to the system') }}</b></h1>
             </div>
             <div class="card-body">
-                <form action="{{ route('login') }}" method="POST">
+                <form action="{{ url('/login') }}" method="POST" id="login-form">
                     @csrf
 
                     <div class="input-group mb-3">
@@ -112,6 +112,7 @@
             $('#select-language').val('ru')
         }
 
+        @if(config('app.env') !== 'local')
         $(".flags").select2({
             theme: 'bootstrap4',
             minimumResultsForSearch: Infinity,
@@ -126,9 +127,14 @@
                 return $state;
             }
         });
+        @endif
     </script>
     <script>
         $(document).ready(function () {
+            $('#login-form').on('submit', function () {
+                $('#login-button').prop('disabled', true).html('Вход… подождите');
+            });
+
             $('#select-language').on('change', function () {
                 if ($(this).val() === 'en') {
                     setEngLanguage()

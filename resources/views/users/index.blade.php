@@ -251,6 +251,22 @@
 
             $("#select-users").select2({
                 theme: 'bootstrap4',
+                width: '100%',
+                placeholder: $('#select-users').data('placeholder') || '',
+                allowClear: true,
+                minimumInputLength: 2,
+                ajax: {
+                    url: '{{ route('users.search-emails') }}',
+                    dataType: 'json',
+                    delay: 250,
+                    data: function (params) {
+                        return { q: params.term || '' };
+                    },
+                    processResults: function (data) {
+                        return { results: data.results || [] };
+                    },
+                    cache: true
+                }
             });
         });
 

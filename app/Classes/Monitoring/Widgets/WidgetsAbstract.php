@@ -17,14 +17,21 @@ abstract class WidgetsAbstract implements WidgetInterface
     protected $bg = 'bg-info';
     protected $link = '';
 
+    /** @var \Illuminate\Support\Collection|null */
+    private static $monitoringWidgetsByCode;
+
+    /** @var int|null */
+    private static $monitoringWidgetsUserId;
 
     public function widget(): Collection
     {
         /** @var User $user */
         $this->user = Auth::user();
 
-        if(!$widget = $this->getWidgetModel()->where('code', $this->code)->first())
+        $widget = $this->getWidgetRow();
+        if ($widget === null) {
             return collect([]);
+        }
 
         return collect([
             'id' => $widget['id'],
@@ -44,12 +51,29 @@ abstract class WidgetsAbstract implements WidgetInterface
         $this->getWidgetModel()->updateOrCreate(['code' => $this->code], ['active' => $status]);
     }
 
+    protected function getWidgetRow()
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        if (!$user) {
+            throw new ModelNotFoundException('Auth user not found.');
+        }
+
+        if (self::$monitoringWidgetsByCode === null || self::$monitoringWidgetsUserId !== $user->id) {
+            self::$monitoringWidgetsUserId = $user->id;
+            self::$monitoringWidgetsByCode = $user->monitoringWidgets()->get()->keyBy('code');
+        }
+
+        return self::$monitoringWidgetsByCode->get($this->code);
+    }
+
     protected function getWidgetModel()
     {
         /** @var User $user */
         $user = Auth::user();
-        if(!$user)
+        if (!$user) {
             throw new ModelNotFoundException('Auth user not found.');
+        }
 
         return $user->monitoringWidgets();
     }

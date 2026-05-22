@@ -19,7 +19,11 @@ class MaxBudgetWidget extends WidgetsAbstract
     {
         $projects = ProjectsStatisticFacade::getTodayProjects();
 
-        return $projects->pluck('budget')->sum();
+        if ($projects === null) {
+            return '0';
+        }
+
+        return (string) $projects->pluck('budget')->sum();
     }
 
     public function generateDesc(): string

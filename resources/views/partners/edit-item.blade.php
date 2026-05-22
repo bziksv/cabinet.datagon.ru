@@ -88,7 +88,7 @@
             <div class="form-group">
                 <div>
                     <label>{{ __('Current Image') }}</label>
-                    <img class="card-img-top" src="../../storage/{{ $item['image'] }}" alt="image"
+                    <img class="card-img-top" src="{{ cabinet_storage_url($item['image']) }}" alt="{{ $item['name_ru'] }}"
                          style="width: 100px; height: 100px;">
                 </div>
 

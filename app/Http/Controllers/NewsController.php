@@ -24,15 +24,56 @@ use JavaScript;
 class NewsController extends Controller
 {
     /**
+     * Без User::$with (pay, roles) — иначе на каждого автора/комментатора 2+ запроса к удалённой БД.
+     */
+    private function newsIndexRelations(): array
+    {
+        $userColumns = ['id', 'name', 'last_name', 'image'];
+        $userLoader = static function ($query) use ($userColumns) {
+            $query->without(['pay', 'roles'])->select($userColumns);
+        };
+
+        $commentsLoader = static function ($query) use ($userLoader) {
+            $query->with(['user' => $userLoader]);
+            if (cabinet_skip_heavy_web()) {
+                $query->latest('id')->limit(5);
+            }
+        };
+
+        $likeLoader = static function ($query) {
+            if (Auth::check()) {
+                $query->where('user_id', Auth::id());
+            }
+        };
+
+        return [
+            'user' => $userLoader,
+            'like' => $likeLoader,
+            'comments' => $commentsLoader,
+        ];
+    }
+
+    /**
      * @return array|Application|Factory|View|mixed
      */
     public function index()
     {
-        $notification = NewsNotification::firstOrNew(['user_id' => Auth::id()]);
-        $notification->last_check = Carbon::now();
-        $notification->save();
-        $news = News::all();
-        $news = $news->sortByDesc('created_at');
+        if (! cabinet_skip_heavy_web()) {
+            $notification = NewsNotification::firstOrNew(['user_id' => Auth::id()]);
+            $notification->last_check = Carbon::now();
+            $notification->save();
+        }
+
+        $newsQuery = News::query()
+            ->with($this->newsIndexRelations())
+            ->orderByDesc('created_at');
+
+        // Local + удалённая БД: не тянуть все новости и все комментарии.
+        if (cabinet_skip_heavy_web()) {
+            $news = $newsQuery->limit(15)->get();
+        } else {
+            $news = $newsQuery->get();
+        }
         $admin = NewsController::isUserAdmin();
         if ($admin) {
             JavaScript::put([
@@ -151,7 +192,11 @@ class NewsController extends Controller
      */
     public function editNewsView($id)
     {
-        $news = News::where('id', '=', $id)->first();
+        if (! User::isUserAdmin()) {
+            return abort(403);
+        }
+
+        $news = News::query()->findOrFail($id);
 
         return view('news.edit', compact('news'));
     }
@@ -183,14 +228,7 @@ class NewsController extends Controller
      */
     public static function isUserAdmin(): bool
     {
-        $roles = (array)Auth::user()->role;
-        if (in_array(1, $roles["\x00*\x00items"])) {
-            $admin = true;
-        } else {
-            $admin = false;
-        }
-
-        return $admin;
+        return User::isUserAdmin();
     }
 
     /**
@@ -198,11 +236,11 @@ class NewsController extends Controller
      */
     public static function calculateCountNewNews()
     {
-        $notification = NewsNotification::where('user_id', '=', Auth::id())->first();
-        if (isset($notification)) {
-            $count = News::where('created_at', '>=', $notification->last_check)->get()->count();
+        $notification = NewsNotification::where('user_id', Auth::id())->first();
+        if ($notification !== null) {
+            $count = News::where('created_at', '>=', $notification->last_check)->count();
         } else {
-            $count = News::all()->count();
+            $count = News::count();
         }
 
         return response([

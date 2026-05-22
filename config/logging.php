@@ -16,7 +16,8 @@ return [
     |
     */
 
-    'default' => env('LOG_CHANNEL', 'stack'),
+    // На Mac php -S иногда не может писать в storage/logs (TCC) — в local уводим в stderr
+    'default' => env('LOG_CHANNEL', env('APP_ENV') === 'local' ? 'stderr' : 'stack'),
 
     /*
     |--------------------------------------------------------------------------

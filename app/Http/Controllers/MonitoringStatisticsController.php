@@ -24,7 +24,7 @@ class MonitoringStatisticsController extends Controller
     {
         $this->middleware(function ($request, $next) {
             $this->user = Auth::user();
-            $this->projects = ProjectsStatisticFacade::getTodayProjects();
+            $this->projects = ProjectsStatisticFacade::getTodayProjects() ?? collect();
 
             return $next($request);
         });
@@ -152,12 +152,25 @@ class MonitoringStatisticsController extends Controller
 
         $users = $this->getUsersWithProjectsByStatus(MonitoringProjectUserStatusController::STATUS_SEO);
 
+        if (!isset($users[$id])) {
+            return view('monitoring.statistics.projects', ['data' => collect([]), 'periods' => []]);
+        }
+
         $user = $users[$id];
+        $userModel = User::find($user['id']);
 
         $projects = $this->projects->whereIn('id', $user['projects']);
 
         $colMonth = 6;
         $periods = array_reverse($this->periodOfMonth($colMonth - 1)->toArray());
+
+        $statsByMonth = [];
+        if ($userModel !== null) {
+            foreach ($periods as $date) {
+                $statsByMonth[$date->format('Y-m')] = $this->getStatisticsProjectLastOfMonth($userModel, $date)
+                    ->keyBy('id');
+            }
+        }
 
         foreach($projects as $project)
         {
@@ -182,7 +195,8 @@ class MonitoringStatisticsController extends Controller
                     'words' => 0,
                 ]);
 
-                $statProject = $this->getStatisticsProjectLastOfMonth(User::find($user['id']), $date)->where('id', $project['id'])->first();
+                $monthKey = $date->format('Y-m');
+                $statProject = $statsByMonth[$monthKey][$project['id']] ?? null;
 
                 if(!is_null($statProject))
                 {
@@ -212,9 +226,17 @@ class MonitoringStatisticsController extends Controller
         /** @var User $user */
         $user = $this->user;
 
-        foreach ($user->statistics as $statistic)
-        {
+        $statistics = $user->statistics()
+            ->orderByDesc('created_at')
+            ->limit(24)
+            ->get();
+
+        foreach ($statistics->reverse() as $statistic) {
             $projects = $statistic['monitoring_project'];
+
+            if ($projects === null) {
+                continue;
+            }
 
             $budget = $projects->pluck('budget')->sum();
             $mastered = $projects->pluck('mastered')->sum();

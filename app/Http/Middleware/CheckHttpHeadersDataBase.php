@@ -38,6 +38,11 @@ class CheckHttpHeadersDataBase
      */
     public function terminate()
     {
+        // На local и при DB на другом VPS DELETE по http_headers висит >60s (удалённая БД, большая таблица).
+        if (app()->environment('local') || ! env('HTTP_HEADERS_CLEANUP_ON_REQUEST', true)) {
+            return;
+        }
+
         $this->httpHeaders->deleteData();
     }
 }

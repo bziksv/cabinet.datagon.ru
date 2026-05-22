@@ -43,7 +43,7 @@ Route::get('/personal-data/en', 'AccessController@getEnPersonalData');
 Route::get('/privacy-policy/ru', 'AccessController@getRuPrivacyPolicy');
 Route::get('/privacy-policy/en', 'AccessController@getEnPrivacyPolicy');
 
-Route::middleware(['verified'])->group(function () {
+Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('test', 'TestController@index')->name('test');
 
     Route::get('/', 'HomeController@index')->name('home');
@@ -65,6 +65,7 @@ Route::middleware(['verified'])->group(function () {
     Route::post('/get-filtered-users', 'UsersController@filterExportsUsers')->name('filter.exports.users');
     Route::get('/visits-statistics/', 'UsersController@userVisitStatistics')->name('users.statistics');
     Route::post('users/tariff', 'UsersController@storeTariff')->name('users.tariff');
+    Route::get('users/search-emails', 'UsersController@searchEmails')->name('users.search-emails');
     Route::resource('users', 'UsersController');
 
     Route::post('/manage-access/assignPermission', 'ManageAccessController@assignPermission');
@@ -89,6 +90,7 @@ Route::middleware(['verified'])->group(function () {
     Route::patch('/meta-tags/histories/{id}', 'MetaTagsController@storeHistories');
     Route::get('/meta-tags/histories/{id}', 'MetaTagsController@showHistories');
     Route::get('/meta-tags/history/{id}/compare/{id_compare}', 'MetaTagsController@showHistoryCompare')->name('meta.history.compare');
+    Route::get('/meta-tags/history/{id}/data', 'MetaTagsController@historyData')->name('meta.history.data');
     Route::get('/meta-tags/history/{id}', 'MetaTagsController@showHistory');
     Route::get('/meta-tags/getTariffMetaTagsPages', 'MetaTagsController@getTariffMetaTagsPages');
     Route::get('/meta-tags/settings', 'MetaTagsController@settings')->name('meta-tags.settings')->middleware(['role:Super Admin|admin']);

@@ -3,10 +3,14 @@
 
 namespace App\Classes\Monitoring\Widgets;
 
+use Illuminate\Support\Collection;
 
 class WidgetsFactory
 {
     protected $widgets;
+
+    /** @var \Illuminate\Support\Collection|null code => widget data */
+    protected $resolvedByCode;
 
     public function __construct()
     {
@@ -27,24 +31,37 @@ class WidgetsFactory
         return $this->widgets;
     }
 
-    public function getCollection()
+    protected function resolveByCode(): Collection
     {
-        $widgets = collect([]);
-        foreach ($this->widgets as $widget){
-            if($widget->widget()->isNotEmpty())
-                $widgets->push($widget->widget());
+        if ($this->resolvedByCode !== null) {
+            return $this->resolvedByCode;
         }
 
-        return $widgets;
+        $this->resolvedByCode = collect();
+
+        foreach ($this->widgets as $widget) {
+            $data = $widget->widget();
+            if ($data->isNotEmpty()) {
+                $this->resolvedByCode->put($widget->getCode(), $data);
+            }
+        }
+
+        return $this->resolvedByCode;
+    }
+
+    public function getCollection()
+    {
+        return $this->resolveByCode()->values();
     }
 
     public function getMenu()
     {
+        $resolved = $this->resolveByCode();
         $menu = collect([]);
-        foreach ($this->widgets as $widget){
-            $active = false;
-            if($widget->widget()->isNotEmpty() && $widget->widget()->has('active'))
-                $active = $widget->widget()->get('active');
+
+        foreach ($this->widgets as $widget) {
+            $data = $resolved->get($widget->getCode());
+            $active = $data !== null && $data->has('active') ? $data->get('active') : false;
 
             $menu->push(collect([
                 'code' => $widget->getCode(),

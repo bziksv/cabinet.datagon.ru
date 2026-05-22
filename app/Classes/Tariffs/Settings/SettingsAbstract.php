@@ -17,7 +17,9 @@ abstract class SettingsAbstract
     {
         $this->settings = [];
 
-        $settings = TariffSettingValue::where('tariff', $this->tariff)->get();
+        $settings = TariffSettingValue::where('tariff', $this->tariff)
+            ->with('property')
+            ->get();
 
         if($this->user)
             $this->changeSettingsValue($settings);
@@ -36,7 +38,7 @@ abstract class SettingsAbstract
 
     private function changeSettingsValue(Collection $settings): void
     {
-        $settingsUser = $this->user->tariffSettings()->get();
+        $settingsUser = $this->user->tariffSettings()->with('field')->get();
         foreach ($settingsUser as $item){
             if($setting = $settings->find($item->tariff_setting_value_id))
                 $setting->value = $item->value;

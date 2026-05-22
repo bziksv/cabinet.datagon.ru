@@ -19,8 +19,9 @@ class PartnersItems extends Model
 
     public function delete()
     {
-        if (file_exists(public_path('storage\\' . $this->image))) {
-            unlink(public_path('storage\\' . $this->image));
+        $localPath = public_path('storage/' . ltrim(str_replace('\\', '/', (string) $this->image), '/'));
+        if (file_exists($localPath)) {
+            unlink($localPath);
         }
 
         parent::delete();

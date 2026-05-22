@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 
+use App\ViewComposers\AdminSettingsMenuComposer;
 use App\ViewComposers\CountUnreadNewsComposer;
 use App\ViewComposers\DescriptionComposer;
 use App\ViewComposers\LimitsComposer;
@@ -33,6 +34,7 @@ class ComposerServiceProvider extends ServiceProvider
         
         view()->composer('component.card', DescriptionComposer::class);
         view()->composer('users.panel', UserPanelComposer::class);
+        view()->composer('users.panel', AdminSettingsMenuComposer::class);
         view()->composer('navigation.menu-right', UserPanelComposer::class);
         view()->composer('navigation.menu-right', LimitsComposer::class);
         view()->composer('navigation.sidebar', MenuComposer::class);

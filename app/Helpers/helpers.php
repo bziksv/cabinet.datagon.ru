@@ -7,8 +7,19 @@ if (! function_exists('apply_team_permissions')) {
         $user = Auth::user();
 
         if ($user) {
-            setPermissionsTeamId($id);
-            $user->unsetRelation('roles', 'permissions');
+            $registrar = app(\Spatie\Permission\PermissionRegistrar::class);
+            $teamChanged = $registrar->getPermissionsTeamId() !== $id;
+
+            if ($teamChanged) {
+                setPermissionsTeamId($id);
+            }
+
+            // Spatie: роли привязаны к team_id — без сброса relation меню пустое (getRoleNames() = []).
+            if ($teamChanged
+                || ! $user->relationLoaded('roles')
+                || $user->roles->isEmpty()) {
+                $user->unsetRelation('roles', 'permissions');
+            }
         }
     }
 }
@@ -25,5 +36,81 @@ if (! function_exists('get_team_permission_id')) {
     function get_team_permission_id()
     {
         return app(\Spatie\Permission\PermissionRegistrar::class)->getPermissionsTeamId();
+    }
+}
+
+if (! function_exists('cabinet_clear_menu_session_cache')) {
+    function cabinet_clear_menu_session_cache(): void
+    {
+        if (class_exists(\App\MenuItemsPosition::class)) {
+            \App\MenuItemsPosition::clearSortMenuCache();
+        }
+
+        foreach (['cabinet_menu_modules', 'cabinet_menu_modules_v2', 'cabinet_menu_modules_v3', 'cabinet_menu_modules_v4'] as $key) {
+            session()->forget($key);
+        }
+    }
+}
+
+if (! function_exists('cabinet_skip_heavy_web')) {
+    /** Local dev: remote DB + тяжёлые composers/middleware отключены через .env */
+    function cabinet_skip_heavy_web(): bool
+    {
+        return app()->environment('local') || (bool) env('SKIP_HEAVY_WEB_MIDDLEWARE', false);
+    }
+}
+
+if (! function_exists('localize_cabinet_url')) {
+    /**
+     * В local ссылки из БД часто абсолютные на lk.redbox.su — подменяем на APP_URL.
+     */
+    function localize_cabinet_url(?string $url): ?string
+    {
+        if ($url === null || $url === '' || ! app()->environment('local')) {
+            return $url;
+        }
+
+        $local = rtrim(config('app.url'), '/');
+        $prefixes = [
+            'https://lk.redbox.su',
+            'http://lk.redbox.su',
+            'https://cabinet.datagon.ru',
+            'http://cabinet.datagon.ru',
+        ];
+
+        foreach ($prefixes as $prefix) {
+            if (strpos($url, $prefix) === 0) {
+                return $local . substr($url, strlen($prefix));
+            }
+        }
+
+        return $url;
+    }
+}
+
+if (! function_exists('cabinet_storage_url')) {
+    /**
+     * URL файла из storage/app/public (симлинк public/storage).
+     * Local: если файла нет на диске — CABINET_STORAGE_URL (прод), как у аватаров.
+     */
+    function cabinet_storage_url(?string $path): ?string
+    {
+        if ($path === null || $path === '') {
+            return null;
+        }
+
+        $path = ltrim(str_replace('\\', '/', $path), '/');
+
+        if (file_exists(public_path('storage/' . $path))) {
+            return asset('storage/' . $path);
+        }
+
+        if (app()->environment('local')) {
+            $remote = rtrim(env('CABINET_STORAGE_URL', 'https://lk.redbox.su'), '/');
+
+            return $remote . '/storage/' . $path;
+        }
+
+        return asset('storage/' . $path);
     }
 }

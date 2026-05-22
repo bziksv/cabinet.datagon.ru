@@ -1147,7 +1147,7 @@
 
                         $("#checklist-icon").html('<img src="/storage/' + checklist.icon + '" alt="' + checklist.icon + '" class="icon mr-2">')
                         $("#checklist-name").html('<a href="' + checklist.url + '" target="_blank" data-toggle="tooltip" data-placement="top" title="' + checklist.url + '">' + new URL(checklist.url)['host'] + '</a>')
-                        $("#checklist-counter").html(checklist.tasks.length)
+                        $("#checklist-counter").html(checklist.tasks_total ?? checklist.tasks.length)
                         $("#checklist-new").html(checklist.new)
                         $("#checklist-work").html(checklist.work)
                         $("#checklist-inactive").html(checklist.inactive)

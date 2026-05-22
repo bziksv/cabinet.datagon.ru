@@ -1,3 +1,366 @@
+/* Сайдбар: лого и аватар — один размер, один левый отступ */
+:root {
+    --cabinet-sidebar-inset: 0.75rem;
+    --cabinet-sidebar-icon: 40px;
+    /* AdminLTE .sidebar { padding-left: 0.5rem } — компенсируем у блока профиля */
+    --cabinet-sidebar-inner-pad: 0.5rem;
+    /* AdminLTE по умолчанию 250px — +15px для длинных подписей меню */
+    --cabinet-sidebar-width: 265px;
+}
+
+/* Ширина сайдбара и отступ контента (вместо 250px в AdminLTE) */
+@media (min-width: 768px) {
+    .main-sidebar,
+    .main-sidebar::before {
+        width: var(--cabinet-sidebar-width) !important;
+    }
+
+    .layout-fixed .brand-link,
+    .layout-fixed .main-sidebar .cabinet-brand {
+        width: var(--cabinet-sidebar-width) !important;
+        max-width: var(--cabinet-sidebar-width) !important;
+    }
+
+    body:not(.sidebar-mini-md):not(.sidebar-mini-xs):not(.layout-top-nav):not(.sidebar-collapse) .content-wrapper,
+    body:not(.sidebar-mini-md):not(.sidebar-mini-xs):not(.layout-top-nav):not(.sidebar-collapse) .main-footer,
+    body:not(.sidebar-mini-md):not(.sidebar-mini-xs):not(.layout-top-nav):not(.sidebar-collapse) .main-header {
+        margin-left: var(--cabinet-sidebar-width) !important;
+    }
+
+    body.sidebar-mini.sidebar-collapse .main-sidebar:hover,
+    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused,
+    body.sidebar-mini.sidebar-collapse .main-sidebar:hover::before,
+    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused::before {
+        width: var(--cabinet-sidebar-width) !important;
+    }
+
+    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .brand-link,
+    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .brand-link,
+    body.sidebar-mini.sidebar-collapse.layout-fixed .main-sidebar:hover .brand-link,
+    body.sidebar-mini.sidebar-collapse.layout-fixed .main-sidebar.sidebar-focused .brand-link {
+        width: var(--cabinet-sidebar-width) !important;
+    }
+
+    .sidebar-collapse.sidebar-mini .main-sidebar.sidebar-focused .nav-link,
+    .sidebar-collapse.sidebar-mini .main-sidebar:hover .nav-link,
+    .sidebar-collapse.sidebar-mini .main-sidebar.sidebar-focused .nav-child-indent .nav-link,
+    .sidebar-collapse.sidebar-mini .main-sidebar:hover .nav-child-indent .nav-link {
+        width: calc(var(--cabinet-sidebar-width) - 1rem) !important;
+    }
+
+    .sidebar-collapse.sidebar-mini .main-sidebar.sidebar-focused .nav-legacy .nav-link,
+    .sidebar-collapse.sidebar-mini .main-sidebar:hover .nav-legacy .nav-link {
+        width: var(--cabinet-sidebar-width) !important;
+    }
+}
+
+@media (min-width: 992px) {
+    .sidebar-mini .cabinet-sidebar-menu .nav-link {
+        white-space: normal !important;
+    }
+}
+
+/* Бренд сайдбара — Датагон */
+.cabinet-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem var(--cabinet-sidebar-inset) !important;
+    min-height: calc(var(--cabinet-sidebar-icon) + 1.25rem);
+}
+
+.cabinet-brand .cabinet-brand__icon,
+.cabinet-brand .brand-image {
+    float: none;
+    flex-shrink: 0;
+    width: var(--cabinet-sidebar-icon);
+    height: var(--cabinet-sidebar-icon);
+    max-height: var(--cabinet-sidebar-icon);
+    margin: 0 !important;
+    padding: 0;
+    line-height: 1;
+    object-fit: contain;
+    vertical-align: middle;
+    box-shadow: none !important;
+    filter: none;
+    opacity: 1;
+}
+
+.cabinet-brand .brand-text {
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+}
+
+/* Профиль: отменяем padding .sidebar, чтобы левый край = как у лого */
+.main-sidebar .sidebar > .cabinet-user-panel {
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: calc(-1 * var(--cabinet-sidebar-inner-pad));
+    margin-right: calc(-1 * var(--cabinet-sidebar-inner-pad));
+    padding-left: var(--cabinet-sidebar-inset) !important;
+    padding-right: var(--cabinet-sidebar-inset) !important;
+}
+
+.cabinet-user-panel .image {
+    padding: 0 !important;
+    margin: 0;
+    flex-shrink: 0;
+    width: var(--cabinet-sidebar-icon);
+    height: var(--cabinet-sidebar-icon);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cabinet-user-panel img {
+    width: var(--cabinet-sidebar-icon) !important;
+    height: var(--cabinet-sidebar-icon) !important;
+    max-width: var(--cabinet-sidebar-icon);
+    max-height: var(--cabinet-sidebar-icon);
+    object-fit: cover;
+    box-sizing: border-box;
+}
+
+.cabinet-user-panel .info {
+    padding: 0 !important;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.cabinet-user-panel .info a {
+    font-size: 0.875rem;
+    line-height: 1.25;
+}
+
+.cabinet-admin-gear__toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    color: rgba(255, 255, 255, 0.85);
+    border-radius: 0.25rem;
+    line-height: 1;
+}
+
+.cabinet-admin-gear__toggle:hover,
+.cabinet-admin-gear.show .cabinet-admin-gear__toggle {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.12);
+    text-decoration: none;
+}
+
+.cabinet-admin-gear__menu {
+    min-width: 17rem;
+    max-width: 22rem;
+}
+
+.cabinet-admin-gear__menu .dropdown-item {
+    white-space: normal;
+    line-height: 1.35;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+}
+
+/* Поиск и меню — тот же левый отступ, что у лого и аватара (без padding .sidebar + ml-2) */
+.main-sidebar .sidebar > nav.mt-2 {
+    margin-left: calc(-1 * var(--cabinet-sidebar-inner-pad));
+    margin-right: calc(-1 * var(--cabinet-sidebar-inner-pad));
+    padding-left: var(--cabinet-sidebar-inset);
+    padding-right: var(--cabinet-sidebar-inset);
+}
+
+.cabinet-sidebar-menu {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.cabinet-sidebar-menu > .nav-item,
+.cabinet-sidebar-menu > .folder,
+.cabinet-sidebar-menu > li.menu-item {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+}
+
+.cabinet-sidebar-menu .nav-treeview > .nav-item {
+    padding-left: 0 !important;
+}
+
+/* Подписи пунктов меню — до 2 строк, без «…» в одну линию */
+.cabinet-sidebar-menu .nav-item > .nav-link,
+.cabinet-sidebar-menu .folder > .nav-link,
+.cabinet-sidebar-menu .nav-treeview .nav-link {
+    align-items: flex-start !important;
+    height: auto !important;
+    min-height: 2.35rem;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+}
+
+.cabinet-sidebar-menu > .nav-item > .nav-link,
+.cabinet-sidebar-menu > .folder > .nav-link {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+.cabinet-sidebar-menu .nav-treeview .nav-link {
+    padding-left: 0.75rem !important;
+    padding-right: 0 !important;
+}
+
+.cabinet-sidebar-menu .nav-link .ml-2,
+.cabinet-sidebar-menu .nav-link > span.ml-2,
+.cabinet-sidebar-menu .module-name.ml-2 {
+    margin-left: 0 !important;
+}
+
+.cabinet-sidebar-menu .nav-link > span {
+    display: flex !important;
+    align-items: flex-start;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+    line-height: 1.3;
+}
+
+.cabinet-sidebar-menu .nav-link > span > i,
+.cabinet-sidebar-menu .nav-link > span > svg,
+.cabinet-sidebar-menu .nav-link > span > img,
+.cabinet-sidebar-menu .folder > .nav-link > i:first-child {
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+    width: 1.25rem;
+    min-width: 1.25rem;
+    text-align: center;
+}
+
+.cabinet-sidebar-menu .folder > .nav-link {
+    display: flex !important;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.cabinet-sidebar-menu .module-name,
+.cabinet-sidebar-menu .nav-link > p {
+    white-space: normal !important;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    word-break: break-word;
+    flex: 1;
+    min-width: 0;
+    max-width: 100%;
+}
+
+/* --- Свёрнутый сайдбар (sidebar-mini + sidebar-collapse) --- */
+@media (min-width: 768px) {
+    /* Подписи: clip, без display:none — иконки не смещаются при hover (как AdminLTE для .nav-link p) */
+    body.sidebar-mini.sidebar-collapse .cabinet-brand .brand-text,
+    body.sidebar-mini.sidebar-collapse .cabinet-user-panel .info,
+    body.sidebar-mini.sidebar-collapse .cabinet-sidebar-menu .module-name,
+    body.sidebar-mini.sidebar-collapse .cabinet-sidebar-menu .nav-link > p,
+    body.sidebar-mini.sidebar-collapse .cabinet-sidebar-menu .js-toggle.x-drop-down {
+        max-width: 0;
+        overflow: hidden;
+        opacity: 0;
+        visibility: hidden;
+        margin: 0 !important;
+        padding: 0 !important;
+        white-space: nowrap;
+        flex: 0 0 auto;
+    }
+
+    /* В узком сайдбаре подменю не показываем (только иконки верхнего уровня) */
+    body.sidebar-mini.sidebar-collapse .cabinet-sidebar-menu .nav-treeview {
+        display: none !important;
+    }
+
+    body.sidebar-mini.sidebar-collapse .cabinet-brand {
+        justify-content: flex-start;
+        padding-left: 0.65rem !important;
+        padding-right: 0.5rem !important;
+        gap: 0;
+        overflow: hidden;
+    }
+
+    body.sidebar-mini.sidebar-collapse .main-sidebar .sidebar > .cabinet-user-panel {
+        justify-content: flex-start;
+        margin-left: calc(-1 * var(--cabinet-sidebar-inner-pad)) !important;
+        margin-right: calc(-1 * var(--cabinet-sidebar-inner-pad)) !important;
+        padding-left: 0.65rem !important;
+        padding-right: 0.5rem !important;
+        overflow: hidden;
+    }
+
+    body.sidebar-mini.sidebar-collapse .cabinet-sidebar-menu > .nav-item > .nav-link,
+    body.sidebar-mini.sidebar-collapse .cabinet-sidebar-menu > .folder > .nav-link,
+    body.sidebar-mini.sidebar-collapse .cabinet-sidebar-menu .nav-treeview .nav-link {
+        justify-content: flex-start !important;
+        text-align: left !important;
+    }
+
+    body.sidebar-mini.sidebar-collapse .cabinet-sidebar-menu .nav-link > span {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: flex-start !important;
+        gap: 0.5rem;
+        margin-left: 0 !important;
+        width: 100%;
+        min-width: 0;
+    }
+
+    body.sidebar-mini.sidebar-collapse .cabinet-sidebar-menu .nav-link .ml-2,
+    body.sidebar-mini.sidebar-collapse .cabinet-sidebar-menu .module-name.ml-2 {
+        margin-left: 0 !important;
+    }
+
+    /* Без fadeIn/fadeOut AdminLTE — иначе подписи «прыгают» при hover */
+    body.sidebar-mini.sidebar-collapse .cabinet-sidebar-menu .nav-link p,
+    body.sidebar-mini.sidebar-collapse .cabinet-sidebar-menu .module-name {
+        animation: none !important;
+        transition: none !important;
+    }
+
+    /* При наведении AdminLTE расширяет сайдбар — только подписи, без сдвига иконок */
+    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .cabinet-brand,
+    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .cabinet-brand {
+        padding: 0.75rem var(--cabinet-sidebar-inset) !important;
+        gap: 0.5rem;
+    }
+
+    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .cabinet-brand .brand-text,
+    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .cabinet-brand .brand-text,
+    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .cabinet-user-panel .info,
+    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .cabinet-user-panel .info,
+    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .cabinet-sidebar-menu .module-name,
+    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .cabinet-sidebar-menu .module-name,
+    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .cabinet-sidebar-menu .nav-link > p,
+    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .cabinet-sidebar-menu .nav-link > p,
+    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .cabinet-sidebar-menu .js-toggle.x-drop-down,
+    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .cabinet-sidebar-menu .js-toggle.x-drop-down {
+        max-width: calc(var(--cabinet-sidebar-width) - 3.25rem);
+        white-space: normal !important;
+        opacity: 1;
+        visibility: visible;
+    }
+
+    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .sidebar > .cabinet-user-panel,
+    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .sidebar > .cabinet-user-panel {
+        padding-left: var(--cabinet-sidebar-inset) !important;
+        padding-right: var(--cabinet-sidebar-inset) !important;
+    }
+
+    /* Подменю только у раскрытых папок, не все сразу */
+    body.sidebar-mini.sidebar-collapse .main-sidebar:hover .cabinet-sidebar-menu li.folder.menu-open > .nav-treeview,
+    body.sidebar-mini.sidebar-collapse .main-sidebar.sidebar-focused .cabinet-sidebar-menu li.folder.menu-open > .nav-treeview {
+        display: block !important;
+    }
+}
+
 .item_hide {
     display: none;
 }
@@ -14,17 +377,7 @@ img.img-flag {
 }
 
 .user-panel img {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 2.8rem !important;
-}
-
-.user-panel .info {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 0 0 0 5px !important;
+    display: block;
 }
 
 .login-box {
@@ -33,6 +386,19 @@ img.img-flag {
 
 .nav-sidebar > .nav-item .nav-icon {
     vertical-align: sub;
+}
+
+/* Сайдбар: раскрытие папок без AdminLTE Treeview (конфликтовал с кастомным JS) */
+.cabinet-sidebar-menu li.has-treeview > .nav-treeview {
+    display: none;
+}
+
+.cabinet-sidebar-menu li.has-treeview.menu-open > .nav-treeview {
+    display: block;
+}
+
+.cabinet-sidebar-menu li.folder > a.sidebar-folder-toggle {
+    cursor: pointer;
 }
 
 .bg-purple-light {

@@ -29,6 +29,10 @@ class VisitStatistics
             return $next($request);
         }
 
+        if (app()->environment('local') || env('SKIP_HEAVY_WEB_MIDDLEWARE', false)) {
+            return $next($request);
+        }
+
         try {
             if(!array_key_exists('controller', Route::current()->action))
                 return $next($request);

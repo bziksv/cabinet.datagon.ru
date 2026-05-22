@@ -77,35 +77,20 @@
 
                     <div class="row boxes">
 
-                        <?
-                        $arRoi = array(
-                            array("id_name" => "bg-change-roi", "id_value" => "rez-roi-roi", "theme" => "danger", "name" => "ROI", "text" => __('Return on investment'), "type" => "%"),
-                            array("id_name" => "bg-change-ctr", "id_value" => "rez-roi-ctr", "theme" => "danger", "name" => "CTR", "text" => __('From impressions to clicks'), "type" => "%"),
-                            array("id_name" => "bg-change-ctc", "id_value" => "rez-roi-ctc", "theme" => "danger", "name" => "CTC", "text" => __('From clicks to actions'), "type" => "%"),
-                            array("id_name" => "bg-change-ctb", "id_value" => "rez-roi-ctb", "theme" => "danger", "name" => "CTB", "text" => __('From impressions to purchases'), "type" => "%"),
-                            array("id_name" => "bg-change-cpm", "id_value" => "rez-roi-cpm", "theme" => "warning", "name" => "CPM", "text" => __('Price per 1000 impressions'), "type" => "₽"),
-                            array("id_name" => "bg-change-cpc", "id_value" => "rez-roi-cpc", "theme" => "warning", "name" => "CPC", "text" => __('Price per click'), "type" => "₽"),
-                            array("id_name" => "bg-change-cpa", "id_value" => "rez-roi-cpa", "theme" => "warning", "name" => "CPA", "text" => __('Price per action'), "type" => "₽"),
-                            array("id_name" => "bg-change-cps", "id_value" => "rez-roi-cps", "theme" => "warning", "name" => "CPS", "text" => __('Price per sale'), "type" => "₽"),
-                            array("id_name" => "bg-change-apv", "id_value" => "rez-roi-apv", "theme" => "success", "name" => "APV", "text" => __('Average check for 1 purchase'), "type" => "₽"),
-                            array("id_name" => "bg-change-apc", "id_value" => "rez-roi-apc", "theme" => "success", "name" => "APC", "text" => __('Average check for 1 visit'), "type" => "₽"),
-                        );
-                        ?>
-
-                        <? foreach($arRoi as $roi): ?>
+                        @foreach($arRoi as $roi)
                         <div class="col-lg-6 col-sm-6 col-xs-12">
-                            <div class="box box-solid box-<?=$roi['theme']?>">
+                            <div class="box box-solid box-{{ $roi['theme'] }}">
                                 <div class="box-header">
-                                    <div class="box-name" id="<?=$roi['id_name']?>"><?=$roi['name']?></div>
-                                    <div class="box-text"><?=$roi['text']?></div>
+                                    <div class="box-name" id="{{ $roi['id_name'] }}">{{ $roi['name'] }}</div>
+                                    <div class="box-text">{{ $roi['text'] }}</div>
                                 </div><!-- /.box-header -->
                                 <div class="box-body text-center">
-                                    <span id="<?=$roi['id_value']?>"></span><?=$roi['type']?>
+                                    <span id="{{ $roi['id_value'] }}"></span>{{ $roi['type'] }}
                                 </div><!-- /.box-body -->
                             </div>
                         </div>
                         <!-- /.col -->
-                        <? endforeach; ?>
+                        @endforeach
 
                     </div>
                     <!-- /.row -->
@@ -114,9 +99,9 @@
 
             </div>
 
-            <? foreach($arRoi as $roi): ?>
-            <input type="hidden" id="<?=$roi['id_value']?>-val">
-            <? endforeach; ?>
+            @foreach($arRoi as $roi)
+            <input type="hidden" id="{{ $roi['id_value'] }}-val">
+            @endforeach
         </header>
 
 
@@ -171,39 +156,30 @@
                 <div class="col-lg-8 col-sm-8 col-xs-12">
 
                     <div class="row boxes">
-                        <?
-                        $arRoiTraff = array(
-                            array("id_name" => "bg-change-prcli", "id_value" => "perclicks", "theme" => "danger", "name" => "CLI", "text" => __('Clicks'), "type" => " "),
-                            array("id_name" => "bg-change-pract", "id_value" => "peractions", "theme" => "danger", "name" => "ACT", "text" => __('Targeted actions'), "type" => " "),
-                            array("id_name" => "bg-change-prsal", "id_value" => "persales", "theme" => "danger", "name" => "SAL", "text" => __('Sales'), "type" => " "),
-                            array("id_name" => "bg-change-prrev", "id_value" => "perrevenue", "theme" => "danger", "name" => "REV", "text" => __('Income'), "type" => "₽"),
-                            array("id_name" => "bg-change-prroi", "id_value" => "perroi", "theme" => "warning", "name" => "ROI", "text" => __('Return on investment'), "type" => "%"),
-                        )
-                        ?>
 
-                        <? foreach($arRoiTraff as $key => $roi): ?>
-                        <div class="col-lg-<?=($key == 4) ? 12 : 6?> col-sm-<?=($key == 4) ? 12 : 6?> col-xs-12">
-                            <div class="box box-solid box-<?=$roi['theme']?>">
+                        @foreach($arRoiTraff as $key => $roi)
+                        <div class="col-lg-{{ $key == 4 ? 12 : 6 }} col-sm-{{ $key == 4 ? 12 : 6 }} col-xs-12">
+                            <div class="box box-solid box-{{ $roi['theme'] }}">
                                 <div class="box-header">
-                                    <div class="box-name" id="<?=$roi['id_name']?>"><?=$roi['name']?></div>
-                                    <div class="box-text"><?=$roi['text']?></div>
+                                    <div class="box-name" id="{{ $roi['id_name'] }}">{{ $roi['name'] }}</div>
+                                    <div class="box-text">{{ $roi['text'] }}</div>
                                 </div><!-- /.box-header -->
                                 <div class="box-body text-center">
-                                    <span id="<?=$roi['id_value']?>"></span><?=$roi['type']?>
+                                    <span id="{{ $roi['id_value'] }}"></span>{{ $roi['type'] }}
                                 </div><!-- /.box-body -->
                             </div>
                         </div>
                         <!-- /.col -->
-                        <? endforeach; ?>
+                        @endforeach
 
                     </div>
                     <!-- /.row -->
                 </div>
             </div>
 
-            <? foreach($arRoiTraff as $roi): ?>
-            <input type="hidden" id="rez-<?=$roi['id_value']?>">
-            <? endforeach; ?>
+            @foreach($arRoiTraff as $roi)
+            <input type="hidden" id="rez-{{ $roi['id_value'] }}">
+            @endforeach
 
         </header>
 

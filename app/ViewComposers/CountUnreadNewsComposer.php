@@ -11,11 +11,23 @@ class CountUnreadNewsComposer
 {
     public function compose(View $view)
     {
-        $notification = NewsNotification::where('user_id', '=', Auth::id())->first();
-        if (isset($notification)) {
-            $count = News::where('created_at', '>=', $notification->last_check)->get()->count();
+        if (! Auth::check()) {
+            $view->with('count', 0);
+
+            return;
+        }
+
+        if (cabinet_skip_heavy_web()) {
+            $view->with('count', 0);
+
+            return;
+        }
+
+        $notification = NewsNotification::where('user_id', Auth::id())->first();
+        if ($notification !== null) {
+            $count = News::where('created_at', '>=', $notification->last_check)->count();
         } else {
-            $count = News::all()->count();
+            $count = News::count();
         }
 
         $view->with(compact('count'));

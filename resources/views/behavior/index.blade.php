@@ -34,10 +34,10 @@
                         <td><a href="{{ route('behavior.show', [$behavior->id]) }}"
                                class="text-muted text-bold">{{ $behavior->domain }}</a>
                         </td>
-                        <td>{{ $behavior->phrases()->count() }}</td>
-                        <td>{{ $behavior->phrases()->success()->count() }}</td>
-                        <td>{{ $behavior->phrases()->fail()->count() }}</td>
-                        <td><a href="{{ route('behavior.unique.phrases', $behavior->id) }}">{{ $behavior->phrases()->unique()->get()->count() }}</a></td>
+                        <td>{{ $behavior->phrases_count }}</td>
+                        <td>{{ $behavior->phrases_success_count }}</td>
+                        <td>{{ $behavior->phrases_fail_count }}</td>
+                        <td><a href="{{ route('behavior.unique.phrases', $behavior->id) }}">{{ $uniquePhraseCounts[$behavior->id] ?? 0 }}</a></td>
                         <td>
                             <a href="{{ route('behavior.show', [$behavior->id]) }}" class="btn btn-app">
                                 <i class="fas fa-project-diagram"></i> {{ __('Go to project') }}

@@ -51,8 +51,10 @@ class ProfilesController extends Controller
         $name = ($tariff) ? $tariff->name() : null;
 
         $tariffProperties = [];
-        $tariffSettings = $user->tariffSettings()->get();
-        foreach ($tariffSettings as $tariffSetting){
+        $tariffSettings = $user->tariffSettings()
+            ->with(['field.property'])
+            ->get();
+        foreach ($tariffSettings as $tariffSetting) {
             $property = $tariffSetting->field->property;
             $tariffProperties[$property['id']]['setting'] = $property;
             $tariffProperties[$property['id']]['ids'][] = $tariffSetting['id'];

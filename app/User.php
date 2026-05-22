@@ -60,16 +60,6 @@ class User extends Authenticatable implements MustVerifyEmail
     ];
 
     /**
-     *
-     *
-     * @var array
-     */
-    protected $with = [
-        'pay',
-        'roles',
-    ];
-
-    /**
      * Delete no verify users
      * @var int
      */
@@ -77,11 +67,24 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function getImageAttribute($value)
     {
-        $public = Storage::disk('public');
-        if(!Storage::exists($value))
-            return $public->url('avatar/user-icon.png');
+        if (! $value) {
+            return asset('img/user-icon.svg');
+        }
 
-        return $public->url($value);
+        $public = Storage::disk('public');
+
+        if ($public->exists($value)) {
+            return $public->url($value);
+        }
+
+        // Local: avatar лежит на проде (storage не синхронизирован на Mac).
+        if (app()->environment('local')) {
+            $remote = rtrim(env('CABINET_STORAGE_URL', 'https://lk.redbox.su'), '/');
+
+            return $remote . '/storage/' . ltrim($value, '/');
+        }
+
+        return asset('img/user-icon.svg');
     }
 
     /**

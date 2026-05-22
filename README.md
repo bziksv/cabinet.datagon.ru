@@ -1,72 +1,42 @@
-<p align="center"><img src="https://res.cloudinary.com/dtfbvvkyp/image/upload/v1566331377/laravel-logolockup-cmyk-red.svg" width="400"></p>
+# cabinet.datagon.ru (Laravel / кабинет)
 
-<p align="center">
-<a href="https://travis-ci.org/laravel/framework"><img src="https://travis-ci.org/laravel/framework.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://poser.pugx.org/laravel/framework/d/total.svg" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://poser.pugx.org/laravel/framework/v/stable.svg" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://poser.pugx.org/laravel/framework/license.svg" alt="License"></a>
-</p>
+Локальная папка для workspace рядом с **datagon.ru**.
 
-## About Laravel
+**Git:** [github.com/bziksv/cabinet.datagon.ru](https://github.com/bziksv/cabinet.datagon.ru). Инструкция: [datagon.ru/docs/cabinet-git.md](../datagon.ru/docs/cabinet-git.md).
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Деплой и серверы (актуально)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+**Не дублировать здесь** — каноническая заметка в маркетинг-репозитории:
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+**[datagon.ru/docs/cabinet-servers.md](../datagon.ru/docs/cabinet-servers.md)** · деплой VPS: **[cabinet-deploy.md](../datagon.ru/docs/cabinet-deploy.md)**
 
-## Learning Laravel
+Кратко (май 2026):
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+| | Старый | Новый |
+|---|--------|--------|
+| IP | `178.250.157.140` | `155.212.171.103` |
+| Домен | lk.redbox.su | cabinet.datagon.ru |
+| Порт | (старый VPS) | **3002** (nginx → `127.0.0.1:3002`; datagon.ru — **3001**) |
+| Путь | `/var/www/redbox.su/data/www/lk.redbox.su` | `/var/www/cabinet_data_usr/data/www/cabinet.datagon.ru` |
+| БД | **здесь** | подключение к старому серверу, пока БД не перенесли |
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 1500 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Прод для пользователей пока **lk.redbox.su**; файлы на новом VPS уже скопированы.
 
-## Laravel Sponsors
+## Локальный запуск (Mac)
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+1. `.env` с VPS (имя файла именно **`.env`**, не `env`).
+2. PHP **7.4**: `brew install shivammathur/php/php@7.4`, в PATH: `/opt/homebrew/opt/php@7.4/bin`.
+3. `composer install --no-dev`
+4. `./scripts/dev-serve.sh` → http://localhost:3002 (3 PHP-воркера + прокси; остановка: `./scripts/dev-parallel.sh stop`)
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[British Software Development](https://www.britishsoftware.co)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- [UserInsights](https://userinsights.com)
-- [Fragrantica](https://www.fragrantica.com)
-- [SOFTonSOFA](https://softonsofa.com/)
-- [User10](https://user10.com)
-- [Soumettre.fr](https://soumettre.fr/)
-- [CodeBrisk](https://codebrisk.com)
-- [1Forge](https://1forge.com)
-- [TECPRESSO](https://tecpresso.co.jp/)
-- [Runtime Converter](http://runtimeconverter.com/)
-- [WebL'Agence](https://weblagence.com/)
-- [Invoice Ninja](https://www.invoiceninja.com)
-- [iMi digital](https://www.imi-digital.de/)
-- [Earthlink](https://www.earthlink.ro/)
-- [Steadfast Collective](https://steadfastcollective.com/)
-- [We Are The Robots Inc.](https://watr.mx/)
-- [Understand.io](https://www.understand.io/)
-- [Abdel Elrafa](https://abdelelrafa.com)
-- [Hyper Host](https://hyper.host)
+В `.env` для Mac: **`DB_HOST=178.250.157.140`** (не `127.0.0.1`). Подробнее: [datagon.ru/docs/cabinet-git.md](../datagon.ru/docs/cabinet-git.md).
 
-## Contributing
+## Эталон UI (обязательно для вёрстки)
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+**cabinet.datagon.ru** (local **:3002**, прод **cabinet.datagon.ru**) — все UI-элементы для Blade-страниц **берём из шаблона AdminLTE** в `public/html/`:
 
-## Security Vulnerabilities
+- **URL:** http://localhost:3002/html/ (AdminLTE 4.0.0, см. `public/html/VERSION.txt`)
+- **Как:** открыть подходящую демо-страницу (`forms/`, `tables/`, `widgets/`, `layout/`, …) → подобрать блок → перенести разметку в `resources/views/`
+- **Обновление шаблона:** `./scripts/sync-lte-html.sh --force`
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-source software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Полная инструкция: **[datagon.ru/docs/cabinet-reference.md](../datagon.ru/docs/cabinet-reference.md)** (раздел «Эталон UI кабинета»). Рабочий `layouts/app.blade.php` пока AdminLTE 3 — при переносе из v4 см. [migration guide](https://adminlte.io/themes/v4/docs/migration.html).

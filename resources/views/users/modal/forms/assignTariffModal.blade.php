@@ -1,6 +1,6 @@
 <div class="form-group">
     {!! Form::label('users', __('Select users')) !!}
-    {!! Form::select('users[]', $users->pluck('email', 'id'), null, ['class' => 'custom-select', 'id' => 'select-users', 'multiple' => 'multiple']) !!}
+    {!! Form::select('users[]', [], null, ['class' => 'custom-select', 'id' => 'select-users', 'multiple' => 'multiple', 'data-placeholder' => __('Start typing email (min 2 characters)')]) !!}
     @error('users') <span class="error invalid-feedback">{{ $message }}</span> @enderror
 </div>
 

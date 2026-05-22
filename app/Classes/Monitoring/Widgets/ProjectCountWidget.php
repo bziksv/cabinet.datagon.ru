@@ -3,9 +3,6 @@
 
 namespace App\Classes\Monitoring\Widgets;
 
-use App\User;
-use Illuminate\Support\Facades\Auth;
-
 class ProjectCountWidget extends WidgetsAbstract
 {
     public function __construct()
@@ -18,9 +15,7 @@ class ProjectCountWidget extends WidgetsAbstract
 
     public function generateTitle(): string
     {
-        /** @var User $user */
-        $user = Auth::user();
-        return $user->monitoringProjects()->count();
+        return (string) MonitoringWidgetUserCounts::monitoringProjectCount();
     }
 
     public function generateDesc(): string

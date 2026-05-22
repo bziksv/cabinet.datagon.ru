@@ -11,10 +11,14 @@ class PositionLimit extends Limits
 {
     private $name = "monitoring";
 
-    public function __construct(int $user)
+    /**
+     * @param User|int $user
+     */
+    public function __construct($user)
     {
-        /** @var User $user */
-        $user = User::find($user);
+        if (! $user instanceof User) {
+            $user = User::find($user);
+        }
         $this->user = $user;
 
         $tariff = $user->tariff()->getAsArray();

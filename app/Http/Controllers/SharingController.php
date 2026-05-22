@@ -18,7 +18,13 @@ class SharingController extends Controller
      */
     public function index(): View
     {
-        $projects = ProjectRelevanceHistory::where('user_id', '=', Auth::id())->get();
+        $projects = ProjectRelevanceHistory::where('user_id', Auth::id())
+            ->with([
+                'relevanceTags:id,name,color',
+                'sharing.user:id,email,name,last_name',
+            ])
+            ->orderByDesc('id')
+            ->get(['id', 'user_id', 'name']);
         $admin = User::isUserAdmin();
 
         return view('relevance-analysis.sharing.index', [
@@ -291,7 +297,13 @@ class SharingController extends Controller
      */
     public function accessProject(): View
     {
-        $projects = RelevanceSharing::where('user_id', '=', Auth::id())->get();
+        $projects = RelevanceSharing::where('user_id', Auth::id())
+            ->with([
+                'item:id,name,user_id',
+                'owner:id,name,email,last_name',
+            ])
+            ->orderByDesc('id')
+            ->get();
         $admin = User::isUserAdmin();
         $config = RelevanceAnalysisConfig::first();
 

@@ -32,7 +32,9 @@ class MonitoringKeywordPricesController extends Controller
         if(!$this->project)
             abort('404');
 
-        $this->regions = $this->project->searchengines()->with('location')->get();
+        $this->regions = $this->project->searchengines()
+            ->with(['location:id,lr,name'])
+            ->get();
         $this->request = $request;
     }
 

@@ -9,6 +9,9 @@ use App\Classes\Monitoring\PanelButtons\Templates\DefaultButtonTemplate;
 
 class ProjectButton extends Buttons
 {
+    /** @var int|null */
+    private static $monitoringProjectsCount;
+
     protected function createButton(): ButtonTemplate
     {
         $temp = new DefaultButtonTemplate();
@@ -22,6 +25,10 @@ class ProjectButton extends Buttons
 
     private function getCount()
     {
-       return $this->user->monitoringProjects()->count();
+        if (self::$monitoringProjectsCount === null) {
+            self::$monitoringProjectsCount = $this->user->monitoringProjects()->count();
+        }
+
+        return self::$monitoringProjectsCount;
     }
 }

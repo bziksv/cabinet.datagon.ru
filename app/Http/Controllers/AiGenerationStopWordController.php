@@ -11,10 +11,11 @@ class AiGenerationStopWordController extends Controller
 {
 public function index()
     {
-        $words = AiGenerationStopWords::with('category')->where('user_id', Auth::id())->latest()->get();
-        $categories = AiGenerationStopWordCategory::where('user_id', Auth::id())->orderBy('name')->get();
+        $categories = AiGenerationStopWordCategory::where('user_id', Auth::id())
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
-        return view('ai-generation.stopwords', compact('words', 'categories'));
+        return view('ai-generation.stopwords', compact('categories'));
     }
 
     public function store(Request $request)
@@ -82,7 +83,11 @@ public function index()
 
     public function datatable()
     {
-        $words = AiGenerationStopWords::with('category')->where('user_id', Auth::id())->latest()->get();
+        $words = AiGenerationStopWords::with('category:id,name')
+            ->where('user_id', Auth::id())
+            ->latest()
+            ->get(['id', 'user_id', 'category_id', 'word', 'created_at']);
+
         return response()->json(['data' => $words]);
     }
 }

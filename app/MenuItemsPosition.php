@@ -2,10 +2,9 @@
 
 namespace App;
 
-use Carbon\Carbon;
+use App\Services\MenuProjectRegistry;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
-use Throwable;
 
 class MenuItemsPosition extends Model
 {
@@ -13,14 +12,37 @@ class MenuItemsPosition extends Model
 
     protected $guarded = [];
 
+    /** @var array|null Кэш на один HTTP-запрос (index + MenuComposer). */
+    private static $sortMenuCache;
+
+    public static function clearSortMenuCache(): void
+    {
+        self::$sortMenuCache = null;
+    }
+
     public static function sortMenu(): array
     {
-        if (User::isUserAdmin()) {
-            $items = MainProject::orderBy('position', 'asc')->get();
-        } else {
-            $items = MainProject::where('show', '=', 1)->orderBy('position', 'asc')->get();
+        if (self::$sortMenuCache !== null) {
+            return self::$sortMenuCache;
         }
-        $items = $items->toArray();
+
+        $columns = ['id', 'title', 'description', 'link', 'icon', 'access', 'position', 'show'];
+
+        if (MenuProjectRegistry::isLoaded()) {
+            $items = MenuProjectRegistry::forSortMenu()
+                ->map(static function (MainProject $project) use ($columns) {
+                    return $project->only($columns);
+                })
+                ->values()
+                ->all();
+        } else {
+            $query = MainProject::query()->orderBy('position', 'asc')->select($columns);
+            if (User::isUserAdmin()) {
+                $items = $query->get()->toArray();
+            } else {
+                $items = $query->where('show', '=', 1)->get()->toArray();
+            }
+        }
         $config = MenuItemsPosition::where('user_id', '=', Auth::id())->first();
 
         if (isset($config)) {
@@ -57,8 +79,12 @@ class MenuItemsPosition extends Model
                 }
             }
 
+            self::$sortMenuCache = $newPositions;
+
             return $newPositions;
         }
+
+        self::$sortMenuCache = $items;
 
         return $items;
     }

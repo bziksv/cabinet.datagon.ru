@@ -2,10 +2,20 @@
 
 namespace App\Http\Middleware;
 
+use Closure;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as Middleware;
 
 class VerifyCsrfToken extends Middleware
 {
+    public function handle($request, Closure $next)
+    {
+        if (app()->environment('local')) {
+            return $next($request);
+        }
+
+        return parent::handle($request, $next);
+    }
+
     /**
      * Indicates whether the XSRF-TOKEN cookie should be set on the response.
      *

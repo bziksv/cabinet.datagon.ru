@@ -11,9 +11,11 @@
             @foreach($items as $item)
                 @include('manage-access.partials._items', ['item' => $item])
 
-                @foreach($item->permissions as $permissions)
-                    @include('manage-access.partials._items_permissions', ['item' => $permissions])
-                @endforeach
+                @if($id === 'role')
+                    @foreach($item->permissions as $permissions)
+                        @include('manage-access.partials._items_permissions', ['item' => $permissions])
+                    @endforeach
+                @endif
             @endforeach
         </ul>
     </div>

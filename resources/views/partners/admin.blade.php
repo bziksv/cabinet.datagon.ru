@@ -119,7 +119,7 @@
                         @foreach($elem['items'] as $item)
                             <tr>
                                 <td>
-                                    <img class="card-img-top" src="../../storage/{{ $item['image'] }}" alt="image">
+                                    <img class="card-img-top" src="{{ cabinet_storage_url($item['image']) }}" alt="{{ $item['name_ru'] }}">
                                 </td>
                                 <td>{{ $item['name_ru'] }}</td>
                                 <td style="max-width: 250px; min-height: 250px;">{{ $item['description_ru'] }}</td>

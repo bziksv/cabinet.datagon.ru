@@ -8,18 +8,33 @@ use Illuminate\Support\Facades\Auth;
 
 class ProjectsStatisticFacade
 {
+    /** @var bool|null */
+    private static $todayResolved = false;
+
+    /** @var \Illuminate\Support\Collection|null */
+    private static $todayProjects;
+
     static public function getTodayProjects()
     {
+        if (self::$todayResolved) {
+            return self::$todayProjects;
+        }
+
+        self::$todayResolved = true;
+
         $user = Auth::user();
 
         $statistics = $user->statistics()->selectMonitoringProjectsToday()->first();
 
-        if(!$statistics)
+        if (!$statistics) {
+            self::$todayProjects = null;
+
             return null;
+        }
 
-        $projects = $statistics['monitoring_project'];
+        self::$todayProjects = $statistics['monitoring_project'];
 
-        return $projects;
+        return self::$todayProjects;
     }
 
     static public function getMidTopPct(string $filedPct): float

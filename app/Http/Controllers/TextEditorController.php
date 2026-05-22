@@ -30,7 +30,10 @@ class TextEditorController extends Controller
      */
     public function index()
     {
-        $projects = Project::where('user_id', Auth::id())->get()->sortByDesc('id');
+        $projects = Project::where('user_id', Auth::id())
+            ->with('descriptions')
+            ->orderByDesc('id')
+            ->get();
         if (count($projects) === 0) {
             return self::createView(false);
         }
@@ -62,7 +65,9 @@ class TextEditorController extends Controller
      */
     public function editProjectView(int $id)
     {
-        $project = Project::findOrFail($id);
+        $project = Project::query()
+            ->where('user_id', Auth::id())
+            ->findOrFail($id);
 
         return view('html-editor.edit-project', compact('project'));
     }
@@ -73,7 +78,9 @@ class TextEditorController extends Controller
      */
     protected function editProject(EditProjectRequest $request): RedirectResponse
     {
-        $project = Project::find($request->project_id);
+        $project = Project::query()
+            ->where('user_id', Auth::id())
+            ->findOrFail($request->project_id);
         $project->update([
             'project_name' => $request->project_name,
             'short_description' => $request->short_description
@@ -125,7 +132,12 @@ class TextEditorController extends Controller
     public function editDescriptionView(string $id)
     {
         $lang = Auth::user()->lang;
-        $project = ProjectDescription::where('id', $id)->first();
+        $project = ProjectDescription::query()
+            ->join('projects', 'projects.id', '=', 'project_description.project_id')
+            ->where('projects.user_id', Auth::id())
+            ->where('project_description.id', $id)
+            ->select('project_description.*')
+            ->firstOrFail();
 
         return view('html-editor.edit-description', compact('project', 'lang'));
     }
@@ -143,7 +155,12 @@ class TextEditorController extends Controller
             return $this->editDescriptionView($request->description_id);
         }
 
-        $description = ProjectDescription::where('id', $request->description_id)->first();
+        $description = ProjectDescription::query()
+            ->join('projects', 'projects.id', '=', 'project_description.project_id')
+            ->where('projects.user_id', Auth::id())
+            ->where('project_description.id', $request->description_id)
+            ->select('project_description.*')
+            ->firstOrFail();
         $description->description = $request->description;
         $description->save();
         flash()->overlay(__('Text was successfully change'), ' ')
@@ -180,9 +197,12 @@ class TextEditorController extends Controller
             return Redirect::route('HTML.editor');
         }
 
-        $projects = Project::where('user_id', $user->id)->get();
+        $projects = Project::query()
+            ->where('user_id', $user->id)
+            ->orderBy('project_name')
+            ->get(['id', 'project_name']);
 
-        return view('html-editor.create-description', compact('lang'))->with('projects', $projects);
+        return view('html-editor.create-description', compact('lang', 'projects'));
     }
 
     /**
@@ -197,7 +217,10 @@ class TextEditorController extends Controller
             return Redirect::back();
         }
 
-        self::saveDescription($request->description, $request->project_id);
+        $project = Project::query()
+            ->where('user_id', Auth::id())
+            ->findOrFail($request->project_id);
+        self::saveDescription($request->description, $project->id);
         flash()->overlay(__('Text was saved successfully'), ' ')
             ->success();
 

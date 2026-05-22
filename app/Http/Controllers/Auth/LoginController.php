@@ -13,6 +13,10 @@ use Illuminate\View\View;
 
 class LoginController extends Controller
 {
+    use AuthenticatesUsers {
+        login as protected traitLogin;
+        logout as protected traitLogout;
+    }
     /*
     |--------------------------------------------------------------------------
     | Login Controller
@@ -23,8 +27,6 @@ class LoginController extends Controller
     | to conveniently provide its functionality to your applications.
     |
     */
-
-    use AuthenticatesUsers;
 
     /**
      * Where to redirect users after login.
@@ -49,11 +51,50 @@ class LoginController extends Controller
      */
     public function showLoginForm(): View
     {
-        $lang = collect(Storage::disk('lang')->files())->map(function ($val) {
-            return Str::before($val, '.');
-        });
+        static $langCache = null;
 
-        return view('auth.login', ['lang' => $lang]);
+        if ($langCache === null) {
+            $langCache = collect(Storage::disk('lang')->files())->map(function ($val) {
+                return Str::before($val, '.');
+            });
+        }
+
+        return view('auth.login', ['lang' => $langCache]);
+    }
+
+    public function logout(Request $request)
+    {
+        session()->forget([
+            'cabinet_menu_modules',
+            'cabinet_menu_modules_v2',
+            'cabinet_menu_modules_v3',
+            'cabinet_menu_modules_v4',
+            'cabinet_home_projects',
+        ]);
+
+        return $this->traitLogout($request);
+    }
+
+    /**
+     * Удалённая БД — авторизация может идти долго; не обрывать на 60s.
+     */
+    public function login(Request $request)
+    {
+        set_time_limit(300);
+
+        $response = $this->traitLogin($request);
+
+        if (Auth::check()) {
+            session()->forget([
+                'cabinet_menu_modules',
+                'cabinet_menu_modules_v2',
+            'cabinet_menu_modules_v3',
+            'cabinet_menu_modules_v4',
+                'cabinet_home_projects',
+            ]);
+        }
+
+        return $response;
     }
 
 }

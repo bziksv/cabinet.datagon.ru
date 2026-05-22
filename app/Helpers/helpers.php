@@ -91,7 +91,7 @@ if (! function_exists('localize_cabinet_url')) {
 if (! function_exists('cabinet_storage_url')) {
     /**
      * URL файла из storage/app/public (симлинк public/storage).
-     * Local: если файла нет на диске — CABINET_STORAGE_URL (прод), как у аватаров.
+     * Если файла нет на диске — CABINET_STORAGE_URL (обычно lk), пока storage не на cabinet.
      */
     function cabinet_storage_url(?string $path): ?string
     {
@@ -105,12 +105,15 @@ if (! function_exists('cabinet_storage_url')) {
             return asset('storage/' . $path);
         }
 
-        if (app()->environment('local')) {
-            $remote = rtrim(env('CABINET_STORAGE_URL', 'https://lk.redbox.su'), '/');
+        $remote = rtrim((string) env('CABINET_STORAGE_URL', ''), '/');
+        if ($remote === '' && app()->environment('local')) {
+            $remote = 'https://lk.redbox.su';
+        }
 
+        if ($remote !== '') {
             return $remote . '/storage/' . $path;
         }
 
-        return asset('storage/' . $path);
+        return null;
     }
 }

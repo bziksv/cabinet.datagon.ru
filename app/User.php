@@ -24,7 +24,6 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Spatie\Permission\Traits\HasRoles;
 use Spatie\Url\Url as SpatieUrl;
-use Illuminate\Support\Facades\Storage;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -71,20 +70,7 @@ class User extends Authenticatable implements MustVerifyEmail
             return asset('img/user-icon.svg');
         }
 
-        $public = Storage::disk('public');
-
-        if ($public->exists($value)) {
-            return $public->url($value);
-        }
-
-        // Local: avatar лежит на проде (storage не синхронизирован на Mac).
-        if (app()->environment('local')) {
-            $remote = rtrim(env('CABINET_STORAGE_URL', 'https://lk.redbox.su'), '/');
-
-            return $remote . '/storage/' . ltrim($value, '/');
-        }
-
-        return asset('img/user-icon.svg');
+        return cabinet_storage_url($value) ?? asset('img/user-icon.svg');
     }
 
     /**

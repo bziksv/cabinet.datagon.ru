@@ -54,7 +54,7 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
         }
 
         var table = $('#unigram').DataTable({
-            "order": [[2, "desc"]],
+            "order": [[4, "desc"]],
             "pageLength": count,
             "searching": true,
             dom: 'lBfrtip',
@@ -129,7 +129,7 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
 
         $.fn.dataTable.ext.search.push(function (settings, data) {
             var minIdf = parseFloat($('#minIdf').val());
-            var maxIdf = parseFloat($('maxIdf').val());
+            var maxIdf = parseFloat($('#maxIdf').val());
             var IDF = parseFloat(data[3]);
             return isUnigram(minIdf, maxIdf, IDF, settings)
         });
@@ -143,7 +143,7 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
         $.fn.dataTable.ext.search.push(function (settings, data) {
             var minInter = parseFloat($('#minInter').val());
             var maxInter = parseFloat($('#maxInter').val());
-            var inter = parseFloat(data[4])
+            var inter = parseFloat(data[5])
             return isUnigram(minInter, maxInter, inter, settings)
         });
         $('#minInter, #maxInter').keyup(function () {
@@ -156,7 +156,7 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
         $.fn.dataTable.ext.search.push(function (settings, data) {
             var minReSpam = parseFloat($('#minReSpam').val());
             var maxReSpam = parseFloat($('#maxReSpam').val());
-            var reSpam = parseFloat(data[5])
+            var reSpam = parseFloat(data[6])
             return isUnigram(minReSpam, maxReSpam, reSpam, settings)
         });
         $('#minReSpam, #maxReSpam').keyup(function () {
@@ -170,7 +170,7 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
         $.fn.dataTable.ext.search.push(function (settings, data) {
             var minAVG = parseFloat($('#minAVG').val());
             var maxAVG = parseFloat($('#maxAVG').val());
-            var AVG = parseFloat(data[6])
+            var AVG = parseFloat(data[7])
             return isUnigram(minAVG, maxAVG, AVG, settings)
         });
         $('#minAVG, #maxAVG').keyup(function () {
@@ -184,7 +184,7 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
         $.fn.dataTable.ext.search.push(function (settings, data) {
             var minAVGText = parseFloat($('#minAVGText').val());
             var maxAVGText = parseFloat($('#maxAVGText').val());
-            var count = parseFloat(data[7])
+            var count = parseFloat(data[8])
             return isUnigram(minAVGText, maxAVGText, count, settings)
         });
         $('#minAVGText, #maxAVGText').keyup(function () {
@@ -198,7 +198,7 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
         $.fn.dataTable.ext.search.push(function (settings, data) {
             var minInYourPage = parseFloat($('#minInYourPage').val());
             var maxInYourPage = parseFloat($('#maxInYourPage').val());
-            var count = parseFloat(data[8])
+            var count = parseFloat(data[9])
             return isUnigram(minInYourPage, maxInYourPage, count, settings)
         });
         $('#minInYourPage, #maxInYourPage').keyup(function () {
@@ -212,7 +212,7 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
         $.fn.dataTable.ext.search.push(function (settings, data) {
             var minTextIYP = parseFloat($('#minTextIYP').val());
             var maxTextIYP = parseFloat($('#maxTextIYP').val());
-            var count = parseFloat(data[9])
+            var count = parseFloat(data[10])
             return isUnigram(minTextIYP, maxTextIYP, count, settings)
         });
         $('#minTextIYP, #maxTextIYP').keyup(function () {
@@ -226,7 +226,7 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
         $.fn.dataTable.ext.search.push(function (settings, data) {
             var minAVGLink = parseFloat($('#minAVGLink').val());
             var maxAVGLink = parseFloat($('#maxAVGLink').val());
-            var count = parseFloat(data[10])
+            var count = parseFloat(data[11])
             return isUnigram(minAVGLink, maxAVGLink, count, settings)
         });
         $('#minAVGLink, #maxAVGLink').keyup(function () {
@@ -240,7 +240,7 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
         $.fn.dataTable.ext.search.push(function (settings, data) {
             var minLinkIYP = parseFloat($('#minLinkIYP').val());
             var maxLinkIYP = parseFloat($('#maxLinkIYP').val());
-            var count = parseFloat(data[11])
+            var count = parseFloat(data[12])
             return isUnigram(minLinkIYP, maxLinkIYP, count, settings)
         });
         $('#minLinkIYP, #maxLinkIYP').keyup(function () {
@@ -255,7 +255,7 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
             $.fn.dataTable.ext.search.push(function (settings, data) {
                 var minAVGPassages = parseFloat($('#minAVGPassages').val());
                 var maxAVGPassages = parseFloat($('#maxAVGPassages').val());
-                var count = parseFloat(data[12])
+                var count = parseFloat(data[13])
                 return isUnigram(minAVGPassages, maxAVGPassages, count, settings)
             });
             $('#minAVGPassages, #maxAVGPassages').keyup(function () {
@@ -269,7 +269,7 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
             $.fn.dataTable.ext.search.push(function (settings, data) {
                 var minPassages = parseFloat($('#minPassages').val());
                 var maxPassages = parseFloat($('#maxPassages').val());
-                var count = parseFloat(data[13])
+                var count = parseFloat(data[14])
                 return isUnigram(minPassages, maxPassages, count, settings)
             });
             $('#minPassages, #maxPassages').keyup(function () {
@@ -294,6 +294,7 @@ function renderMainTr(key, wordWorm, searchPassages) {
     let className = wordWorm['total']['danger'] ? "bg-warning-elem" : ""
     let tf = crop(wordWorm['total']['tf'])
     let idf = crop(wordWorm['total']['idf'])
+    let score = crop(wordWorm['total']['score'] ?? wordWorm['total']['tf'])
     let numberOccurrences = crop(wordWorm['total']['numberOccurrences'])
     let reSpam = crop(wordWorm['total']['reSpam'])
     let avgInTotalCompetitors = wordWorm['total']['avgInTotalCompetitors']
@@ -322,6 +323,7 @@ function renderMainTr(key, wordWorm, searchPassages) {
         "   <td>" + key + lockBlock + "</td>" +
         "   <td>" + tf + "</td>" +
         "   <td>" + idf + "</td>" +
+        "   <td>" + score + "</td>" +
         "   <td data-order='" + numberOccurrences + "'>" + numberOccurrences + "" +
         "       <span class='__helper-link ui_tooltip_w'>" +
         "           <i class='fa fa-paperclip'></i>" +
@@ -360,6 +362,7 @@ function renderChildTr(elem, key, word, stats) {
     });
     let tf = crop(stats['tf'])
     let idf = crop(stats['idf'])
+    let score = crop(stats['score'] ?? stats['tf'])
     let numberOccurrences = crop(stats['numberOccurrences'])
     let reSpam = stats['reSpam']
     let avgInText = stats['avgInText']
@@ -405,6 +408,7 @@ function renderChildTr(elem, key, word, stats) {
         "   <td>" + word + lockBlock + "</td>" +
         "   <td>" + tf + "</td>" +
         "   <td>" + idf + "</td>" +
+        "   <td>" + score + "</td>" +
         "   <td>" + numberOccurrences + "" +
         "       <span class='__helper-link ui_tooltip_w'>" +
         "           <i class='fa fa-paperclip'></i>" +

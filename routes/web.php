@@ -34,6 +34,10 @@ Route::post('email/verify/code', 'Auth\VerificationController@verifyCode')->name
 
 //Public method
 Route::get('public/http-headers/{id}', 'PublicController@httpHeaders');
+Route::get('public/share/relevance/{token}', 'RelevancePublicShareController@showProject')->name('relevance.public.share.view');
+Route::get('public/share/relevance/{token}/history/{id}', 'RelevancePublicShareController@showHistory')->name('relevance.public.share.history');
+Route::post('public/share/relevance/{token}/details', 'RelevancePublicShareController@getDetails')->name('relevance.public.share.details');
+Route::get('public/share/text-analyzer/{token}', 'TextAnalyzerPublicShareController@show')->name('text.analyzer.public.share.view');
 Route::post('/balance-add/result', 'BalanceAddController@result')->name('balance.add.result');
 Route::get('/personal-data/ru', 'AccessController@getRuPersonalData');
 Route::get('/personal-data/en', 'AccessController@getEnPersonalData');
@@ -194,6 +198,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('text-analyzer', 'TextAnalyzerController@index')->name('text.analyzer.view');
     Route::get('/redirect-to-text-analyzer/{url}', 'TextAnalyzerController@redirectToAnalyse')->name('text.analyzer.redirect');
     Route::post('text-analyzer', 'TextAnalyzerController@analyze')->name('text.analyzer');
+    Route::post('text-analyzer/export/excel', 'TextAnalyzerController@exportExcel')->name('text.analyzer.export.excel');
+    Route::post('text-analyzer/export/pdf', 'TextAnalyzerController@exportPdf')->name('text.analyzer.export.pdf');
+    Route::post('text-analyzer/public-share', 'TextAnalyzerController@createPublicShare')->name('text.analyzer.public.share.create');
+    Route::post('text-analyzer/public-share/revoke', 'TextAnalyzerController@revokePublicShare')->name('text.analyzer.public.share.revoke');
 
     Route::get('news', 'NewsController@index')->name('news');
     Route::get('/create-news', 'NewsController@createView')->name('create.news');
@@ -411,6 +419,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/remove-access-to-my-project', 'SharingController@removeAccess')->name('remove.access.to.my.project');
     Route::post('/remove-guest-access', 'SharingController@removeGuestAccess')->name('remove.guest.access');
     Route::post('/change-access-to-my-project', 'SharingController@changeAccess')->name('change.access.to.my.project');
+    Route::post('/create-public-share', 'SharingController@createPublicShare')->name('relevance.public.share.create');
+    Route::post('/revoke-public-share', 'SharingController@revokePublicShare')->name('relevance.public.share.revoke');
     Route::get('/access-projects', 'SharingController@accessProject')->name('access.project');
     Route::get('/all-projects', 'AdminController@relevanceHistoryProjects')->name('all.relevance.projects');
     Route::get('/get-queue-count', 'AdminController@getCountQueue')->name('get.queue.count');

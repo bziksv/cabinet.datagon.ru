@@ -38,6 +38,11 @@ class ProjectRelevanceHistory extends Model
         return $this->hasMany(RelevanceSharing::class, 'project_id', 'id');
     }
 
+    public function publicShare(): HasOne
+    {
+        return $this->hasOne(RelevancePublicShare::class, 'project_id', 'id');
+    }
+
     public function relevanceTags(): BelongsToMany
     {
         return $this->belongsToMany(RelevanceTags::class, 'project_relevance_history_tags', 'relevance_history_id', 'tags_id');

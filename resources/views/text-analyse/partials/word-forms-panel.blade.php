@@ -22,6 +22,7 @@
                                 <th scope="col" class="text-end text-nowrap cabinet-ta-word-zone__col-count">{{ __('Count') }}</th>
                                 <th scope="col" class="text-end text-nowrap cabinet-ta-word-zone__col-metric">TF</th>
                                 <th scope="col" class="text-end text-nowrap cabinet-ta-word-zone__col-metric">IDF</th>
+                                <th scope="col" class="text-end text-nowrap cabinet-ta-word-zone__col-metric">{{ __('Score') }}</th>
                             </tr>
                             </thead>
                             <tbody>
@@ -35,6 +36,7 @@
                                         <td class="text-end font-monospace">{{ $parsedForm['count'] }}</td>
                                         <td class="text-end font-monospace text-secondary">{{ $parsedForm['tf'] ?? '—' }}</td>
                                         <td class="text-end font-monospace text-secondary">{{ $parsedForm['idf'] ?? '—' }}</td>
+                                        <td class="text-end font-monospace text-secondary">{{ $parsedForm['score'] ?? '—' }}</td>
                                     </tr>
                                 @endif
                             @endforeach

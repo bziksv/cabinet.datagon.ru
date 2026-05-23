@@ -64,7 +64,7 @@
                 <a class="nav-link search-link {{ $partnersActive ? 'active' : '' }}"
                    href="{{ route('partners') }}"
                    @if($partnersActive) aria-current="page" @endif>
-                    <i class="nav-icon bi bi-handshake"></i>
+                    <span class="nav-icon cabinet-sidebar-menu__icon"><i class="bi bi-people"></i></span>
                     <p class="module-name mb-0">{{ __('Partners') }}</p>
                 </a>
             </li>

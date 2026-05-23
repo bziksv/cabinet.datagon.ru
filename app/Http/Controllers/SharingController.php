@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\ProjectRelevanceHistory;
 use App\RelevanceAnalysisConfig;
 use App\RelevanceSharing;
+use App\RelevancePublicShare;
 use App\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -45,10 +46,12 @@ class SharingController extends Controller
         }
 
         $access = RelevanceSharing::where('project_id', '=', $project->id)->get();
+        $publicShare = RelevancePublicShare::where('project_id', $project->id)->active()->first();
 
         return view('relevance-analysis.sharing.sharing-config', [
             'project' => $project,
-            'access' => $access
+            'access' => $access,
+            'publicShare' => $publicShare,
         ]);
     }
 
@@ -289,6 +292,54 @@ class SharingController extends Controller
             'message' => "Доступы пользователя убраны",
             'code' => 200,
             'objects' => $objectsId
+        ]);
+    }
+
+    public function createPublicShare(Request $request): JsonResponse
+    {
+        $project = ProjectRelevanceHistory::where('id', '=', $request->project_id)
+            ->where('user_id', '=', Auth::id())
+            ->first();
+
+        if ($project === null) {
+            return response()->json([
+                'success' => false,
+                'message' => __('The project does not exist or does not belong to you'),
+                'code' => 415,
+            ]);
+        }
+
+        $share = RelevancePublicShare::issueForProject($project, Auth::id());
+
+        return response()->json([
+            'success' => true,
+            'message' => __('Public link created'),
+            'code' => 201,
+            'url' => $share->publicUrl(),
+            'expires_at' => $share->expires_at->format('d.m.Y H:i'),
+        ]);
+    }
+
+    public function revokePublicShare(Request $request): JsonResponse
+    {
+        $project = ProjectRelevanceHistory::where('id', '=', $request->project_id)
+            ->where('user_id', '=', Auth::id())
+            ->first();
+
+        if ($project === null) {
+            return response()->json([
+                'success' => false,
+                'message' => __('The project does not exist or does not belong to you'),
+                'code' => 415,
+            ]);
+        }
+
+        RelevancePublicShare::revokeForProject($project->id, Auth::id());
+
+        return response()->json([
+            'success' => true,
+            'message' => __('Public link revoked'),
+            'code' => 201,
         ]);
     }
 

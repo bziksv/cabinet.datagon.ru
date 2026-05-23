@@ -213,3 +213,86 @@ div.dataTables_wrapper div.dataTables_info {
 .card.collapsed-card .card-footer {
     display: none;
 }
+
+/* AdminLTE 3 custom-switch (красный OFF / зелёный ON) — разметка BS4 на layout AdminLTE 4 */
+.custom-control.custom-switch {
+    position: relative;
+    z-index: 1;
+    display: block;
+    min-height: 1.5rem;
+    padding-left: 2.25rem;
+}
+
+.custom-control.custom-switch .custom-control-input {
+    position: absolute;
+    left: 0;
+    z-index: -1;
+    width: 1rem;
+    height: 1.25rem;
+    opacity: 0;
+}
+
+.custom-control.custom-switch .custom-control-label {
+    position: relative;
+    margin-bottom: 0;
+    vertical-align: top;
+    cursor: pointer;
+}
+
+.custom-control.custom-switch .custom-control-label::before {
+    position: absolute;
+    top: 0.25rem;
+    left: -2.25rem;
+    display: block;
+    width: 1.75rem;
+    height: 1rem;
+    pointer-events: all;
+    content: "";
+    background-color: #dee2e6;
+    border: #adb5bd solid 1px;
+    border-radius: 0.5rem;
+    box-shadow: inset 0 0.1rem 0.15rem rgba(0, 0, 0, 0.08);
+}
+
+.custom-control.custom-switch .custom-control-label::after {
+    position: absolute;
+    top: calc(0.25rem + 2px);
+    left: calc(-2.25rem + 2px);
+    display: block;
+    width: calc(1rem - 4px);
+    height: calc(1rem - 4px);
+    content: "";
+    background-color: #adb5bd;
+    border-radius: 0.5rem;
+    transition: transform 0.15s ease-in-out, background-color 0.15s ease-in-out;
+}
+
+.custom-control.custom-switch .custom-control-input:checked ~ .custom-control-label::after {
+    transform: translateX(0.75rem);
+}
+
+.custom-switch.custom-switch-off-danger .custom-control-input ~ .custom-control-label::before {
+    background-color: #dc3545;
+    border-color: #921925;
+}
+
+.custom-switch.custom-switch-off-danger .custom-control-input:focus ~ .custom-control-label::before {
+    box-shadow: 0 0 0 1px #fff, 0 0 0 2px rgba(220, 53, 69, 0.25);
+}
+
+.custom-switch.custom-switch-off-danger .custom-control-input ~ .custom-control-label::after {
+    background-color: #7c151f;
+}
+
+.custom-switch.custom-switch-on-success .custom-control-input:checked ~ .custom-control-label::before {
+    background-color: #28a745;
+    border-color: #145523;
+}
+
+.custom-switch.custom-switch-on-success .custom-control-input:checked:focus ~ .custom-control-label::before {
+    box-shadow: 0 0 0 1px #fff, 0 0 0 2px rgba(40, 167, 69, 0.25);
+}
+
+.custom-switch.custom-switch-on-success .custom-control-input:checked ~ .custom-control-label::after {
+    background-color: #86e29b;
+}

@@ -4,6 +4,7 @@ namespace App;
 
 use App\Classes\SimpleHtmlDom\HtmlDocument;
 use App\Support\TextAnalyzerStopWords;
+use App\Support\TfidfMetrics;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
@@ -146,7 +147,7 @@ class TextAnalyzer extends Model
         $html = TextAnalyzer::clearHTMLFromLinks($html);
         $text = TextAnalyzer::deleteEverythingExceptCharacters($html);
 
-        if ($request['conjunctionsPrepositionsPronouns'] ?? false) {
+        if (self::shouldExcludeConjunctionsPrepositionsPronouns($request)) {
             $text = TextAnalyzer::removeConjunctionsPrepositionsPronouns($text);
             $title = TextAnalyzer::removeConjunctionsPrepositionsPronouns($title);
             $alt = TextAnalyzer::removeConjunctionsPrepositionsPronouns($alt);
@@ -154,38 +155,55 @@ class TextAnalyzer extends Model
             $link = TextAnalyzer::removeConjunctionsPrepositionsPronouns($link);
         }
 
-        if (isset($request['removeWords']) && $request['removeWords'] === 'on' && $request['listWords'] !== "") {
-            $text = TextAnalyzer::removeWords(strtolower($request['listWords']), strtolower($text));
-            $title = TextAnalyzer::removeWords(strtolower($request['listWords']), strtolower($title));
-            $alt = TextAnalyzer::removeWords(strtolower($request['listWords']), strtolower($alt));
-            $data = TextAnalyzer::removeWords(strtolower($request['listWords']), strtolower($data));
-            $link = TextAnalyzer::removeWords(strtolower($request['listWords']), strtolower($link));
+        if (self::shouldApplyCustomWordExclusion($request)) {
+            $excludeList = (string) $request['listWords'];
+            $text = TextAnalyzer::removeWords($excludeList, $text);
+            $title = TextAnalyzer::removeWords($excludeList, $title);
+            $alt = TextAnalyzer::removeWords($excludeList, $alt);
+            $data = TextAnalyzer::removeWords($excludeList, $data);
+            $link = TextAnalyzer::removeWords($excludeList, $link);
         }
 
         $total = trim($text . ' ' . $alt . ' ' . $title . ' ' . $data);
-
-        $countSpaces = substr_count(trim($total . ' ' . $link), ' ');
-        $totalWords = TextAnalyzer::deleteEverythingExceptCharacters($string);
-        $length = mb_strlen($totalWords);
+        $generalText = trim(preg_replace('/\s+/u', ' ', $total . ' ' . $link));
+        $countSpaces = $generalText === '' ? 0 : substr_count($generalText, ' ');
+        $length = mb_strlen($generalText);
+        $wordParts = $generalText === ''
+            ? []
+            : array_values(array_filter(explode(' ', $generalText), static function ($word) {
+                return $word !== '';
+            }));
 
         $response['general'] = [
             'textLength' => $length,
             'countSpaces' => $countSpaces,
             'lengthWithOutSpaces' => $length - $countSpaces,
-            'countWords' => count(explode(' ', $totalWords)),
+            'countWords' => count($wordParts),
         ];
 
-        $excludePhraseStopWords = !empty($request['conjunctionsPrepositionsPronouns']);
+        $excludePhraseStopWords = self::shouldExcludeConjunctionsPrepositionsPronouns($request);
 
         $response['totalWords'] = TextAnalyzer::analyzeWords($total, $link);
         if ($excludePhraseStopWords) {
             $response['totalWords'] = TextAnalyzer::filterStopWordsFromStats($response['totalWords']);
         }
+        if (self::shouldApplyCustomWordExclusion($request)) {
+            $response['totalWords'] = TextAnalyzer::filterExcludedFromWordStats(
+                $response['totalWords'],
+                (string) $request['listWords']
+            );
+        }
         $response['phrases'] = TextAnalyzer::searchPhrases(trim($total . ' ' . $link), $excludePhraseStopWords);
+        if (self::shouldApplyCustomWordExclusion($request)) {
+            $response['phrases'] = TextAnalyzer::filterExcludedFromPhrases(
+                $response['phrases'],
+                (string) $request['listWords']
+            );
+        }
         $response['clouds'] = [
-            'text' => TextAnalyzer::prepareCloudFromAnalyzedWords($response['totalWords'], 'inText', 80),
-            'links' => TextAnalyzer::prepareCloudFromAnalyzedWords($response['totalWords'], 'inLink', 80),
-            'both' => TextAnalyzer::prepareCloudFromAnalyzedWords($response['totalWords'], 'total', 80),
+            'text' => TextAnalyzer::prepareCloudFromAnalyzedWords($response['totalWords'], 'inText', 100),
+            'links' => TextAnalyzer::prepareCloudFromAnalyzedWords($response['totalWords'], 'inLink', 100),
+            'both' => TextAnalyzer::prepareCloudFromAnalyzedWords($response['totalWords'], 'total', 100),
         ];
         $response['graph'] = TextAnalyzer::prepareDataGraph($response['totalWords']);
 
@@ -373,16 +391,156 @@ class TextAnalyzer extends Model
         return $text;
     }
 
+    public static function shouldApplyCustomWordExclusion(array $request): bool
+    {
+        if (empty($request['removeWords'])) {
+            return false;
+        }
+
+        return trim((string) ($request['listWords'] ?? '')) !== '';
+    }
+
+    public static function shouldExcludeConjunctionsPrepositionsPronouns(array $request): bool
+    {
+        if (!array_key_exists('conjunctionsPrepositionsPronouns', $request)) {
+            return true;
+        }
+
+        $value = $request['conjunctionsPrepositionsPronouns'];
+
+        return !in_array($value, [false, 0, '0', 'false', 'off', ''], true);
+    }
+
+    /**
+     * Строка списка = одно исключение (слово или фраза целиком), как в lk.redbox.su.
+     *
+     * @return string[]
+     */
+    public static function parseExcludeWordList(string $listWords): array
+    {
+        $normalized = str_replace("\r\n", "\n", trim($listWords));
+        if ($normalized === '') {
+            return [];
+        }
+
+        $entries = [];
+        foreach (explode("\n", $normalized) as $line) {
+            $line = mb_strtolower(trim($line), 'UTF-8');
+            if ($line === '') {
+                continue;
+            }
+            $line = preg_replace('/\s+/u', ' ', $line);
+            if (is_string($line) && $line !== '') {
+                $entries[] = $line;
+            }
+        }
+
+        usort($entries, static function ($a, $b) {
+            return mb_strlen($b) <=> mb_strlen($a);
+        });
+
+        return array_values(array_unique($entries));
+    }
+
     public static function removeWords($listWords, $text): string
     {
-        $listWords = str_replace("\r\n", "\n", strtolower($listWords));
-        $listWords = explode("\n", $listWords);
-        foreach ($listWords as $listWord) {
-            $text = TextAnalyzer::mbStrReplace([' ' . $listWord . ' '], ' ', $text);
-            $text = preg_replace('| +|', ' ', $text);
+        $text = trim((string) $text);
+        if ($text === '') {
+            return '';
+        }
+
+        $text = ' ' . preg_replace('/\s+/u', ' ', $text) . ' ';
+        foreach (self::parseExcludeWordList((string) $listWords) as $entry) {
+            if ($entry === '') {
+                continue;
+            }
+            $quoted = preg_quote($entry, '/');
+            $text = preg_replace('/(?<=\s)' . $quoted . '(?=\s)/u', ' ', $text);
+            $text = preg_replace('/\s+/u', ' ', $text);
         }
 
         return trim($text);
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $phrases
+     * @return array<int, array<string, mixed>>
+     */
+    public static function filterExcludedFromPhrases(array $phrases, string $listWords): array
+    {
+        $exclude = self::parseExcludeWordList($listWords);
+        if (!$exclude) {
+            return $phrases;
+        }
+
+        return array_values(array_filter($phrases, static function ($row) use ($exclude) {
+            $phrase = mb_strtolower(trim((string) ($row['phrase'] ?? '')), 'UTF-8');
+            if ($phrase === '') {
+                return false;
+            }
+
+            foreach ($exclude as $item) {
+                if ($item === '') {
+                    continue;
+                }
+                if (strpos($item, ' ') !== false) {
+                    if ($phrase === $item) {
+                        return false;
+                    }
+                    continue;
+                }
+                $tokens = preg_split('/\s+/u', $phrase, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+                if (in_array($item, $tokens, true)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }));
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $words
+     * @return array<int, array<string, mixed>>
+     */
+    public static function filterExcludedFromWordStats(array $words, string $listWords): array
+    {
+        $exclude = array_flip(self::parseExcludeWordList($listWords));
+        if (!$exclude) {
+            return $words;
+        }
+
+        $filtered = [];
+        foreach ($words as $row) {
+            $lemma = mb_strtolower((string) ($row['text'] ?? ''), 'UTF-8');
+            if (isset($exclude[$lemma])) {
+                continue;
+            }
+
+            $skip = false;
+            foreach ($row['wordForms'] ?? [] as $zoneForms) {
+                if (!is_array($zoneForms)) {
+                    continue;
+                }
+                foreach ($zoneForms as $formEntry) {
+                    if (!is_array($formEntry)) {
+                        continue;
+                    }
+                    foreach ($formEntry as $form => $count) {
+                        if (isset($exclude[mb_strtolower((string) $form, 'UTF-8')])) {
+                            $skip = true;
+                            break 3;
+                        }
+                    }
+                }
+            }
+
+            if (!$skip) {
+                $filtered[] = $row;
+            }
+        }
+
+        return array_values($filtered);
     }
 
     public static function mbStrReplace($search, $replace, $string)
@@ -823,11 +981,15 @@ class TextAnalyzer extends Model
                     continue;
                 }
                 $count = (int) $parsed['count'];
+                $tf = TfidfMetrics::termFrequency((float) $count, (float) $corpusSize);
+                $idf = 0.0;
+                $score = $tf;
                 $formEntry = [
                     'lemma' => $parsed['lemma'],
                     'count' => $count,
-                    'tf' => round($count / $corpusSize, 4),
-                    'idf' => round(log10($corpusSize / $count), 4),
+                    'tf' => $tf,
+                    'idf' => $idf,
+                    'score' => $score,
                 ];
             }
             unset($formEntry);
@@ -841,11 +1003,11 @@ class TextAnalyzer extends Model
      * Нормализация одной словоформы для UI (поддержка старого и нового формата).
      *
      * @param mixed $entry
-     * @return array{lemma: string, count: int|null, tf: float|null, idf: float|null}
+     * @return array{lemma: string, count: int|null, tf: float|null, idf: float|null, score: float|null}
      */
     public static function parseWordFormEntry($entry): array
     {
-        $empty = ['lemma' => '', 'count' => null, 'tf' => null, 'idf' => null];
+        $empty = ['lemma' => '', 'count' => null, 'tf' => null, 'idf' => null, 'score' => null];
         if (!is_array($entry)) {
             return $empty;
         }
@@ -856,14 +1018,16 @@ class TextAnalyzer extends Model
                 'count' => isset($entry['count']) ? (int) $entry['count'] : null,
                 'tf' => isset($entry['tf']) ? (float) $entry['tf'] : null,
                 'idf' => isset($entry['idf']) ? (float) $entry['idf'] : null,
+                'score' => isset($entry['score']) ? (float) $entry['score'] : null,
             ];
         }
 
         $tf = isset($entry['tf']) ? (float) $entry['tf'] : null;
         $idf = isset($entry['idf']) ? (float) $entry['idf'] : null;
+        $score = isset($entry['score']) ? (float) $entry['score'] : null;
 
         foreach ($entry as $key => $value) {
-            if ($key === 'tf' || $key === 'idf') {
+            if ($key === 'tf' || $key === 'idf' || $key === 'score') {
                 continue;
             }
             if (is_array($value)) {
@@ -874,6 +1038,7 @@ class TextAnalyzer extends Model
                             'count' => (int) $innerVal,
                             'tf' => $tf,
                             'idf' => $idf,
+                            'score' => $score,
                         ];
                     }
                 }
@@ -888,6 +1053,7 @@ class TextAnalyzer extends Model
                 'count' => is_numeric($value) ? (int) $value : null,
                 'tf' => $tf,
                 'idf' => $idf,
+                'score' => $score,
             ];
         }
 

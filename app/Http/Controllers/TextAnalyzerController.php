@@ -2,15 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\TextAnalyzer\TextAnalyzerReportPdfExport;
+use App\Exports\TextAnalyzer\TextAnalyzerWorkbookExport;
 use App\TariffSetting;
 use App\TextAnalyzer;
+use App\TextAnalyzerPublicShare;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\Factory;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Maatwebsite\Excel\Excel as ExcelFormat;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class TextAnalyzerController extends Controller
 {
@@ -25,11 +33,42 @@ class TextAnalyzerController extends Controller
      */
     public function index()
     {
+        $response = session('text_analyzer.response');
+        $request = session('text_analyzer.request', []);
+        $url = session('text_analyzer.url');
+        $scrollToResults = session('text_analyzer.scroll_to_results', false);
+
+        if ($response !== null) {
+            session(['text_analyzer.export_snapshot' => [
+                'response' => $response,
+                'request' => $request,
+                'url' => $url,
+            ]]);
+        }
+
+        // Не держим результат в session (v1.5): после отображения — сброс; F5 / новая вкладка без «залипшего» анализа
+        session()->forget([
+            'text_analyzer.response',
+            'text_analyzer.request',
+            'text_analyzer.url',
+            'text_analyzer.scroll_to_results',
+        ]);
+
+        $exportSnapshot = session('text_analyzer.export_snapshot');
+        $publicShare = null;
+        if (is_array($exportSnapshot) && !empty($exportSnapshot['response'])) {
+            $activeShare = TextAnalyzerPublicShare::activeForUser((int) Auth::id());
+            if ($activeShare !== null && $activeShare->matchesSnapshot($exportSnapshot)) {
+                $publicShare = $activeShare;
+            }
+        }
+
         return view('text-analyse.index', [
-            'response' => session('text_analyzer.response'),
-            'request' => session('text_analyzer.request', []),
-            'url' => session('text_analyzer.url'),
-            'scrollToResults' => session('text_analyzer.scroll_to_results', false),
+            'response' => $response,
+            'request' => $request,
+            'url' => $url,
+            'scrollToResults' => $scrollToResults,
+            'publicShare' => $publicShare,
         ]);
     }
 
@@ -46,6 +85,9 @@ class TextAnalyzerController extends Controller
             flash()->overlay(__('Your limits are exhausted this month'), ' ')->error();
             return Redirect::back();
         }
+
+        session()->forget('text_analyzer.export_snapshot');
+        TextAnalyzerPublicShare::revokeActiveForUser((int) Auth::id());
 
         $request = $request->all();
 
@@ -64,13 +106,106 @@ class TextAnalyzerController extends Controller
             $response = TextAnalyzer::analyze($request['textarea'], $request);
         }
 
-        session([
-            'text_analyzer.response' => $response,
-            'text_analyzer.request' => $request,
-            'text_analyzer.scroll_to_results' => true,
-        ]);
+        session()->flash('text_analyzer.response', $response);
+        session()->flash('text_analyzer.request', $request);
+        session()->flash('text_analyzer.scroll_to_results', true);
 
         return redirect()->route('text.analyzer.view');
+    }
+
+    /**
+     * @return BinaryFileResponse|RedirectResponse
+     */
+    public function exportExcel()
+    {
+        $snapshot = $this->exportSnapshot();
+        if ($snapshot === null) {
+            flash()->overlay(__('Run the analysis again before exporting.'), __('Export'))->warning();
+            return redirect()->route('text.analyzer.view');
+        }
+
+        $meta = $this->buildExportMeta($snapshot);
+        $fileName = 'text-analyzer-' . date('Y-m-d-His') . '.xlsx';
+
+        return Excel::download(
+            new TextAnalyzerWorkbookExport($snapshot['response'], $snapshot['request'], $meta),
+            $fileName,
+            ExcelFormat::XLSX
+        );
+    }
+
+    /**
+     * @return BinaryFileResponse|RedirectResponse
+     */
+    public function createPublicShare(): JsonResponse
+    {
+        $snapshot = $this->exportSnapshot();
+        if ($snapshot === null) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Run the analysis again before exporting.'),
+                'code' => 415,
+            ]);
+        }
+
+        if (!TextAnalyzerPublicShare::tableAvailable()) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Public sharing is temporarily unavailable. Run database migration text_analyzer_public_shares.'),
+                'code' => 503,
+            ]);
+        }
+
+        $share = TextAnalyzerPublicShare::issueForUser(
+            (int) Auth::id(),
+            $snapshot,
+            $this->buildExportMeta($snapshot)
+        );
+
+        if ($share === null) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Public link could not be created.'),
+                'code' => 500,
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => __('Public link created'),
+            'code' => 201,
+            'url' => $share->publicUrl(),
+            'expires_at' => $share->expires_at->format('d.m.Y H:i'),
+        ]);
+    }
+
+    public function revokePublicShare(): JsonResponse
+    {
+        TextAnalyzerPublicShare::revokeActiveForUser((int) Auth::id());
+
+        return response()->json([
+            'success' => true,
+            'message' => __('Public link revoked'),
+            'code' => 201,
+        ]);
+    }
+
+    public function exportPdf()
+    {
+        $snapshot = $this->exportSnapshot();
+        if ($snapshot === null) {
+            flash()->overlay(__('Run the analysis again before exporting.'), __('Export'))->warning();
+            return redirect()->route('text.analyzer.view');
+        }
+
+        $meta = $this->buildExportMeta($snapshot);
+        $fileName = 'text-analyzer-report-' . date('Y-m-d-His') . '.pdf';
+
+        return Excel::download(
+            new TextAnalyzerReportPdfExport($snapshot['response'], $snapshot['request'], $meta),
+            $fileName,
+            ExcelFormat::MPDF
+        );
     }
 
     /**
@@ -106,6 +241,41 @@ class TextAnalyzerController extends Controller
                 'url.website' => __('The URL must be valid')
             ]);
         }
+    }
+
+    protected function exportSnapshot(): ?array
+    {
+        $snapshot = session('text_analyzer.export_snapshot');
+        if (!is_array($snapshot) || empty($snapshot['response'])) {
+            return null;
+        }
+
+        return $snapshot;
+    }
+
+    protected function buildExportMeta(array $snapshot): array
+    {
+        $request = $snapshot['request'] ?? [];
+        $url = $snapshot['url'] ?? null;
+        $sourceLabel = ($request['type'] ?? '') === 'url'
+            ? (string) ($request['url'] ?? $url ?? '')
+            : __('Text Analysis');
+
+        if (($request['type'] ?? '') !== 'url' && !empty($request['textarea'])) {
+            $preview = mb_substr(trim((string) $request['textarea']), 0, 180);
+            if (mb_strlen(trim((string) $request['textarea'])) > 180) {
+                $preview .= '…';
+            }
+            $sourceLabel = $preview;
+        }
+
+        return [
+            'generated_at' => now()->format('d.m.Y H:i'),
+            'source_label' => $sourceLabel,
+            'version' => config('cabinet-text-analyzer.version', '1.0'),
+            'brand_name' => \App\Support\TextAnalyzerPdfBranding::BRAND_NAME,
+            'brand_site' => \App\Support\TextAnalyzerPdfBranding::BRAND_SITE,
+        ];
     }
 
 }

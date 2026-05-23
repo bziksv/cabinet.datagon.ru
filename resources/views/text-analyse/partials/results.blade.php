@@ -18,6 +18,10 @@
 @endif
 
 <div class="cabinet-ta-results">
+    @if(empty($isPublicView))
+        @include('text-analyse.partials.export-bar', ['publicShare' => $publicShare ?? null])
+    @endif
+
     <div class="row g-2 g-md-3 mb-3 cabinet-ta-kpi">
         <div class="col-6 col-lg-3 d-flex min-w-0">
             <div class="info-box mb-0 flex-fill h-100">
@@ -65,7 +69,7 @@
         </div>
         <div class="card-body">
             <p class="text-secondary small mb-2">
-                @if(!empty($request['conjunctionsPrepositionsPronouns']))
+                @if(\App\TextAnalyzer::shouldExcludeConjunctionsPrepositionsPronouns($request ?? []))
                     {{ __('Zipf chart stop words hint') }}
                 @else
                     {{ __('Zipf chart includes stop words hint') }}
@@ -79,6 +83,31 @@
         </div>
     </div>
 
+    <div class="card shadow-sm mb-3 cabinet-ta-cloud-card">
+        <div class="card-header py-2">
+            <h3 class="card-title h6 mb-0">
+                <i class="bi bi-cloud me-1 text-primary"></i>{{ __('The clouds') }}
+            </h3>
+        </div>
+        <div class="card-body cabinet-ta-cloud-panel">
+            <p class="text-secondary small cabinet-ta-cloud-panel__hint">{{ __('Word cloud display limit hint') }}</p>
+            <div class="cabinet-ta-clouds-grid">
+                <div class="cabinet-ta-cloud-block">
+                    <h4 class="cabinet-ta-cloud-block__title h6">{{ __('Text Area') }}</h4>
+                    <div id="cabinet-ta-cloud-text-host" class="cabinet-ta-cloud generated-cloud"></div>
+                </div>
+                <div class="cabinet-ta-cloud-block">
+                    <h4 class="cabinet-ta-cloud-block__title h6">{{ __('Link Zone') }}</h4>
+                    <div id="cabinet-ta-cloud-links-host" class="cabinet-ta-cloud generated-cloud"></div>
+                </div>
+                <div class="cabinet-ta-cloud-block">
+                    <h4 class="cabinet-ta-cloud-block__title h6">{{ __('Text and Link zone') }}</h4>
+                    <div id="cabinet-ta-cloud-both-host" class="cabinet-ta-cloud generated-cloud"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="card shadow-sm mb-3 cabinet-ta-words-table-card">
         <div class="card-header py-2">
             <h3 class="card-title h6 mb-0">
@@ -86,7 +115,16 @@
             </h3>
         </div>
         <div class="card-body p-0 cabinet-ta-dt-card">
-            <div class="table-responsive cabinet-ta-table-wrap">
+            <div class="cabinet-ta-table-toolbar px-2 pt-2 pb-1 d-flex flex-wrap align-items-center gap-2">
+                <input type="search"
+                       class="form-control form-control-sm cabinet-ta-table-search"
+                       data-table="#totalTable"
+                       data-row=".cabinet-ta-word-row"
+                       autocomplete="off"
+                       placeholder="{{ __('Search') }}">
+                <span class="cabinet-ta-table-count text-secondary small"></span>
+            </div>
+            <div class="table-responsive cabinet-ta-table-wrap cabinet-ta-table-scroll">
                 <table id="totalTable" class="table table-sm table-striped table-hover align-middle mb-0 w-100">
                     <thead class="table-light">
                     <tr>
@@ -131,58 +169,13 @@
         </div>
     </div>
 
-    <div class="card shadow-sm mb-3 cabinet-ta-cloud-card">
-        <div class="card-header p-0 border-bottom-0">
-            <ul class="nav nav-tabs card-header-tabs px-2 pt-2" id="cabinet-ta-cloud-tabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="cabinet-ta-cloud-text-tab" data-bs-toggle="tab"
-                            data-bs-target="#cabinet-ta-cloud-text" type="button" role="tab"
-                            aria-controls="cabinet-ta-cloud-text" aria-selected="true">
-                        {{ __('Text Area') }}
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="cabinet-ta-cloud-links-tab" data-bs-toggle="tab"
-                            data-bs-target="#cabinet-ta-cloud-links" type="button" role="tab"
-                            aria-controls="cabinet-ta-cloud-links" aria-selected="false">
-                        {{ __('Link Zone') }}
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="cabinet-ta-cloud-both-tab" data-bs-toggle="tab"
-                            data-bs-target="#cabinet-ta-cloud-both" type="button" role="tab"
-                            aria-controls="cabinet-ta-cloud-both" aria-selected="false">
-                        {{ __('Text and Link zone') }}
-                    </button>
-                </li>
-            </ul>
-        </div>
-        <div class="card-body cabinet-ta-cloud-panel">
-            <p class="text-secondary small px-2 pt-1 mb-2">{{ __('Word cloud display limit hint') }}</p>
-            <div class="tab-content">
-                <div class="tab-pane fade show active" id="cabinet-ta-cloud-text" role="tabpanel"
-                     aria-labelledby="cabinet-ta-cloud-text-tab" tabindex="0">
-                    <div id="cabinet-ta-cloud-text-host" class="cabinet-ta-cloud generated-cloud" style="height:350px;width:100%;"></div>
-                </div>
-                <div class="tab-pane fade" id="cabinet-ta-cloud-links" role="tabpanel"
-                     aria-labelledby="cabinet-ta-cloud-links-tab" tabindex="0">
-                    <div id="cabinet-ta-cloud-links-host" class="cabinet-ta-cloud generated-cloud" style="height:350px;width:100%;"></div>
-                </div>
-                <div class="tab-pane fade" id="cabinet-ta-cloud-both" role="tabpanel"
-                     aria-labelledby="cabinet-ta-cloud-both-tab" tabindex="0">
-                    <div id="cabinet-ta-cloud-both-host" class="cabinet-ta-cloud generated-cloud" style="height:350px;width:100%;"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div class="card shadow-sm mb-3">
         <div class="card-header py-2 cabinet-ta-card-header-stacked">
             <h3 class="card-title h6 mb-1">
                 <i class="bi bi-quote me-1 text-primary"></i>{{ __('Phrases of 2 words') }}
             </h3>
             <p class="cabinet-ta-card-header-stacked__hint text-secondary small mb-0">
-                @if(!empty($request['conjunctionsPrepositionsPronouns']))
+                @if(\App\TextAnalyzer::shouldExcludeConjunctionsPrepositionsPronouns($request ?? []))
                     {{ __('Phrases of 2 words without stop words hint') }}
                 @else
                     {{ __('Phrases of 2 words with stop words hint') }}
@@ -190,7 +183,16 @@
             </p>
         </div>
         <div class="card-body p-0 cabinet-ta-dt-card">
-            <div class="table-responsive cabinet-ta-table-wrap">
+            <div class="cabinet-ta-table-toolbar px-2 pt-2 pb-1 d-flex flex-wrap align-items-center gap-2">
+                <input type="search"
+                       class="form-control form-control-sm cabinet-ta-table-search"
+                       data-table="#phrasesTable"
+                       data-row="tbody tr"
+                       autocomplete="off"
+                       placeholder="{{ __('Search') }}">
+                <span class="cabinet-ta-table-count text-secondary small"></span>
+            </div>
+            <div class="table-responsive cabinet-ta-table-wrap cabinet-ta-table-scroll">
                 <table id="phrasesTable" class="table table-sm table-striped table-hover align-middle mb-0 w-100">
                     <thead class="table-light">
                     <tr>
@@ -200,7 +202,7 @@
                     </tr>
                     </thead>
                     <tbody>
-                    @foreach($response['phrases'] as $phrase)
+                    @forelse($response['phrases'] as $phrase)
                         <tr>
                             <td data-order="{{ $phrase['phrase'] }}"
                                 title="{{ __('Repetitions') }}: {{ $phrase['count'] }}">
@@ -209,7 +211,11 @@
                             <td data-order="{{ $phrase['count'] }}" class="text-end font-monospace">{{ $phrase['count'] }}</td>
                             <td data-order="{{ $phrase['density'] }}" class="text-end font-monospace">{{ $phrase['density'] }}</td>
                         </tr>
-                    @endforeach
+                    @empty
+                        <tr>
+                            <td colspan="3" class="text-secondary text-center py-4">{{ __('No records') }}</td>
+                        </tr>
+                    @endforelse
                     </tbody>
                 </table>
             </div>

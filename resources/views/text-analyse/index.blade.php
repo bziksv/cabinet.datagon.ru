@@ -5,10 +5,6 @@
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('css/cabinet-text-analyzer.css') }}?v={{ @filemtime(public_path('css/cabinet-text-analyzer.css')) ?: time() }}">
-        <link rel="stylesheet" href="{{ asset('plugins/jqcloud/css/jqcloud.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/text-analyzer/css/style.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/common/css/datatable.css') }}">
-        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'core-only'])
     @endslot
 
     <div class="cabinet-text-analyzer-page">
@@ -25,15 +21,13 @@
             @include('text-analyse.partials.results', [
                 'response' => $response,
                 'request' => $request ?? [],
+                'publicShare' => $publicShare ?? null,
             ])
         @endisset
     </div>
 
     @slot('js')
         <script src="{{ asset('plugins/chart.js/3.9.1/chart.js') }}"></script>
-        <script src="{{ asset('plugins/jqcloud/js/jqcloud-1.0.4.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'core-only'])
         @include('text-analyse.partials.scripts')
     @endslot
 @endcomponent

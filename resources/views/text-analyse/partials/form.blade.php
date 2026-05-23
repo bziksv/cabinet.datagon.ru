@@ -39,7 +39,7 @@
                       class="form-control cabinet-ta-textarea"
                       rows="10"
                       placeholder="{{ __('Paste at least 200 characters of text…') }}">@isset($request['textarea']){{ $request['textarea'] }}@endisset</textarea>
-            <div class="form-text">{{ __('Minimum 200 characters for text analysis.') }}</div>
+            <div class="form-text mb-0">{{ __('Minimum 200 characters for text analysis.') }}</div>
         </div>
 
         <div id="cabinet-ta-panel-url" class="cabinet-ta-panel {{ $mode !== 'url' ? 'd-none' : '' }}">
@@ -62,75 +62,81 @@
             </div>
         @endif
 
-        <div class="cabinet-ta-options row g-3 mt-3">
-            <div class="col-12 col-lg-6">
-                <div class="form-check form-switch">
-                    <input class="form-check-input click_tracking"
-                           type="checkbox"
-                           id="switchNoindex"
-                           name="noIndex"
-                           value="1"
-                           data-click="Track the text in the noindex tag"
-                           @if(!empty($request['noIndex'])) checked @endif>
-                    <label class="form-check-label" for="switchNoindex">
-                        {{ __('Track the text in the noindex tag') }}
-                    </label>
+        <div class="cabinet-ta-options cabinet-ta-switches mt-2">
+            <div class="cabinet-ta-switch-row">
+                <div class="cabinet-ta-switch-row__toggle">
+                    <div class="custom-control custom-switch custom-switch-off-danger custom-switch-on-success">
+                        <input class="custom-control-input click_tracking"
+                               type="checkbox"
+                               id="switchNoindex"
+                               name="noIndex"
+                               value="1"
+                               data-click="Track the text in the noindex tag"
+                               @if(!empty($request['noIndex'])) checked @endif>
+                        <label class="custom-control-label" for="switchNoindex"></label>
+                    </div>
                 </div>
+                <span class="cabinet-ta-switch-row__text">{{ __('Track the text in the noindex tag') }}</span>
             </div>
-            <div class="col-12 col-lg-6">
-                <div class="form-check form-switch">
-                    <input class="form-check-input click_tracking"
-                           type="checkbox"
-                           id="switchAltAndTitle"
-                           name="hiddenText"
-                           value="1"
-                           data-click="Track words in the alt title and data text attributes"
-                           @if(!empty($request['hiddenText'])) checked @endif>
-                    <label class="form-check-label" for="switchAltAndTitle">
-                        {{ __('Track words in the alt, title, and data-text attributes') }}
-                    </label>
+            <div class="cabinet-ta-switch-row">
+                <div class="cabinet-ta-switch-row__toggle">
+                    <div class="custom-control custom-switch custom-switch-off-danger custom-switch-on-success">
+                        <input class="custom-control-input click_tracking"
+                               type="checkbox"
+                               id="switchAltAndTitle"
+                               name="hiddenText"
+                               value="1"
+                               data-click="Track words in the alt title and data text attributes"
+                               @if(!empty($request['hiddenText'])) checked @endif>
+                        <label class="custom-control-label" for="switchAltAndTitle"></label>
+                    </div>
                 </div>
+                <span class="cabinet-ta-switch-row__text">{{ __('Track words in the alt, title, and data-text attributes') }}</span>
             </div>
-            <div class="col-12 col-lg-6">
-                <div class="form-check form-switch">
-                    <input class="form-check-input click_tracking"
-                           type="checkbox"
-                           id="switchConjunctionsPrepositionsPronouns"
-                           name="conjunctionsPrepositionsPronouns"
-                           value="1"
-                           data-click="Track conjunctions prepositions pronouns"
-                           @if(!empty($request['conjunctionsPrepositionsPronouns'])) checked @endif>
-                    <label class="form-check-label" for="switchConjunctionsPrepositionsPronouns">
-                        {{ __('Exclude conjunctions, prepositions, pronouns') }}
-                    </label>
+            <div class="cabinet-ta-switch-row">
+                <div class="cabinet-ta-switch-row__toggle">
+                    <input type="hidden" name="conjunctionsPrepositionsPronouns" value="0">
+                    <div class="custom-control custom-switch custom-switch-off-danger custom-switch-on-success">
+                        <input class="custom-control-input click_tracking"
+                               type="checkbox"
+                               id="switchConjunctionsPrepositionsPronouns"
+                               name="conjunctionsPrepositionsPronouns"
+                               value="1"
+                               data-click="Track conjunctions prepositions pronouns"
+                               @if(\App\TextAnalyzer::shouldExcludeConjunctionsPrepositionsPronouns($request ?? [])) checked @endif>
+                        <label class="custom-control-label" for="switchConjunctionsPrepositionsPronouns"></label>
+                    </div>
                 </div>
+                <span class="cabinet-ta-switch-row__text">{{ __('Exclude conjunctions, prepositions, pronouns') }}</span>
             </div>
-            <div class="col-12 col-lg-6">
-                <div class="form-check form-switch">
-                    <input class="form-check-input click_tracking"
-                           type="checkbox"
-                           id="removeWords"
-                           name="removeWords"
-                           value="1"
-                           data-click="Exclude words"
-                           @if(!empty($request['removeWords'])) checked @endif>
-                    <label class="form-check-label" for="removeWords">
-                        {{ __('Exclude custom word list') }}
-                    </label>
+            <div class="cabinet-ta-switch-row">
+                <div class="cabinet-ta-switch-row__toggle">
+                    <div class="custom-control custom-switch custom-switch-off-danger custom-switch-on-success">
+                        <input class="custom-control-input click_tracking"
+                               type="checkbox"
+                               id="removeWords"
+                               name="removeWords"
+                               value="1"
+                               data-click="Exclude words"
+                               @if(!empty($request['removeWords'])) checked @endif>
+                        <label class="custom-control-label" for="removeWords"></label>
+                    </div>
                 </div>
+                <span class="cabinet-ta-switch-row__text">{{ __('Exclude') }} <span class="text-muted">{{ __('(your own list of words)') }}</span></span>
             </div>
         </div>
 
-        <div id="cabinet-ta-list-words" class="mt-3 {{ empty($request['removeWords']) ? 'd-none' : '' }}">
+        <div id="cabinet-ta-list-words" class="mt-2 {{ empty($request['removeWords']) ? 'd-none' : '' }}">
             <label class="form-label" for="listWords">{{ __('Words to exclude') }}</label>
             <textarea class="form-control font-monospace"
                       name="listWords"
                       id="listWords"
                       rows="4"
                       placeholder="{{ __('One word per line or separated by spaces') }}">@if(!empty($request['listWords'])){{ $request['listWords'] }}@endif</textarea>
+            <p class="form-text mb-0">{{ __('Words to exclude hint') }}</p>
         </div>
 
-        <div class="d-flex flex-wrap gap-2 mt-4">
+        <div class="cabinet-ta-form-actions mt-3">
             <button type="submit" class="btn btn-primary" id="cabinet-ta-submit">
                 <i class="bi bi-search me-1"></i>{{ __('Analyse') }}
             </button>

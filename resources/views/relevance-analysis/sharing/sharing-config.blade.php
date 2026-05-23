@@ -60,6 +60,41 @@
             </div>
         </div>
 
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">{{ __('Public link without registration') }}</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    {{ __('Anyone with the link can view the project for 30 days without logging in. View only.') }}
+                </p>
+                <div class="input-group input-group-sm mb-2">
+                    <input type="text"
+                           id="publicShareUrl"
+                           class="form-control"
+                           readonly
+                           value="{{ isset($publicShare) ? $publicShare->publicUrl() : '' }}"
+                           placeholder="{{ __('Create a public link to copy it here') }}">
+                    <button type="button" class="btn btn-outline-secondary" id="copyPublicShareUrl" @if(empty($publicShare)) disabled @endif>
+                        <i class="fa fa-copy"></i>
+                    </button>
+                </div>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <button type="button" class="btn btn-primary btn-sm" id="createPublicShare">
+                        {{ isset($publicShare) ? __('Refresh public link') : __('Create public link') }}
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-sm" id="revokePublicShare" @if(empty($publicShare)) disabled @endif>
+                        {{ __('Revoke public link') }}
+                    </button>
+                    <span class="text-muted small" id="publicShareExpires">
+                        @if(!empty($publicShare))
+                            {{ __('Valid until') }}: {{ $publicShare->expires_at->format('d.m.Y H:i') }}
+                        @endif
+                    </span>
+                </div>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-header d-flex p-0">
                 <h3 class="p-3">{{ "Проект $project->name" }}</h3>
@@ -122,6 +157,68 @@
             <script>
                 $(document).ready(function () {
                     $('#users-access').DataTable();
+
+                    $('#copyPublicShareUrl').on('click', function () {
+                        const input = document.getElementById('publicShareUrl');
+                        if (!input.value) {
+                            return;
+                        }
+                        input.select();
+                        document.execCommand('copy');
+                    });
+
+                    $('#createPublicShare').on('click', function () {
+                        $.ajax({
+                            type: 'POST',
+                            dataType: 'json',
+                            url: "{{ route('relevance.public.share.create') }}",
+                            data: {
+                                _token: $('meta[name="csrf-token"]').attr('content'),
+                                project_id: $('#projectId').val(),
+                            },
+                            success: function (response) {
+                                if (response.code === 201) {
+                                    $('#publicShareUrl').val(response.url);
+                                    $('#publicShareExpires').text('{{ __('Valid until') }}: ' + response.expires_at);
+                                    $('#copyPublicShareUrl, #revokePublicShare').prop('disabled', false);
+                                    $('#createPublicShare').text('{{ __('Refresh public link') }}');
+                                    $('.toast-top-right.success-message').show(300);
+                                    $('.toast-message').html(response.message);
+                                    setTimeout(function () {
+                                        $('.toast-top-right.success-message').hide(300);
+                                    }, 3000);
+                                } else {
+                                    $('.toast-top-right.error-message').show(300);
+                                    $('.toast-message.error-message').html(response.message);
+                                }
+                            },
+                        });
+                    });
+
+                    $('#revokePublicShare').on('click', function () {
+                        $.ajax({
+                            type: 'POST',
+                            dataType: 'json',
+                            url: "{{ route('relevance.public.share.revoke') }}",
+                            data: {
+                                _token: $('meta[name="csrf-token"]').attr('content'),
+                                project_id: $('#projectId').val(),
+                            },
+                            success: function (response) {
+                                if (response.code === 201) {
+                                    $('#publicShareUrl').val('');
+                                    $('#publicShareExpires').text('');
+                                    $('#copyPublicShareUrl, #revokePublicShare').prop('disabled', true);
+                                    $('#createPublicShare').text('{{ __('Create public link') }}');
+                                    $('.toast-top-right.success-message').show(300);
+                                    $('.toast-message').html(response.message);
+                                    setTimeout(function () {
+                                        $('.toast-top-right.success-message').hide(300);
+                                    }, 3000);
+                                }
+                            },
+                        });
+                    });
 
                     setInterval(() => {
                         refreshAllMethods()

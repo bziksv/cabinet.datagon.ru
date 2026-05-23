@@ -1,15 +1,77 @@
 /**
- * Анализ текста — результаты (DataTables, jQCloud, Chart.js).
- * Конфиг: window.cabinetTextAnalyzerConfig (из Blade).
+ * Анализ текста — результаты (таблицы, спиральное облако, Chart.js).
+ * jQCloud намеренно не используем: блокирует main thread (зависание UI).
  */
 (function ($, window, document) {
     'use strict';
 
     function releaseUiLock() {
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
+        document.body.style.removeProperty('pointer-events');
+        document.documentElement.style.removeProperty('pointer-events');
+        document.querySelectorAll('.modal-backdrop, div.dtr-modal, div.dtr-modal-background, .card > .overlay, .overlay-wrapper > .overlay').forEach(function (el) {
+            el.remove();
+        });
         if (typeof window.cabinetReleaseUiLock === 'function') {
             window.cabinetReleaseUiLock();
         }
         $('.cabinet-text-analyzer-page .dataTables_processing').remove();
+    }
+
+    function startUiLockWatchdog() {
+        var ticks = 0;
+        var timer = window.setInterval(function () {
+            releaseUiLock();
+            if (++ticks >= 40) {
+                window.clearInterval(timer);
+            }
+        }, 250);
+    }
+
+    function initCloudTooltips() {
+        if (window._cabinetTaCloudTipsBound) {
+            return;
+        }
+        window._cabinetTaCloudTipsBound = true;
+        var $tip = $('#cabinet-ta-cloud-tooltip');
+        if (!$tip.length) {
+            $tip = $('<div id="cabinet-ta-cloud-tooltip" class="cabinet-ta-cloud-tooltip" role="tooltip"></div>').appendTo('body');
+        }
+        var selector = '.cabinet-text-analyzer-page .cabinet-ta-spiral-cloud__word[data-tip], .cabinet-text-analyzer-page .cabinet-ta-tag-cloud__word[title]';
+        $(document)
+            .on('mouseenter', selector, function (e) {
+                var title = $(this).attr('data-tip') || $(this).attr('title');
+                if (!title) {
+                    return;
+                }
+                $tip.text(title).addClass('is-visible').css({left: e.pageX + 14, top: e.pageY + 14});
+            })
+            .on('mousemove', selector, function (e) {
+                if (!$tip.hasClass('is-visible')) {
+                    return;
+                }
+                $tip.css({left: e.pageX + 14, top: e.pageY + 14});
+            })
+            .on('mouseleave', selector, function () {
+                $tip.removeClass('is-visible');
+            });
+    }
+
+    function boxesOverlap(a, b, pad) {
+        pad = pad || 5;
+        return !(
+            a.right + pad <= b.left ||
+            a.left >= b.right + pad ||
+            a.bottom + pad <= b.top ||
+            a.top >= b.bottom + pad
+        );
+    }
+
+    function weightClass(ratio) {
+        var bucket = Math.max(1, Math.min(10, Math.round(ratio * 9) + 1));
+        return 'cabinet-ta-spiral-cloud__word--w' + bucket;
     }
 
     function readJsonScript(id, fallback) {
@@ -41,21 +103,24 @@
         if (!words.length) {
             return [];
         }
-        return words.slice()
-            .sort(function (a, b) {
-                return (b.weight || 0) - (a.weight || 0);
-            })
-            .slice(0, limit)
-            .map(function (word) {
-                var count = word.weight || 1;
-                return {
-                    text: String(word.text),
-                    weight: count,
-                    html: {
-                        title: String(word.text) + ' — ' + repetitionsLabel + ': ' + count
-                    }
-                };
-            });
+        var sorted = words.slice().sort(function (a, b) {
+            return (b.weight || 0) - (a.weight || 0);
+        }).slice(0, limit);
+        var maxW = sorted[0].weight || 1;
+        var minW = sorted[sorted.length - 1].weight || 1;
+        return sorted.map(function (word) {
+            var count = word.weight || 1;
+            var scaled = maxW > minW
+                ? Math.round(((count - minW) / (maxW - minW)) * 99) + 1
+                : 50;
+            var tip = String(word.text) + ' — ' + repetitionsLabel + ': ' + count;
+            return {
+                text: String(word.text),
+                weight: count,
+                scaled: scaled,
+                tip: tip
+            };
+        });
     }
 
     function CloudRenderer(cfg) {
@@ -64,92 +129,135 @@
         this.wordLimit = cfg.wordLimit || 80;
         this.emptyLabel = cfg.emptyLabel || '';
         this.repetitionsLabel = cfg.repetitionsLabel || '';
-        this.token = 0;
-        this.resizeObserver = null;
+        this.painted = false;
     }
 
-    CloudRenderer.prototype.destroy = function () {
-        if (this.resizeObserver) {
-            this.resizeObserver.disconnect();
-            this.resizeObserver = null;
+    CloudRenderer.prototype.paintSpiralCloud = function ($host, words) {
+        $host.empty().removeClass('jqcloud cabinet-ta-tag-cloud-host').addClass('cabinet-ta-spiral-cloud--ready');
+        if (!words.length) {
+            $host.append($('<p class="text-secondary small mb-0 text-center py-5"></p>').text(this.emptyLabel));
+            return;
         }
+
+        var hostW = Math.max(260, Math.floor($host.innerWidth() || $host.width() || 320));
+        var hostH = Math.max(320, Math.floor($host.innerHeight() || $host.height() || 400));
+        var maxWeight = words[0].weight || 1;
+        var placed = [];
+        var edgePad = 18;
+        var $wrap = $('<div class="cabinet-ta-spiral-cloud"></div>').css({
+            width: hostW + 'px',
+            height: hostH + 'px'
+        });
+        $host.append($wrap);
+
+        words.forEach(function (word) {
+            var ratio = maxWeight > 0 ? (word.weight || 1) / maxWeight : 1;
+            var len = String(word.text).length;
+            var sizePx = Math.round(11 + ratio * 24 - Math.min(7, Math.max(0, len - 7) * 0.35));
+            var $el = $('<span class="cabinet-ta-spiral-cloud__word"></span>')
+                .addClass(weightClass(ratio))
+                .text(word.text)
+                .css('font-size', sizePx + 'px')
+                .attr('data-tip', word.tip);
+
+            $wrap.append($el);
+            var w = $el.outerWidth();
+            var h = $el.outerHeight();
+            var cx = hostW / 2;
+            var cy = hostH / 2;
+            var angle = 0;
+            var radius = 0;
+            var step = 0.42;
+            var placedOk = false;
+            var i;
+
+            for (i = 0; i < 500; i++) {
+                var x = cx + radius * Math.cos(angle);
+                var y = cy + radius * Math.sin(angle);
+                var box = {
+                    left: x - w / 2,
+                    top: y - h / 2,
+                    right: x + w / 2,
+                    bottom: y + h / 2
+                };
+
+                if (box.left < edgePad || box.top < edgePad || box.right > hostW - edgePad || box.bottom > hostH - edgePad) {
+                    angle += step;
+                    radius += 0.75;
+                    continue;
+                }
+
+                var collision = false;
+                var j;
+                for (j = 0; j < placed.length; j++) {
+                    if (boxesOverlap(box, placed[j], 4)) {
+                        collision = true;
+                        break;
+                    }
+                }
+
+                if (!collision) {
+                    $el.css({left: x + 'px', top: y + 'px'});
+                    placed.push(box);
+                    placedOk = true;
+                    break;
+                }
+
+                angle += step;
+                radius += 0.75;
+            }
+
+            if (!placedOk) {
+                $el.remove();
+            }
+        });
     };
 
-    CloudRenderer.prototype.paint = function () {
-        var self = this;
-        if (typeof $.fn.jQCloud !== 'function') {
-            return false;
+    CloudRenderer.prototype.paint = function (force) {
+        if (this.painted && !force) {
+            return true;
         }
         var $host = $(this.hostSelector);
         if (!$host.length) {
             return false;
         }
+
         var words = normalizeCloudWords(
             cloudFromArray(this.getData()),
             this.wordLimit,
             this.repetitionsLabel
         );
-        var renderToken = ++this.token;
-        var $pane = $host.closest('.tab-pane');
 
         if (!words.length) {
-            $host.empty().removeClass('jqcloud');
+            $host.empty().removeClass('jqcloud cabinet-ta-spiral-cloud--ready cabinet-ta-tag-cloud-host');
             $host.append($('<p class="text-secondary small mb-0 text-center py-5"></p>').text(this.emptyLabel));
+            this.painted = true;
             return true;
         }
 
-        function run(attempt) {
-            if (renderToken !== self.token) {
-                return;
-            }
-            if ($pane.length && !$pane.hasClass('active') && !$pane.hasClass('show')) {
-                return;
-            }
-            var width = Math.floor($host.innerWidth());
-            var height = Math.floor($host.innerHeight());
-            if ((width < 40 || height < 40) && attempt < 40) {
-                window.setTimeout(function () {
-                    run(attempt + 1);
-                }, 75);
-                return;
-            }
-            if (width < 40 || height < 40) {
-                width = 640;
-                height = 350;
-            }
-            $host.empty().removeClass('jqcloud');
-            try {
-                $host.jQCloud(words, {
-                    width: width,
-                    height: height,
-                    removeOverflowing: false,
-                    delayedMode: false,
-                    shape: 'rectangular'
-                });
-            } catch (e) {
-                console.error('cabinet-text-analyzer: jQCloud', e);
-            }
+        var maxWeight = words[0].weight || 1;
+
+        try {
+            this.paintSpiralCloud($host, words);
+        } catch (e) {
+            console.error('cabinet-text-analyzer: spiral cloud', e);
+            $host.empty().removeClass('cabinet-ta-spiral-cloud--ready').addClass('cabinet-ta-tag-cloud-host');
+            var $wrap = $('<div class="cabinet-ta-tag-cloud"></div>');
+            words.forEach(function (word) {
+                var ratio = maxWeight > 0 ? (word.weight || 1) / maxWeight : 1;
+                var sizeRem = (0.78 + ratio * 1.55).toFixed(2);
+                $wrap.append(
+                    $('<span class="cabinet-ta-tag-cloud__word"></span>')
+                        .text(word.text)
+                        .css('font-size', sizeRem + 'rem')
+                        .attr('title', word.tip)
+                );
+            });
+            $host.append($wrap);
         }
 
-        run(0);
+        this.painted = true;
         return true;
-    };
-
-    CloudRenderer.prototype.bindResize = function () {
-        var self = this;
-        var node = document.querySelector(this.hostSelector);
-        if (!node || typeof ResizeObserver === 'undefined') {
-            return;
-        }
-        if (this.resizeObserver) {
-            this.resizeObserver.disconnect();
-        }
-        this.resizeObserver = new ResizeObserver(function () {
-            if (node.closest('.tab-pane.active, .tab-pane.show')) {
-                self.paint();
-            }
-        });
-        this.resizeObserver.observe(node);
     };
 
     function ZipfChart(cfg) {
@@ -196,7 +304,7 @@
         var baseY = graph[0].y;
         var actualLabel = this.labels.actual || 'Actual';
         var idealLabel = this.labels.ideal || 'Ideal';
-        var rankLabel = this.labels.rank || 'Rank';
+        var xAxisLabel = this.labels.xAxis || this.labels.rank || 'Word density';
         var self = this;
 
         this.instance = new Chart(canvas.getContext('2d'), {
@@ -208,9 +316,12 @@
                         data: graph.map(function (point) {
                             return {x: point.x, y: point.y};
                         }),
-                        borderColor: '#627d98',
-                        backgroundColor: 'rgba(98, 125, 152, 0.15)',
-                        pointBackgroundColor: '#627d98',
+                        borderColor: '#1d4ed8',
+                        backgroundColor: 'rgba(29, 78, 216, 0.12)',
+                        pointBackgroundColor: '#1d4ed8',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 1,
+                        borderWidth: 2.5,
                         pointRadius: 4,
                         pointHoverRadius: 6,
                         tension: 0.15,
@@ -219,9 +330,13 @@
                     {
                         label: idealLabel,
                         data: this.buildIdeal(baseY, graph.length),
-                        borderColor: '#5a8fa8',
-                        backgroundColor: 'rgba(90, 143, 168, 0.08)',
-                        pointBackgroundColor: '#5a8fa8',
+                        borderColor: '#ea580c',
+                        backgroundColor: 'rgba(234, 88, 12, 0.08)',
+                        pointBackgroundColor: '#ea580c',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 1,
+                        borderWidth: 2,
+                        borderDash: [7, 5],
                         pointRadius: 3,
                         pointHoverRadius: 5,
                         tension: 0.15,
@@ -232,7 +347,7 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                animation: {duration: 300},
+                animation: false,
                 interaction: {mode: 'nearest', intersect: false},
                 plugins: {
                     legend: {display: true, position: 'top', align: 'end'},
@@ -261,11 +376,11 @@
                         type: 'linear',
                         min: 1,
                         max: graph.length,
-                        title: {display: true, text: rankLabel},
+                        title: {display: true, text: xAxisLabel},
                         grid: {color: 'rgba(0, 0, 0, 0.06)'},
                         ticks: {
                             stepSize: 1,
-                            autoSkip: false,
+                            autoSkip: true,
                             maxRotation: 55,
                             minRotation: 55,
                             font: {size: 10},
@@ -300,132 +415,127 @@
         }
     };
 
-    function collapseWordRows(table) {
-        if (!table) {
-            return;
-        }
-        table.rows().every(function () {
-            if (this.child.isShown()) {
-                this.child.hide();
-            }
-        });
+    function collapseWordRows() {
+        $('#totalTable tr.cabinet-ta-word-detail-row').addClass('d-none');
         $('#totalTable tbody tr.cabinet-ta-word-row').removeClass('is-expanded');
         $('#totalTable .cabinet-ta-word-toggle').attr('aria-expanded', 'false')
             .find('.cabinet-ta-word-toggle__icon')
             .removeClass('bi-chevron-up').addClass('bi-chevron-down');
     }
 
-    function initDataTables(cfg) {
-        if (!$.fn.DataTable) {
-            return null;
+    function updateTableCount($input) {
+        var tableSel = $input.data('table');
+        var rowSel = $input.data('row') || 'tbody tr';
+        var $table = $(tableSel);
+        var visible = $table.find(rowSel + ':not(.d-none)').length;
+        var total = $table.find(rowSel).length;
+        var $count = $input.closest('.cabinet-ta-dt-card').find('.cabinet-ta-table-count');
+        if (!$count.length) {
+            return;
         }
-        var dtDom = '<"row align-items-center g-2 cabinet-ta-dt-top px-2 pt-2"<"col-sm-auto"l><"col-sm ms-sm-auto"f>>rt<"row align-items-center g-2 cabinet-ta-dt-bottom px-2 pb-2"<"col-sm-auto"i><"col-sm"p>>';
-        var dtLang = cfg.dtLang || {};
-        var base = {
-            dom: dtDom,
-            pageLength: 25,
-            lengthMenu: [25, 50, 100, 250],
-            pagingType: 'simple_numbers',
-            autoWidth: false,
-            processing: false,
-            responsive: false,
-            language: dtLang
-        };
+        $count.text(visible === total ? total : visible + ' / ' + total);
+    }
 
-        ['#totalTable', '#phrasesTable'].forEach(function (sel) {
-            if ($.fn.DataTable.isDataTable(sel)) {
-                $(sel).DataTable().destroy();
+    function filterTable($input) {
+        var q = ($input.val() || '').toLowerCase().trim();
+        var tableSel = $input.data('table');
+        var rowSel = $input.data('row') || 'tbody tr';
+        var $table = $(tableSel);
+
+        $table.find(rowSel).each(function () {
+            var $row = $(this);
+            var match = !q || $row.text().toLowerCase().indexOf(q) !== -1;
+            $row.toggleClass('d-none', !match);
+            if (!match && $row.hasClass('cabinet-ta-word-row')) {
+                var $detail = $row.next('tr.cabinet-ta-word-detail-row');
+                if ($detail.length) {
+                    $detail.addClass('d-none');
+                }
+                $row.removeClass('is-expanded');
             }
         });
 
-        var totalTable = $('#totalTable').DataTable($.extend({}, base, {
-            order: [[2, 'desc']],
-            drawCallback: function () {
-                collapseWordRows(totalTable);
-            }
-        }));
+        updateTableCount($input);
+    }
 
-        totalTable.on('order.dt page.dt search.dt', function () {
-            collapseWordRows(totalTable);
-        });
-
-        $('#phrasesTable').DataTable($.extend({}, base, {
-            order: [[1, 'desc']]
-        }));
-
+    function initWordFormsToggle(wordForms) {
         $('#totalTable').on('click', '.cabinet-ta-word-toggle', function (e) {
             e.preventDefault();
             e.stopPropagation();
             var $btn = $(this);
             var $row = $btn.closest('tr.cabinet-ta-word-row');
+            if ($row.hasClass('d-none')) {
+                return;
+            }
             var wordId = $row.attr('data-cabinet-ta-word-id');
-            var dtRow = totalTable.row($row);
-            var panelHtml = (cfg.wordForms || {})[wordId] || '';
-            if (!dtRow.length || !panelHtml) {
+            var panelHtml = (wordForms || {})[wordId] || '';
+            if (!panelHtml) {
                 return;
             }
-            if (dtRow.child.isShown()) {
-                dtRow.child.hide();
-                $row.removeClass('is-expanded');
-                $btn.find('.cabinet-ta-word-toggle__icon').removeClass('bi-chevron-up').addClass('bi-chevron-down');
-                $btn.attr('aria-expanded', 'false');
-                return;
-            }
-            collapseWordRows(totalTable);
-            dtRow.child('<div class="cabinet-ta-word-detail__cell">' + panelHtml + '</div>').show();
-            $row.addClass('is-expanded');
-            $btn.find('.cabinet-ta-word-toggle__icon').removeClass('bi-chevron-down').addClass('bi-chevron-up');
-            $btn.attr('aria-expanded', 'true');
-        });
 
-        return totalTable;
+            var $detail = $row.next('tr.cabinet-ta-word-detail-row');
+            if ($detail.length) {
+                var open = !$detail.hasClass('d-none');
+                collapseWordRows();
+                if (!open) {
+                    $detail.removeClass('d-none');
+                    $row.addClass('is-expanded');
+                    $btn.attr('aria-expanded', 'true')
+                        .find('.cabinet-ta-word-toggle__icon')
+                        .removeClass('bi-chevron-down').addClass('bi-chevron-up');
+                }
+                return;
+            }
+
+            collapseWordRows();
+            $(
+                '<tr class="cabinet-ta-word-detail-row">' +
+                '<td colspan="5"><div class="cabinet-ta-word-detail__cell">' + panelHtml + '</div></td>' +
+                '</tr>'
+            ).insertAfter($row);
+            $row.addClass('is-expanded');
+            $btn.attr('aria-expanded', 'true')
+                .find('.cabinet-ta-word-toggle__icon')
+                .removeClass('bi-chevron-down').addClass('bi-chevron-up');
+        });
     }
 
-    function initCloudTabs(clouds, activeSelector) {
-        var map = {};
-        clouds.forEach(function (cloud) {
-            map[cloud.tabSelector] = cloud;
+    function initTableSearch() {
+        $('.cabinet-ta-table-search').each(function () {
+            updateTableCount($(this));
+        }).on('input', function () {
+            filterTable($(this));
         });
+    }
 
-        function render(selector) {
-            var item = map[selector];
-            if (item && item.renderer) {
-                item.renderer.paint();
+    function initResultTables(cfg) {
+        initWordFormsToggle(cfg.wordForms || {});
+        initTableSearch();
+    }
+
+    function initAllClouds(clouds) {
+        clouds.forEach(function (item, index) {
+            if (!item || !item.renderer) {
+                return;
             }
-        }
-
-        document.querySelectorAll('#cabinet-ta-cloud-tabs [data-bs-toggle="tab"]').forEach(function (tab) {
-            tab.addEventListener('shown.bs.tab', function (event) {
-                window.setTimeout(function () {
-                    render(event.target.getAttribute('data-bs-target'));
-                }, 30);
-            });
+            window.setTimeout(function () {
+                item.renderer.paint(true);
+            }, index * 40);
         });
-
-        window.setTimeout(function () {
-            render(activeSelector || '#cabinet-ta-cloud-text');
-        }, 100);
-
-        if (typeof IntersectionObserver !== 'undefined') {
-            var host = document.querySelector('#cabinet-ta-cloud-text-host');
-            if (host) {
-                var obs = new IntersectionObserver(function (entries) {
-                    entries.forEach(function (entry) {
-                        if (entry.isIntersecting) {
-                            render('#cabinet-ta-cloud-text');
-                        }
-                    });
-                }, {threshold: 0.1});
-                obs.observe(host);
-            }
-        }
     }
 
     function initResults(cfg) {
         releaseUiLock();
+        startUiLockWatchdog();
 
         var payload = readJsonScript('cabinet-ta-payload', {clouds: {text: [], links: [], both: []}, graph: []});
         var wordForms = readJsonScript('cabinet-ta-word-forms', {});
+
+        try {
+            initResultTables({wordForms: wordForms});
+        } catch (e) {
+            console.error('cabinet-text-analyzer: tables', e);
+        }
 
         try {
             (new ZipfChart({
@@ -439,59 +549,133 @@
 
         var clouds = [
             {
-                tabSelector: '#cabinet-ta-cloud-text',
                 hostSelector: '#cabinet-ta-cloud-text-host',
                 getData: function () { return (payload.clouds || {}).text; }
             },
             {
-                tabSelector: '#cabinet-ta-cloud-links',
                 hostSelector: '#cabinet-ta-cloud-links-host',
                 getData: function () { return (payload.clouds || {}).links; }
             },
             {
-                tabSelector: '#cabinet-ta-cloud-both',
                 hostSelector: '#cabinet-ta-cloud-both-host',
                 getData: function () { return (payload.clouds || {}).both; }
             }
         ].map(function (item) {
-            var renderer = new CloudRenderer({
+            item.renderer = new CloudRenderer({
                 hostSelector: item.hostSelector,
                 getData: item.getData,
                 wordLimit: cfg.cloudWordLimit || 80,
                 emptyLabel: cfg.emptyLabel || '',
                 repetitionsLabel: cfg.repetitionsLabel || ''
             });
-            renderer.bindResize();
-            item.renderer = renderer;
             return item;
         });
 
         try {
-            initCloudTabs(clouds, '#cabinet-ta-cloud-text');
+            initAllClouds(clouds);
+            initCloudTooltips();
         } catch (e) {
             console.error('cabinet-text-analyzer: cloud', e);
-        }
-
-        try {
-            initDataTables($.extend({}, cfg, {wordForms: wordForms}));
-        } catch (e) {
-            console.error('cabinet-text-analyzer: datatables', e);
         }
 
         if (cfg.scrollToResults) {
             var $results = $('.cabinet-ta-results');
             if ($results.length) {
-                window.setTimeout(function () {
+                window.requestAnimationFrame(function () {
                     var top = $results.offset().top - 80;
-                    $('html, body').scrollTop(top > 0 ? top : 0);
-                }, 80);
+                    window.scrollTo(0, top > 0 ? top : 0);
+                });
             }
         }
 
         releaseUiLock();
     }
 
+    function initPublicShare() {
+        var $root = $('#cabinet-ta-public-share');
+        if (!$root.length) {
+            return;
+        }
+
+        var $url = $('#cabinet-ta-public-share-url');
+        var $expires = $('#cabinet-ta-public-share-expires');
+        var $copy = $('#cabinet-ta-public-share-copy');
+        var $create = $('#cabinet-ta-public-share-create');
+        var $revoke = $('#cabinet-ta-public-share-revoke');
+        var token = $('meta[name="csrf-token"]').attr('content');
+        var labels = {
+            create: $create.text().trim(),
+            refresh: window.cabinetTaShareLabels && window.cabinetTaShareLabels.refresh
+                ? window.cabinetTaShareLabels.refresh
+                : $create.text().trim(),
+            validUntil: window.cabinetTaShareLabels && window.cabinetTaShareLabels.validUntil
+                ? window.cabinetTaShareLabels.validUntil
+                : ''
+        };
+
+        $copy.on('click', function () {
+            var input = $url.get(0);
+            if (!input || !input.value) {
+                return;
+            }
+            input.select();
+            input.setSelectionRange(0, input.value.length);
+            try {
+                document.execCommand('copy');
+            } catch (e) {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(input.value);
+                }
+            }
+        });
+
+        $create.on('click', function () {
+            $create.prop('disabled', true);
+            $.ajax({
+                type: 'POST',
+                url: $root.data('create-url'),
+                data: { _token: token }
+            }).done(function (response) {
+                if (response && response.success) {
+                    $url.val(response.url);
+                    $expires.text((labels.validUntil ? labels.validUntil + ': ' : '') + (response.expires_at || ''));
+                    $copy.add($revoke).prop('disabled', false);
+                    $create.html('<i class="bi bi-link-45deg me-1"></i>' + labels.refresh);
+                }
+            }).always(function () {
+                $create.prop('disabled', false);
+            });
+        });
+
+        $revoke.on('click', function () {
+            if (!window.confirm(window.cabinetTaShareLabels && window.cabinetTaShareLabels.revokeConfirm
+                ? window.cabinetTaShareLabels.revokeConfirm
+                : '')) {
+                return;
+            }
+            $revoke.prop('disabled', true);
+            $.ajax({
+                type: 'POST',
+                url: $root.data('revoke-url'),
+                data: { _token: token }
+            }).done(function (response) {
+                if (response && response.success) {
+                    $url.val('');
+                    $expires.text('');
+                    $copy.add($revoke).prop('disabled', true);
+                    $create.html('<i class="bi bi-link-45deg me-1"></i>' + labels.create);
+                }
+            }).always(function () {
+                $revoke.prop('disabled', false);
+            });
+        });
+    }
+
     function initForm(cfg) {
+        if (cfg.isPublicView) {
+            return;
+        }
+
         function setMode(mode) {
             $('#cabinet-ta-type').val(mode);
             $('#cabinet-ta-mode-text').toggleClass('active', mode === 'text');
@@ -519,17 +703,17 @@
 
     $(function () {
         releaseUiLock();
+        startUiLockWatchdog();
         var cfg = window.cabinetTextAnalyzerConfig || {};
         initForm(cfg);
+        initPublicShare();
         if (cfg.hasResponse) {
-            window.requestAnimationFrame(function () {
-                try {
-                    initResults(cfg);
-                } catch (e) {
-                    console.error('cabinet-text-analyzer', e);
-                    releaseUiLock();
-                }
-            });
+            try {
+                initResults(cfg);
+            } catch (e) {
+                console.error('cabinet-text-analyzer', e);
+                releaseUiLock();
+            }
         }
     });
 

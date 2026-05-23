@@ -4,6 +4,7 @@ namespace App;
 
 use App\Classes\Xml\SimplifiedXmlFacade;
 use App\Jobs\Relevance\RemoveRelevanceProgress;
+use App\Support\TfidfMetrics;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -634,12 +635,14 @@ class Relevance
                 $repeatLinkInMainPage = $myLink[$word] ?? 0;
                 $repeatInPassagesMainPage = $myPassages[$word] ?? 0;
 
-                $tf = round($item / $wordCount, 7);
-                $idf = round(log10($wordCount / $item), 7);
+                $tf = TfidfMetrics::termFrequency((float) $item, (float) $wordCount);
+                $idf = TfidfMetrics::inverseDocumentFrequency($countSites, $numberOccurrences);
+                $score = TfidfMetrics::score($tf, $idf);
 
                 $this->wordForms[$root][$word] = [
                     'tf' => $tf,
                     'idf' => $idf,
+                    'score' => $score,
                     'numberOccurrences' => $numberOccurrences,
                     'reSpam' => $reSpam,
                     'avgInTotalCompetitors' => (int)ceil(($numberLinkOccurrences + $numberTextOccurrences) / $countSites),
@@ -661,15 +664,19 @@ class Relevance
         $this->coverageInfo['sum'] = 0;
 
         foreach ($this->wordForms as $key => $wordForm) {
-            $tf = $idf = $reSpam = $repeatInPassages = $repeatInText = $repeatInLink = $avgInText = $avgInPassages = 0;
+            $tf = $reSpam = $repeatInPassages = $repeatInText = $repeatInLink = $avgInText = $avgInPassages = 0;
             $avgInLink = $avgInTotalCompetitors = $totalRepeatMainPage = 0;
             $occurrences = [];
+            $danger = false;
 
-            foreach ($wordForm as $word) {
-                $danger = $word['repeatInTextMainPage'] == 0 || $word['repeatInLinkMainPage'] == 0;
+            foreach ($wordForm as $wordKey => $word) {
+                if ($wordKey === 'total' || !is_array($word)) {
+                    continue;
+                }
+
+                $danger = $danger || $word['repeatInTextMainPage'] == 0 || $word['repeatInLinkMainPage'] == 0;
 
                 $tf += $word['tf'];
-                $idf += $word['idf'];
 
                 $avgInTotalCompetitors += $word['avgInTotalCompetitors'];
                 $totalRepeatMainPage += $word['totalRepeatMainPage'];
@@ -697,9 +704,15 @@ class Relevance
             }
             arsort($occurrences);
 
+            $documentCount = max(1, (int) $this->countNotIgnoredSites);
+            $documentFrequency = max(1, count($occurrences));
+            $idf = TfidfMetrics::inverseDocumentFrequency($documentCount, $documentFrequency);
+            $score = TfidfMetrics::score($tf, $idf);
+
             $this->wordForms[$key]['total'] = [
                 'tf' => $tf,
                 'idf' => $idf,
+                'score' => $score,
                 'avgInTotalCompetitors' => (int)ceil($avgInTotalCompetitors),
                 'avgInText' => (int)ceil($avgInText),
                 'avgInLink' => (int)ceil($avgInLink),
@@ -720,17 +733,42 @@ class Relevance
 
         $collection = collect($this->wordForms);
 
-        $this->wordForms = $collection->sortBy(
-            function ($key, $value) {
-            },
-            SORT_REGULAR,
-            true
-        )->toArray();
+        $this->wordForms = $collection->sortByDesc(function ($wordForm) {
+            return $wordForm['total']['score'] ?? 0;
+        })->toArray();
+    }
+
+  /**
+   * @return array<string, int> lemma => df (число сайтов конкурентов с термином)
+   */
+    private function buildDocumentFrequencyMap(): array
+    {
+        $map = [];
+
+        foreach ($this->wordForms as $wordForm) {
+            foreach ($wordForm as $word => $data) {
+                if ($word === 'total' || !is_array($data)) {
+                    continue;
+                }
+
+                $df = (int) ($data['numberOccurrences'] ?? 0);
+                if ($df < 1) {
+                    continue;
+                }
+
+                if (!isset($map[$word]) || $df > $map[$word]) {
+                    $map[$word] = $df;
+                }
+            }
+        }
+
+        return $map;
     }
 
     public function prepareClouds()
     {
         RelevanceProgress::editProgress(90, $this->request);
+        $documentFrequencyMap = $this->buildDocumentFrequencyMap();
         $mainPage = Relevance::concatenation([
             $this->mainPage['html'],
             $this->mainPage['hiddenText'],
@@ -740,24 +778,27 @@ class Relevance
             $this->mainPage['html'],
             $this->mainPage['hiddenText']
         ]);
-        $this->mainPage['totalTf'] = Relevance::prepareTfCloud($mainPage);
-        $this->mainPage['textTf'] = Relevance::prepareTfCloud($textMainPage);
-        $this->mainPage['linkTf'] = Relevance::prepareTfCloud($this->mainPage['linkText']);
+        $this->mainPage['totalTf'] = $this->prepareTfCloud($mainPage, $documentFrequencyMap);
+        $this->mainPage['textTf'] = $this->prepareTfCloud($textMainPage, $documentFrequencyMap);
+        $this->mainPage['linkTf'] = $this->prepareTfCloud($this->mainPage['linkText'], $documentFrequencyMap);
 
         $this->mainPage['textWithLinks'] = TextAnalyzer::prepareCloud($mainPage);
         $this->mainPage['text'] = TextAnalyzer::prepareCloud($textMainPage);
         $this->mainPage['links'] = TextAnalyzer::prepareCloud($this->mainPage['linkText']);
 
-        $this->competitorsCloud['totalTf'] = Relevance::prepareTFCloud($this->competitorsTextAndLinks);
-        $this->competitorsCloud['textTf'] = Relevance::prepareTFCloud($this->competitorsText);
-        $this->competitorsCloud['linkTf'] = Relevance::prepareTFCloud($this->competitorsLinks);
+        $this->competitorsCloud['totalTf'] = $this->prepareTfCloud($this->competitorsTextAndLinks, $documentFrequencyMap);
+        $this->competitorsCloud['textTf'] = $this->prepareTfCloud($this->competitorsText, $documentFrequencyMap);
+        $this->competitorsCloud['linkTf'] = $this->prepareTfCloud($this->competitorsLinks, $documentFrequencyMap);
 
         $this->competitorsTextAndLinksCloud = TextAnalyzer::prepareCloud($this->competitorsTextAndLinks);
         $this->competitorsTextCloud = TextAnalyzer::prepareCloud($this->competitorsText);
         $this->competitorsLinksCloud = TextAnalyzer::prepareCloud($this->competitorsLinks);
 
         foreach ($this->sites as $key => $page) {
-            $this->tfCompClouds[$key] = $this->prepareTfCloud($this->separateText($page['html'] . ' ' . $page['linkText']));
+            $this->tfCompClouds[$key] = $this->prepareTfCloud(
+                $this->separateText($page['html'] . ' ' . $page['linkText']),
+                $documentFrequencyMap
+            );
         }
     }
 
@@ -880,21 +921,27 @@ class Relevance
         return implode(' ', $array);
     }
 
-    public function prepareTfCloud($text): array
+    public function prepareTfCloud($text, array $documentFrequencyMap = []): array
     {
         $wordForms = $cloud = [];
         $m = new Morphy();
+        $documentCount = max(1, (int) $this->countNotIgnoredSites);
 
         $array = array_count_values(explode(' ', $text));
         arsort($array);
         $array = array_slice($array, 0, 199);
 
-        $wordCount = count(explode(" ", $text));
+        $wordCount = max(1, count(explode(' ', $text)));
         foreach ($array as $key => $item) {
-            $tf = round($item / $wordCount, 4);
+            $tf = TfidfMetrics::termFrequency((float) $item, (float) $wordCount);
+            $documentFrequency = max(1, (int) ($documentFrequencyMap[$key] ?? 1));
+            $idf = TfidfMetrics::inverseDocumentFrequency($documentCount, $documentFrequency);
+            $score = TfidfMetrics::score($tf, $idf);
             $cloud[] = [
                 'text' => $key,
-                'weight' => $tf,
+                'weight' => $score,
+                'tf' => $tf,
+                'idf' => $idf,
             ];
         }
 
@@ -991,17 +1038,20 @@ class Relevance
 
             if ($numberOccurrences > 0) {
                 $countOccurrences = $numberTextOccurrences + $numberLinkOccurrences;
-                $tf = round($countOccurrences / $totalCount, 6);
-                $idf = round(log10($totalCount / $countOccurrences), 6);
+                $tf = TfidfMetrics::termFrequency((float) $countOccurrences, (float) max(1, $totalCount));
+                $documentCount = max(1, (int) $this->countNotIgnoredSites);
+                $idf = TfidfMetrics::inverseDocumentFrequency($documentCount, $numberOccurrences);
+                $score = TfidfMetrics::score($tf, $idf);
 
                 $repeatInTextMainPage = mb_substr_count(Relevance::concatenation([$this->mainPage['html'], $this->mainPage['hiddenText']]), "$phrase");
                 $repeatLinkInMainPage = mb_substr_count($this->mainPage['linkText'], "$phrase");
-                $countSites = count($this->sites);
+                $countSites = max(1, (int) $this->countNotIgnoredSites);
                 arsort($occurrences);
 
                 $result[$phrase] = [
                     'tf' => $tf,
                     'idf' => $idf,
+                    'score' => $score,
                     'numberOccurrences' => $numberOccurrences,
                     'reSpam' => $reSpam,
                     'avgInTotalCompetitors' => (int)ceil(($numberLinkOccurrences + $numberTextOccurrences) / $countSites),
@@ -1017,7 +1067,7 @@ class Relevance
 
         $collection = collect($result);
         $collection = $collection->unique();
-        $collection = $collection->sortByDesc('tf');
+        $collection = $collection->sortByDesc('score');
         $this->phrases = $collection->slice(0, 600)->toArray();
     }
 

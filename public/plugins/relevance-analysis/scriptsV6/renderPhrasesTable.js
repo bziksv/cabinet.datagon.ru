@@ -13,7 +13,7 @@ function renderPhrasesTable(phrases, count, words) {
         }
 
         var table = $('#phrases').DataTable({
-            "order": [[1, "desc"]],
+            "order": [[3, "desc"]],
             "pageLength": count,
             "searching": true,
             dom: 'lBfrtip',
@@ -75,7 +75,7 @@ function renderPhrasesTable(phrases, count, words) {
             $.fn.dataTable.ext.search.push(function (settings, data) {
                 var minInter = parseFloat($('#phrasesMinInter').val());
                 var maxInter = parseFloat($('#phrasesMaxInter').val());
-                var inter = parseFloat(data[3])
+                var inter = parseFloat(data[4])
                 return isPhrases(minInter, maxInter, inter, settings)
             });
             $('#phrasesMinInter, #phrasesMaxInter').keyup(function () {
@@ -85,7 +85,7 @@ function renderPhrasesTable(phrases, count, words) {
             $.fn.dataTable.ext.search.push(function (settings, data) {
                 var minReSpam = parseFloat($('#phrasesMinReSpam').val());
                 var maxReSpam = parseFloat($('#phrasesMaxReSpam').val());
-                var reSpam = parseFloat(data[4])
+                var reSpam = parseFloat(data[5])
                 return isPhrases(minReSpam, maxReSpam, reSpam, settings)
             });
             $('#phrasesMinReSpam, #phrasesMaxReSpam').keyup(function () {
@@ -95,7 +95,7 @@ function renderPhrasesTable(phrases, count, words) {
             $.fn.dataTable.ext.search.push(function (settings, data) {
                 var minAVG = parseFloat($('#phrasesMinAVG').val());
                 var maxAVG = parseFloat($('#phrasesMaxAVG').val());
-                var AVG = parseFloat(data[5])
+                var AVG = parseFloat(data[6])
                 return isPhrases(minAVG, maxAVG, AVG, settings)
             });
             $('#phrasesMinAVG, #phrasesMaxAVG').keyup(function () {
@@ -105,7 +105,7 @@ function renderPhrasesTable(phrases, count, words) {
             $.fn.dataTable.ext.search.push(function (settings, data) {
                 var minAVGText = parseFloat($('#phrasesMinAVGText').val());
                 var maxAVGText = parseFloat($('#phrasesMaxAVGText').val());
-                var count = parseFloat(data[6])
+                var count = parseFloat(data[7])
                 return isPhrases(minAVGText, maxAVGText, count, settings)
             });
             $('#phrasesMinAVGText, #phrasesMaxAVGText').keyup(function () {
@@ -115,7 +115,7 @@ function renderPhrasesTable(phrases, count, words) {
             $.fn.dataTable.ext.search.push(function (settings, data) {
                 var minInYourPage = parseFloat($('#phrasesMinInYourPage').val());
                 var maxInYourPage = parseFloat($('#phrasesMaxInYourPage').val());
-                var count = parseFloat(data[7])
+                var count = parseFloat(data[8])
                 return isPhrases(minInYourPage, maxInYourPage, count, settings)
             });
             $('#phrasesMinInYourPage, #phrasesMaxInYourPage').keyup(function () {
@@ -125,7 +125,7 @@ function renderPhrasesTable(phrases, count, words) {
             $.fn.dataTable.ext.search.push(function (settings, data) {
                 var minTextIYP = parseFloat($('#phrasesMinTextIYP').val());
                 var maxTextIYP = parseFloat($('#phrasesMaxTextIYP').val());
-                var count = parseFloat(data[8])
+                var count = parseFloat(data[9])
                 return isPhrases(minTextIYP, maxTextIYP, count, settings)
             });
             $('#phrasesMinTextIYP, #phrasesMaxTextIYP').keyup(function () {
@@ -135,7 +135,7 @@ function renderPhrasesTable(phrases, count, words) {
             $.fn.dataTable.ext.search.push(function (settings, data) {
                 var minAVGLink = parseFloat($('#phrasesMinAVGLink').val());
                 var maxAVGLink = parseFloat($('#phrasesMaxAVGLink').val());
-                var count = parseFloat(data[9])
+                var count = parseFloat(data[10])
                 return isPhrases(minAVGLink, maxAVGLink, count, settings)
             });
             $('#phrasesMinAVGLink, #phrasesMaxAVGLink').keyup(function () {
@@ -145,7 +145,7 @@ function renderPhrasesTable(phrases, count, words) {
             $.fn.dataTable.ext.search.push(function (settings, data) {
                 var minLinkIYP = parseFloat($('#phrasesMinLinkIYP').val());
                 var maxLinkIYP = parseFloat($('#phrasesMaxLinkIYP').val());
-                var count = parseFloat(data[10])
+                var count = parseFloat(data[11])
                 return isPhrases(minLinkIYP, maxLinkIYP, count, settings)
             });
             $('#phrasesMinLinkIYP, #phrasesMaxLinkIYP').keyup(function () {
@@ -174,6 +174,7 @@ function renderTr(key, item) {
     "<td>" + key + "</td>" +
     "<td>" + item['tf'] + "</td>" +
     "<td>" + item['idf'] + "</td>" +
+    "<td>" + (item['score'] ?? '') + "</td>" +
     "<td>" + item['numberOccurrences'] + "" +
     "<span class='__helper-link ui_tooltip_w'>" +
     "    <i class='fa fa-paperclip'></i>" +

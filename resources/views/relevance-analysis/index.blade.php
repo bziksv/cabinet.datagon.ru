@@ -431,18 +431,18 @@
                             <button id="tf-idf-clouds" class="btn btn-secondary col-lg-3 col-md-5 mb-3 click_tracking"
                                     data-click="TF idf clouds of sites from the top and landing page"
                                     style="cursor: pointer">
-                                {{ __('TF-idf clouds of sites from the top and landing page') }}
+                                {{ __('TF-IDF score clouds of sites from the top and landing page') }}
                             </button>
                             <div class="tf-idf-clouds" style="display: none">
                                 <div class="d-lg-flex mt-4 justify-content-around">
                                     <div class="col-lg-5 col-md-10">
-                                        <span>{{ __('Average tf-idf values of links and competitor text') }}</span>
+                                        <span>{{ __('Average TF-IDF score for links and competitor text') }}</span>
                                         <div style="height: 350px" id="competitorsTfCloud"
                                              class="generated-cloud"></div>
                                     </div>
 
                                     <div class="col-lg-5 col-md-10">
-                                        <span>{{ __('TF-idf values of links and landing page text') }}</span>
+                                        <span>{{ __('TF-IDF score for links and landing page text') }}</span>
                                         <div style="height: 350px" id="mainPageTfCloud" class="generated-cloud"></div>
                                     </div>
 
@@ -450,13 +450,13 @@
                                 <div class="d-lg-flex mt-4 justify-content-around">
 
                                     <div class="col-lg-5 col-md-10">
-                                        <span>{{ __('Average tf-idf values of competitors text') }}</span>
+                                        <span>{{ __('Average TF-IDF score for competitors text') }}</span>
                                         <div style="height: 350px" id="competitorsTextTfCloud"
                                              class="generated-cloud"></div>
                                     </div>
 
                                     <div class="col-lg-5 col-md-10">
-                                        <span>{{ __('TF-idf values of the landing page text') }}</span>
+                                        <span>{{ __('TF-IDF score for the landing page text') }}</span>
                                         <div style="height: 350px" id="mainPageTextTfCloud"
                                              class="generated-cloud"></div>
                                     </div>
@@ -465,13 +465,13 @@
                                 <div class="d-lg-flex mt-4 justify-content-around">
 
                                     <div class="col-lg-5 col-md-10">
-                                        <span>{{ __('Average tf-idf values of competitor links') }}</span>
+                                        <span>{{ __('Average TF-IDF score for competitor links') }}</span>
                                         <div style="height: 350px" id="competitorsLinksTfCloud"
                                              class="generated-cloud"></div>
                                     </div>
 
                                     <div class="col-lg-5 col-md-10">
-                                        <span>{{ __('TF-idf values of landing page links') }}</span>
+                                        <span>{{ __('TF-IDF score for landing page links') }}</span>
                                         <div style="height: 350px" id="mainPageLinksTfCloud"
                                              class="generated-cloud"></div>
                                     </div>
@@ -481,7 +481,7 @@
                             <button id="text-clouds" class="btn btn-secondary col-lg-3 col-md-5 click_tracking"
                                     data-click="Clouds of site text from the top and landing page"
                                     style="cursor: pointer;">
-                                {{ __('Clouds of site text from the top and landing page') }}
+                                {{ __('TF clouds of site text from the top and landing page') }}
                             </button>
                             <div class="text-clouds" style=" display: none">
                                 <div class="d-lg-flex mt-4 justify-content-around">
@@ -577,6 +577,7 @@
                                         <input class="w-100" type="number" name="maxIdf" id="maxIdf" placeholder="max">
                                     </div>
                                 </th>
+                                <th></th>
                                 <th>
                                     <div>
                                         <input class="w-100" type="number" name="minInter" id="minInter"
@@ -656,7 +657,7 @@
                                     <span class="__helper-link ui_tooltip_w">
                             <i class="fa fa-question-circle"></i>
                             <span class="ui_tooltip __left">
-                                <span class="ui_tooltip_content">{{ __('The weight of the phrase relative to others.') }}
+                                <span class="ui_tooltip_content">{{ __('Term frequency in the aggregated competitor corpus.') }}
                                 </span>
                             </span>
                         </span>
@@ -665,7 +666,16 @@
                                     <span class="__helper-link ui_tooltip_w">
                             <i class="fa fa-question-circle"></i>
                             <span class="ui_tooltip __left">
-                                <span class="ui_tooltip_content">{{ __('The weight of the phrase relative to others.') }}
+                                <span class="ui_tooltip_content">{{ __('Inverse document frequency: log10(N/df), N — competitors, df — sites with the term.') }}
+                                </span>
+                            </span>
+                        </span>
+                                </th>
+                                <th>{{ __('Score') }}
+                                    <span class="__helper-link ui_tooltip_w">
+                            <i class="fa fa-question-circle"></i>
+                            <span class="ui_tooltip __left">
+                                <span class="ui_tooltip_content">{{ __('TF-IDF score: TF × IDF.') }}
                                 </span>
                             </span>
                         </span>
@@ -767,6 +777,7 @@
                                         <input class="w-100" type="number" id="phrasesMaxIdf" placeholder="max">
                                     </div>
                                 </th>
+                                <th></th>
                                 <th>
                                     <div>
                                         <input class="w-100" type="number" id="phrasesMinInter" placeholder="min">
@@ -822,6 +833,7 @@
                                 <th>{{ __('Phrase') }}</th>
                                 <th>tf</th>
                                 <th>idf</th>
+                                <th>{{ __('Score') }}</th>
                                 <th>{{ __('Intersection') }}</th>
                                 <th>{{ __('Re - spam') }}</th>
                                 <th>{{ __('Average number of repetitions in the text and links') }}</th>

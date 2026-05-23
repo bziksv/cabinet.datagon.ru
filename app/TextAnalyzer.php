@@ -207,7 +207,9 @@ class TextAnalyzer extends Model
         ];
         $response['graph'] = TextAnalyzer::prepareDataGraph($response['totalWords']);
 
-        TariffSetting::saveStatistics(TextAnalyzer::class, Auth::id());
+        if (empty($request['demo'])) {
+            TariffSetting::saveStatistics(TextAnalyzer::class, Auth::id());
+        }
 
         return $response;
     }

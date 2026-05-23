@@ -83,3 +83,5 @@ Route::get('checkYandexToken/{name?}', function($name = "Воронеж"){
 });
 
 Route::post('bot', 'TelegramBotController@index');
+
+Route::post('demo/analiz-teksta/run', 'Api\\Demo\\TextAnalyzerDemoController@run');

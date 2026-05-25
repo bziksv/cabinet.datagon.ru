@@ -66,19 +66,7 @@ class PagesController extends Controller
      */
     public function duplicates()
     {
-        $options = collect([
-            1 => __('remove duplicate spaces between words'),
-            2 => __('remove spaces and tabs at the beginning and end of the line'),
-            3 => __('replace tabs with spaces'),
-            4 => __('remove blank lines'),
-            5 => __('convert to lowercase'),
-            6 => __('remove characters at the beginning of a word'),
-            7 => __('remove characters at the end of a word'),
-            8 => __('remove duplicates'),
-            9 => __('replace e'),
-        ])->toJson();
-
-        return view('pages.duplicates', compact('options'));
+        return view('pages.duplicates');
     }
 
     /**

@@ -12,6 +12,8 @@ use App\Common;
 use App\Exports\Cluster\ClusterGroupExport;
 use App\Exports\Cluster\ClusterResultExport;
 use App\Jobs\Cluster\StartClusterAnalyseQueue;
+use App\Support\ClusterAnalysisDebugLog;
+use App\Support\YandexLrRegions;
 use App\User;
 use Carbon\Carbon;
 use Doctrine\DBAL\Exception;
@@ -39,8 +41,118 @@ class ClusterController extends Controller
         ]);
     }
 
+    public function indexV2(): View
+    {
+        $admin = User::isUserAdmin();
+        $config = ClusterConfiguration::first();
+        $configClassic = ClusterConfigurationClassic::first();
+
+        return view('cluster-v2.index', [
+            'admin' => $admin,
+            'config' => $config,
+            'config_classic' => $configClassic,
+            'clusterV2DefaultsClassic' => $this->clusterV2DefaultsFromConfig($configClassic),
+            'clusterV2DefaultsPro' => $this->clusterV2DefaultsFromConfig($config),
+            'clusterV2DefaultRegion' => $this->clusterV2ResolvedRegion($configClassic),
+            'telegramConnected' => Auth::user()->isTelegramConnected(),
+            'clusterV2PresetKawe' => $admin ? $this->clusterV2PresetKawe() : null,
+        ]);
+    }
+
+    private function clusterV2PresetKawe(): ?array
+    {
+        $preset = config('cabinet-cluster.presets.kawe');
+        $file = is_array($preset) ? ($preset['phrases_file'] ?? null) : null;
+
+        if (!$file || !is_readable($file)) {
+            return null;
+        }
+
+        $phrases = trim((string) file_get_contents($file));
+        if ($phrases === '') {
+            return null;
+        }
+
+        return [
+            'phrases' => $phrases,
+            'domain' => (string) ($preset['domain'] ?? ''),
+            'searchBase' => (bool) ($preset['search_base'] ?? false),
+            'searchPhrases' => (bool) ($preset['search_phrases'] ?? false),
+            'searchTarget' => (bool) ($preset['search_target'] ?? false),
+            'searchRelevance' => (bool) ($preset['search_relevance'] ?? false),
+            'save' => (string) ($preset['save'] ?? '0'),
+            'sendMessage' => (string) (($preset['send_message'] ?? false) ? '1' : '0'),
+        ];
+    }
+
+    public function searchRegions(Request $request): JsonResponse
+    {
+        $q = trim((string) $request->query('q', ''));
+        $limit = min(50, max(5, (int) $request->query('limit', 25)));
+
+        return response()->json([
+            'results' => YandexLrRegions::search($q, $limit),
+        ]);
+    }
+
+    private function clusterV2ResolvedRegion($config): ?array
+    {
+        $id = $config !== null ? (string) $config->region : '213';
+        if ($id === '') {
+            $id = '213';
+        }
+
+        return YandexLrRegions::find($id) ?? YandexLrRegions::find('213');
+    }
+
+    private function clusterV2DefaultsFromConfig($config): array
+    {
+        if ($config === null) {
+            return [];
+        }
+
+        $regionItem = YandexLrRegions::find((string) $config->region);
+
+        return [
+            'region' => $config->region,
+            'region_text' => $regionItem['name'] ?? ($regionItem['text'] ?? (string) $config->region),
+            'count' => $config->count ?? 30,
+            'clustering_level' => $config->clustering_level,
+            'save_results' => (bool) $config->save_results,
+            'search_base' => (bool) $config->search_base,
+            'search_phrased' => (bool) $config->search_phrased,
+            'search_target' => (bool) $config->search_target,
+            'search_relevance' => (bool) $config->search_relevance,
+            'search_engine' => $config->search_engine ?? 'yandex',
+            'send_message' => (bool) $config->send_message,
+            'brut_force' => (bool) $config->brut_force,
+            'gain_factor' => $config->gain_factor,
+            'brut_force_count' => $config->brut_force_count,
+            'reduction_ratio' => $config->reduction_ratio,
+            'ignored_domains' => $config->ignored_domains,
+            'ignored_words' => $config->ignored_words,
+        ];
+    }
+
     public function analyseCluster(Request $request): JsonResponse
     {
+        if ($request->has('domain')) {
+            $request->merge(['domain' => $this->normalizeClusterDomains((string) $request->input('domain'))]);
+        }
+
+        $progressId = (string) $request->input('progressId', '');
+        if ($progressId !== '') {
+            ClusterAnalysisDebugLog::info($progressId, 'http.analyseCluster.accepted', [
+                'mode' => $request->input('mode'),
+                'region' => $request->input('region'),
+                'phrases' => count(array_filter(explode("\n", str_replace("\r", '', (string) $request->input('phrases', ''))))),
+                'search_base' => filter_var($request->input('searchBase'), FILTER_VALIDATE_BOOLEAN),
+                'search_phrases' => filter_var($request->input('searchPhrases'), FILTER_VALIDATE_BOOLEAN),
+                'search_target' => filter_var($request->input('searchTarget'), FILTER_VALIDATE_BOOLEAN),
+                'search_relevance' => filter_var($request->input('searchRelevance'), FILTER_VALIDATE_BOOLEAN),
+            ]);
+        }
+
         $this->validate($request, [
             'domain' => 'sometimes|required_if:searchRelevance,==,true',
         ], [
@@ -55,28 +167,103 @@ class ClusterController extends Controller
         }
 
         if (filter_var($request->input('searchRelevance'), FILTER_VALIDATE_BOOL)) {
-            $link = parse_url($request->input('domain'));
-            if (empty($link['host'])) {
-                return response()->json([
-                    'errors' => ['domain' => __('url not valid')]
-                ], 422);
+            foreach ($this->clusterDomainLines((string) $request->input('domain')) as $line) {
+                $link = parse_url($line);
+                if (empty($link['host'])) {
+                    return response()->json([
+                        'errors' => ['domain' => __('url not valid')]
+                    ], 422);
+                }
             }
         }
+
         $user = Auth::user();
+        if (filter_var($request->input('sendMessage'), FILTER_VALIDATE_BOOLEAN) && !$user->isTelegramConnected()) {
+            return response()->json([
+                'errors' => ['sendMessage' => __('Subscribe to notifications in Telegram first.')],
+            ], 422);
+        }
+
         dispatch(new StartClusterAnalyseQueue($request->all(), $user))->onQueue('main_cluster');
 
-        return response()->json([
+        ClusterAnalysisDebugLog::info($progressId, 'http.analyseCluster.dispatched', [
+            'queue' => 'main_cluster',
+        ]);
+
+        return $this->withClusterDebug($progressId, [
             'result' => true,
             'totalPhrases' => count(array_unique(array_diff(explode("\n", str_replace("\r", "", $request['phrases'])), []))),
             'totalRequests' => $countRequests,
         ]);
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     */
+    protected function withClusterDebug(string $progressId, array $payload, int $status = 200): JsonResponse
+    {
+        if (User::isUserAdmin() && $progressId !== '') {
+            $payload['debug_log'] = ClusterAnalysisDebugLog::get($progressId);
+            $payload['debug_admin'] = true;
+        }
+
+        return response()->json($payload, $status);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function clusterDomainLines(string $domain): array
+    {
+        $lines = preg_split('/\r\n|\r|\n/', $domain) ?: [];
+        $out = [];
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line !== '') {
+                $out[] = $line;
+            }
+        }
+
+        return $out;
+    }
+
+    private function normalizeClusterDomains(string $domain): string
+    {
+        $lines = $this->clusterDomainLines($domain);
+        if ($lines === []) {
+            return '';
+        }
+
+        $normalized = array_map(function (string $line): string {
+            if (!preg_match('#^https?://#i', $line)) {
+                $line = 'https://' . ltrim($line, '/');
+            }
+
+            return $line;
+        }, $lines);
+
+        return implode("\n", $normalized);
+    }
+
     public function startProgress(): JsonResponse
     {
-        return response()->json([
-            'id' => md5(microtime(true))
+        $progressId = md5(microtime(true));
+        ClusterAnalysisDebugLog::clear($progressId);
+        ClusterAnalysisDebugLog::info($progressId, 'http.startProgress', ['progress_id' => $progressId]);
+
+        return $this->withClusterDebug($progressId, [
+            'id' => $progressId,
         ], 201);
+    }
+
+    public function telegramStatus(): JsonResponse
+    {
+        $user = Auth::user();
+
+        return response()->json([
+            'connected' => $user ? $user->isTelegramConnected() : false,
+        ]);
     }
 
     public function getProgress(string $id): JsonResponse
@@ -84,15 +271,28 @@ class ClusterController extends Controller
         $cluster = ClusterResults::where('progress_id', '=', $id)->first();
         if (isset($cluster)) {
             ClusterQueue::where('progress_id', '=', $id)->delete();
-            return response()->json([
+            ClusterAnalysisDebugLog::info($id, 'http.getProgress.complete', [
+                'object_id' => $cluster->id,
+                'count_phrases' => $cluster->count_phrases,
+            ]);
+
+            return $this->withClusterDebug($id, [
                 'count' => $cluster->count_phrases,
                 'result' => Cluster::unpackCluster($cluster->result),
                 'objectId' => $cluster->id,
             ]);
         }
 
-        return response()->json([
-            'count' => ClusterQueue::where('progress_id', '=', $id)->count(),
+        $queueCount = ClusterQueue::where('progress_id', '=', $id)->count();
+        ClusterAnalysisDebugLog::info($id, 'http.getProgress.pending', [
+            'queue_count' => $queueCount,
+        ]);
+
+        return $this->withClusterDebug($id, [
+            'count' => $queueCount,
+            'debug_state' => [
+                'queue_count' => $queueCount,
+            ],
         ]);
     }
 
@@ -309,7 +509,13 @@ class ClusterController extends Controller
         return view('cluster.config', [
             'config' => ClusterConfiguration::first(),
             'config_classic' => ClusterConfigurationClassic::first(),
-            'admin' => User::isUserAdmin()
+            'admin' => User::isUserAdmin(),
+            'counter' => ClusterResults::countScansInCurrentMonth(),
+            'uniqueUsers' => [
+                30 => ClusterResults::countUniqueUsersSinceDays(30),
+                60 => ClusterResults::countUniqueUsersSinceDays(60),
+                90 => ClusterResults::countUniqueUsersSinceDays(90),
+            ],
         ]);
     }
 

@@ -42,6 +42,8 @@ class CompetitorAnalysisDemoController extends Controller
         $demoInput = [
             'phrase' => $body['phrase'] ?? '',
             'region_id' => $body['region_id'] ?? '',
+            'compare_region_id' => $body['compare_region_id'] ?? '',
+            'search_engine' => $body['search_engine'] ?? 'yandex',
         ];
 
         $validated = CompetitorAnalysisDemoService::validate($demoInput);

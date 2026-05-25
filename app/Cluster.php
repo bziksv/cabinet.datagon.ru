@@ -5,6 +5,7 @@ namespace App;
 use App\Classes\Xml\SimplifiedXmlFacade;
 use App\Jobs\Cluster\ClusterQueue;
 use App\Jobs\Cluster\WaitClusterAnalyseQueue;
+use App\Support\ClusterAnalysisDebugLog;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -136,6 +137,8 @@ class Cluster
             $this->region = $request['region'];
 
             $this->xml = new SimplifiedXmlFacade($this->region, 100);
+            $this->xml->setDebugPageHash($this->progressId);
+            $this->xml->setDebugLogDriver('cluster');
 
             $this->host = $this->searchRelevance ? parse_url($this->request['domain'])['host'] : $this->request['domain'];
         }
@@ -250,6 +253,11 @@ class Cluster
 
     public function startAnalysis()
     {
+        ClusterAnalysisDebugLog::info($this->progressId, 'cluster.startAnalysis', [
+            'phrases' => $this->countPhrases,
+            'mode' => $this->mode,
+        ]);
+
         foreach ($this->phrases as $key => $phrase) {
             dispatch(new ClusterQueue($this, $key, $phrase))->onQueue('child_cluster');
         }
@@ -257,12 +265,18 @@ class Cluster
         try {
             dispatch(new WaitClusterAnalyseQueue($this))->onQueue('cluster_wait');
         } catch (\Throwable $e) {
-
+            ClusterAnalysisDebugLog::error($this->progressId, 'cluster.wait.dispatch_failed', [
+                'message' => $e->getMessage(),
+            ]);
         }
     }
 
     public function calculate()
     {
+        ClusterAnalysisDebugLog::info($this->getProgressId(), 'cluster.calculate.start', [
+            'queue_rows' => $this->getProgressCurrentCount(),
+        ]);
+
         $results = \App\ClusterQueue::where('progress_id', '=', $this->getProgressId())->get();
         $res = [];
         foreach ($results as $result) {
@@ -293,6 +307,10 @@ class Cluster
         $count = ClusterLimit::calculateCountRequests($this->request);
         ClusterLimit::where('user_id', '=', $this->user->id)
             ->where('date', '=', "$now->year-$month")->increment('count', $count);
+
+        ClusterAnalysisDebugLog::info($this->getProgressId(), 'cluster.calculate.done', [
+            'clusters' => count($this->clusters ?? []),
+        ]);
     }
 
     protected function markIgnoredDomains()

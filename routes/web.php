@@ -443,6 +443,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('/set-cluster-cleaning-interval', 'ClusterController@setCleaningInterval')->name('set.cluster.cleaning.interval');
     Route::get('/cluster', 'ClusterController@index')->name('cluster');
+    Route::get('/cluster-v2', 'ClusterController@indexV2')->name('cluster.v2');
+    Route::get('/cluster-v2/regions', 'ClusterController@searchRegions')->name('cluster.v2.regions');
+    Route::get('/cluster-telegram-status', 'ClusterController@telegramStatus')->name('cluster.telegram.status');
     Route::post('/analysis-cluster', 'ClusterController@analyseCluster')->name('analysis.cluster');
     Route::get('/start-cluster-progress', 'ClusterController@startProgress')->name('start.cluster.progress');
     Route::get('/get-cluster-progress/{id}', 'ClusterController@getProgress')->name('get.cluster.progress');

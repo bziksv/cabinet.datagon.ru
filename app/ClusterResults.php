@@ -2,6 +2,7 @@
 
 namespace App;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -184,5 +185,27 @@ class ClusterResults extends Model
         }
 
         return $item;
+    }
+
+    public static function countScansInCurrentMonth(): int
+    {
+        $now = Carbon::now();
+
+        return (int) static::query()
+            ->whereYear('created_at', $now->year)
+            ->whereMonth('created_at', $now->month)
+            ->count();
+    }
+
+    public static function countUniqueUsersSinceDays(int $days): int
+    {
+        if ($days < 1) {
+            return 0;
+        }
+
+        return (int) static::query()
+            ->where('created_at', '>=', Carbon::now()->subDays($days))
+            ->selectRaw('COUNT(DISTINCT user_id) as aggregate')
+            ->value('aggregate');
     }
 }

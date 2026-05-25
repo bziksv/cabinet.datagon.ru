@@ -1,163 +1,137 @@
-@component('component.card', ['title' =>  __('My projects') ])
+@component('component.card', [
+    'title' => __('My projects'),
+    'titleHtml' => e(__('My projects')) . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-cluster'])->render(),
+])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('plugins/keyword-generator/css/font-awesome-4.7.0/css/font-awesome.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/keyword-generator/css/style.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/common/css/datatable.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/relevance-analysis/css/style.css') }}">
-
-        <style>
-            #clusters-table > tbody > tr > td > table > thead:hover {
-                background: transparent !important;
-            }
-
-            .centered-text {
-                text-align: center;
-                vertical-align: inherit;
-            }
-
-            .dataTables_info, .hidden-result-table_filter {
-                display: none;
-            }
-
-            .bg-cluster-warning {
-                background: rgba(245, 226, 170, 0.5);
-            }
-
-            .text-primary {
-                color: #007bff !important;
-            }
-
-            a.paginate_button.current {
-                background: #ebf0f5 !important;
-            }
-
-            .Clusters {
-                background: oldlace;
-            }
-
-            #my-cluster-projects_paginate,
-            #my-cluster-projects_filter {
-                display: flex;
-                justify-content: end;
-            }
-        </style>
+        <link rel="stylesheet" href="{{ asset('css/cabinet-cluster.css') }}?v={{ @filemtime(public_path('css/cabinet-cluster.css')) ?: time() }}">
     @endslot
 
-    <div id="toast-container" class="toast-top-right success-message">
-        <div class="toast toast-success" aria-live="polite" style="display:none;">
-            <div class="toast-message success-msg"></div>
-        </div>
-    </div>
+    <div class="cabinet-cluster-page cabinet-cluster-projects-page">
+        @include('cluster.partials.module-nav', ['active' => 'projects', 'admin' => $admin])
 
-    <div id="toast-container" class="toast-top-right error-message">
-        <div class="toast toast-error" aria-live="assertive" style="display:none;">
-            <div class="toast-message error-msg"></div>
+        <div id="toast-container" class="toast-top-right success-message">
+            <div class="toast toast-success" aria-live="polite" style="display:none;">
+                <div class="toast-message success-msg"></div>
+            </div>
         </div>
-    </div>
 
-    <div class="card">
-        <div class="card-header d-flex p-0">
-            <ul class="nav nav-pills p-2">
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ route('cluster') }}">{{ __('Analyzer') }}</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link active"
-                       href="{{ route('cluster.projects') }}">{{ __('My projects') }}</a>
-                </li>
-                @if($admin)
-                    <li class="nav-item">
-                        <a class="nav-link text-primary" href="{{ route('cluster.configuration') }}">
-                            {{ __('Module administration') }}
-                        </a>
-                    </li>
+        <div id="toast-container" class="toast-top-right error-message">
+            <div class="toast toast-error" aria-live="assertive" style="display:none;">
+                <div class="toast-message error-msg"></div>
+            </div>
+        </div>
+
+        <div id="cabinet-cluster-projects">
+            <div class="card shadow-sm cabinet-cluster-projects-card">
+                <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <h3 class="card-title mb-0">{{ __('Saved analyses') }}</h3>
+                    <span class="badge text-bg-secondary">{{ count($projects) }}</span>
+                </div>
+                @if($projects->isEmpty())
+                    <div class="card-body cabinet-cluster-projects-empty text-center py-5">
+                        <p class="text-secondary mb-3">{{ __('No saved projects yet. Run an analysis on the Analyzer tab and choose Save results.') }}</p>
+                        <a href="{{ route('cluster') }}" class="btn btn-primary">{{ __('Go to Analyzer') }}</a>
+                    </div>
+                @else
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table id="my-cluster-projects" class="table table-hover table-striped mb-0 cabinet-cluster-projects-table align-middle">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>{{ __('Analysis date') }}</th>
+                                    <th>{{ __('Domain') }}</th>
+                                    <th>{{ __('Comment') }}</th>
+                                    <th class="text-center">{{ __('Number of phrases') }}</th>
+                                    <th class="text-center">{{ __('Number of groups') }}</th>
+                                    <th class="text-center">{{ __('TOP') }}</th>
+                                    <th>{{ __('Mode') }}</th>
+                                    <th>{{ __('Region') }}</th>
+                                    <th class="cabinet-cluster-projects-actions-col"></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                @foreach($projects as $project)
+                                    <tr>
+                                        <td class="text-nowrap small text-secondary">{{ $project->created_at }}</td>
+                                        <td>
+                                            <textarea data-target="{{ $project->id }}" name="domain"
+                                                      class="action-edit project-domain form-control form-control-sm"
+                                                      rows="2">{{ $project->domain }}</textarea>
+                                        </td>
+                                        <td>
+                                            <textarea data-target="{{ $project->id }}" name="comment"
+                                                      class="action-edit project-comment form-control form-control-sm"
+                                                      rows="2">{{ $project->comment }}</textarea>
+                                        </td>
+                                        <td class="text-center text-num">{{ $project->count_phrases }}</td>
+                                        <td class="text-center text-num">{{ $project->count_clusters }}</td>
+                                        <td class="text-center text-num">{{ $project->top }}</td>
+                                        <td>
+                                            <span class="badge text-bg-light text-dark border">
+                                                {{ $project->clustering_level }} / {{ $project->request['engineVersion'] ?? '—' }}
+                                            </span>
+                                        </td>
+                                        <td class="project-region small">{{ $project->region }}</td>
+                                        <td>
+                                            <div class="cabinet-cluster-project-actions">
+                                                <a class="btn btn-primary btn-sm w-100"
+                                                   href="{{ route('show.cluster.result', $project->id) }}" target="_blank">
+                                                    {{ __('View results') }}
+                                                </a>
+                                                <div class="btn-group btn-group-sm w-100 mt-1" role="group">
+                                                    <a href="{{ route('edit.clusters', $project->id) }}"
+                                                       class="btn btn-outline-secondary" target="_blank"
+                                                       title="{{ __('Hands editor') }}">
+                                                        <i class="fas fa-edit" aria-hidden="true"></i>
+                                                    </a>
+                                                    <button type="button"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#repeat-scan"
+                                                            data-order="{{ $project->id }}"
+                                                            class="btn btn-outline-secondary repeat-scan"
+                                                            title="{{ __('Repeat analysis') }}">
+                                                        <i class="fas fa-redo" aria-hidden="true"></i>
+                                                    </button>
+                                                    <a class="btn btn-outline-secondary"
+                                                       href="/download-cluster-result/{{ $project->id }}/csv"
+                                                       target="_blank" title="{{ __('Download csv') }}">CSV</a>
+                                                    <a class="btn btn-outline-secondary"
+                                                       href="/download-cluster-result/{{ $project->id }}/xls"
+                                                       target="_blank" title="{{ __('Download xls') }}">XLS</a>
+                                                </div>
+                                                @if($project->count_phrases >= $config->warning_limit)
+                                                    <span class="badge text-bg-warning mt-1 w-100">
+                                                        {{ __('A page can weigh a lot and work slowly') }}
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 @endif
-            </ul>
-        </div>
-        <div class="card-body">
-            <div class="tab-content">
-                <div class="tab-pane active" id="tab_1">
-                    <table id="my-cluster-projects" class="table table-bordered table-hover">
-                        <thead>
-                        <tr>
-                            <th>{{ __('Analysis date') }}</th>
-                            <th>{{ __('Domain') }}</th>
-                            <th>{{ __('Comment') }}</th>
-                            <th>{{ __('Number of phrases') }}</th>
-                            <th>{{ __('Number of groups') }}</th>
-                            <th>{{ __('TOP') }}</th>
-                            <th>{{ __('Mode') }}</th>
-                            <th>{{ __('Region') }}</th>
-                            <th></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        @foreach($projects as $project)
-                            <tr>
-                                <td>{{ $project->created_at }}</td>
-                                <td>
-                                    <textarea data-target="{{ $project->id }}" name="domain"
-                                              class="action-edit project-domain form-control"
-                                              rows="7">{{ $project->domain }}</textarea>
-                                </td>
-                                <td>
-                                    <textarea data-target="{{ $project->id }}" name="comment"
-                                              class="action-edit project-comment form-control"
-                                              rows="7">{{ $project->comment }}</textarea>
-                                </td>
-                                <td>{{ $project->count_phrases }}</td>
-                                <td>{{ $project->count_clusters }}</td>
-                                <td>{{ $project->top }}</td>
-                                <td>{{ $project->clustering_level }} / {{ $project->request['engineVersion'] }}</td>
-                                <td class="project-region">{{ $project->region }}</td>
-                                <td>
-                                    <div class="d-flex flex-column">
-                                        <a class="btn btn-secondary mb-2"
-                                           href="{{ route('show.cluster.result', $project->id) }}" target="_blank">
-                                            {{ __('View results') }}
-                                        </a>
-                                        <a href="{{ route('edit.clusters', $project->id) }}"
-                                           class="btn btn-secondary mb-2" target="_blank">
-                                            {{ __('Hands editor') }}
-                                        </a>
-                                        <button type="button"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#repeat-scan"
-                                                data-order="{{ $project->id }}"
-                                                class="btn btn-secondary mb-2 repeat-scan">
-                                            {{ __('Repeat analysis') }}
-                                        </button>
-                                        <a class="btn btn-secondary mb-2"
-                                           href="/download-cluster-result/{{$project->id}}/csv"
-                                           target="_blank">{{ __('Download csv') }}</a>
-                                        <a class="btn btn-secondary mb-2"
-                                           href="/download-cluster-result/{{$project->id}}/xls"
-                                           target="_blank">{{ __('Download xls') }}</a>
-                                        @if($project->count_phrases >= $config->warning_limit)
-                                            <span class="text-info">{{ __('A page can weigh a lot') }}<br> {{ __('and work slowly') }}</span>
-                                        @endif
-                                    </div>
-                                </td>
-                            </tr>
-                        @endforeach
-                        </tbody>
-                    </table>
+            </div>
 
                     <div class="modal fade" id="repeat-scan" tabindex="-1" aria-labelledby="repeat-scanLabel"
                          aria-hidden="true">
-                        <div class="modal-dialog">
+                        <div class="modal-dialog modal-lg modal-dialog-scrollable">
                             <div class="modal-content">
                                 <div class="modal-header">
-                                    <h5 class="modal-title" id="repeat-scanLabel"></h5>
-                                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                                        <span aria-hidden="true">&times;</span>
-                                    </button>
+                                    <h5 class="modal-title" id="repeat-scanLabel">{{ __('Repeat analysis') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                 </div>
                                 <div class="modal-body">
                                     <div id="pro" style="display: none">
-                                        <div class="form-group required">
-                                            <label>{{ __('Region') }}</label>
+                                        <div class="mb-3 required">
+                                            <label class="form-label">{{ __('Region') }}</label>
                                             {!! Form::select('region', array_unique([
                                               '213' => __('Moscow'),
                                                '1' => __('Moscow and the area'),
@@ -221,53 +195,53 @@
                                                '56' => __('Chelyabinsk'),
                                                '1104' => __('Cherkessk'),
                                                '16' => __('Yaroslavl'),
-                                           ]), null, ['class' => 'form-select rounded-0', 'id' => 'region']) !!}
+                                           ]), null, ['class' => 'form-select', 'id' => 'region']) !!}
                                         </div>
 
-                                        <div class="form-group required">
-                                            <label>{{ __('TOP') }}</label>
+                                        <div class="mb-3 required">
+                                            <label class="form-label">{{ __('TOP') }}</label>
                                             {!! Form::select('count', array_unique([
                                                 '10' => 10,
                                                 '20' => 20,
                                                 '30' => 30,
                                                 '40' => 40,
                                                 '50' => 50,
-                                            ]), null, ['class' => 'form-select rounded-0', 'id' => 'count']) !!}
+                                            ]), null, ['class' => 'form-select', 'id' => 'count']) !!}
                                         </div>
 
-                                        <div class="form-group required" id="phrases-form-block">
-                                            <label>{{ __('Key phrases') }}</label>
+                                        <div class="mb-3 required" id="phrases-form-block">
+                                            <label class="form-label">{{ __('Key phrases') }}</label>
                                             {!! Form::textarea('phrases', null, ['class' => 'form-control', 'id'=>'phrases'] ) !!}
                                         </div>
 
-                                        <div class="form-group required">
-                                            <label for="ignoredDomains">Игнорируемые домены</label>
-                                            <textarea class="form form-control" name="ignoredDomains"
+                                        <div class="mb-3 required">
+                                            <label class="form-label" for="ignoredDomains">Игнорируемые домены</label>
+                                            <textarea class="form-control" name="ignoredDomains"
                                                       id="ignoredDomains" cols="8"
                                                       rows="8"></textarea>
                                         </div>
 
                                         <div>
-                                            <div class="form-group required">
-                                                <label for="ignoredWords">Игнорируемые слова</label>
-                                                <textarea class="form form-control" name="ignoredWords"
+                                            <div class="mb-3 required">
+                                                <label class="form-label" for="ignoredWords">Игнорируемые слова</label>
+                                                <textarea class="form-control" name="ignoredWords"
                                                           id="ignoredWords" cols="8"
                                                           rows="8"></textarea>
                                             </div>
                                         </div>
 
-                                        <div class="form-group required">
-                                            <label>{{ __('clustering level') }}</label>
+                                        <div class="mb-3 required">
+                                            <label class="form-label">{{ __('clustering level') }}</label>
                                             {!! Form::select('clustering_level', [
                                                 'light' => 'light',
                                                 'soft' => 'soft',
                                                 'pre-hard' => 'pre-hard',
                                                 'hard' => 'hard',
-                                                ], null, ['class' => 'form-select rounded-0', 'id' => 'clusteringLevel']) !!}
+                                                ], null, ['class' => 'form-select', 'id' => 'clusteringLevel']) !!}
                                         </div>
 
-                                        <div class="form-group required">
-                                            <label for="brutForce">{{ __('Additional bulkhead') }}</label>
+                                        <div class="mb-3 required">
+                                            <label class="form-label" for="brutForce">{{ __('Additional bulkhead') }}</label>
                                             <input type="checkbox" name="brutForce" id="brutForce">
                                             <span class="__helper-link ui_tooltip_w">
                                                 <i class="fa fa-question-circle" style="color: grey"></i>
@@ -280,35 +254,35 @@
                                                 </span>
                                             </span>
                                             <div class="brut-force" style="display: none">
-                                                <div class="form-group required">
-                                                    <label for="gainFactor">коэффициент усиления(%)</label>
-                                                    <input class="form form-control" type="number" id="gainFactor"
+                                                <div class="mb-3 required">
+                                                    <label class="form-label" for="gainFactor">коэффициент усиления(%)</label>
+                                                    <input class="form-control" type="number" id="gainFactor"
                                                            name="gainFactor"
                                                            value="">
                                                 </div>
 
-                                                <div class="form-group required">
-                                                    <label for="brutForceCount">Минимальный размер кластера для
+                                                <div class="mb-3 required">
+                                                    <label class="form-label" for="brutForceCount">Минимальный размер кластера для
                                                         повторной переборки</label>
                                                     <input type="number" name="brutForceCount" id="brutForceCount"
-                                                           class="form form-control"
+                                                           class="form-control"
                                                            value="">
                                                 </div>
 
-                                                <div class="form-group required">
-                                                    <label for="reductionRatio">Минимальный множитель</label>
+                                                <div class="mb-3 required">
+                                                    <label class="form-label" for="reductionRatio">Минимальный множитель</label>
                                                     {!! Form::select('reductionRatio', [
                                                         'pre-hard' => 'pre-hard',
                                                         'soft' => 'soft',
-                                                    ], null, ['class' => 'form-select rounded-0', 'id' => 'reductionRatio']) !!}
+                                                    ], null, ['class' => 'form-select', 'id' => 'reductionRatio']) !!}
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div class="form-group required" id="extra-block">
+                                        <div class="mb-3 required" id="extra-block">
                                             <div class="row">
                                                 <div class="col-6 d-flex flex-column">
-                                                    <label for="domain-textarea">{{ __('Domain') }}</label>
+                                                    <label class="form-label" for="domain-textarea">{{ __('Domain') }}</label>
                                                     <textarea name="domain-textarea" id="domain-textarea" rows="5"
                                                               class="form-control w-100"
                                                               placeholder="https://site.ru"></textarea>
@@ -316,15 +290,15 @@
 
                                                 <div class="col-6">
                                                     <div class="d-flex flex-column">
-                                                        <label for="comment-textarea">{{ __('Comment') }}</label>
+                                                        <label class="form-label" for="comment-textarea">{{ __('Comment') }}</label>
                                                         <textarea name="comment-textarea" id="comment-textarea" rows="5"
                                                                   class="form-control w-100"></textarea>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <div class="form-group required">
-                                                <label
+                                            <div class="mb-3 required">
+                                                <label class="form-label"
                                                     for="searchRelevance">{{ __('Select a relevant page for the domain') }}</label>
                                                 <input type="checkbox" name="searchRelevance" id="searchRelevance">
                                                 <span class="__helper-link ui_tooltip_w">
@@ -340,11 +314,11 @@
                                             </div>
 
                                             <div id="searchEngineBlock">
-                                                <label for="domain-textarea">{{ __('Search Engine') }}</label>
+                                                <label class="form-label" for="domain-textarea">{{ __('Search Engine') }}</label>
                                                 {!! Form::select('searchEngine', [
                                                     'yandex' => 'Yandex',
                                                     'google' => 'Google',
-                                                ], null, ['class' => 'form-select rounded-0', 'id' => 'searchEngine']) !!}
+                                                ], null, ['class' => 'form-select', 'id' => 'searchEngine']) !!}
                                             </div>
 
                                             @if(!Auth::user()->telegram_bot_active)
@@ -361,29 +335,29 @@
                                                     {!! Form::select('sendMessage', [
                                                         true => __('Yes'),
                                                         false => __('No'),
-                                                    ], null, ['class' => 'form-select rounded-0', 'id' => 'sendMessage']) !!}
+                                                    ], null, ['class' => 'form-select', 'id' => 'sendMessage']) !!}
                                                 </div>
                                             @endif
                                         </div>
 
-                                        <div class="form-group required mt-2">
+                                        <div class="mb-3 required mt-2">
                                             <div>
-                                                <label for="searchBase">{{ __('Base frequency analysis') }}</label>
+                                                <label class="form-label" for="searchBase">{{ __('Base frequency analysis') }}</label>
                                                 <input type="checkbox" name="searchBase" id="searchBase">
                                             </div>
                                             <div>
-                                                <label for="searchPhrases">{{ __('Phrase frequency analysis') }}</label>
+                                                <label class="form-label" for="searchPhrases">{{ __('Phrase frequency analysis') }}</label>
                                                 <input type="checkbox" name="searchPhrases" id="searchPhrases">
                                             </div>
                                             <div>
-                                                <label
+                                                <label class="form-label"
                                                     for="searchTarget">{{ __('Accurate frequency analysis') }}</label>
                                                 <input type="checkbox" name="searchTarget" id="searchTarget">
                                             </div>
                                         </div>
 
-                                        <div class="form-group required" id="saveResultBlock">
-                                            <label>{{ __('Save results') }}</label>
+                                        <div class="mb-3 required" id="saveResultBlock">
+                                            <label class="form-label">{{ __('Save results') }}</label>
                                             <span class="__helper-link ui_tooltip_w">
                                                 <i class="fa fa-question-circle" style="color: grey"></i>
                                                 <span class="ui_tooltip __right">
@@ -397,13 +371,13 @@
                                             {!! Form::select('save', [
                                                 '1' => __('Save'),
                                                 '0' => __('Do not save'),
-                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'save']) !!}
+                                            ], null, ['class' => 'form-select', 'id' => 'save']) !!}
                                         </div>
                                     </div>
 
                                     <div id="classic" style="display: block">
-                                        <div class="form-group required">
-                                            <label>{{ __('Region') }}</label>
+                                        <div class="mb-3 required">
+                                            <label class="form-label">{{ __('Region') }}</label>
                                             {!! Form::select('region_classic', array_unique([
                                               '213' => __('Moscow'),
                                                '1' => __('Moscow and the area'),
@@ -467,28 +441,28 @@
                                                '56' => __('Chelyabinsk'),
                                                '1104' => __('Cherkessk'),
                                                '16' => __('Yaroslavl'),
-                                           ]), null, ['class' => 'form-select rounded-0', 'id' => 'region_classic']) !!}
+                                           ]), null, ['class' => 'form-select', 'id' => 'region_classic']) !!}
                                         </div>
 
-                                        <div class="form-group required" id="phrases-form-block">
-                                            <label>{{ __('Key phrases') }}</label>
+                                        <div class="mb-3 required" id="phrases-form-block">
+                                            <label class="form-label">{{ __('Key phrases') }}</label>
                                             {!! Form::textarea('phrases_classic', null, ['class' => 'form-control', 'id' => 'phrases_classic'] ) !!}
                                         </div>
 
-                                        <div class="form-group required">
-                                            <label>{{ __('clustering level') }}</label>
+                                        <div class="mb-3 required">
+                                            <label class="form-label">{{ __('clustering level') }}</label>
                                             {!! Form::select('clustering_level_classic', [
                                                 'light' => 'light',
                                                 'soft' => 'soft',
                                                 'pre-hard' => 'pre-hard',
                                                 'hard' => 'hard',
-                                                ], null, ['class' => 'form-select rounded-0', 'id' => 'clusteringLevel_classic']) !!}
+                                                ], null, ['class' => 'form-select', 'id' => 'clusteringLevel_classic']) !!}
                                         </div>
 
-                                        <div class="form-group required" id="extra-block">
+                                        <div class="mb-3 required" id="extra-block">
                                             <div class="row">
                                                 <div class="col-6 d-flex flex-column">
-                                                    <label for="domain-textarea">{{ __('Domain') }}</label>
+                                                    <label class="form-label" for="domain-textarea">{{ __('Domain') }}</label>
                                                     <textarea name="domain-textarea" id="domain-textarea_classic"
                                                               rows="5" class="form-control w-100"
                                                               placeholder="https://site.ru"></textarea>
@@ -496,7 +470,7 @@
 
                                                 <div class="col-6">
                                                     <div class="d-flex flex-column">
-                                                        <label for="comment-textarea">{{ __('Comment') }}</label>
+                                                        <label class="form-label" for="comment-textarea">{{ __('Comment') }}</label>
                                                         <textarea name="comment-textarea" id="comment-textarea_classic"
                                                                   rows="5"
                                                                   class="form-control w-100"></textarea>
@@ -504,8 +478,8 @@
                                                 </div>
                                             </div>
 
-                                            <div class="form-group required">
-                                                <label
+                                            <div class="mb-3 required">
+                                                <label class="form-label"
                                                     for="searchRelevance">{{ __('Select a relevant page for the domain') }}</label>
                                                 <input type="checkbox" name="searchRelevance"
                                                        id="searchRelevance_classic">
@@ -522,11 +496,11 @@
                                             </div>
 
                                             <div id="searchEngineBlock_classic">
-                                                <label for="domain-textarea">{{ __('Search Engine') }}</label>
+                                                <label class="form-label" for="domain-textarea">{{ __('Search Engine') }}</label>
                                                 {!! Form::select('searchEngine_classic', [
                                                     'yandex' => 'Yandex',
                                                     'google' => 'Google',
-                                                ], null, ['class' => 'form-select rounded-0', 'id' => 'searchEngine']) !!}
+                                                ], null, ['class' => 'form-select', 'id' => 'searchEngine']) !!}
                                             </div>
 
                                             @if(!Auth::user()->telegram_bot_active)
@@ -543,29 +517,29 @@
                                                     {!! Form::select('sendMessage', [
                                                         true => __('Yes'),
                                                         false => __('No'),
-                                                    ], null, ['class' => 'form-select rounded-0', 'id' => 'sendMessage_classic']) !!}
+                                                    ], null, ['class' => 'form-select', 'id' => 'sendMessage_classic']) !!}
                                                 </div>
                                             @endif
                                         </div>
 
-                                        <div class="form-group required mt-2">
+                                        <div class="mb-3 required mt-2">
                                             <div>
-                                                <label for="searchBase">{{ __('Base frequency analysis') }}</label>
+                                                <label class="form-label" for="searchBase">{{ __('Base frequency analysis') }}</label>
                                                 <input type="checkbox" name="searchBase" id="searchBase_classic">
                                             </div>
                                             <div>
-                                                <label for="searchPhrases">{{ __('Phrase frequency analysis') }}</label>
+                                                <label class="form-label" for="searchPhrases">{{ __('Phrase frequency analysis') }}</label>
                                                 <input type="checkbox" name="searchPhrases" id="searchPhrases_classic">
                                             </div>
                                             <div>
-                                                <label
+                                                <label class="form-label"
                                                     for="searchTarget">{{ __('Accurate frequency analysis') }}</label>
                                                 <input type="checkbox" name="searchTarget" id="searchTarget_classic">
                                             </div>
                                         </div>
 
-                                        <div class="form-group required" id="saveResultBlock">
-                                            <label>{{ __('Save results') }}</label>
+                                        <div class="mb-3 required" id="saveResultBlock">
+                                            <label class="form-label">{{ __('Save results') }}</label>
                                             <span class="__helper-link ui_tooltip_w">
                                                 <i class="fa fa-question-circle" style="color: grey"></i>
                                                 <span class="ui_tooltip __right">
@@ -579,25 +553,25 @@
                                             {!! Form::select('save_classic', [
                                                 '1' => __('Save'),
                                                 '0' => __('Do not save'),
-                                            ], null, ['class' => 'form-select rounded-0', 'id' => 'save_classic']) !!}
+                                            ], null, ['class' => 'form-select', 'id' => 'save_classic']) !!}
                                         </div>
                                     </div>
 
-                                    <input type="button" data-bs-dismiss="modal"
-                                           class="btn btn-secondary" id="start-analyse" value="{{ __('Analyse') }}">
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                                    <button type="button" class="btn btn-primary" id="start-analyse" data-bs-dismiss="modal">
+                                        <i class="fas fa-play me-1" aria-hidden="true"></i>{{ __('Analyse') }}
+                                    </button>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <input type="hidden" id="progressId">
-                </div>
-            </div>
+            <input type="hidden" id="progressId">
         </div>
     </div>
     @slot('js')
         <script src="{{ asset('/plugins/cluster/js/common_v2.min.js') }}"></script>
-        <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables/buttons/buttons.min.js') }}"></script>
@@ -611,7 +585,8 @@
             $(document).ready(function () {
                 refreshAll()
                 $('#saveResultBlock').remove()
-                $('#my-cluster-projects').dataTable({
+                if ($('#my-cluster-projects').length) {
+                    $('#my-cluster-projects').dataTable({
                     "order": [[0, "desc"]],
                     "pageLength": 25,
                     "searching": true,
@@ -627,8 +602,7 @@
                         }
                     }
                 })
-                $('.dt-button.buttons-copy.buttons-html5').addClass('ml-2')
-                $('.dt-button').addClass('btn btn-secondary')
+                }
 
                 $('#brutForce').change(function () {
                     if ($(this).is(':checked')) {
@@ -863,19 +837,21 @@
                                 let table = $('#my-cluster-projects').DataTable();
                                 table.row.add({
                                     0: cluster['created_at'],
-                                    1: '<textarea data-target="' + cluster['id'] + '" name="domain" rows="7" class="action-edit project-domain form-control">' + domain + '</textarea>',
-                                    2: '<textarea data-target="' + cluster['id'] + '" name="comment" rows="7" class="action-edit project-comment form-control">' + comment + '</textarea>',
+                                    1: '<textarea data-target="' + cluster['id'] + '" name="domain" rows="2" class="action-edit project-domain form-control form-control-sm">' + domain + '</textarea>',
+                                    2: '<textarea data-target="' + cluster['id'] + '" name="comment" rows="2" class="action-edit project-comment form-control form-control-sm">' + comment + '</textarea>',
                                     3: cluster['count_phrases'],
                                     4: cluster['count_clusters'],
                                     5: cluster['top'],
                                     6: cluster['clustering_level'] + ' / ' + cluster['request']['engineVersion'],
                                     7: cluster['region'],
-                                    8: '<div class="d-flex flex-column">' +
-                                        '<a href="/show-cluster-result/' + cluster['id'] + '" target="_blank" class="btn btn-secondary mb-2">{{ __('View results') }}</a> ' +
-                                        '<a href="/edit-clusters/' + cluster['id'] + '" class="btn btn-secondary mb-2">{{ __('Redistribute clusters') }}</a>' +
-                                        '<button type="button" data-bs-toggle="modal" data-bs-target="#repeat-scan" data-order="' + cluster['id'] + '" class="btn btn-secondary mb-2 repeat-scan">{{ __('Repeat the analysis') }}</button> ' +
-                                        '<button class="btn btn-secondary mb-2">{{ __('Download csv') }}</button>' +
-                                        '<button class="btn btn-secondary">{{ __('Download xls') }}</button></div>'
+                                    8: '<div class="cabinet-cluster-project-actions">' +
+                                        '<a href="/show-cluster-result/' + cluster['id'] + '" target="_blank" class="btn btn-primary btn-sm w-100">{{ __('View results') }}</a>' +
+                                        '<div class="btn-group btn-group-sm w-100 mt-1" role="group">' +
+                                        '<a href="/edit-clusters/' + cluster['id'] + '" class="btn btn-outline-secondary" target="_blank" title="{{ __('Hands editor') }}"><i class="fas fa-edit"></i></a>' +
+                                        '<button type="button" data-bs-toggle="modal" data-bs-target="#repeat-scan" data-order="' + cluster['id'] + '" class="btn btn-outline-secondary repeat-scan" title="{{ __('Repeat analysis') }}"><i class="fas fa-redo"></i></button>' +
+                                        '<a href="/download-cluster-result/' + cluster['id'] + '/csv" target="_blank" class="btn btn-outline-secondary" title="{{ __('Download csv') }}">CSV</a>' +
+                                        '<a href="/download-cluster-result/' + cluster['id'] + '/xls" target="_blank" class="btn btn-outline-secondary" title="{{ __('Download xls') }}">XLS</a>' +
+                                        '</div></div>'
                                 });
                                 table.draw()
                                 refreshAll()

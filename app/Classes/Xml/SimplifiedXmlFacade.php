@@ -2,6 +2,7 @@
 
 namespace App\Classes\Xml;
 
+use App\Support\ClusterAnalysisDebugLog;
 use App\Support\CompetitorAnalysisDebugLog;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -19,6 +20,8 @@ class SimplifiedXmlFacade extends XmlFacade
     protected $progressCallback;
 
     protected ?string $debugPageHash = null;
+
+    protected string $debugLogDriver = 'competitor';
 
     public function __construct($region, int $count = 100)
     {
@@ -45,6 +48,11 @@ class SimplifiedXmlFacade extends XmlFacade
     public function setDebugPageHash(?string $pageHash): void
     {
         $this->debugPageHash = $pageHash !== '' ? $pageHash : null;
+    }
+
+    public function setDebugLogDriver(string $driver): void
+    {
+        $this->debugLogDriver = $driver === 'cluster' ? 'cluster' : 'competitor';
     }
 
     public function getXMLResponse(string $searchEngine = 'yandex')
@@ -415,6 +423,12 @@ class SimplifiedXmlFacade extends XmlFacade
     protected function logDebug(string $level, string $message, array $context = []): void
     {
         if ($this->debugPageHash === null) {
+            return;
+        }
+
+        if ($this->debugLogDriver === 'cluster') {
+            ClusterAnalysisDebugLog::append($this->debugPageHash, $level, $message, $context);
+
             return;
         }
 

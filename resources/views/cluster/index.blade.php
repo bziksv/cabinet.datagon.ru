@@ -1,37 +1,18 @@
-@component('component.card', ['title' =>  __('Cluster') ])
+@component('component.card', [
+    'title' => __('Cluster'),
+    'titleHtml' => e(__('Cluster')) . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-cluster'])->render(),
+])
     @slot('css')
         <link rel="stylesheet" type="text/css"
               href="{{ asset('plugins/keyword-generator/css/font-awesome-4.7.0/css/font-awesome.css') }}"/>
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/keyword-generator/css/style.css') }}"/>
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/toastr/toastr.css') }}"/>
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/datatable.css') }}"/>
-        <style>
-            #clusters-table > tbody > tr > td > table > thead:hover {
-                background: transparent !important;
-            }
-
-            .centered-text {
-                text-align: center;
-                vertical-align: inherit;
-            }
-
-            .dataTables_info, .hidden-result-table_filter {
-                display: none;
-            }
-
-            .bg-cluster-warning {
-                background: rgba(245, 226, 170, 0.5);
-            }
-
-            .text-primary {
-                color: #007bff !important;
-            }
-
-            .Clusters {
-                background: oldlace;
-            }
-        </style>
+        <link rel="stylesheet" href="{{ asset('css/cabinet-cluster.css') }}?v={{ @filemtime(public_path('css/cabinet-cluster.css')) ?: time() }}">
     @endslot
+
+    <div class="cabinet-cluster-page">
+        @include('cluster.partials.module-nav', ['active' => 'analyzer', 'admin' => $admin])
 
     <div id="toast-container" class="toast-top-right success-message">
         <div class="toast toast-success" aria-live="polite" style="display:none;">
@@ -52,47 +33,24 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="saveUrlsModalLabel"></h5>
-                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <label
+                    <label class="form-label"
                         for="relevanceUrls">{{ __('Select the url that will be saved for each phrase of this cluster') }}</label>
                     <select name="relevanceUrls" id="relevanceUrls" class="select form-select"></select>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="save-cluster-url-button"
                             data-bs-dismiss="modal">{{ __('Save') }}</button>
-                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-header d-flex p-0">
-            <ul class="nav nav-pills p-2">
-                <li class="nav-item">
-                    <a class="nav-link active" href="{{ route('cluster') }}">{{ __('Analyzer') }}</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link admin-link"
-                       href="{{ route('cluster.projects') }}">{{ __('My projects') }}</a>
-                </li>
-                @if($admin)
-                    <li class="nav-item">
-                        <a class="nav-link text-primary" href="{{ route('cluster.configuration') }}">
-                            {{ __('Module administration') }}
-                        </a>
-                    </li>
-                @endif
-            </ul>
-        </div>
-        <div class="card-body">
-            <div class="tab-content">
-                <div class="tab-pane active" id="tab_1">
-                    <p>
+    <div id="cabinet-cluster-analyzer">
+                    <p class="cabinet-cluster-mode-toggle mb-3">
                         <button class="btn btn-secondary click_tracking" data-click="Classic mode" id="classicMode">
                             {{ __('Classic mode') }}
                         </button>
@@ -102,7 +60,7 @@
                             {{ __('Pro mode') }}
                         </button>
                     </p>
-                    <div class="w-50 pb-3">
+                    <div class="cabinet-cluster-form pb-3">
 
                         <div id="toast-container" class="toast-top-right success-message dont-worry-notification"
                              style="display:none;">
@@ -125,8 +83,8 @@
                         </div>
 
                         <div id="pro" style="display: none">
-                            <div class="form-group required">
-                                <label>{{ __('Region') }}</label>
+                            <div class="mb-3 required">
+                                <label class="form-label">{{ __('Region') }}</label>
                                 {!! Form::select('region', array_unique([
                                     $config->region => $config->region,
                                   '213' => __('Moscow'),
@@ -194,8 +152,8 @@
                                ]), null, ['class' => 'form-select rounded-0', 'id' => 'region']) !!}
                             </div>
 
-                            <div class="form-group required">
-                                <label>{{ __('TOP') }}</label>
+                            <div class="mb-3 required">
+                                <label class="form-label">{{ __('TOP') }}</label>
                                 {!! Form::select('count', array_unique([
                                    $config->count => $config->count,
                                     '10' => 10,
@@ -206,9 +164,9 @@
                                 ]), null, ['class' => 'form-select rounded-0', 'id' => 'count']) !!}
                             </div>
 
-                            <div class="form-group required" id="phrases-form-block">
+                            <div class="mb-3 required" id="phrases-form-block">
                                 <div class="d-flex justify-content-between">
-                                    <label>{{ __('Key phrases') }}</label>
+                                    <label class="form-label">{{ __('Key phrases') }}</label>
                                     <span class="text-muted">{{ __('Count phrases') }}:
                 <span id="list-phrases-counter">0</span>
             </span>
@@ -216,22 +174,22 @@
                                 {!! Form::textarea('phrases', null, ['class' => 'form-control', 'id'=>'phrases'] ) !!}
                             </div>
 
-                            <div class="form-group required">
-                                <label for="ignoredDomains">{{ __('Ignored domains') }}</label>
-                                <textarea class="form form-control" name="ignoredDomains" id="ignoredDomains" cols="8"
+                            <div class="mb-3 required">
+                                <label class="form-label" for="ignoredDomains">{{ __('Ignored domains') }}</label>
+                                <textarea class="form-control" name="ignoredDomains" id="ignoredDomains" cols="8"
                                           rows="8">{{ $config->ignored_domains }}</textarea>
                             </div>
 
                             <div id="ignoredWordsBlock">
-                                <div class="form-group required">
-                                    <label for="ignoredWords">{{ __('Ignored words') }}</label>
-                                    <textarea class="form form-control" name="ignoredWords" id="ignoredWords" cols="8"
+                                <div class="mb-3 required">
+                                    <label class="form-label" for="ignoredWords">{{ __('Ignored words') }}</label>
+                                    <textarea class="form-control" name="ignoredWords" id="ignoredWords" cols="8"
                                               rows="8">{{ $config->ignored_words }}</textarea>
                                 </div>
                             </div>
 
-                            <div class="form-group required">
-                                <label>{{ __('clustering level') }}</label>
+                            <div class="mb-3 required">
+                                <label class="form-label">{{ __('clustering level') }}</label>
                                 <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle" style="color: grey"></i>
             <span class="ui_tooltip __right">
@@ -249,8 +207,8 @@
                                     ], null, ['class' => 'form-select rounded-0', 'id' => 'clusteringLevel']) !!}
                             </div>
 
-                            <div class="form-group required">
-                                <label for="brutForce">{{ __('Additional bulkhead') }}</label>
+                            <div class="mb-3 required">
+                                <label class="form-label" for="brutForce">{{ __('Additional bulkhead') }}</label>
                                 <input type="checkbox" name="brutForce" id="brutForce"
                                        @if($config->brut_force) checked @endif>
                                 <span class="__helper-link ui_tooltip_w">
@@ -264,8 +222,8 @@
             </span>
         </span>
                                 <div class="brut-force" style="display: none">
-                                    <div class="form-group required">
-                                        <label for="gainFactor">{{ __('Gain factor(%)') }}</label>
+                                    <div class="mb-3 required">
+                                        <label class="form-label" for="gainFactor">{{ __('Gain factor(%)') }}</label>
                                         <span class="__helper-link ui_tooltip_w">
                     <i class="fa fa-question-circle" style="color: grey"></i>
                     <span class="ui_tooltip __right">
@@ -278,20 +236,20 @@
                         </span>
                     </span>
                 </span>
-                                        <input class="form form-control" type="number" id="gainFactor" name="gainFactor"
+                                        <input class="form-control" type="number" id="gainFactor" name="gainFactor"
                                                value="{{ $config->gain_factor }}">
                                     </div>
 
-                                    <div class="form-group required">
-                                        <label
+                                    <div class="mb-3 required">
+                                        <label class="form-label"
                                             for="brutForceCount">{{ __('Minimum cluster size for re-bulkhead') }}</label>
                                         <input type="number" name="brutForceCount" id="brutForceCount"
-                                               class="form form-control"
+                                               class="form-control"
                                                value="{{ $config->brut_force_count }}">
                                     </div>
 
-                                    <div class="form-group required">
-                                        <label for="reductionRatio">{{ __('Minimum multiplier') }}</label>
+                                    <div class="mb-3 required">
+                                        <label class="form-label" for="reductionRatio">{{ __('Minimum multiplier') }}</label>
                                         <span class="__helper-link ui_tooltip_w">
                     <i class="fa fa-question-circle" style="color: grey"></i>
                     <span class="ui_tooltip __right">
@@ -311,10 +269,10 @@
                                 </div>
                             </div>
 
-                            <div class="form-group required" id="extra-block">
+                            <div class="mb-3 required" id="extra-block">
                                 <div class="row">
                                     <div class="col-6 d-flex flex-column">
-                                        <label for="domain-textarea">{{ __('Domain') }} <b>http/https</b></label>
+                                        <label class="form-label" for="domain-textarea">{{ __('Domain') }} <b>http/https</b></label>
                                         <textarea name="domain-textarea" id="domain-textarea" rows="5"
                                                   class="form-control w-100"
                                                   placeholder="https://site.ru"></textarea>
@@ -322,15 +280,15 @@
 
                                     <div class="col-6">
                                         <div class="d-flex flex-column">
-                                            <label for="comment-textarea">{{ __('Comment') }}</label>
+                                            <label class="form-label" for="comment-textarea">{{ __('Comment') }}</label>
                                             <textarea name="comment-textarea" id="comment-textarea" rows="5"
                                                       class="form-control w-100"></textarea>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div class="form-group required">
-                                    <label
+                                <div class="mb-3 required">
+                                    <label class="form-label"
                                         for="searchRelevance">{{ __('Select a relevant page for the domain') }}</label>
                                     <input type="checkbox" name="searchRelevance" id="searchRelevance"
                                            @if($config->search_relevance) checked @endif>
@@ -347,7 +305,7 @@
                                 </div>
 
                                 <div id="searchEngineBlock">
-                                    <label for="domain-textarea">{{ __('Search Engine') }}</label>
+                                    <label class="form-label" for="domain-textarea">{{ __('Search Engine') }}</label>
                                     {!! Form::select('searchEngine', [
                                         $config->search_engine => $config->search_engine,
                                         'yandex' => 'Yandex',
@@ -364,7 +322,7 @@
                                     </div>
                                 @else
                                     <div id="sendTelegramMessage">
-                                        <label for="sendMessage"
+                                        <label class="form-label" for="sendMessage"
                                                class="pt-1">{{ __('Notify in a telegram upon completion') }}</label>
                                         {!! Form::select('sendMessage', [
                                             $config->send_message => $config->send_message,
@@ -375,26 +333,26 @@
                                 @endif
                             </div>
 
-                            <div class="form-group required mt-2">
+                            <div class="mb-3 required mt-2">
                                 <div>
-                                    <label for="searchBase">{{ __('Base frequency analysis') }}</label>
+                                    <label class="form-label" for="searchBase">{{ __('Base frequency analysis') }}</label>
                                     <input type="checkbox" name="searchBase" id="searchBase"
                                            @if($config->search_base) checked @endif>
                                 </div>
                                 <div>
-                                    <label for="searchPhrases">{{ __('Phrase frequency analysis') }}</label>
+                                    <label class="form-label" for="searchPhrases">{{ __('Phrase frequency analysis') }}</label>
                                     <input type="checkbox" name="searchPhrases" id="searchPhrases"
                                            @if($config->search_phrased) checked @endif>
                                 </div>
                                 <div>
-                                    <label for="searchTarget">{{ __('Accurate frequency analysis') }}</label>
+                                    <label class="form-label" for="searchTarget">{{ __('Accurate frequency analysis') }}</label>
                                     <input type="checkbox" name="searchTarget" id="searchTarget"
                                            @if($config->search_target) checked @endif>
                                 </div>
                             </div>
 
-                            <div class="form-group required" id="saveResultBlock">
-                                <label>{{ __('Save results') }}</label>
+                            <div class="mb-3 required" id="saveResultBlock">
+                                <label class="form-label">{{ __('Save results') }}</label>
                                 <span class="__helper-link ui_tooltip_w">
         <i class="fa fa-question-circle" style="color: grey"></i>
         <span class="ui_tooltip __right">
@@ -414,8 +372,8 @@
                         </div>
 
                         <div id="classic" style="display: block">
-                            <div class="form-group required">
-                                <label>{{ __('Region') }}</label>
+                            <div class="mb-3 required">
+                                <label class="form-label">{{ __('Region') }}</label>
                                 {!! Form::select('region_classic', array_unique([
                                     $config_classic->region => $config->region,
                                   '213' => __('Moscow'),
@@ -483,9 +441,9 @@
                                ]), null, ['class' => 'form-select rounded-0', 'id' => 'region_classic']) !!}
                             </div>
 
-                            <div class="form-group required" id="phrases-form-block">
+                            <div class="mb-3 required" id="phrases-form-block">
                                 <div class="d-flex justify-content-between">
-                                    <label>{{ __('Key phrases') }}</label>
+                                    <label class="form-label">{{ __('Key phrases') }}</label>
                                     <span class="text-muted">{{ __('Count phrases') }}:
                 <span id="list-phrases-counter-classic">0</span>
             </span>
@@ -493,24 +451,24 @@
                                 {!! Form::textarea('phrases_classic', null, ['class' => 'form-control', 'id' => 'phrases_classic'] ) !!}
                             </div>
 
-                            <div class="form-group required" style="display: none">
-                                <label for="ignoredDomains">{{ __('Ignored domains') }}</label>
-                                <textarea class="form form-control" name="ignoredDomains" id="ignoredDomains_classic"
+                            <div class="mb-3 required" style="display: none">
+                                <label class="form-label" for="ignoredDomains">{{ __('Ignored domains') }}</label>
+                                <textarea class="form-control" name="ignoredDomains" id="ignoredDomains_classic"
                                           cols="8"
                                           rows="8">{{ $config_classic->ignored_domains }}</textarea>
                             </div>
 
                             <div style="display: none">
-                                <div class="form-group required">
-                                    <label for="ignoredWords">{{ __('Ignored words') }}</label>
-                                    <textarea class="form form-control" name="ignoredWords" id="ignoredWords_classic"
+                                <div class="mb-3 required">
+                                    <label class="form-label" for="ignoredWords">{{ __('Ignored words') }}</label>
+                                    <textarea class="form-control" name="ignoredWords" id="ignoredWords_classic"
                                               cols="8"
                                               rows="8">{{ $config_classic->ignored_words }}</textarea>
                                 </div>
                             </div>
 
-                            <div class="form-group required">
-                                <label>{{ __('clustering level') }}</label>
+                            <div class="mb-3 required">
+                                <label class="form-label">{{ __('clustering level') }}</label>
                                 <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle" style="color: grey"></i>
             <span class="ui_tooltip __right">
@@ -528,10 +486,10 @@
                                     ], null, ['class' => 'form-select rounded-0', 'id' => 'clusteringLevel_classic']) !!}
                             </div>
 
-                            <div class="form-group required" id="extra-block">
+                            <div class="mb-3 required" id="extra-block">
                                 <div class="row">
                                     <div class="col-6 d-flex flex-column">
-                                        <label for="domain-textarea">{{ __('Domain') }} <b>http/https</b></label>
+                                        <label class="form-label" for="domain-textarea">{{ __('Domain') }} <b>http/https</b></label>
                                         <textarea name="domain-textarea" id="domain-textarea_classic" rows="5"
                                                   class="form-control w-100"
                                                   placeholder="https://site.ru"></textarea>
@@ -539,15 +497,15 @@
 
                                     <div class="col-6">
                                         <div class="d-flex flex-column">
-                                            <label for="comment-textarea">{{ __('Comment') }}</label>
+                                            <label class="form-label" for="comment-textarea">{{ __('Comment') }}</label>
                                             <textarea name="comment-textarea" id="comment-textarea_classic" rows="5"
                                                       class="form-control w-100"></textarea>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div class="form-group required">
-                                    <label
+                                <div class="mb-3 required">
+                                    <label class="form-label"
                                         for="searchRelevance">{{ __('Select a relevant page for the domain') }}</label>
                                     <input type="checkbox" name="searchRelevance" id="searchRelevance_classic"
                                            @if($config_classic->search_relevance) checked @endif>
@@ -564,7 +522,7 @@
                                 </div>
 
                                 <div id="searchEngineBlock_classic">
-                                    <label for="domain-textarea">{{ __('Search Engine') }}</label>
+                                    <label class="form-label" for="domain-textarea">{{ __('Search Engine') }}</label>
                                     {!! Form::select('searchEngine_classic', [
                                         $config_classic->search_engine => $config_classic->search_engine,
                                         'yandex' => 'Yandex',
@@ -581,7 +539,7 @@
                                     </div>
                                 @else
                                     <div id="sendTelegramMessage">
-                                        <label for="sendMessage"
+                                        <label class="form-label" for="sendMessage"
                                                class="pt-1">{{ __('Notify in a telegram upon completion') }}</label>
                                         {!! Form::select('sendMessage', [
                                             $config_classic->send_message => $config_classic->send_message,
@@ -592,26 +550,26 @@
                                 @endif
                             </div>
 
-                            <div class="form-group required mt-2">
+                            <div class="mb-3 required mt-2">
                                 <div>
-                                    <label for="searchBase">{{ __('Base frequency analysis') }}</label>
+                                    <label class="form-label" for="searchBase">{{ __('Base frequency analysis') }}</label>
                                     <input type="checkbox" name="searchBase" id="searchBase_classic"
                                            @if($config_classic->search_base) checked @endif>
                                 </div>
                                 <div>
-                                    <label for="searchPhrases">{{ __('Phrase frequency analysis') }}</label>
+                                    <label class="form-label" for="searchPhrases">{{ __('Phrase frequency analysis') }}</label>
                                     <input type="checkbox" name="searchPhrases" id="searchPhrases_classic"
                                            @if($config_classic->search_phrased) checked @endif>
                                 </div>
                                 <div>
-                                    <label for="searchTarget">{{ __('Accurate frequency analysis') }}</label>
+                                    <label class="form-label" for="searchTarget">{{ __('Accurate frequency analysis') }}</label>
                                     <input type="checkbox" name="searchTarget" id="searchTarget_classic"
                                            @if($config_classic->search_target) checked @endif>
                                 </div>
                             </div>
 
-                            <div class="form-group required" id="saveResultBlock">
-                                <label>{{ __('Save results') }}</label>
+                            <div class="mb-3 required" id="saveResultBlock">
+                                <label class="form-label">{{ __('Save results') }}</label>
                                 <span class="__helper-link ui_tooltip_w">
         <i class="fa fa-question-circle" style="color: grey"></i>
         <span class="ui_tooltip __right">
@@ -634,12 +592,12 @@
                                class="btn btn-secondary" id="start-analyse"
                                data-target="classic" value="{{ __('Analyse') }}">
 
-                        <span class="ml-2">
+                        <span class="ms-2 cabinet-cluster-limits-note">
     {{ __('It will be written off') }} <span id="loss-limits">0</span> {{ __('limits') }}
 </span>
                     </div>
 
-                    <div id="progress-bar" class="w-25 pt-3 pb-3" style="display: none">
+                    <div id="progress-bar" class="cabinet-cluster-progress pt-3 pb-3" style="display: none">
                         <span id="progress-bar-state"></span>
                         <span id="total-phrases"></span>
                         <img src="/img/1485.gif" alt="preloader_gif" width="20">
@@ -665,9 +623,7 @@
                     <textarea name="hiddenForCopy" id="hiddenForCopy" style="display: none"></textarea>
 
                     <input type="hidden" id="progressId">
-                </div>
-            </div>
-        </div>
+    </div>
     </div>
 
     @slot('js')
@@ -769,8 +725,8 @@
         </script>
 
         <script>
-            $('#tab_1 > div.w-50.pb-3 > div:nth-child(4)').hide()
-            $('#tab_1 > div.w-50.pb-3 > div:nth-child(6)').hide()
+            $('#cabinet-cluster-analyzer > div.cabinet-cluster-form.pb-3 > div:nth-child(4)').hide()
+            $('#cabinet-cluster-analyzer > div.cabinet-cluster-form.pb-3 > div:nth-child(6)').hide()
 
             function successCopiedMessage() {
                 $('.toast.toast-success').show(300)

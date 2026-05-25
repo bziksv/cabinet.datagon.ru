@@ -2,9 +2,7 @@
 
 namespace App\Classes\Xml;
 
-use App\TelegramBot;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class RiverFacade
 {
@@ -16,19 +14,13 @@ class RiverFacade
 
     protected $query;
 
-    protected $xmlRiverPath;
-
     protected $countAttempts;
 
     public function __construct($region)
     {
         $this->user = config('xmlriver.user');
         $this->key = config('xmlriver.key');
-
         $this->region = $region;
-
-        $this->xmlRiverPath = "https://xmlriver.com/wordstat/json?user=$this->user&key=$this->key&regions=$this->region&query=";
-
         $this->countAttempts = 3;
     }
 
@@ -58,61 +50,145 @@ class RiverFacade
     }
 
     /**
-     * @param bool $searchInItems
-     * @return array
+     * @param bool $searchInItems Для базовой частоты — подставить нормализованную фразу из popular, если есть.
+     * @return array{number: int, phrase: string}
      */
     public function riverRequest(bool $searchInItems = true): array
     {
+        $query = (string) $this->getQuery();
+        $empty = [
+            'number' => 0,
+            'phrase' => $query,
+        ];
+
         try {
-            $url = str_replace(' ', '%20', $this->xmlRiverPath . $this->query);
-            $riverResponse = [];
+            $riverResponse = null;
 
-            $attempt = 1;
-            while (!isset($riverResponse['content']['includingPhrases']['items']) && $attempt <= $this->countAttempts) {
-                $riverResponse = json_decode(file_get_contents(html_entity_decode($url)), true);
-                $attempt = $attempt + 1;
-                if ($attempt === $this->countAttempts && isset($riverResponse['error'])) {
-                    return [
-                        'number' => 0,
-                        'phrase' => $this->getQuery()
-                    ];
+            for ($attempt = 1; $attempt <= $this->countAttempts; $attempt++) {
+                $riverResponse = $this->fetchNewWordstatResponse($query);
+
+                if ($this->hasWordstatError($riverResponse)) {
+                    if ($attempt >= $this->countAttempts) {
+                        Log::debug('river request error response', [
+                            'query' => $query,
+                            'response' => $riverResponse,
+                        ]);
+
+                        return $empty;
+                    }
+
+                    usleep(400000 * $attempt);
+                    continue;
                 }
+
+                if (isset($riverResponse['totalValue'])) {
+                    break;
+                }
+
+                if ($attempt >= $this->countAttempts) {
+                    Log::debug('river request missing totalValue', [
+                        'query' => $query,
+                        'response' => $riverResponse,
+                    ]);
+
+                    return $empty;
+                }
+
+                usleep(400000 * $attempt);
             }
 
-            if ($searchInItems &&
-                isset($riverResponse['content']['includingPhrases']['items'][0]['phrase']) &&
-                Str::length($riverResponse['content']['includingPhrases']['items'][0]['phrase']) === Str::length($this->getQuery())
-            ) {
-                $number = htmlentities($riverResponse['content']['includingPhrases']['items'][0]['number']);
-
-                return [
-                    'number' => str_replace("&nbsp;", '', $number),
-                    'phrase' => $riverResponse['content']['includingPhrases']['items'][0]['phrase']
-                ];
-            } elseif (isset($riverResponse['content']['includingPhrases']['info'][2])) {
-                return [
-                    'number' => $this->removeExtraSymbols($riverResponse['content']['includingPhrases']['info'][2]),
-                    'phrase' => $this->getQuery()
-                ];
-            } else {
-                return [
-                    'number' => 0,
-                    'phrase' => $this->getQuery()
-                ];
+            $phrase = $query;
+            if ($searchInItems) {
+                $phrase = $this->resolvePopularPhrase($riverResponse, $query) ?? $query;
             }
+
+            return [
+                'number' => (int) $riverResponse['totalValue'],
+                'phrase' => $phrase,
+            ];
         } catch (\Throwable $e) {
             Log::debug('river request error', [
-                $e->getMessage(),
-                $e->getLine(),
-                $e->getFile(),
-                $this->getQuery(),
-                $riverResponse,
+                'message' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+                'query' => $query,
             ]);
-            return [
-                'number' => 0,
-                'phrase' => $this->getQuery()
-            ];
+
+            return $empty;
         }
+    }
+
+  /**
+     * @return array<string, mixed>|null
+     */
+    protected function fetchNewWordstatResponse(string $query): ?array
+    {
+        $url = $this->buildNewWordstatUrl($query);
+        $raw = @file_get_contents($url);
+
+        if ($raw === false || $raw === '') {
+            return null;
+        }
+
+        $decoded = json_decode($raw, true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    protected function buildNewWordstatUrl(string $query): string
+    {
+        $base = rtrim((string) config('xmlriver.url', 'https://xmlriver.com/wordstat/new/json'), '/');
+
+        if (strpos($base, '/wordstat/new/json') === false) {
+            $base = 'https://xmlriver.com/wordstat/new/json';
+        }
+
+        return $base . '?' . http_build_query([
+            'user' => $this->user,
+            'key' => $this->key,
+            'regions' => $this->region,
+            'pagetype' => 'history',
+            'query' => $query,
+        ], '', '&', PHP_QUERY_RFC3986);
+    }
+
+    /**
+     * @param array<string, mixed>|null $response
+     */
+    protected function hasWordstatError(?array $response): bool
+    {
+        if ($response === null) {
+            return true;
+        }
+
+        if (!empty($response['error'])) {
+            return true;
+        }
+
+        return isset($response['code']) && (int) $response['code'] !== 0;
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     */
+    protected function resolvePopularPhrase(array $response, string $query): ?string
+    {
+        $popular = $response['table']['tableData']['popular'] ?? null;
+        if (!is_array($popular)) {
+            return null;
+        }
+
+        $queryLower = mb_strtolower($query);
+        foreach ($popular as $item) {
+            if (!is_array($item) || empty($item['text'])) {
+                continue;
+            }
+            if (mb_strtolower((string) $item['text']) === $queryLower) {
+                return (string) $item['text'];
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -124,6 +200,6 @@ class RiverFacade
         $number = preg_replace('/[^0-9]/', '', $string);
         $number = htmlentities($number);
 
-        return (int)str_replace("&nbsp;", '', $number);
+        return (int) str_replace('&nbsp;', '', $number);
     }
 }

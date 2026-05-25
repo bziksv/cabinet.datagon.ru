@@ -5,6 +5,7 @@ namespace App\Jobs\Cluster;
 use App\Classes\Xml\RiverFacade;
 use App\Cluster;
 use App\ClusterLimit;
+use App\Support\ClusterAnalysisDebugLog;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -39,6 +40,12 @@ class ClusterQueue implements ShouldQueue
 
     public function handle()
     {
+        $progressId = $this->cluster->getProgressId();
+        ClusterAnalysisDebugLog::info($progressId, 'job.phrase.start', [
+            'key' => $this->key,
+            'phrase' => $this->phrase,
+        ]);
+
         $clusterArrays = new \App\ClusterQueue();
         $river = new RiverFacade($this->cluster->getRegion());
 
@@ -85,13 +92,26 @@ class ClusterQueue implements ShouldQueue
             ]
         ]);
 
-        $clusterArrays->progress_id = $this->cluster->getProgressId();
+        $clusterArrays->progress_id = $progressId;
         $clusterArrays->save();
 
+        ClusterAnalysisDebugLog::info($progressId, 'job.phrase.done', [
+            'key' => $this->key,
+            'based' => is_array($based ?? null) ? ($based['number'] ?? 0) : ($based ?? 0),
+            'phrased' => is_array($phrase ?? null) ? ($phrase['number'] ?? 0) : ($phrase ?? 0),
+            'target' => is_array($target ?? null) ? ($target['number'] ?? 0) : ($target ?? 0),
+            'sites' => is_array($sites) ? count($sites) : 0,
+        ]);
     }
 
     public function failed(\Throwable $exception)
     {
+        ClusterAnalysisDebugLog::error($this->cluster->getProgressId(), 'job.phrase.failed', [
+            'key' => $this->key,
+            'phrase' => $this->phrase,
+            'message' => $exception->getMessage(),
+        ]);
+
         Log::debug('cluster queue bug report', [
             'message' => $exception->getMessage(),
             'file' => $exception->getFile(),

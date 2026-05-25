@@ -78,12 +78,12 @@ return [
             'facade' => 'SimplifiedXmlFacade + RiverFacade',
             'providers' => ['xmlstock', 'xmlproxy', 'xmlriver'],
             'engines' => ['yandex'],
-            'usage' => 'SERP — SimplifiedXmlFacade; Wordstat — XMLRiver (wordstat/json)',
+            'usage' => 'SERP — SimplifiedXmlFacade; Wordstat — XMLRiver (wordstat/new/json)',
             'extra_providers' => [
                 [
                     'provider' => 'xmlriver',
-                    'api' => 'https://xmlriver.com/wordstat/json',
-                    'note' => 'RiverFacade / ClusterQueue',
+                    'api' => 'https://xmlriver.com/wordstat/new/json',
+                    'note' => 'RiverFacade / ClusterQueue (pagetype=history, totalValue)',
                 ],
             ],
         ],

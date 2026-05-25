@@ -1,0 +1,247 @@
+/* Кластеризатор — AdminLTE 4 / BS5 */
+
+.cabinet-cluster-page {
+    --cabinet-cluster-highlight: oldlace;
+    --cabinet-cluster-card-radius: 0.5rem;
+}
+
+.cabinet-cluster-page .cabinet-cluster-nav-card > .card-header {
+    background-color: var(--bs-body-bg);
+}
+
+.cabinet-cluster-page .cabinet-cluster-module-nav .nav-link {
+    font-weight: 500;
+}
+
+.cabinet-cluster-page .cabinet-cluster-module-nav .nav-link.text-primary.active {
+    color: var(--bs-nav-pills-link-active-color) !important;
+}
+
+.cabinet-cluster-page .cabinet-cluster-form {
+    max-width: 42rem;
+}
+
+.cabinet-cluster-page .cabinet-cluster-mode-toggle .btn {
+    font-weight: 500;
+}
+
+.cabinet-cluster-page #clusters-table > tbody > tr > td > table > thead:hover {
+    background: transparent !important;
+}
+
+.cabinet-cluster-page .centered-text {
+    text-align: center;
+    vertical-align: inherit;
+}
+
+.cabinet-cluster-page .dataTables_info,
+.cabinet-cluster-page .hidden-result-table_filter {
+    display: none;
+}
+
+.cabinet-cluster-page .bg-cluster-warning {
+    background: rgba(245, 226, 170, 0.5);
+}
+
+.cabinet-cluster-page .Clusters {
+    background: var(--cabinet-cluster-highlight);
+}
+
+.cabinet-cluster-page #my-cluster-projects_paginate,
+.cabinet-cluster-page #my-cluster-projects_filter {
+    display: flex;
+    justify-content: end;
+}
+
+.cabinet-cluster-page a.paginate_button.current {
+    background: #ebf0f5 !important;
+}
+
+.cabinet-cluster-page .cabinet-cluster-config-card.card-primary {
+    border-top-width: 3px;
+}
+
+.cabinet-cluster-page .cabinet-cluster-config-card > .card-header {
+    font-weight: 600;
+}
+
+.cabinet-cluster-page .form-label {
+    margin-bottom: 0.35rem;
+}
+
+.cabinet-cluster-page .form-check-input {
+    margin-top: 0.2rem;
+}
+
+.cabinet-cluster-page .cabinet-cluster-limits-note {
+    color: var(--bs-secondary-color);
+}
+
+.cabinet-cluster-page #result-table {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.cabinet-cluster-page .cabinet-cluster-progress {
+    max-width: 16rem;
+}
+
+/* Редактор кластеров */
+.cabinet-cluster-page .phrase-for-color {
+    width: 370px;
+}
+
+.cabinet-cluster-page .card-header:after {
+    content: none;
+}
+
+.cabinet-cluster-page .work-place-conf {
+    margin-bottom: 0;
+    border-radius: 0;
+    position: sticky;
+    top: 15px;
+    max-height: 80vh;
+    overflow: auto;
+}
+
+.cabinet-cluster-page .cluster-block {
+    margin-bottom: 0;
+    border-radius: 0;
+}
+
+.cabinet-cluster-page .radius {
+    border-top-right-radius: 0;
+    border-top-left-radius: 0;
+}
+
+.cabinet-cluster-page .group-name,
+.cabinet-cluster-page .cluster-block > .card-header,
+.cabinet-cluster-page ul .card-header {
+    background-color: var(--bs-dark);
+    color: var(--bs-white);
+}
+
+.cabinet-cluster-page .card-header.group-name {
+    cursor: move;
+}
+
+.cabinet-cluster-page .relevance-link {
+    width: 550px !important;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    transition: 0.3s -webkit-line-clamp;
+}
+
+.cabinet-cluster-page .relevance-link:hover {
+    -webkit-line-clamp: 4;
+}
+
+.cabinet-cluster-page .selected-group {
+    background-color: #0c84ff !important;
+}
+
+.cabinet-cluster-page #scroll_top,
+.cabinet-cluster-page #scroll_bottom,
+.cabinet-cluster-page #scroll_button {
+    position: fixed;
+    right: 30px;
+    z-index: 1000;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    opacity: 0.5;
+}
+
+.cabinet-cluster-page #scroll_top {
+    bottom: 100px;
+    background: url(https://snipp.ru/img/scroll_top.png) 50% 50% no-repeat;
+}
+
+.cabinet-cluster-page #scroll_bottom {
+    bottom: 30px;
+    background: url(https://snipp.ru/img/scroll_top.png) 50% 50% no-repeat;
+    transform: rotate(180deg);
+}
+
+.cabinet-cluster-page #scroll_button {
+    bottom: 65px;
+    background: #6c757d;
+    transform: rotate(180deg);
+}
+
+.cabinet-cluster-page #scroll_top:hover,
+.cabinet-cluster-page #scroll_bottom:hover,
+.cabinet-cluster-page #scroll_button:hover {
+    opacity: 1;
+}
+
+.cabinet-cluster-projects-page .cabinet-cluster-projects-card > .card-header {
+    background-color: var(--bs-body-bg);
+}
+
+.cabinet-cluster-projects-page .cabinet-cluster-projects-table thead th {
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+.cabinet-cluster-projects-page .cabinet-cluster-projects-table .project-domain,
+.cabinet-cluster-projects-page .cabinet-cluster-projects-table .project-comment {
+    min-width: 9rem;
+    max-width: 14rem;
+    resize: vertical;
+}
+
+.cabinet-cluster-projects-page .cabinet-cluster-projects-table .text-num {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cabinet-cluster-projects-page .cabinet-cluster-projects-actions-col {
+    width: 10rem;
+}
+
+.cabinet-cluster-projects-page .cabinet-cluster-project-actions .btn-group-sm .btn {
+    flex: 1 1 auto;
+}
+
+.cabinet-cluster-projects-page .cabinet-cluster-projects-table .dataTables_wrapper {
+    padding: 0.75rem 1rem 1rem;
+}
+
+.cabinet-cluster-projects-page .cabinet-cluster-projects-table .dataTables_filter label,
+.cabinet-cluster-projects-page .cabinet-cluster-projects-table .dataTables_length label {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0;
+}
+
+.cabinet-cluster-config-page .cabinet-cluster-settings-card.card-outline {
+    border-top-width: 3px;
+}
+
+.cabinet-cluster-config-page .info-box {
+    min-height: 5.5rem;
+    margin-bottom: 0;
+}
+
+.cabinet-cluster-config-page .info-box-number {
+    font-size: 1.75rem;
+    font-weight: 700;
+}
+
+.cabinet-cluster-config-page .cabinet-cluster-users-stats-card .card-title {
+    font-size: 1rem;
+}
+
+.cabinet-cluster-config-page .cabinet-cluster-users-stat-value {
+    font-size: 1.125rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.cabinet-cluster-config-page .cabinet-cluster-users-stats-card .list-group-item {
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
+}

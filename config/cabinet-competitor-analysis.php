@@ -2,10 +2,11 @@
 
 return [
     /**
-     * Видимая версия модуля «Анализ конкурентов» (badge в nav).
+     * Видимая версия модуля «Анализ конкурентов» (badge в шапке карточки).
+     * Стабильная база: 2.9.1s (см. text-analyzer 6.9s). Эксперименты — 2.9.2 или 2.9.1s-dev.
      * Журнал: datagon.ru/docs/cabinet-competitor-analysis-changelog.md
      */
-    'version' => '2.9.0',
+    'version' => '2.9.1s',
 
     /** Расширенный лог прогресса для admin / Super Admin */
     'debug_log' => env('COMPETITOR_ANALYSIS_DEBUG_LOG', true),
@@ -118,6 +119,17 @@ return [
         'max_runs_per_day' => 3,
         'top_count' => 10,
         'serp_rows' => 10,
-        'allowed_region_ids' => ['213', '2', '193', '65', '54'],
+        'search_engines' => ['yandex', 'google'],
+        'allowed_yandex_region_ids' => ['213', '2', '193', '65', '54'],
+        'allowed_google_region_ids' => ['1011969', '1012040', '1012077', '1011984', '1012052'],
+        'top_depths' => [
+            ['value' => 30, 'label' => '30 (рекомендуемый)', 'demo' => false],
+            ['value' => 20, 'label' => '20', 'demo' => false],
+            ['value' => 10, 'label' => '10', 'demo' => true],
+        ],
+        /** XMLStock 210/202 — повтор как в кабинете, но короче (демо не ждёт 8×22 с) */
+        'xmlstock_hybrid_retry' => true,
+        'xmlstock_hybrid_max_attempts' => 4,
+        'xmlstock_hybrid_sleep_sec' => 18,
     ],
 ];

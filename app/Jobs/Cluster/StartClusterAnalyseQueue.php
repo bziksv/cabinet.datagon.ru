@@ -3,6 +3,7 @@
 namespace App\Jobs\Cluster;
 
 use App\Cluster;
+use App\Support\ClusterAnalysisDebugLog;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -36,7 +37,20 @@ class StartClusterAnalyseQueue implements ShouldQueue
      */
     public function handle()
     {
-        $cluster = new Cluster($this->request, $this->user);
-        $cluster->startAnalysis();
+        $progressId = (string) ($this->request['progressId'] ?? '');
+        ClusterAnalysisDebugLog::info($progressId, 'job.startCluster.handle.start', [
+            'user_id' => $this->user->id ?? null,
+        ]);
+
+        try {
+            $cluster = new Cluster($this->request, $this->user);
+            $cluster->startAnalysis();
+            ClusterAnalysisDebugLog::info($progressId, 'job.startCluster.handle.done');
+        } catch (\Throwable $e) {
+            ClusterAnalysisDebugLog::error($progressId, 'job.startCluster.handle.failed', [
+                'message' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
     }
 }

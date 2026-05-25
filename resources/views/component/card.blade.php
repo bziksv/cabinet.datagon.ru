@@ -7,7 +7,7 @@
 @stop
 
 @section('content')
-
+    <div class="cabinet-module-root">
     @if(\App\User::isUserAdmin() && count(explode('/', $code)) == 1)
         <a href="{{ route('description.edit', [$code, 'top']) }}" class="btn btn-secondary mb-4">{{ __('Add description') }}</a>
     @endif
@@ -16,7 +16,7 @@
         @include('description.main', ['description' => $description['top']])
     @endif
 
-    <div class="card">
+    <div class="card cabinet-module-main-card">
         <div class="card-header">
             <h3 class="card-title">{!! $titleHtml ?? e($title) !!}</h3>
             <div class="card-tools">
@@ -41,6 +41,7 @@
     @if(isset($description['bottom']))
         @include('description.main', ['description' => $description['bottom']])
     @endif
+    </div>
 @stop
 
 @section('js')
@@ -48,7 +49,10 @@
 
     <script>
         let name = window.location.pathname;
-        var $moduleCard = $('.app-main .card').first();
+        var $moduleCard = $('.app-main .cabinet-module-main-card').first();
+        if (!$moduleCard.length) {
+            $moduleCard = $('.app-main .card').not('.cabinet-module-description, .cabinet-ca-nav-card').first();
+        }
         $moduleCard.on('collapsed.lte.card expanded.lte.card collapsed.lte.card-widget expanded.lte.card-widget', function (e) {
             var collapsed = e.type === 'collapsed.lte.card' || e.type === 'collapsed.lte.card-widget';
             cookies.set(name, collapsed ? 'collapse' : 'expand');

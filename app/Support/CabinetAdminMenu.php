@@ -71,6 +71,15 @@ class CabinetAdminMenu
             ];
         })->values()->all();
 
+        if (\Illuminate\Support\Facades\Route::has('admin.xml-providers.index')) {
+            self::$itemsCache[] = [
+                'id' => 0,
+                'title' => __('XML services management'),
+                'link' => route('admin.xml-providers.index'),
+                'external' => false,
+            ];
+        }
+
         return self::$itemsCache;
     }
 

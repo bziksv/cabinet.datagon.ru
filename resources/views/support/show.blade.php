@@ -94,7 +94,7 @@
                             </small>
                         </div>
                         <div class="cabinet-support-bubble {{ $message->is_staff ? 'cabinet-support-bubble--staff' : 'cabinet-support-bubble--user' }}">
-                            {!! nl2br(e($message->body)) !!}
+                            {!! \App\Support\TextAutoLinker::format($message->body) !!}
                         </div>
                     </div>
                 </div>

@@ -36,6 +36,7 @@ use Illuminate\Validation\ValidationException;
 use Jenssegers\Agent\Agent;
 use Maatwebsite\Excel\Facades\Excel;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class UsersController extends Controller
 {
@@ -225,16 +226,51 @@ class UsersController extends Controller
      */
     protected function usersIndexStats(): array
     {
-        return Cache::remember('cabinet.users.index.stats', now()->addMinutes(2), static function () {
+        $controller = $this;
+
+        return Cache::remember('cabinet.users.index.stats', now()->addMinutes(2), static function () use ($controller) {
             return [
                 'total' => User::count(),
                 'verified' => User::whereNotNull('email_verified_at')->count(),
                 'telegram' => User::telegramConnected()->count(),
-                'with_tariff' => User::whereHas('pay', static function ($q) {
-                    $q->where('status', true);
-                })->count(),
+                'with_tariff' => $controller->countUsersWithPaidTariff(),
             ];
         });
+    }
+
+    protected function countUsersWithPaidTariff(): int
+    {
+        app(PermissionRegistrar::class)->setPermissionsTeamId(1);
+        apply_global_team_permissions();
+
+        $paidCodes = array_map(static function (Tariff $t) {
+            return $t->code();
+        }, $this->tariff->getTariffs());
+
+        if (count($paidCodes) === 0) {
+            return 0;
+        }
+
+        $classes = [];
+        foreach ($paidCodes as $code) {
+            $instance = $this->tariff->getTariffByCode($code);
+            if ($instance) {
+                $classes[] = get_class($instance);
+            }
+        }
+
+        return User::query()
+            ->where(static function ($q) use ($paidCodes, $classes) {
+                $q->whereHas('roles', static function ($rq) use ($paidCodes) {
+                    $rq->whereIn('name', $paidCodes);
+                });
+                if (count($classes) > 0) {
+                    $q->orWhereHas('pay', static function ($pq) use ($classes) {
+                        $pq->where('status', true)->whereIn('class_tariff', $classes);
+                    });
+                }
+            })
+            ->count();
     }
 
     protected function usersRecordsTotal(): int
@@ -302,6 +338,9 @@ class UsersController extends Controller
 
     protected function applyUserListFilters($query, Request $request): void
     {
+        app(PermissionRegistrar::class)->setPermissionsTeamId(1);
+        apply_global_team_permissions();
+
         $role = trim((string) $request->input('filter_role', ''));
         if ($role !== '') {
             $query->whereHas('roles', static function ($q) use ($role) {
@@ -318,15 +357,26 @@ class UsersController extends Controller
 
         $tariff = trim((string) $request->input('filter_tariff', ''));
         if ($tariff === 'none') {
-            $query->whereDoesntHave('pay', static function ($q) {
-                $q->where('status', true);
-            });
+            $paidCodes = array_map(static function (Tariff $t) {
+                return $t->code();
+            }, $this->tariff->getTariffs());
+
+            if (count($paidCodes) > 0) {
+                $query->whereDoesntHave('roles', static function ($q) use ($paidCodes) {
+                    $q->whereIn('name', $paidCodes);
+                });
+            }
         } elseif ($tariff !== '') {
             $tariffInstance = $this->tariff->getTariffByCode($tariff);
             if ($tariffInstance) {
+                $code = $tariffInstance->code();
                 $class = get_class($tariffInstance);
-                $query->whereHas('pay', static function ($q) use ($class) {
-                    $q->where('status', true)->where('class_tariff', $class);
+                $query->where(static function ($q) use ($code, $class) {
+                    $q->whereHas('roles', static function ($rq) use ($code) {
+                        $rq->where('name', $code);
+                    })->orWhereHas('pay', static function ($pq) use ($class) {
+                        $pq->where('status', true)->where('class_tariff', $class);
+                    });
                 });
             }
         }

@@ -77,18 +77,18 @@ return [
         'array' => 'The :attribute must not have more than :value items.',
     ],
     'max' => [
-        'numeric' => 'The :attribute may not be greater than :max.',
-        'file' => 'The :attribute may not be greater than :max kilobytes.',
-        'string' => 'The :attribute may not be greater than :max characters.',
-        'array' => 'The :attribute may not have more than :max items.',
+        'numeric' => 'Поле :attribute не может быть больше :max.',
+        'file' => 'Размер файла :attribute не может превышать :max Кб.',
+        'string' => 'Поле :attribute не может быть длиннее :max символов.',
+        'array' => 'В поле :attribute не может быть больше :max элементов.',
     ],
     'mimes' => 'The :attribute must be a file of type: :values.',
     'mimetypes' => 'The :attribute must be a file of type: :values.',
     'min' => [
-        'numeric' => 'The :attribute must be at least :min.',
-        'file' => 'The :attribute must be at least :min kilobytes.',
-        'string' => 'The :attribute must be at least :min characters.',
-        'array' => 'The :attribute must have at least :min items.',
+        'numeric' => 'Поле :attribute должно быть не меньше :min.',
+        'file' => 'Размер файла :attribute должен быть не меньше :min Кб.',
+        'string' => 'Поле :attribute должно содержать не менее :min символов.',
+        'array' => 'В поле :attribute должно быть не меньше :min элементов.',
     ],
     'not_in' => 'The selected :attribute is invalid.',
     'not_regex' => 'The :attribute format is invalid.',
@@ -110,7 +110,7 @@ return [
         'array' => 'The :attribute must contain :size items.',
     ],
     'starts_with' => 'The :attribute must start with one of the following: :values',
-    'string' => 'The :attribute must be a string.',
+    'string' => 'Поле :attribute должно быть текстом.',
     'timezone' => 'The :attribute must be a valid zone.',
     'unique' => 'The :attribute has already been taken.',
     'uploaded' => 'The :attribute failed to upload.',
@@ -129,8 +129,15 @@ return [
     */
 
     'custom' => [
-        'attribute-name' => [
-            'rule-name' => 'custom-message',
+        'title' => [
+            'required' => 'Укажите заголовок идеи.',
+            'min' => 'Заголовок слишком короткий — минимум :min символов.',
+            'max' => 'Заголовок слишком длинный — не более :max символов.',
+        ],
+        'body' => [
+            'required' => 'Опишите идею.',
+            'min' => 'Описание слишком короткое — минимум :min символов.',
+            'max' => 'Описание слишком длинное — не более :max символов.',
         ],
     ],
 
@@ -145,6 +152,11 @@ return [
     |
     */
 
-    'attributes' => [],
+    'attributes' => [
+        'title' => 'заголовок',
+        'body' => 'описание',
+        'subject' => 'тема',
+        'moderator_note' => 'комментарий модератора',
+    ],
 
 ];

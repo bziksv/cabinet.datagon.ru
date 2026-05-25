@@ -37,6 +37,19 @@
                     @endif
                 </a>
             </li>
+            <li class="nav-item d-none d-md-block">
+                <a class="nav-link @if(request()->routeIs('ideas.*')) active @endif"
+                   href="{{ route('ideas.index') }}"
+                   title="{{ __('Suggest an idea / Vote') }}">
+                    <i class="bi bi-lightbulb me-1" aria-hidden="true"></i>
+                    {{ __('Ideas') }}
+                    @if(($ideasModerationCount ?? 0) > 0)
+                        <span class="navbar-badge badge text-bg-warning ms-1" title="{{ __('Awaiting moderation') }}">
+                            {{ $ideasModerationCount > 99 ? '99+' : $ideasModerationCount }}
+                        </span>
+                    @endif
+                </a>
+            </li>
         </ul>
 
         <ul class="navbar-nav ms-auto align-items-center">
@@ -55,6 +68,25 @@
                             <span class="text-secondary">{{ __('Your tariff') }}:</span>
                             <strong class="ms-1">{{ $name }}</strong>
                         </a>
+                    </li>
+                @endif
+                @if(!empty($headerModuleLimit))
+                    <li class="nav-item d-none d-xl-block cabinet-header-module-limit"
+                        id="cabinet-header-module-limit"
+                        data-limit-code="{{ $headerModuleLimit['code'] }}">
+                        <span class="nav-link @if($headerModuleLimit['exhausted']) text-danger @else text-warning-emphasis @endif">
+                            <i class="bi bi-pie-chart me-1" aria-hidden="true"></i>
+                            @if($headerModuleLimit['unlimited'])
+                                <span class="text-secondary">{{ __('Competitor analysis') }}:</span>
+                                <strong class="ms-1">{{ __('No restrictions') }}</strong>
+                            @elseif($headerModuleLimit['exhausted'])
+                                <strong>{{ __('Your limits are exhausted this month') }}</strong>
+                            @else
+                                <span class="text-secondary">{{ __('Left') }}:</span>
+                                <strong class="ms-1">{{ $headerModuleLimit['left'] }}</strong>
+                                <span class="text-muted ms-1">{{ __('from') }} {{ $headerModuleLimit['limit'] }}</span>
+                            @endif
+                        </span>
                     </li>
                 @endif
                 @if(!empty($limitsStatistics))
@@ -105,7 +137,7 @@
                         </div>
                     </li>
                     <li class="nav-item cabinet-header-limits-hint is-empty d-none d-xl-block" id="cabinet-header-limits-hint">
-                        <span class="nav-link py-1 text-warning-emphasis small">
+                        <span class="nav-link text-warning-emphasis">
                             <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
                             <span id="userModuleUsed"></span>
                             <span id="userModuleLimit"></span>

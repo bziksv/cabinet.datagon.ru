@@ -11,9 +11,10 @@
     <div class="cabinet-support-page">
         @hasSection('support-header')
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
-                <h2 class="h4 mb-0">
+                <h2 class="h4 mb-0 d-flex align-items-center flex-wrap gap-1">
                     <i class="bi bi-headset me-2 text-primary" aria-hidden="true"></i>
-                    @yield('support-header')
+                    <span>@yield('support-header')</span>
+                    @include('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-support'])
                 </h2>
                 @hasSection('support-header-tools')
                     <div class="d-flex flex-wrap gap-2">

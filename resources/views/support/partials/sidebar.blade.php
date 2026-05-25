@@ -58,6 +58,18 @@
 
     @include('support.partials.recent-tickets')
 
+    <div class="card mt-3 cabinet-ideas-sidebar-promo border-0 shadow-sm">
+        <div class="card-body py-3">
+            <p class="small fw-semibold text-body mb-1">
+                <i class="bi bi-lightbulb text-warning me-1"></i>{{ __('Ideas board') }}
+            </p>
+            <p class="small text-secondary mb-2">{{ __('Suggest improvements and vote for the best ideas from other users.') }}</p>
+            <a href="{{ route('ideas.index') }}" class="btn btn-sm btn-outline-warning w-100">
+                {{ __('Suggest an idea / Vote') }}
+            </a>
+        </div>
+    </div>
+
     @if($isStaff ?? false)
         <div class="card mt-3">
             <div class="card-body small text-secondary py-3">

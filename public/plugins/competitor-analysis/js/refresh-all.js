@@ -1,25 +1,34 @@
 function refreshAll() {
-    $('.btn.btn-secondary.pull-left').prop('disabled', true);
-    $('.top-sites').hide()
-    $('.nested').hide()
-    $('.positions').hide()
-    $('.tag-analysis').hide()
-    $('#sites-block').hide()
-    $('.urls.mt-5').hide()
-    $('#render-bar').hide()
-    $('#recommendations-block').hide()
-    $('.render').remove()
-
-    $('#dualbox-phrases-block').html('')
-    if ($('.form-select.rounded-0.count').val() === '20') {
-        $('.extra-th').show()
+    $('#start-analyse').prop('disabled', true);
+    $('.top-sites').hide();
+    $('.nested').hide();
+    $('.positions').hide();
+    $('.tag-analysis').hide();
+    $('#sites-block').hide();
+    $('.urls.mt-5').hide();
+    $('#render-bar').hide();
+    if (typeof resetCompetitorRecommendations === 'function') {
+        resetCompetitorRecommendations();
     } else {
-        $('.extra-th').hide()
+        $('#recommendations-block').hide();
+    }
+    if (typeof hideGeoDependencyVerdict === 'function') {
+        hideGeoDependencyVerdict();
+    }
+    $('.render').remove();
+    $('.extra-th').hide();
+
+    if ($.fn.dataTable) {
+        if ($('#positions').length && $.fn.dataTable.isDataTable('#positions')) {
+            $('#positions').DataTable().destroy();
+        }
+        if ($('#urls-table').length && $.fn.dataTable.isDataTable('#urls-table')) {
+            $('#urls-table').DataTable().destroy();
+        }
     }
 
-    $('#positions').dataTable().fnDestroy();
-    $('#urls-table').dataTable().fnDestroy();
-
-    setProgressBarStyles(0)
-    $("#progress-bar").show(300)
+    if (typeof setProgressBarStyles === 'function') {
+        setProgressBarStyles(1);
+    }
+    $('#progress-bar').show(300);
 }

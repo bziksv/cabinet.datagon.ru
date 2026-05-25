@@ -2,6 +2,7 @@
 
 namespace App\Classes\Xml;
 
+use App\Support\CompetitorAnalysisDebugLog;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
@@ -13,6 +14,11 @@ class SimplifiedXmlFacade extends XmlFacade
     protected int $attempt;
 
     protected string $url;
+
+    /** @var callable|null */
+    protected $progressCallback;
+
+    protected ?string $debugPageHash = null;
 
     public function __construct($region, int $count = 100)
     {
@@ -31,92 +37,373 @@ class SimplifiedXmlFacade extends XmlFacade
         $this->attempt = $attempt;
     }
 
+    public function setProgressCallback(?callable $callback): void
+    {
+        $this->progressCallback = $callback;
+    }
+
+    public function setDebugPageHash(?string $pageHash): void
+    {
+        $this->debugPageHash = $pageHash !== '' ? $pageHash : null;
+    }
+
     public function getXMLResponse(string $searchEngine = 'yandex')
     {
-        $this->attempt += 1;
-        if ($this->attempt >= 7) {
-            return 'Превышен лимит попыток';
+        $providers = $this->providersForEngine($searchEngine);
+        $providerIndex = 0;
+
+        foreach ($providers as $provider) {
+            $providerIndex++;
+            $this->attempt = $providerIndex;
+            $this->notifyProgress($providerIndex, count($providers));
+
+            try {
+                $result = $this->fetchProviderResponse($searchEngine, $provider);
+                if ($result === null) {
+                    $this->logDebug('warn', 'xml.empty_http', [
+                        'engine' => $searchEngine,
+                        'provider' => $provider,
+                        'query' => $this->query,
+                    ]);
+                    continue;
+                }
+
+                if (isset($result['response']['error'])) {
+                    $code = $this->extractApiErrorCode($result);
+                    $message = $this->extractApiErrorMessage($result);
+                    $this->logDebug('warn', 'xml.api_error', [
+                        'engine' => $searchEngine,
+                        'provider' => $provider,
+                        'code' => $code,
+                        'message' => $message,
+                        'query' => $this->query,
+                    ]);
+                    Log::debug('XML API error response', [
+                        'engine' => $searchEngine,
+                        'provider' => $provider,
+                        'code' => $code,
+                        'message' => $message,
+                    ]);
+
+                    // 15 — нет результатов по запросу (валидная пустая выдача)
+                    if ($code === 15) {
+                        return [];
+                    }
+
+                    continue;
+                }
+
+                if (isset($result['response']['results']['grouping']['group'])) {
+                    $urls = $this->parseResult($result['response']['results']['grouping']['group']);
+                    $this->logDebug('info', 'xml.success', [
+                        'engine' => $searchEngine,
+                        'provider' => $provider,
+                        'urls' => count($urls),
+                        'query' => $this->query,
+                    ]);
+
+                    return $urls;
+                }
+            } catch (Throwable $e) {
+                $this->logDebug('error', 'xml.exception', [
+                    'engine' => $searchEngine,
+                    'provider' => $provider,
+                    'message' => $e->getMessage(),
+                    'query' => $this->query,
+                ]);
+                Log::debug('XML Response error', [
+                    'engine' => $searchEngine,
+                    'provider' => $provider,
+                    'message' => $e->getMessage(),
+                    'line' => $e->getLine(),
+                    'file' => $e->getFile(),
+                ]);
+            }
         }
 
-        try {
-            $result = $this->sendRequest($searchEngine);
-            if (isset($result['response']['results']['grouping']['group'])) {
-                return $this->parseResult($result['response']['results']['grouping']['group']);
+        return [];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function providersForEngine(string $searchEngine): array
+    {
+        if ($searchEngine === 'google') {
+            $providers = ['xmlstock', 'xmlriver'];
+        } else {
+            $providers = ['xmlstock', 'xmlproxy', 'xmlriver'];
+        }
+
+        if (in_array('xmlriver', $providers, true) && $this->getRiverLocation() === null) {
+            $providers = array_values(array_diff($providers, ['xmlriver']));
+        }
+
+        return $providers;
+    }
+
+    protected function notifyProgress(int $providerIndex, int $providerTotal): void
+    {
+        if ($this->progressCallback !== null) {
+            ($this->progressCallback)($providerIndex, $providerTotal);
+        }
+    }
+
+    protected function fetchProviderResponse(string $searchEngine, string $provider): ?array
+    {
+        if ($provider === 'xmlstock' && $this->xmlstockHybridRetryEnabled()) {
+            return $this->fetchXmlstockHybrid($searchEngine);
+        }
+
+        return $this->sendRequest($searchEngine, $provider);
+    }
+
+    protected function xmlstockHybridRetryEnabled(): bool
+    {
+        return (bool) config('cabinet-competitor-analysis.xmlstock_hybrid_retry', true);
+    }
+
+    /**
+     * XMLStock: гибридный режим — коды 210/202 требуют повтор того же URL через 20–30 с.
+     */
+    protected function fetchXmlstockHybrid(string $searchEngine): ?array
+    {
+        $url = $this->buildRequestUrl($searchEngine, 'xmlstock');
+        if ($url === null || $url === '') {
+            return null;
+        }
+
+        $maxAttempts = (int) config('cabinet-competitor-analysis.xmlstock_hybrid_max_attempts', 8);
+        $sleepSec = (int) config('cabinet-competitor-analysis.xmlstock_hybrid_sleep_sec', 22);
+        $retryCodes = config('cabinet-competitor-analysis.xmlstock_hybrid_retry_codes', [202, 210]);
+        if (! is_array($retryCodes)) {
+            $retryCodes = [202, 210];
+        }
+        $retryCodes = array_map('intval', $retryCodes);
+
+        $lastResult = null;
+
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $this->notifyProgress($attempt, $maxAttempts);
+            $lastResult = $this->httpGetParsed($url, true);
+            $code = $this->extractApiErrorCode($lastResult);
+
+            if ($lastResult !== null && ! isset($lastResult['response']['error'])) {
+                $this->logDebug('info', 'xmlstock.hybrid.ready', [
+                    'attempt' => $attempt,
+                    'query' => $this->query,
+                ]);
+
+                return $lastResult;
             }
 
-        } catch (Throwable $e) {
-            Log::debug('XML Response error', [
-                $e->getMessage(),
-                $e->getLine(),
-                $e->getFile(),
+            if ($lastResult !== null && isset($lastResult['response']['results']['grouping']['group'])) {
+                return $lastResult;
+            }
+
+            $message = $this->extractApiErrorMessage($lastResult);
+            $this->logDebug('info', 'xmlstock.hybrid.attempt', [
+                'attempt' => $attempt,
+                'max' => $maxAttempts,
+                'code' => $code,
+                'message' => $message,
+                'query' => $this->query,
             ]);
 
-            $this->getXMLResponse($searchEngine);
+            if ($code === 15) {
+                return $lastResult;
+            }
+
+            if ($code !== null && ! in_array($code, $retryCodes, true)) {
+                return $lastResult;
+            }
+
+            if ($attempt < $maxAttempts && $sleepSec > 0) {
+                sleep($sleepSec);
+            }
         }
 
-        return $this->getXMLResponse($searchEngine);
+        return $lastResult;
     }
 
-    protected function sendRequest($searchEngine)
+    protected function sendRequest(string $searchEngine, string $provider): ?array
     {
-        if ($searchEngine === 'yandex') {
-            $this->url = $this->prepareYandexRequest();
-        } else {
-            $this->url = $this->prepareGoogleRequest();
+        $this->url = $this->buildRequestUrl($searchEngine, $provider);
+
+        if ($this->url === null || $this->url === '') {
+            return null;
         }
 
-        $response = file_get_contents($this->url);
+        return $this->httpGetParsed($this->url, false);
+    }
+
+    protected function httpGetParsed(string $url, bool $xmlstockHybrid): ?array
+    {
+        $timeout = (int) config('cabinet-competitor-analysis.xml_http_timeout', 12);
+        if ($xmlstockHybrid) {
+            $timeout = max($timeout, (int) config('cabinet-competitor-analysis.xmlstock_hybrid_http_timeout', 30));
+        }
+
+        $context = stream_context_create([
+            'http' => [
+                'timeout' => $timeout,
+            ],
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+
+        $response = @file_get_contents($url, false, $context);
+        if ($response === false || $response === '') {
+            return null;
+        }
+
         $xml = $this->load($response);
+        $parsed = json_decode(json_encode($xml), true);
+        if (! is_array($parsed)) {
+            return null;
+        }
 
-        return json_decode(json_encode($xml), true);
+        return $this->enrichParsedXml($xml, $parsed);
     }
 
-    protected function prepareGoogleRequest(): ?string
+    /**
+     * simplexml → json теряет атрибут code у <error code="…">.
+     *
+     * @param \SimpleXMLElement $xml
+     */
+    protected function enrichParsedXml($xml, array $parsed): array
     {
-        $query = str_replace(' ', '%20', $this->query);
+        if (! isset($xml->response->error)) {
+            return $parsed;
+        }
 
-        if ($this->attempt <= 2) {
-            $this->setPath('https://xmlstock.com/google/xml/');
-            $this->setUser(config('xmlstock.user'));
-            $this->setKey(config('xmlstock.key'));
+        $errorNode = $xml->response->error;
+        $attrs = $errorNode->attributes();
+        if ($attrs === null || ! isset($attrs['code'])) {
+            return $parsed;
+        }
 
-            return "$this->path?user=$this->user&key=$this->key&query=$query&groupby=$this->count&lr=$this->lr&sortby=$this->sortby";
+        $parsed['response']['error'] = [
+            '@attributes' => ['code' => (string) $attrs['code']],
+            0 => trim((string) $errorNode),
+        ];
 
-        } elseif ($this->attempt <= 4) {
-            $this->setPath('https://xmlriver.com/search/xml');
-            $this->setUser(config('xmlriver.user'));
-            $this->setKey(config('xmlriver.key'));
-            $loc = $this->getRiverLocation();
+        return $parsed;
+    }
 
-            return "$this->path?user=$this->user&key=$this->key&query=$query&groupby=$this->count&loc=$loc";
+    protected function encodeQueryForUrl(): string
+    {
+        return rawurlencode($this->query);
+    }
+
+    /**
+     * XMLStock: простой groupby=10…100 или продвинутый attr=d.mode=deep…
+     */
+    protected function groupbyForXmlstock(): string
+    {
+        $allowed = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+        if (in_array($this->count, $allowed, true)) {
+            return (string) $this->count;
+        }
+
+        return 'attr=d.mode=deep.groups-on-page=' . $this->count . '.docs-in-group=1';
+    }
+
+    protected function extractApiErrorCode(?array $result): ?int
+    {
+        if ($result === null || ! isset($result['response']['error'])) {
+            return null;
+        }
+
+        $error = $result['response']['error'];
+
+        if (is_array($error)) {
+            if (isset($error['@attributes']['code'])) {
+                return (int) $error['@attributes']['code'];
+            }
+            if (isset($error['code'])) {
+                return (int) $error['code'];
+            }
+        }
+
+        if (is_numeric($error)) {
+            return (int) $error;
         }
 
         return null;
     }
 
-    protected function prepareYandexRequest(): ?string
+    protected function extractApiErrorMessage(?array $result): string
     {
-        $query = str_replace(' ', '%20', $this->query);
+        if ($result === null || ! isset($result['response']['error'])) {
+            return '';
+        }
 
-        if ($this->attempt <= 2) {
+        $error = $result['response']['error'];
+
+        if (is_array($error)) {
+            return (string) ($error[0] ?? $error['@value'] ?? json_encode($error, JSON_UNESCAPED_UNICODE));
+        }
+
+        return (string) $error;
+    }
+
+    protected function buildRequestUrl(string $searchEngine, string $provider): ?string
+    {
+        $query = $this->encodeQueryForUrl();
+
+        if ($searchEngine === 'google') {
+            if ($provider === 'xmlstock') {
+                $this->setPath('https://xmlstock.com/google/xml/');
+                $this->setUser(config('xmlstock.user'));
+                $this->setKey(config('xmlstock.key'));
+
+                return "$this->path?user=$this->user&key=$this->key&query=$query&groupby=$this->count&lr=$this->lr&sortby=$this->sortby";
+            }
+
+            if ($provider === 'xmlriver') {
+                $loc = $this->getRiverLocation();
+                if ($loc === null) {
+                    return null;
+                }
+                $this->setPath('https://xmlriver.com/search/xml');
+                $this->setUser(config('xmlriver.user'));
+                $this->setKey(config('xmlriver.key'));
+
+                return "$this->path?user=$this->user&key=$this->key&query=$query&groupby=$this->count&loc=$loc";
+            }
+
+            return null;
+        }
+
+        if ($provider === 'xmlstock') {
             $this->setPath('https://xmlstock.com/yandex/xml/');
             $this->setUser(config('xmlstock.user'));
             $this->setKey(config('xmlstock.key'));
+            $groupby = rawurlencode($this->groupbyForXmlstock());
 
-            return "$this->path?user=$this->user&key=$this->key&query=$query&groupby=attr=d.mode%3Ddeep.groups-on-page%3D"
-                . "$this->count.docs-in-group%3D1&lr=$this->lr&sortby=$this->sortby&page=$this->page";
-        } elseif ($this->attempt <= 4) {
+            return "$this->path?user=$this->user&key=$this->key&query=$query&groupby=$groupby&lr=$this->lr&sortby=$this->sortby&page=$this->page";
+        }
+
+        if ($provider === 'xmlproxy') {
             $this->setPath('https://xmlproxy.ru/search/xml');
             $this->setUser(config('xmlproxy.user'));
             $this->setKey(config('xmlproxy.key'));
 
             return "$this->path?user=$this->user&key=$this->key&query=$query&groupby=attr=d.mode%3Ddeep.groups-on-page%3D"
                 . "$this->count.docs-in-group%3D1&lr=$this->lr&sortby=$this->sortby&page=$this->page";
-        } elseif ($this->attempt <= 6) {
+        }
+
+        if ($provider === 'xmlriver') {
+            $loc = $this->getRiverLocation();
+            if ($loc === null) {
+                return null;
+            }
             $this->setPath('https://xmlriver.com/yandex/xml');
             $this->setUser(config('xmlriver.user'));
             $this->setKey(config('xmlriver.key'));
-            $loc = $this->getRiverLocation();
 
             return "$this->path?user=$this->user&key=$this->key&query=$query&groupby=attr=d.mode%3Ddeep.groups-on-page%3D"
                 . "$this->count.docs-in-group%3D1&loc=$loc";
@@ -125,15 +412,24 @@ class SimplifiedXmlFacade extends XmlFacade
         return null;
     }
 
+    protected function logDebug(string $level, string $message, array $context = []): void
+    {
+        if ($this->debugPageHash === null) {
+            return;
+        }
+
+        CompetitorAnalysisDebugLog::append($this->debugPageHash, $level, $message, $context);
+    }
+
     protected function parseResult($xmlResult): array
     {
         $result = [];
         if (isset($xmlResult['doc']['url'])) {
             return [$xmlResult['doc']['url']];
-        } else {
-            foreach ($xmlResult as $item) {
-                $result[] = Str::lower($item['doc']['url']);
-            }
+        }
+
+        foreach ($xmlResult as $item) {
+            $result[] = Str::lower($item['doc']['url']);
         }
 
         return $result;
@@ -153,7 +449,7 @@ class SimplifiedXmlFacade extends XmlFacade
         return $position;
     }
 
-    protected function getRiverLocation(): string
+    protected function getRiverLocation(): ?string
     {
         $array = [
             '213' => '1015930',
@@ -220,6 +516,6 @@ class SimplifiedXmlFacade extends XmlFacade
             '16' => '1012084',
         ];
 
-        return $array[$this->lr];
+        return $array[$this->lr] ?? null;
     }
 }

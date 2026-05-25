@@ -63,6 +63,18 @@
     background: var(--bs-tertiary-bg);
 }
 
+.cabinet-users-page .cabinet-users-filters__actions-col {
+    display: flex;
+    align-items: flex-end;
+}
+
+@media (min-width: 992px) {
+    .cabinet-users-page .cabinet-users-filters__actions {
+        justify-content: flex-end;
+        width: 100%;
+    }
+}
+
 .cabinet-users-page .cabinet-users-dt-top {
     padding: 0 1rem;
 }

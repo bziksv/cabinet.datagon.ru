@@ -57,6 +57,35 @@
 }
 
 /* Шапка (разметка из public/html/index.html) */
+#header-nav-bar.cabinet-header > .container-fluid {
+    align-items: center;
+    min-height: 3.5rem;
+}
+
+#header-nav-bar.cabinet-header .navbar-nav {
+    align-items: center;
+    flex-wrap: nowrap;
+}
+
+#header-nav-bar.cabinet-header .navbar-nav > .nav-item > .nav-link,
+#header-nav-bar.cabinet-header .navbar-nav > .nav-item > form > .nav-link.btn {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    line-height: 1.25;
+    min-height: 2.75rem;
+}
+
+#header-nav-bar.cabinet-header .navbar-nav > .nav-item > .nav-link .bi {
+    line-height: 1;
+}
+
+#header-nav-bar.cabinet-header .cabinet-header-module-limit .nav-link {
+    cursor: default;
+}
+
 #header-nav-bar.cabinet-header .navbar-badge {
     position: static;
     display: inline-flex;

@@ -1,5 +1,5 @@
 <div class="card shadow-sm mb-3 cabinet-users-filters">
-    <div class="card-header py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <div class="card-header py-2">
         <button class="btn btn-link text-decoration-none p-0 fw-semibold text-body d-flex align-items-center gap-1"
                 type="button"
                 data-bs-toggle="collapse"
@@ -8,14 +8,6 @@
             <i class="bi bi-funnel"></i>{{ __('Filters') }}
             <span class="badge text-bg-primary d-none" id="cabinet-users-filters-active">0</span>
         </button>
-        <div class="d-flex gap-2">
-            <button type="button" class="btn btn-sm btn-primary" id="cabinet-users-filters-apply">
-                <i class="bi bi-check-lg me-1"></i>{{ __('Apply filters') }}
-            </button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="cabinet-users-filters-reset">
-                {{ __('Reset') }}
-            </button>
-        </div>
     </div>
     <div id="cabinet-users-filters-collapse" class="collapse show">
         <div class="card-body">
@@ -89,6 +81,16 @@
                                data-filter
                                placeholder="{{ __('To') }}"
                                min="1">
+                    </div>
+                </div>
+                <div class="col-12 col-md-6 col-lg-4 cabinet-users-filters__actions-col">
+                    <div class="cabinet-users-filters__actions d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-sm btn-primary" id="cabinet-users-filters-apply">
+                            <i class="bi bi-check-lg me-1"></i>{{ __('Apply filters') }}
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="cabinet-users-filters-reset">
+                            {{ __('Reset') }}
+                        </button>
                     </div>
                 </div>
             </div>

@@ -77,6 +77,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         'index', 'store', 'update'
     ]);
 
+    Route::get('/admin/xml-providers', 'XmlProvidersAdminController@index')->name('admin.xml-providers.index');
+    Route::post('/admin/xml-providers/refresh', 'XmlProvidersAdminController@refresh')->name('admin.xml-providers.refresh');
+
     Route::resource('tariff-settings', 'TariffSettingsController');
     Route::get('tariff-setting-values/{id}/create', 'TariffSettingValuesController@create')->name('tariff-setting-values.create');
     Route::resource('tariff-setting-values', 'TariffSettingValuesController')->except([
@@ -115,6 +118,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('support/{ticket}/messages', 'SupportTicketController@storeMessage')->name('support.messages.store');
     Route::patch('support/{ticket}/close', 'SupportTicketController@close')->name('support.close');
     Route::patch('support/{ticket}/reopen', 'SupportTicketController@reopen')->name('support.reopen');
+
+    Route::get('ideas', 'FeatureIdeaController@index')->name('ideas.index');
+    Route::get('ideas/create', 'FeatureIdeaController@create')->name('ideas.create');
+    Route::post('ideas', 'FeatureIdeaController@store')->name('ideas.store');
+    Route::post('ideas/{idea}/vote', 'FeatureIdeaController@vote')->name('ideas.vote');
+    Route::post('ideas/{idea}/approve', 'FeatureIdeaController@approve')->name('ideas.approve');
+    Route::post('ideas/{idea}/reject', 'FeatureIdeaController@reject')->name('ideas.reject');
 
     Route::get('description/{description}/edit/{position?}', 'DescriptionController@edit')->name('description.edit');
     Route::patch('description/{description}', 'DescriptionController@update')->name('description.update');
@@ -218,6 +228,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/news/unblock-comment-user', 'NewsController@unblockCommentUser')->name('news.unblock-comment-user');
 
     Route::get('/competitor-analysis', 'SearchCompetitorsController@index')->name('competitor.analysis');
+    Route::get('/competitor-analysis/regions', 'SearchCompetitorsController@searchRegions')->name('competitor.analysis.regions');
     Route::post('/competitor-analysis', 'SearchCompetitorsController@analyseSites')->name('analysis.sites');
     Route::post('/analyze-nesting', 'SearchCompetitorsController@analyseNesting')->name('analysis.nesting');
     Route::post('/analyze-positions', 'SearchCompetitorsController@analysePositions')->name('analysis.positions');

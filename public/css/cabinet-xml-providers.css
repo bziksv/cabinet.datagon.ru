@@ -1,0 +1,11 @@
+.cabinet-xml-providers-page .cabinet-xml-provider-card .info-box {
+    min-height: 0;
+}
+
+.cabinet-xml-providers-page .cabinet-xml-modules-table td {
+    vertical-align: top;
+}
+
+.cabinet-xml-providers-page .cabinet-xml-modules-table .badge {
+    font-weight: 500;
+}

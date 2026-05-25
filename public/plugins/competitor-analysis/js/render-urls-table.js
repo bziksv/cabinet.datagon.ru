@@ -1,58 +1,60 @@
 function renderUrlsTable(urls, pageLength) {
     $.each(urls, function (key, value) {
+        const phrases = value.phrases || value['phrases'] || [];
+        const phrasesBlock = buildPhrasesEyeToggle(phrases);
 
-        let hideBlock = '<div class="card direct-chat direct-chat-primary collapsed-card pt-2 mb-0" style="background: transparent !important; box-shadow: none; border: none">' +
-            '        <div class="card-header ui-sortable-handle" style="padding: 0 !important; border: 0">' +
-            '            <div class="d-flex justify-content-between">' +
-            '                <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse">' +
-            '                    <i class="fas fa-eye"></i>' +
-            '                </button>' +
-            '            </div>' +
-            '        </div>' +
-            '        <div class="card-body pl-2 pt-2">' +
-            '            ' + (value['phrases']).join("<br>") +
-            '        </div>' +
-            '    </div>';
-
+        const linkText = typeof escapeHtml === 'function' ? escapeHtml(key) : key;
+        const linkHref = String(key).replace(/"/g, '&quot;');
         $('#urls-tbody').append(
             "<tr class='render'>" +
-            "   <td class='col-9 word-wrap'>" + key + "</td>" +
-            "   <td class='col-2'>" + hideBlock + "</td>" +
-            "   <td class='col-1'>" + value['count'] + "</td>" +
+            "   <td class='word-wrap'><a class='cabinet-ca-url-link' href=\"" + linkHref + "\" target='_blank' rel='noopener'>" + linkText + "</a></td>" +
+            "   <td class='cabinet-ca-url-phrases-cell'>" + phrasesBlock + "</td>" +
+            "   <td class='cabinet-ca-url-count-cell'><span class='cabinet-ca-repeat-badge'>" + value['count'] + "</span></td>" +
             "</tr>"
-        )
-    })
+        );
+    });
 
-    $(document).ready(function () {
-        $('#urls-table').dataTable({
-            order: [[2, "desc"]],
-            pageLength: pageLength,
-            searching: true,
-            dom: 'Bfrtip',
-            buttons: [
-                {
-                    extend: 'excelHtml5',
-                    text: 'Экспорт в Excel',
-                    title: 'Анализ URL',
-                    className: 'btn btn-secondary'
-                }
-            ],
-            language: {
-                "paginate": {
-                    "first": "«",
-                    "last": "»",
-                    "next": "»",
-                    "previous": "«"
-                }
+    if ($.fn.dataTable && $.fn.dataTable.isDataTable('#urls-table')) {
+        $('#urls-table').DataTable().destroy();
+    }
+
+    $('#urls-table').dataTable({
+        order: [[2, 'desc']],
+        pageLength: pageLength,
+        searching: true,
+        dom: 'Bfrtip',
+        buttons: [
+            {
+                extend: 'excelHtml5',
+                text: 'Экспорт в Excel',
+                title: 'Анализ URL',
+                className: 'btn btn-secondary',
+            },
+        ],
+        language: {
+            paginate: {
+                first: '«',
+                last: '»',
+                next: '»',
+                previous: '«',
+            },
+        },
+        drawCallback: function () {
+            if (typeof initPhrasesEyeDropdowns === 'function') {
+                initPhrasesEyeDropdowns($('#urls-table'));
             }
-        });
+        },
+    });
 
-        $('#urls-table').wrap('<div style="width: 100%; overflow: auto"></div>')
-    })
+    $('#urls-table').closest('.table-responsive').addClass('cabinet-ca-urls-table-responsive');
 
-    $('.urls.mt-5').show()
+    if (typeof initPhrasesEyeDropdowns === 'function') {
+        initPhrasesEyeDropdowns($('#urls-table'));
+    }
 
-    setTimeout(() => {
-        $('#render-bar').hide(300)
-    }, 1000)
+    $('.urls.mt-5').show();
+
+    setTimeout(function () {
+        $('#render-bar').hide(300);
+    }, 1000);
 }

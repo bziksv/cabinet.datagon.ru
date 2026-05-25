@@ -66,6 +66,9 @@ $(function () {
     var $limitsHint = $('#cabinet-header-limits-hint');
     var $used = $('#userModuleUsed');
     var $limit = $('#userModuleLimit');
+    if ($('#cabinet-header-module-limit').length) {
+        return;
+    }
     $('#header-nav-bar .cabinet-header-limits-menu table tbody tr').each(function () {
         var bg = $(this).css('background-color');
         if (bg === 'rgb(253, 245, 230)' || bg === 'rgb(255, 243, 205)') {

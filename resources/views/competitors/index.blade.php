@@ -42,11 +42,12 @@
                     <span class="text-muted">{{ __('The maximum number of phrases is 40') }}</span>
                 </div>
                 <div class="mb-3 required">
-                    <label class="form-label">{{ __('Top 10/20') }}</label>
+                    <label class="form-label">{{ __('Top 10/20/30') }}</label>
                     {!! Form::select('count', [
-                            '10' => 10,
+                            '30' => __('30 (recommended)'),
                             '20' => 20,
-                            ], null, ['class' => 'form-select count']) !!}
+                            '10' => 10,
+                            ], '30', ['class' => 'form-select count']) !!}
                 </div>
                 <div class="mb-3 required">
                     <label class="form-label d-block">{{ __('Search engines') }}</label>
@@ -145,12 +146,27 @@
             <div id="cabinet-ca-geo-verdict" class="cabinet-ca-geo-verdict-wrap mt-3" style="display: none" aria-live="polite"></div>
 
             <div id="sites-block" class="cabinet-ca-results-section mt-5" style="display:none;">
-                <div class="cabinet-ca-results-section__head">
+                <div class="cabinet-ca-results-section__head cabinet-ca-results-section__head--serp">
                     <h2 class="cabinet-ca-section-title mb-0">{{ __('Top sites based on your keywords') }}</h2>
+                    <div id="cabinet-ca-serp-compare-bar" class="cabinet-ca-serp-compare-bar alert alert-info border-2 mb-0 py-2 px-3" style="display: none" role="region" aria-label="{{ __('Compare cities in SERP') }}">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <span class="fw-semibold text-nowrap">
+                                <i class="fas fa-city me-1" aria-hidden="true"></i>{{ __('City comparison') }}:
+                            </span>
+                            <span class="small">{{ __('Showing') }}</span>
+                            <span id="cabinet-ca-serp-active-label" class="badge text-bg-primary"></span>
+                            <span class="small cabinet-ca-serp-compare-plus">+</span>
+                            <div id="cabinet-ca-serp-compare-buttons" class="btn-group btn-group-sm flex-wrap" role="group"></div>
+                            <button type="button" class="btn btn-sm btn-outline-dark" id="cabinet-ca-serp-compare-clear" style="display: none">
+                                {{ __('Hide second city') }}
+                            </button>
+                        </div>
+                        <p class="small mb-0 mt-2">{{ __('Click a second city to show two SERPs side by side in each phrase column. Then press Highlight identical urls to match URLs between cities.') }}</p>
+                    </div>
                 </div>
                 <div class="card cabinet-ca-results-card border-0 shadow-sm">
                     <div class="card-body">
-                <div class="site-block-buttons cabinet-ca-toolbar mb-3" role="toolbar">
+                <div class="site-block-buttons cabinet-ca-toolbar mb-3 d-flex flex-wrap align-items-center gap-2" role="toolbar">
                     <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="{{ __('Highlight') }}">
                     <button class="btn btn-primary colored-button click_tracking"
                             type="button"
@@ -278,16 +294,26 @@
                         <th class="row-width">{{ __('Eighth place') }}</th>
                         <th class="row-width">{{ __('Ninth place') }}</th>
                         <th class="row-width">{{ __('Tenth place') }}</th>
-                        <th class="extra-th row-width">{{ __('Eleventh place') }}</th>
-                        <th class="extra-th row-width">{{ __('Twelfth place') }}</th>
-                        <th class="extra-th row-width">{{ __('Thirteenth place') }}</th>
-                        <th class="extra-th row-width">{{ __('Fourteenth place') }}</th>
-                        <th class="extra-th row-width">{{ __('Fifteenth place') }}</th>
-                        <th class="extra-th row-width">{{ __('Sixteenth place') }}</th>
-                        <th class="extra-th row-width">{{ __('Seventeenth place') }}</th>
-                        <th class="extra-th row-width">{{ __('Eighteenth place') }}</th>
-                        <th class="extra-th row-width">{{ __('Nineteenth place') }}</th>
-                        <th class="extra-th row-width">{{ __('Twentieth place') }}</th>
+                        @php
+                            $metaExtraPlaces = [
+                                11 => __('Eleventh place'),
+                                12 => __('Twelfth place'),
+                                13 => __('Thirteenth place'),
+                                14 => __('Fourteenth place'),
+                                15 => __('Fifteenth place'),
+                                16 => __('Sixteenth place'),
+                                17 => __('Seventeenth place'),
+                                18 => __('Eighteenth place'),
+                                19 => __('Nineteenth place'),
+                                20 => __('Twentieth place'),
+                            ];
+                        @endphp
+                        @foreach ($metaExtraPlaces as $place => $label)
+                            <th class="extra-th row-width" data-place="{{ $place }}">{{ $label }}</th>
+                        @endforeach
+                        @for ($place = 21; $place <= 30; $place++)
+                            <th class="extra-th row-width" data-place="{{ $place }}">{{ __('Place :n', ['n' => $place]) }}</th>
+                        @endfor
                     </tr>
                     </thead>
                     <tbody id="top-sites-body">
@@ -466,6 +492,12 @@
             }
 
             window.competitorRecommendationsUrl = @json(route('competitor.get.recommendations'));
+            window.competitorSerpCompareStrings = {
+                showCity: @json(__('Show :city')),
+                hideSecond: @json(__('Hide second city')),
+                needTwoRegions: @json(__('Select at least two regions before analysis to compare cities here.')),
+            };
+
             window.competitorHighlightStrings = {
                 noAggregators: @json(__('No rows match aggregator domains in this SERP')),
                 noDuplicateUrls: @json(__('No identical URLs across two or more query columns')),
@@ -473,7 +505,13 @@
                 tipHighlightUrls: @json(__('Highlight URLs that appear in two or more query columns (same color per URL)')),
                 tipHighlightDomains: @json(__('Highlight domains that appear in two or more query columns')),
                 tipHighlightMain: @json(__('Highlight main pages in the SERP')),
+                tipHighlightUrlsCompare: @json(__('Highlight identical URLs in the same query column between the two cities')),
+                tipHighlightDomainsCompare: @json(__('Highlight identical domains in the same query column between the two cities')),
+                noCrossRegionUrls: @json(__('No identical URLs between cities in the same query column')),
+                noCrossRegionDomains: @json(__('No identical domains between cities in the same query column')),
             };
+
+            window.competitorGeoExcludedPreset = @json(\App\Support\CompetitorSerpDomainFilter::excludedDomainsBreakdown());
 
             window.competitorGeoStrings = {
                 title_geo_independent: @json(__('Queries are geo-independent')),
@@ -492,7 +530,16 @@
                 badge_geo_dependent: @json(__('Geo-dependent')),
                 badge_partial: @json(__('Partial')),
                 badge_skipped: @json(__('Not scored (only aggregators/marketplaces in top)')),
-                footnote: @json(__('Overlap is Jaccard similarity of organic top URLs between regions. Aggregators and marketplaces from module settings are excluded (0% = different SERPs, 100% = identical).')),
+                sharedPages: @json(__('Shared pages')),
+                noSharedUrls: @json(__('No shared URLs in top')),
+                topCountHint: @json(__('top')),
+                moreSharedUrls: @json(__('more')),
+                overlapPerRegion: @json(__('Share of shared URLs in each region’s top')),
+                footnote: @json(__('Overlap % is the average of (shared ÷ top in city A) and (shared ÷ top in city B). Example: 7 common of 15+15 → ~47%, not 7÷23. Aggregators/marketplaces excluded.')),
+                excludedTitle: @json(__('Domains excluded from geo calculation')),
+                excludedSourcesBoth: @json(__('From module “Aggregator list” settings and the default marketplace list')),
+                excludedSourcesSettings: @json(__('From module “Aggregator list” settings')),
+                excludedSourcesDefaults: @json(__('Default marketplace and aggregator list')),
             };
 
             window.competitorRecStrings = {
@@ -531,6 +578,13 @@
                 google: @json($defaultGoogleRegion ?? null),
             };
             let competitorResultBundle = null;
+
+            /** Общий bundle для inline-скрипта и render-top-sites-table.js (вкладки регионов, сравнение городов в SERP). */
+            function setCompetitorResultBundle(data) {
+                competitorResultBundle = data;
+                window.competitorResultBundle = data;
+            }
+
             let activeCompetitorRegionKey = null;
             let competitorProgressTimer = null;
             let competitorLastProgressPercent = 0;
@@ -539,6 +593,8 @@
             let competitorClientDebugLines = [];
             let competitorRunFinished = false;
             let competitorPollGeneration = 0;
+            window.competitorActiveRegionKey = null;
+            window.competitorSerpCompareRegionKey = '';
 
             function selectedEngines() {
                 const engines = [];
@@ -682,15 +738,24 @@
 
             function buildRegionTabs(regions) {
                 const $tabs = $('#cabinet-ca-region-results-tabs');
+                let list = (typeof getCompetitorRegionsList === 'function')
+                    ? getCompetitorRegionsList()
+                    : [];
+                if (!list || list.length < 2) {
+                    list = regions || [];
+                }
                 $tabs.empty();
-                if (!regions || regions.length < 2) {
+                if (!list || list.length < 2) {
                     $tabs.hide();
+                    if (typeof syncSerpCompareRegionBar === 'function') {
+                        syncSerpCompareRegionBar(window.competitorActiveRegionKey || '');
+                    }
                     return;
                 }
-                regions.forEach(function (region, index) {
+                list.forEach(function (region, index) {
                     const active = index === 0 ? ' active' : '';
                     const regionKey = resolveRegionKey(region);
-                    const label = region.tabLabel || region.name || region.text || region.id;
+                    const label = region.tabLabel || region.name || region.text || region.id || regionKey;
                     $tabs.append(
                         '<button type="button" class="nav-link' + active + '" data-region-id="' + regionKey + '">' +
                         label + '</button>'
@@ -724,14 +789,23 @@
                     return;
                 }
                 activeCompetitorRegionKey = regionKey;
+                window.competitorActiveRegionKey = regionKey;
                 const payload = getRegionPayload(competitorResultBundle, regionKey);
 
+                if (window.competitorSerpCompareRegionKey === regionKey) {
+                    window.competitorSerpCompareRegionKey = '';
+                }
                 clearCompetitorResults();
                 $('#cabinet-ca-region-results-tabs .nav-link').removeClass('active');
                 $('#cabinet-ca-region-results-tabs .nav-link[data-region-id="' + regionKey + '"]').addClass('active');
 
+                if (typeof syncSerpCompareRegionBar === 'function') {
+                    syncSerpCompareRegionBar(regionKey);
+                }
+
+                const serpOptions = buildSerpRenderOptions(regionKey);
                 await renderTopSites(payload.analysedSites, localization, count);
-                await renderTopSitesV2(payload.analysedSites, localization);
+                await renderTopSitesV2(payload.analysedSites, localization, serpOptions);
                 await renderNestingTable(payload.pagesCounter);
                 await renderSitePositionsTable(payload.domainsPosition, {{ $config->positions_length }});
                 await renderTagsTable(payload.totalMetaTags);
@@ -741,6 +815,25 @@
                 if (typeof renderGeoDependencyVerdict === 'function' && competitorResultBundle) {
                     renderGeoDependencyVerdict(competitorResultBundle.geoDependency || null);
                 }
+            }
+
+            function buildSerpRenderOptions(activeRegionKey) {
+                const options = {
+                    primaryLabel: typeof getCompetitorRegionLabel === 'function'
+                        ? getCompetitorRegionLabel(activeRegionKey)
+                        : activeRegionKey,
+                };
+                const compareKey = window.competitorSerpCompareRegionKey || '';
+                if (!compareKey || compareKey === activeRegionKey || !competitorResultBundle) {
+                    return options;
+                }
+                const comparePayload = getRegionPayload(competitorResultBundle, compareKey);
+                options.compareSites = comparePayload.analysedSites || {};
+                options.compareLabel = typeof getCompetitorRegionLabel === 'function'
+                    ? getCompetitorRegionLabel(compareKey)
+                    : compareKey;
+
+                return options;
             }
 
             $(document).on('click', '#cabinet-ca-region-results-tabs .nav-link', function () {
@@ -758,7 +851,7 @@
                     return String(result.analysisCount);
                 }
 
-                return String(fallback || $('.form-select.count').val() || '10');
+                return String(fallback || $('.form-select.count').val() || '30');
             }
 
             $('#start-analyse').click(() => {
@@ -784,7 +877,7 @@
                 if (phrases.length > 0) {
                     stopCompetitorProgressPolling();
                     competitorPollGeneration++;
-                    competitorResultBundle = null;
+                    setCompetitorResultBundle(null);
                     competitorLastProgressPercent = 0;
                     competitorDebugLine('info', 'analyse.click', {
                         phrases: phrases.length,
@@ -1004,7 +1097,7 @@
                             }
                             window.competitorLocalization = localization;
 
-                            competitorResultBundle = response.result;
+                            setCompetitorResultBundle(response.result);
                             const resultCount = resolveAnalysisCount(response.result, count);
                             const regionList = response.result.regions || [];
                             const firstRegionKey = regionList.length
@@ -1016,8 +1109,14 @@
                             $('#render-bar').show(300);
 
                             buildRegionTabs(regionList);
-                            if (firstRegionKey) {
-                                await renderCompetitorRegion(firstRegionKey, resultCount, localization)
+                            const regionKeysForUi = (typeof getCompetitorRegionsList === 'function')
+                                ? getCompetitorRegionsList()
+                                : regionList;
+                            const uiFirstKey = regionKeysForUi.length
+                                ? resolveRegionKey(regionKeysForUi[0])
+                                : firstRegionKey;
+                            if (uiFirstKey) {
+                                await renderCompetitorRegion(uiFirstKey, resultCount, localization)
                             } else if (typeof renderGeoDependencyVerdict === 'function') {
                                 renderGeoDependencyVerdict(response.result.geoDependency || null);
                             }

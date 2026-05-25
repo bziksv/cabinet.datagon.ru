@@ -49,7 +49,7 @@ function buildCompetitorRecommendations(options) {
             analysedSites: JSON.stringify(payload.analysedSites || {}),
             totalMetaTags: JSON.stringify(payload.totalMetaTags || {}),
             selectedTags: JSON.stringify(getSelectedRecommendationTags()),
-            count: window.competitorRecommendationsCount || $('.form-select.count').val() || '10',
+            count: window.competitorRecommendationsCount || $('.form-select.count').val() || '30',
         },
         success: function (response) {
             renderRecommendationClusters(response.result || {}, opts);

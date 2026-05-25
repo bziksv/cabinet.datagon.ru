@@ -49,6 +49,54 @@ class CompetitorSerpDomainFilter
         static::$excludedCache = null;
     }
 
+    /**
+     * @return array{all: array<int, string>, from_settings: array<int, string>, from_defaults: array<int, string>}
+     */
+    public static function excludedDomainsBreakdown(): array
+    {
+        $defaults = config('cabinet-competitor-analysis.geo_exclude_domains_default', []);
+        if (! is_array($defaults)) {
+            $defaults = [];
+        }
+
+        $fromSettings = [];
+        $config = CompetitorConfig::first();
+        if ($config !== null && is_string($config->agrigators) && $config->agrigators !== '') {
+            $fromSettings = static::parseDomainLines($config->agrigators);
+        }
+
+        $defaultMap = [];
+        foreach ($defaults as $domain) {
+            $host = static::normalizeHost((string) $domain);
+            if ($host !== '') {
+                $defaultMap[$host] = $host;
+            }
+        }
+
+        $settingsMap = [];
+        foreach ($fromSettings as $domain) {
+            $host = static::normalizeHost((string) $domain);
+            if ($host !== '') {
+                $settingsMap[$host] = $host;
+            }
+        }
+
+        $allMap = $defaultMap + $settingsMap;
+
+        $sort = static function (array $map): array {
+            $list = array_values($map);
+            sort($list, SORT_STRING);
+
+            return $list;
+        };
+
+        return [
+            'all' => $sort($allMap),
+            'from_settings' => $sort($settingsMap),
+            'from_defaults' => $sort($defaultMap),
+        ];
+    }
+
     public static function isExcludedUrl(string $url): bool
     {
         $normalized = static::normalizeSerpUrl($url);

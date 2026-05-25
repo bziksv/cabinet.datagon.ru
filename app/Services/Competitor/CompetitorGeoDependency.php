@@ -7,6 +7,7 @@ use App\Support\CompetitorSerpDomainFilter;
 
 /**
  * Сравнение выдачи между регионами: геозависимость запросов.
+ * При нескольких ПС — отдельный расчёт и вывод по Яндексу и Google, без смешивания пар.
  */
 class CompetitorGeoDependency
 {
@@ -16,7 +17,45 @@ class CompetitorGeoDependency
      */
     public function analyze(array $byRegion, array $regionsMeta): ?array
     {
-        $regionMap = $this->resolveRegionMap($regionsMeta, $byRegion);
+        $groups = $this->groupRegionsByEngine($regionsMeta, $byRegion);
+        $enginePayloads = [];
+
+        foreach ($this->engineOrder($groups) as $engine) {
+            if (! isset($groups[$engine]) || count($groups[$engine]['regionMap']) < 2) {
+                continue;
+            }
+
+            $payload = $this->analyzeRegionGroup($byRegion, $groups[$engine]['regionMap']);
+            if ($payload === null) {
+                continue;
+            }
+
+            $enginePayloads[] = array_merge($payload, [
+                'engine' => $engine,
+                'engine_label' => CompetitorSearchRegions::engineLabel($engine),
+            ]);
+        }
+
+        if (count($enginePayloads) === 0) {
+            return null;
+        }
+
+        if (count($enginePayloads) === 1) {
+            return $enginePayloads[0];
+        }
+
+        return [
+            'mode' => 'by_engine',
+            'engines' => $enginePayloads,
+        ];
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $byRegion
+     * @param array<string, string> $regionMap
+     */
+    protected function analyzeRegionGroup(array $byRegion, array $regionMap): ?array
+    {
         if (count($regionMap) < 2) {
             return null;
         }
@@ -26,11 +65,13 @@ class CompetitorGeoDependency
             return null;
         }
 
-        $independentMin = (float) config('cabinet-competitor-analysis.geo_independent_min_jaccard', 0.65);
-        $dependentMax = (float) config('cabinet-competitor-analysis.geo_dependent_max_jaccard', 0.4);
+        $independentMin = (float) config('cabinet-competitor-analysis.geo_independent_min_overlap', 0.4);
+        $dependentMax = (float) config('cabinet-competitor-analysis.geo_dependent_max_overlap', 0.35);
+        $regionPairs = $this->buildRegionPairs($regionMap);
+        $maxSharedUrls = (int) config('cabinet-competitor-analysis.geo_max_shared_urls_per_pair', 12);
 
         $phraseRows = [];
-        $jaccardForAvg = [];
+        $overlapForAvg = [];
         $counts = [
             'geo_independent' => 0,
             'geo_dependent' => 0,
@@ -48,14 +89,16 @@ class CompetitorGeoDependency
                 );
             }
 
-            $jaccard = $this->avgPairwiseJaccard($urlSetsByRegion);
-            if ($jaccard === null) {
+            $pairDetails = $this->pairwiseDetailsForPhrase($urlSetsByRegion, $regionPairs, $maxSharedUrls);
+            $overlap = $this->avgFromPairDetails($pairDetails);
+            if ($overlap === null) {
                 $counts['skipped']++;
                 $phraseRows[] = [
                     'phrase' => $phrase,
                     'status' => 'skipped',
-                    'jaccard' => null,
-                    'jaccard_pct' => null,
+                    'overlap' => null,
+                    'overlap_pct' => null,
+                    'pairs' => $pairDetails,
                     'urls_by_region' => array_map(static function (array $urls) {
                         return count($urls);
                     }, $urlSetsByRegion),
@@ -64,15 +107,16 @@ class CompetitorGeoDependency
                 continue;
             }
 
-            $status = $this->classifyPhrase($jaccard, $independentMin, $dependentMax);
+            $status = $this->classifyPhrase($overlap, $independentMin, $dependentMax);
             $counts[$status]++;
-            $jaccardForAvg[] = $jaccard;
+            $overlapForAvg[] = $overlap;
 
             $phraseRows[] = [
                 'phrase' => $phrase,
                 'status' => $status,
-                'jaccard' => round($jaccard, 3),
-                'jaccard_pct' => (int) round($jaccard * 100),
+                'overlap' => round($overlap, 3),
+                'overlap_pct' => (int) round($overlap * 100),
+                'pairs' => $pairDetails,
                 'urls_by_region' => array_map(static function (array $urls) {
                     return count($urls);
                 }, $urlSetsByRegion),
@@ -80,35 +124,104 @@ class CompetitorGeoDependency
         }
 
         usort($phraseRows, function ($a, $b) {
-            $aj = $a['jaccard'] ?? -1;
-            $bj = $b['jaccard'] ?? -1;
+            $aj = $a['overlap'] ?? -1;
+            $bj = $b['overlap'] ?? -1;
 
             return $aj <=> $bj;
         });
 
-        $scoredPhraseCount = count($jaccardForAvg);
+        $scoredPhraseCount = count($overlapForAvg);
         $verdict = $this->overallVerdict($counts, $scoredPhraseCount);
-        $avgJaccard = $scoredPhraseCount > 0
-            ? array_sum($jaccardForAvg) / $scoredPhraseCount
+        $avgOverlap = $scoredPhraseCount > 0
+            ? array_sum($overlapForAvg) / $scoredPhraseCount
             : 0.0;
+
+        $excluded = CompetitorSerpDomainFilter::excludedDomainsBreakdown();
 
         return [
             'verdict' => $verdict,
-            'avg_jaccard' => round($avgJaccard, 3),
-            'avg_jaccard_pct' => (int) round($avgJaccard * 100),
+            'overlap_metric' => 'mean',
+            'avg_overlap' => round($avgOverlap, 3),
+            'avg_overlap_pct' => (int) round($avgOverlap * 100),
             'excludes_aggregators' => true,
+            'excluded_domains' => $excluded['all'],
+            'excluded_domains_from_settings' => $excluded['from_settings'],
+            'excluded_domains_defaults' => $excluded['from_defaults'],
             'region_count' => count($regionMap),
             'phrase_count' => count($phraseRows),
             'counts' => $counts,
             'regions' => array_values(array_map(static function ($key, $label) {
                 return ['key' => $key, 'label' => $label];
             }, array_keys($regionMap), $regionMap)),
+            'region_pairs' => $regionPairs,
             'phrases' => $phraseRows,
             'thresholds' => [
                 'independent_min' => $independentMin,
                 'dependent_max' => $dependentMax,
             ],
         ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $regionsMeta
+     * @param array<string, array<string, mixed>> $byRegion
+     * @return array<string, array{regionMap: array<string, string>}>
+     */
+    protected function groupRegionsByEngine(array $regionsMeta, array $byRegion): array
+    {
+        $groups = [];
+
+        foreach ($regionsMeta as $region) {
+            $engine = CompetitorSearchRegions::normalizeEngine($region['engine'] ?? 'yandex');
+            $id = (string) ($region['id'] ?? '');
+            if ($id === '') {
+                continue;
+            }
+            $key = (string) ($region['key'] ?? CompetitorSearchRegions::regionKey($engine, $id));
+            if (! isset($byRegion[$key])) {
+                continue;
+            }
+            if (! isset($groups[$engine])) {
+                $groups[$engine] = ['regionMap' => []];
+            }
+            $label = (string) ($region['tabLabel'] ?? $region['name'] ?? $region['text'] ?? $id);
+            $groups[$engine]['regionMap'][$key] = $label;
+        }
+
+        if (count($groups) === 0) {
+            foreach (array_keys($byRegion) as $key) {
+                $parts = explode('|', $key, 2);
+                $engine = CompetitorSearchRegions::normalizeEngine($parts[0] ?? 'yandex');
+                if (! isset($groups[$engine])) {
+                    $groups[$engine] = ['regionMap' => []];
+                }
+                $groups[$engine]['regionMap'][$key] = $key;
+            }
+        }
+
+        return $groups;
+    }
+
+    /**
+     * @param array<string, array{regionMap: array<string, string>}> $groups
+     * @return array<int, string>
+     */
+    protected function engineOrder(array $groups): array
+    {
+        $preferred = ['yandex', 'google'];
+        $order = [];
+        foreach ($preferred as $engine) {
+            if (isset($groups[$engine])) {
+                $order[] = $engine;
+            }
+        }
+        foreach (array_keys($groups) as $engine) {
+            if (! in_array($engine, $order, true)) {
+                $order[] = $engine;
+            }
+        }
+
+        return $order;
     }
 
     /**
@@ -195,32 +308,81 @@ class CompetitorGeoDependency
     }
 
     /**
-     * @param array<string, array<int, string>> $urlSetsByRegion
+     * @param array<string, string> $regionMap
+     * @return array<int, array{region_a: string, region_b: string, label: string, label_a: string, label_b: string}>
      */
-    protected function avgPairwiseJaccard(array $urlSetsByRegion): ?float
+    protected function buildRegionPairs(array $regionMap): array
     {
-        $keys = array_keys($urlSetsByRegion);
+        $keys = array_keys($regionMap);
+        $pairs = [];
         $n = count($keys);
-        if ($n < 2) {
-            return 1.0;
-        }
-
-        $scores = [];
         for ($i = 0; $i < $n; $i++) {
             for ($j = $i + 1; $j < $n; $j++) {
-                $a = $urlSetsByRegion[$keys[$i]] ?? [];
-                $b = $urlSetsByRegion[$keys[$j]] ?? [];
-                if (count($a) === 0 && count($b) === 0) {
-                    continue;
-                }
-                if (count($a) === 0 || count($b) === 0) {
-                    $scores[] = 0.0;
-
-                    continue;
-                }
-                $shared = count(array_intersect($a, $b));
-                $scores[] = $shared / max(1, count(array_unique(array_merge($a, $b))));
+                $keyA = $keys[$i];
+                $keyB = $keys[$j];
+                $labelA = $regionMap[$keyA];
+                $labelB = $regionMap[$keyB];
+                $pairs[] = [
+                    'region_a' => $keyA,
+                    'region_b' => $keyB,
+                    'label_a' => $labelA,
+                    'label_b' => $labelB,
+                    'label' => $this->pairColumnLabel($labelA, $labelB),
+                ];
             }
+        }
+
+        return $pairs;
+    }
+
+    protected function pairColumnLabel(string $labelA, string $labelB): string
+    {
+        $cityA = $this->cityNameFromTabLabel($labelA);
+        $cityB = $this->cityNameFromTabLabel($labelB);
+
+        return $cityA . ' ↔ ' . $cityB;
+    }
+
+    /** «Яндекс · Москва» → «Москва» */
+    protected function cityNameFromTabLabel(string $tabLabel): string
+    {
+        $parts = preg_split('/\s*·\s*/u', trim($tabLabel), 2);
+
+        return trim($parts[1] ?? $tabLabel);
+    }
+
+    /**
+     * @param array<string, array<int, string>> $urlSetsByRegion
+     * @param array<int, array{region_a: string, region_b: string}> $regionPairs
+     * @return array<int, array<string, mixed>>
+     */
+    protected function pairwiseDetailsForPhrase(array $urlSetsByRegion, array $regionPairs, int $maxSharedUrls): array
+    {
+        $out = [];
+        foreach ($regionPairs as $pair) {
+            $keyA = $pair['region_a'];
+            $keyB = $pair['region_b'];
+            $setA = $urlSetsByRegion[$keyA] ?? [];
+            $setB = $urlSetsByRegion[$keyB] ?? [];
+            $detail = $this->pairwiseOverlapDetail($setA, $setB, $maxSharedUrls);
+
+            $out[] = array_merge($pair, $detail);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $pairDetails
+     */
+    protected function avgFromPairDetails(array $pairDetails): ?float
+    {
+        $scores = [];
+        foreach ($pairDetails as $detail) {
+            if (! isset($detail['overlap']) || $detail['overlap'] === null) {
+                continue;
+            }
+            $scores[] = (float) $detail['overlap'];
         }
 
         if (count($scores) === 0) {
@@ -230,12 +392,68 @@ class CompetitorGeoDependency
         return array_sum($scores) / count($scores);
     }
 
-    protected function classifyPhrase(float $jaccard, float $independentMin, float $dependentMax): string
+    /**
+     * Средняя доля общих URL в топе каждого региона: (|∩|/|A| + |∩|/|B|) / 2.
+     *
+     * @param array<int, string> $setA
+     * @param array<int, string> $setB
+     * @return array<string, mixed>
+     */
+    protected function pairwiseOverlapDetail(array $setA, array $setB, int $maxSharedUrls): array
     {
-        if ($jaccard >= $independentMin) {
+        $countA = count($setA);
+        $countB = count($setB);
+
+        if ($countA === 0 && $countB === 0) {
+            return [
+                'overlap' => null,
+                'overlap_pct' => null,
+                'overlap_pct_a' => null,
+                'overlap_pct_b' => null,
+                'shared_count' => 0,
+                'shared_urls' => [],
+                'count_a' => 0,
+                'count_b' => 0,
+            ];
+        }
+
+        if ($countA === 0 || $countB === 0) {
+            return [
+                'overlap' => 0.0,
+                'overlap_pct' => 0,
+                'overlap_pct_a' => 0,
+                'overlap_pct_b' => 0,
+                'shared_count' => 0,
+                'shared_urls' => [],
+                'count_a' => $countA,
+                'count_b' => $countB,
+            ];
+        }
+
+        $shared = array_values(array_intersect($setA, $setB));
+        $sharedCount = count($shared);
+        $pctA = (int) round(100 * $sharedCount / max(1, $countA));
+        $pctB = (int) round(100 * $sharedCount / max(1, $countB));
+        $overlap = ($sharedCount / $countA + $sharedCount / $countB) / 2;
+
+        return [
+            'overlap' => round($overlap, 3),
+            'overlap_pct' => (int) round($overlap * 100),
+            'overlap_pct_a' => $pctA,
+            'overlap_pct_b' => $pctB,
+            'shared_count' => $sharedCount,
+            'shared_urls' => array_slice($shared, 0, max(1, $maxSharedUrls)),
+            'count_a' => $countA,
+            'count_b' => $countB,
+        ];
+    }
+
+    protected function classifyPhrase(float $overlap, float $independentMin, float $dependentMax): string
+    {
+        if ($overlap >= $independentMin) {
             return 'geo_independent';
         }
-        if ($jaccard <= $dependentMax) {
+        if ($overlap <= $dependentMax) {
             return 'geo_dependent';
         }
 

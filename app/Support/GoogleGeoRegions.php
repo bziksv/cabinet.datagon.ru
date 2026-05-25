@@ -2,6 +2,9 @@
 
 namespace App\Support;
 
+/**
+ * Справочник Google geo (xmlstock geotargets). В JSON только города РФ (Target Type = City).
+ */
 class GoogleGeoRegions
 {
     /** @var array<int, array{id: string, name: string}>|null */

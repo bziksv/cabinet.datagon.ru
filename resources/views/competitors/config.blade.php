@@ -72,6 +72,16 @@
                                        value="{{ $config->count_repeat_top_20 }}">
                             </div>
 
+                            <div class="col-md-6">
+                                <label class="form-label" for="count_top_30">Среднее количество повторений для вхождения слова в рекомендации <strong>Топ 30</strong> (рекомендуемый глубина выдачи)</label>
+                                <input type="number"
+                                       name="count_repeat_top_30"
+                                       id="count_top_30"
+                                       class="form-control"
+                                       min="0"
+                                       value="{{ $config->count_repeat_top_30 ?? 15 }}">
+                            </div>
+
                             <div class="col-12 d-flex justify-content-end">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-save me-1" aria-hidden="true"></i>{{ __('Update') }}

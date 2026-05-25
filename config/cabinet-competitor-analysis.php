@@ -5,7 +5,7 @@ return [
      * Видимая версия модуля «Анализ конкурентов» (badge в nav).
      * Журнал: datagon.ru/docs/cabinet-competitor-analysis-changelog.md
      */
-    'version' => '2.7.7',
+    'version' => '2.9.0',
 
     /** Расширенный лог прогресса для admin / Super Admin */
     'debug_log' => env('COMPETITOR_ANALYSIS_DEBUG_LOG', true),
@@ -38,16 +38,26 @@ return [
     'progress_update_every_urls' => (int) env('COMPETITOR_ANALYSIS_PROGRESS_EVERY', 2),
 
     /**
-     * Геозависимость: сравнение топ-URL между регионами (Jaccard).
-     * ≥ independent_min — выдача совпадает (геонезависимый запрос); ≤ dependent_max — сильно различается.
+     * Геозависимость: сравнение топ-URL между регионами.
+     * Метрика overlap = среднее (общие/топ_A, общие/топ_B) — ближе к «7 из 15», чем Jaccard по объединению.
+     * ≥ independent_min — геонезависимый; ≤ dependent_max — геозависимый.
      */
-    'geo_independent_min_jaccard' => (float) env('COMPETITOR_GEO_INDEPENDENT_MIN_JACCARD', 0.65),
-    'geo_dependent_max_jaccard' => (float) env('COMPETITOR_GEO_DEPENDENT_MAX_JACCARD', 0.4),
+    'geo_independent_min_overlap' => (float) env(
+        'COMPETITOR_GEO_INDEPENDENT_MIN_OVERLAP',
+        env('COMPETITOR_GEO_INDEPENDENT_MIN_JACCARD', 0.4)
+    ),
+    'geo_dependent_max_overlap' => (float) env(
+        'COMPETITOR_GEO_DEPENDENT_MAX_OVERLAP',
+        env('COMPETITOR_GEO_DEPENDENT_MAX_JACCARD', 0.35)
+    ),
 
     /**
      * Домены, не учитываемые в геозависимости (маркетплейсы/агрегаторы).
      * Дополняется списком «агрегаторы» из настроек модуля (competitor_configs.agrigators).
      */
+    /** Сколько общих URL показывать в ячейке пары регионов */
+    'geo_max_shared_urls_per_pair' => (int) env('COMPETITOR_GEO_MAX_SHARED_URLS', 12),
+
     'geo_exclude_domains_default' => [
         'ozon.ru',
         'wildberries.ru',
@@ -96,4 +106,18 @@ return [
 
     /** Сколько регионов (городов) можно выбрать за один запуск */
     'max_regions' => 5,
+
+    /**
+     * Демо на datagon.ru/analiz-konkurentov/ — POST /api/demo/analiz-konkurentov/run
+     * Только SERP (ТОП-10, Яндекс, 1 фраза), без разбора страниц.
+     */
+    'demo' => [
+        'module_slug' => 'analiz-konkurentov',
+        'max_phrase_length' => 120,
+        'min_phrase_length' => 2,
+        'max_runs_per_day' => 3,
+        'top_count' => 10,
+        'serp_rows' => 10,
+        'allowed_region_ids' => ['213', '2', '193', '65', '54'],
+    ],
 ];

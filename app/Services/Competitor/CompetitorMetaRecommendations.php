@@ -223,11 +223,11 @@ class CompetitorMetaRecommendations
         $groupSize = max(1, count($phraseGroup));
         $competitorPages = $this->countCompetitorPages($phraseGroup, $analysedSites);
         $requestedTop = (int) $topCount;
-        if ($requestedTop !== 10 && $requestedTop !== 20) {
-            $requestedTop = 10;
+        if (! in_array($requestedTop, [10, 20, 30], true)) {
+            $requestedTop = 30;
         }
         $effectiveTop = min($requestedTop, max(1, $competitorPages));
-        $minimumRepeat = $this->minimumRepeatThreshold((string) $effectiveTop);
+        $minimumRepeat = $this->minimumRepeatThreshold((string) $requestedTop);
         $share = (float) config('cabinet-competitor-analysis.recommendation_min_competitor_share', 0.3);
         if ($groupSize === 1) {
             $share = min($share, 0.2);
@@ -382,6 +382,10 @@ class CompetitorMetaRecommendations
         $config = CompetitorConfig::first();
         if ($config === null) {
             return 3;
+        }
+
+        if ((string) $topCount === '30') {
+            return (int) ($config->count_repeat_top_30 ?? $config->count_repeat_top_20 ?? 15);
         }
 
         if ((string) $topCount === '20') {

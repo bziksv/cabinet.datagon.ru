@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / 'config' / 'google_geo_regions.json'
 CSV_URL = 'https://xmlstock.com/geotargets-google.csv'
 SKIP_TYPES = {'Country', 'Airport'}
+# В анализе конкурентов — только города (без Region/Province и т.п., иначе дубли вроде Москва 1011969 vs 20950).
+ALLOWED_TYPES = {'City'}
 
 
 def load_ru_en() -> dict:
@@ -32,7 +34,10 @@ def load_csv(path: Path) -> None:
                 continue
             if row.get('Status') != 'Active':
                 continue
-            if row.get('Target Type') in SKIP_TYPES:
+            target_type = row.get('Target Type', '').strip()
+            if target_type in SKIP_TYPES:
+                continue
+            if target_type not in ALLOWED_TYPES:
                 continue
 
             rid = row['Criteria ID'].strip().strip('"')

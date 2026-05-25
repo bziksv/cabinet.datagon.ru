@@ -77,7 +77,7 @@ class SearchCompetitorsController extends Controller
             'regions' => ['sometimes', 'array', 'max:' . $maxRegions],
             'regions.*' => ['string', 'max:12', 'regex:/^\d+$/'],
             'region' => ['sometimes', 'string', 'max:12', 'regex:/^\d+$/'],
-            'count' => ['required', 'in:10,20'],
+            'count' => ['required', 'in:10,20,30'],
             'phrases' => ['required', 'string'],
         ]);
 
@@ -472,7 +472,7 @@ class SearchCompetitorsController extends Controller
         $result = $service->build(
             is_array($analysedSites) ? $analysedSites : [],
             $totalMetaTags,
-            $request->input('count', '10'),
+            $request->input('count', '30'),
             $tags
         );
 

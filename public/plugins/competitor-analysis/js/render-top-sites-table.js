@@ -17,17 +17,33 @@ function maxAnalysedSitesPerPhrase(analysedSites) {
     return max;
 }
 
-/** Колонки 11–20 — только если в данных есть позиции > 10 и запрошен топ-20. */
+function requestedTopCount(raw) {
+    const n = parseInt(String(raw || '30'), 10);
+    if (n === 20) {
+        return 20;
+    }
+    if (n === 30) {
+        return 30;
+    }
+
+    return 10;
+}
+
+/** Колонки 11–30 — по запрошенному топу и фактическому числу URL в выдаче. */
 function syncMetaTableColumns(requestedCount, analysedSites) {
-    const want = parseInt(String(requestedCount || '10'), 10) === 20 ? 20 : 10;
+    const want = requestedTopCount(requestedCount);
     const have = maxAnalysedSitesPerPhrase(analysedSites);
     const showPositions = Math.min(want, have > 0 ? have : want);
 
     if (showPositions <= 10) {
         $('.extra-th').hide();
-    } else {
-        $('.extra-th').show();
+        return;
     }
+
+    $('.extra-th').each(function () {
+        const place = parseInt($(this).attr('data-place'), 10);
+        $(this).toggle(!isNaN(place) && place > 10 && place <= showPositions);
+    });
 }
 
 /** Кнопка «глаз» + выпадающий список фраз (Bootstrap dropdown) */
@@ -217,7 +233,7 @@ function renderTopSites(analysedSites, messages, requestedCount) {
     })
 
     syncMetaTableColumns(
-        requestedCount || $('.form-select.count').val() || '10',
+        requestedCount || $('.form-select.count').val() || '30',
         analysedSites
     );
 
@@ -234,6 +250,195 @@ function serpRowsByHost(host) {
     return $('.cabinet-ca-serp-row').filter(function () {
         return $(this).attr('data-order') === host;
     });
+}
+
+function resolveCompetitorRegionKey(region) {
+    if (!region) {
+        return '';
+    }
+    if (region.key) {
+        return String(region.key);
+    }
+    if (region.engine && region.id) {
+        return String(region.engine) + '|' + String(region.id);
+    }
+
+    return String(region.id || '');
+}
+
+function getCompetitorRegionLabel(regionKey) {
+    const bundle = window.competitorResultBundle;
+    if (!bundle) {
+        return regionKey;
+    }
+    let label = regionKey;
+    if (Array.isArray(bundle.regions)) {
+        $.each(bundle.regions, function (_, region) {
+            if (resolveCompetitorRegionKey(region) === regionKey) {
+                label = region.tabLabel || region.name || region.text || region.id || regionKey;
+                return false;
+            }
+        });
+    }
+    if (label === regionKey && bundle.byRegion && bundle.byRegion[regionKey]) {
+        const meta = bundle.byRegion[regionKey];
+        if (meta && meta.tabLabel) {
+            label = meta.tabLabel;
+        }
+    }
+
+    return label;
+}
+
+function getCompetitorRegionPayload(result, regionKey) {
+    if (result && result.byRegion && result.byRegion[regionKey]) {
+        return result.byRegion[regionKey];
+    }
+
+    return result || {};
+}
+
+function getCompetitorRegionsList() {
+    const bundle = window.competitorResultBundle;
+    if (!bundle) {
+        return [];
+    }
+
+    const fromByRegion = [];
+    if (bundle.byRegion && typeof bundle.byRegion === 'object') {
+        Object.keys(bundle.byRegion).forEach(function (key) {
+            if (!key) {
+                return;
+            }
+            fromByRegion.push({
+                key: key,
+                tabLabel: getCompetitorRegionLabel(key),
+            });
+        });
+    }
+
+    if (fromByRegion.length >= 2) {
+        return fromByRegion;
+    }
+
+    if (Array.isArray(bundle.regions) && bundle.regions.length > 0) {
+        return bundle.regions;
+    }
+
+    return fromByRegion;
+}
+
+function setSerpCompareRegion(compareKey) {
+    window.competitorSerpCompareRegionKey = compareKey || '';
+    if (typeof syncSerpCompareRegionBar === 'function') {
+        syncSerpCompareRegionBar(window.competitorActiveRegionKey);
+    }
+    if (typeof rerenderSerpGrid === 'function') {
+        rerenderSerpGrid();
+    }
+}
+
+function syncSerpCompareRegionBar(activeRegionKey) {
+    const $bar = $('#cabinet-ca-serp-compare-bar');
+    const $activeLabel = $('#cabinet-ca-serp-active-label');
+    const $buttons = $('#cabinet-ca-serp-compare-buttons');
+    const $clear = $('#cabinet-ca-serp-compare-clear');
+    const $plus = $('.cabinet-ca-serp-compare-plus');
+    const regions = getCompetitorRegionsList();
+    const compareKey = window.competitorSerpCompareRegionKey || '';
+    const strings = window.competitorSerpCompareStrings || {};
+
+    if (!$bar.length) {
+        return;
+    }
+
+    if (regions.length < 2) {
+        $bar.hide();
+        window.competitorSerpCompareRegionKey = '';
+        return;
+    }
+
+    const activeKey = activeRegionKey || window.competitorActiveRegionKey || resolveCompetitorRegionKey(regions[0]);
+    const activeLabel = getCompetitorRegionLabel(activeKey);
+    $activeLabel.text(activeLabel);
+
+    $buttons.empty();
+    let hasCompareTarget = false;
+    $.each(regions, function (_, region) {
+        const key = resolveCompetitorRegionKey(region);
+        if (!key || key === activeKey) {
+            return;
+        }
+        hasCompareTarget = true;
+        const label = region.tabLabel || region.name || region.text || key;
+        const isActive = compareKey === key;
+        const tpl = strings.showCity || 'Показать :city';
+        const btnText = tpl.replace(':city', label);
+        $buttons.append(
+            '<button type="button" class="btn btn-sm cabinet-ca-serp-compare-btn' +
+            (isActive ? ' btn-primary' : ' btn-outline-primary') + '" data-region-key="' +
+            escapeHtml(key) + '">' + escapeHtml(btnText) + '</button>'
+        );
+    });
+
+    if (!hasCompareTarget) {
+        $bar.hide();
+        return;
+    }
+
+    if (compareKey && compareKey !== activeKey) {
+        $clear.show();
+        $plus.show();
+    } else {
+        $clear.hide();
+        $plus.show();
+    }
+
+    $bar.show();
+
+    $buttons.off('click.serpCompare').on('click.serpCompare', '.cabinet-ca-serp-compare-btn', function () {
+        const key = $(this).attr('data-region-key') || '';
+        if (!key) {
+            return;
+        }
+        if (window.competitorSerpCompareRegionKey === key) {
+            setSerpCompareRegion('');
+        } else {
+            setSerpCompareRegion(key);
+        }
+    });
+
+    $clear.off('click.serpCompareClear').on('click.serpCompareClear', function () {
+        setSerpCompareRegion('');
+    });
+}
+
+$(document).off('click.cabinetCaSerpCompareClear', '#cabinet-ca-serp-compare-clear')
+    .on('click.cabinetCaSerpCompareClear', '#cabinet-ca-serp-compare-clear', function () {
+        setSerpCompareRegion('');
+    });
+
+function rerenderSerpGrid() {
+    const activeKey = window.competitorActiveRegionKey;
+    const bundle = window.competitorResultBundle;
+    if (!activeKey || !bundle) {
+        return;
+    }
+
+    const payload = getCompetitorRegionPayload(bundle, activeKey);
+    const messages = window.competitorLocalization || {};
+    const options = {
+        primaryLabel: getCompetitorRegionLabel(activeKey),
+    };
+    const compareKey = window.competitorSerpCompareRegionKey || '';
+    if (compareKey && compareKey !== activeKey) {
+        const comparePayload = getCompetitorRegionPayload(bundle, compareKey);
+        options.compareSites = comparePayload.analysedSites || {};
+        options.compareLabel = getCompetitorRegionLabel(compareKey);
+    }
+
+    resetSerpResultsDom();
+    renderTopSitesV2(payload.analysedSites || {}, messages, options);
 }
 
 /**
@@ -266,6 +471,98 @@ function collectSerpDuplicateHighlights(analysedSites) {
     });
 
     return {duplicateUrls: duplicateUrls, duplicateHosts: duplicateHosts};
+}
+
+/**
+ * Совпадения URL/доменов в одной колонке фразы между основным и сравниваемым регионом.
+ */
+function collectSerpCrossRegionHighlights(primarySites, compareSites) {
+    const urlSet = {};
+    const hostSet = {};
+    const phrases = {};
+
+    $.each(primarySites, function (phrase) {
+        phrases[phrase] = true;
+    });
+    $.each(compareSites, function (phrase) {
+        phrases[phrase] = true;
+    });
+
+    $.each(phrases, function (phrase) {
+        const pSites = primarySites[phrase] || {};
+        const cSites = compareSites[phrase] || {};
+        const cUrlMap = {};
+        const cHostMap = {};
+
+        $.each(cSites, function (link) {
+            cUrlMap[link] = true;
+            const host = formatSerpUrlDisplay(link).host;
+            if (host) {
+                cHostMap[host] = true;
+            }
+        });
+
+        $.each(pSites, function (link) {
+            if (cUrlMap[link]) {
+                urlSet[link] = true;
+            }
+            const host = formatSerpUrlDisplay(link).host;
+            if (host && cHostMap[host]) {
+                hostSet[host] = true;
+            }
+        });
+    });
+
+    return {
+        duplicateUrls: Object.keys(urlSet),
+        duplicateHosts: Object.keys(hostSet),
+        compareMode: true,
+    };
+}
+
+function buildSerpHighlightMeta(analysedSites, renderOptions) {
+    const options = renderOptions || {};
+    if (options.compareSites && Object.keys(options.compareSites).length) {
+        return collectSerpCrossRegionHighlights(analysedSites, options.compareSites);
+    }
+
+    return collectSerpDuplicateHighlights(analysedSites);
+}
+
+function buildSerpRowsHtml(sites, messages) {
+    let html = '';
+    let iterator = 1;
+    $.each(sites || {}, function (link, object) {
+        let url = new URL(link);
+        let display = formatSerpUrlDisplay(link);
+        let btnGroup = getBtnGroup(url, messages);
+        html +=
+            '<div class="cabinet-ca-serp-row await-color" ' +
+            'data-order="' + escapeHtml(display.host) + '" ' +
+            'data-full-url="' + escapeHtml(link) + '" ' +
+            'data-main-page="' + (object['mainPage'] ? 'true' : 'false') + '" ' +
+            'title="' + escapeHtml(link) + '">' +
+            '    <span class="cabinet-ca-serp-rank">' + iterator + '</span>' +
+            '    <div class="cabinet-ca-serp-url">' +
+            '        <span class="cabinet-ca-serp-domain">' + escapeHtml(display.host) + '</span>' +
+            (display.path ? '<span class="cabinet-ca-serp-path">' + escapeHtml(display.path) + '</span>' : '') +
+            '    </div>' +
+            '    <div>' + btnGroup + '</div>' +
+            '</div>';
+        iterator++;
+    });
+
+    return html;
+}
+
+function buildSerpRegionColumnHtml(regionLabel, sites, messages) {
+    return '<div class="cabinet-ca-serp-region-col">' +
+        '<div class="cabinet-ca-serp-region-label">' + escapeHtml(regionLabel) + '</div>' +
+        '<div class="cabinet-ca-phrase-card__cols">' +
+        '   <span>#</span><span>' + escapeHtml(messages.domain) + '</span><span></span>' +
+        '</div>' +
+        buildSerpRowsHtml(sites, messages) +
+        '</div>';
 }
 
 function disposeSerpPhraseTooltips() {
@@ -323,50 +620,67 @@ function resetSerpResultsDom() {
     $('#sites-tables').empty();
 }
 
-function renderTopSitesV2(analysedSites, messages) {
-    $.each(analysedSites, function (phrase, sites) {
-        let newTable = '' +
-            '<div class="cabinet-ca-phrase-card render">' +
+function renderTopSitesV2(analysedSites, messages, renderOptions) {
+    const options = renderOptions || {};
+    const compareSites = options.compareSites;
+    const hasCompare = compareSites && typeof compareSites === 'object' && Object.keys(compareSites).length > 0;
+    const primaryLabel = options.primaryLabel || '';
+    const compareLabel = options.compareLabel || '';
+    const phrases = {};
+
+    $.each(analysedSites, function (phrase) {
+        phrases[phrase] = true;
+    });
+    if (hasCompare) {
+        $.each(compareSites, function (phrase) {
+            phrases[phrase] = true;
+        });
+    }
+
+    $.each(phrases, function (phrase) {
+        const primarySites = (analysedSites && analysedSites[phrase]) ? analysedSites[phrase] : {};
+        const comparePhraseSites = hasCompare && compareSites[phrase] ? compareSites[phrase] : {};
+
+        let bodyHtml = '';
+        if (hasCompare) {
+            bodyHtml =
+                '<div class="cabinet-ca-phrase-card__compare">' +
+                buildSerpRegionColumnHtml(primaryLabel, primarySites, messages) +
+                buildSerpRegionColumnHtml(compareLabel, comparePhraseSites, messages) +
+                '</div>';
+        } else {
+            bodyHtml =
+                '<div class="cabinet-ca-phrase-card__cols">' +
+                '   <span>#</span><span>' + escapeHtml(messages.domain) + '</span><span></span>' +
+                '</div>' +
+                buildSerpRowsHtml(primarySites, messages);
+        }
+
+        const cardClass = hasCompare
+            ? 'cabinet-ca-phrase-card cabinet-ca-phrase-card--compare render'
+            : 'cabinet-ca-phrase-card render';
+
+        const newTable = '' +
+            '<div class="' + cardClass + '">' +
             '   <div class="cabinet-ca-phrase-card__header" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="' + escapeHtml(phrase) + '">' +
             '       <h3 class="cabinet-ca-phrase-card__title">' + escapeHtml(phrase) + '</h3>' +
             '   </div>' +
             '   <div class="card-body p-0 d-flex flex-column">' +
-            '       <div class="cabinet-ca-phrase-card__cols">' +
-            '           <span>#</span>' +
-            '           <span>' + escapeHtml(messages.domain) + '</span>' +
-            '           <span></span>' +
-            '       </div>'
+            bodyHtml +
+            '   </div>' +
+            '</div>';
 
-        let iterator = 1
-        $.each(sites, function (link, object) {
-            let url = new URL(link)
-            let display = formatSerpUrlDisplay(link)
-            let btnGroup = getBtnGroup(url, messages)
-            newTable +=
-                '<div class="cabinet-ca-serp-row await-color" ' +
-                'data-order="' + escapeHtml(display.host) + '" ' +
-                'data-full-url="' + escapeHtml(link) + '" ' +
-                'data-main-page="' + (object['mainPage'] ? 'true' : 'false') + '" ' +
-                'title="' + escapeHtml(link) + '">' +
-                '    <span class="cabinet-ca-serp-rank">' + iterator + '</span>' +
-                '    <div class="cabinet-ca-serp-url">' +
-                '        <span class="cabinet-ca-serp-domain">' + escapeHtml(display.host) + '</span>' +
-                (display.path ? '<span class="cabinet-ca-serp-path">' + escapeHtml(display.path) + '</span>' : '') +
-                '    </div>' +
-                '    <div>' + btnGroup + '</div>' +
-                '</div>'
+        $('#sites-tables').append(newTable);
+    });
 
-            iterator++
-        })
-        newTable += '</div></div>'
-
-        $('#sites-tables').append(newTable)
-    })
-
-    const highlightMeta = collectSerpDuplicateHighlights(analysedSites);
-    colorButtonsActions(highlightMeta.duplicateHosts, highlightMeta.duplicateUrls);
+    const highlightMeta = buildSerpHighlightMeta(analysedSites, options);
+    colorButtonsActions(highlightMeta.duplicateHosts, highlightMeta.duplicateUrls, highlightMeta);
 
     $('#sites-block').show()
+
+    if (typeof syncSerpCompareRegionBar === 'function' && window.competitorActiveRegionKey) {
+        syncSerpCompareRegionBar(window.competitorActiveRegionKey);
+    }
 
     showEquivalentElements()
     initSerpPhraseTooltips()
@@ -432,8 +746,21 @@ function getBtnGroup(url, messages) {
         '</div>'
 }
 
-function colorButtonsActions(duplicateHosts, duplicateUrls) {
+function colorButtonsActions(duplicateHosts, duplicateUrls, highlightMeta) {
     const strings = window.competitorHighlightStrings || {};
+    const meta = highlightMeta || {};
+    const compareMode = !!meta.compareMode;
+    const $urlBtn = $('#coloredEloquentUrls');
+    const $domainBtn = $('#coloredEloquentDomains');
+
+    if (compareMode) {
+        $urlBtn.attr('data-bs-title', strings.tipHighlightUrlsCompare || $urlBtn.attr('data-bs-title'));
+        $domainBtn.attr('data-bs-title', strings.tipHighlightDomainsCompare || $domainBtn.attr('data-bs-title'));
+    } else {
+        $urlBtn.attr('data-bs-title', strings.tipHighlightUrls || $urlBtn.attr('data-bs-title'));
+        $domainBtn.attr('data-bs-title', strings.tipHighlightDomains || $domainBtn.attr('data-bs-title'));
+    }
+    initSerpToolbarTooltips();
 
     $('#coloredMainPages').unbind().on('click', function () {
         coloredButtons($(this))
@@ -448,8 +775,10 @@ function colorButtonsActions(duplicateHosts, duplicateUrls) {
 
         if (!duplicateHosts.length) {
             if (typeof getBrokenScriptMessage === 'function') {
-                getBrokenScriptMessage(null, strings.noDuplicateDomains ||
-                    'Нет доменов, которые встречаются в выдаче двух и более запросов')
+                getBrokenScriptMessage(null, compareMode
+                    ? (strings.noCrossRegionDomains || strings.noDuplicateDomains)
+                    : (strings.noDuplicateDomains ||
+                        'Нет доменов, которые встречаются в выдаче двух и более запросов'))
             }
 
             return
@@ -473,8 +802,10 @@ function colorButtonsActions(duplicateHosts, duplicateUrls) {
 
         if (!duplicateUrls.length) {
             if (typeof getBrokenScriptMessage === 'function') {
-                getBrokenScriptMessage(null, strings.noDuplicateUrls ||
-                    'Нет одинаковых URL в двух и более колонках запросов')
+                getBrokenScriptMessage(null, compareMode
+                    ? (strings.noCrossRegionUrls || strings.noDuplicateUrls)
+                    : (strings.noDuplicateUrls ||
+                        'Нет одинаковых URL в двух и более колонках запросов'))
             }
 
             return

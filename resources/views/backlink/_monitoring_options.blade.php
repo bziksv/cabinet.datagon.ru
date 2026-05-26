@@ -1,2 +1,7 @@
-{!! Form::label('Связать проект с сайтом из мониторинга позиций') !!}
-{!! Form::select('monitoring_project_id', $options, $value, ['class' => implode(' ', array_merge($class, ['monitoring-options']))]) !!}
+@include('backlink.partials.monitoring-field', [
+    'options' => $options,
+    'value' => $value ?? null,
+    'class' => $class ?? ['form-select'],
+    'wrapperClass' => $wrapperClass ?? 'mb-3',
+    'projectId' => $projectId ?? null,
+])

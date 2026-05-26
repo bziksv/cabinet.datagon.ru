@@ -2,8 +2,8 @@
 
 namespace App;
 
-use Illuminate\Database\Eloquent\Model;
 use App\Services\TelegramBotService;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
 class TelegramBot extends Model
@@ -110,6 +110,61 @@ class TelegramBot extends Model
             . " <a href='https://lk.redbox.su/domain-information' target='_blank'>https://lk.redbox.su/domain-information</a>";
 
         (new TelegramBotService($chatId))->sendMsg($text);
+    }
+
+    /**
+     * Сводка по проекту: одно сообщение вместо списка ссылок.
+     */
+    public static function brokenLinkProjectNotification(
+        ProjectTracking $project,
+        $chatId,
+        int $problemCount,
+        bool $isTest = false
+    ): void {
+        $cabinetUrl = url(route('show.backlink', ['id' => $project->id], false));
+        $cabinetUrlAttr = self::escapeTelegramHtml($cabinetUrl);
+        $linkLabel = self::escapeTelegramHtml(__('Backlink telegram open project'));
+
+        $title = self::escapeTelegramHtml(
+            $isTest ? __('Backlink telegram project test title') : __('Backlink telegram project title')
+        );
+
+        $lines = [
+            $title,
+            self::escapeTelegramHtml(__('Backlink telegram project line', ['name' => $project->project_name ?? '—'])),
+        ];
+
+        if ($problemCount > 0) {
+            $lines[] = self::escapeTelegramHtml(
+                __('Backlink telegram problems count', ['count' => $problemCount])
+            );
+        } else {
+            $lines[] = self::escapeTelegramHtml(__('Backlink telegram all links ok'));
+        }
+
+        if (TelegramBotService::supportsInlineUrlButton($cabinetUrl)) {
+            $lines[] = self::escapeTelegramHtml(__('Backlink telegram go service'))
+                . ' <a href="' . $cabinetUrlAttr . '">' . $linkLabel . '</a>';
+            $replyMarkup = [
+                'inline_keyboard' => [[
+                    [
+                        'text' => __('Backlink telegram open project'),
+                        'url' => $cabinetUrl,
+                    ],
+                ]],
+            ];
+        } else {
+            $lines[] = self::escapeTelegramHtml(__('Backlink telegram local url hint'))
+                . "\n<code>" . $cabinetUrlAttr . '</code>';
+            $replyMarkup = null;
+        }
+
+        (new TelegramBotService($chatId))->sendMsg(implode("\n", $lines), $replyMarkup);
+    }
+
+    private static function escapeTelegramHtml(string $text): string
+    {
+        return htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     public static function removeProtocol($project)

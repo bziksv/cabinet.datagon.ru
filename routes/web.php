@@ -189,6 +189,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('html-editor/public-share/revoke', 'TextEditorController@revokePublicShare')->name('html.editor.public.share.revoke');
 
     Route::get('backlink', 'BacklinkController@index')->name('backlink');
+    Route::post('backlink/test-telegram-alerts', 'BacklinkController@testTelegramAlerts')
+        ->name('backlink.test-telegram-alerts');
     Route::get('add-backlink', 'BacklinkController@createView')->name('add.backlink.view');
     Route::post('add-backlink', 'BacklinkController@store')->name('add.backlink');
     Route::delete('delete-backlink/{id}', 'BacklinkController@remove')->name('delete.backlink');

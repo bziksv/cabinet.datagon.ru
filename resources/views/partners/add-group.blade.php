@@ -1,38 +1,44 @@
 @component('component.card', ['title' => __('Add group')])
-    <div class="card-body">
-        <div class="mb-3">
-            <a href="{{ route('partners.add.group') }}" class="btn btn-outline-secondary">{{ __('Add group') }}</a>
-            <a href="{{ route('partners.add.item') }}" class="btn btn-outline-secondary">{{ __('Add partner') }}</a>
-            <a href="{{ route('partners.admin') }}"
-               class="btn btn-outline-secondary">{{ __('Partners (admins)') }}</a>
-            <a href="{{ route('partners') }}" class="btn btn-outline-secondary">{{ __('Partners (users)') }}</a>
+    @slot('css')
+        @include('partners.partials.styles')
+    @endslot
+
+    <div class="cabinet-partners-page">
+        @include('partners.partials.admin-nav', ['active' => 'add-group', 'admin' => true])
+
+        <div class="card shadow-sm border cabinet-partners-form-card">
+            <div class="card-body">
+                <p class="small text-secondary mb-3">{{ __('Partners add group hint') }}</p>
+
+                <form action="{{ route('partners.save.group') }}" method="POST">
+                    @csrf
+
+                    <div class="mb-3">
+                        <label class="form-label" for="name_ru">{{ __('Group Name') }} (ru)</label>
+                        <input type="text" name="name_ru" id="name_ru" class="form-control form-control-sm" required value="{{ old('name_ru') }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="name_en">{{ __('Group Name') }} (en)</label>
+                        <input type="text" name="name_en" id="name_en" class="form-control form-control-sm" required value="{{ old('name_en') }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="position">{{ __('Position') }}</label>
+                        <input type="number" name="position" id="position" class="form-control form-control-sm" required value="{{ old('position') }}">
+                        <p class="form-text small mb-0">{{ __('Partners position hint') }}</p>
+                    </div>
+
+                    @include('partners.partials.form-errors')
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="bi bi-check-lg me-1" aria-hidden="true"></i>{{ __('Add') }}
+                        </button>
+                        <a href="{{ route('partners.admin') }}" class="btn btn-outline-secondary btn-sm">{{ __('Cancel') }}</a>
+                    </div>
+                </form>
+            </div>
         </div>
-        <form action="{{ route('partners.save.group') }}" method="POST" class="w-50">
-            @csrf
-            <div class="form-group required">
-                <label>{{ __('Group Name') }} (ru)</label>
-                <input type="text" name="name_ru" class="form form-control" required>
-            </div>
-
-            <div class="form-group required">
-                <label>{{ __('Group Name') }} (en)</label>
-                <input type="text" name="name_en" class="form form-control" required>
-            </div>
-
-            <div class="form-group required">
-                <label>{{ __('Position') }}</label>
-                <input type="number" name="position" class="form form-control" required>
-            </div>
-
-            @if ($errors->any())
-                <div class="mb-3 mt-3">
-                    @foreach ($errors->all() as $error)
-                        <div class="text-danger">{{ $error }}</div>
-                    @endforeach
-                </div>
-            @endif
-
-            <input type="submit" class="btn btn-secondary" value="{{ __('Add') }}">
-        </form>
     </div>
 @endcomponent

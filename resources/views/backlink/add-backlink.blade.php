@@ -1,138 +1,104 @@
-@component('component.card', ['title' => __('Add link tracking')])
+@component('component.card', ['title' => __('Add link')])
     @slot('css')
-        <link rel="stylesheet" type="text/css"
-              href="{{ asset('plugins/list-comparison/css/font-awesome-4.7.0/css/font-awesome.css') }}"/>
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/common.css') }}"/>
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/toastr/toastr.css') }}"/>
-        <link rel="stylesheet" href="{{ asset('plugins/backlink/css/backlink.css') }}">
-        <style>
-            .BacklinkProject, .BacklinkLinks {
-                background: oldlace;
-            }
-        </style>
+        @include('backlink.partials.styles')
     @endslot
-    {!! Form::open(['action' =>'BacklinkController@storeLink', 'method' => 'POST'])!!}
-    <div class='col-md-6 express-form'>
-        <div class='form-group required'>
-            <input type="hidden" name="id" value="{{ $id }}">
-            {!! Form::label( __('Loading links with a list')) !!}
-            {!! Form::textarea('params', null, [
-            'class'=>'form-control',
-            'required'=>'required',
-            'placeholder' => 'donor.ru/1::akceptor.ru/2::anchor::1::1'
-            ]) !!}
-            <span class="__helper-link ui_tooltip_w">
-                {{ __('Decoding of the design') }}
-            <i class="fa fa-question-circle"></i>
-                <span class="ui_tooltip __right __l">
-                    <span class="ui_tooltip_content" style="width: 600px">
-                        <p>
-                            donor.ru/url/::akceptor.ru/another/url/::anchor::1::1
-                        </p>
-                        donor.ru/url/ - {{ __('The page of the site where the link will be searched') }}
-                        akceptor.ru/another/url/ - {{ __('The link that the script will search for') }}<br>
-                        anchor - {{ __('Anchor') }}<br>
-                        {{ __('Check that the rel attribute with the nofollow property is not present in the link - (0 - no/1 - yes)') }}<br>
-                        {{ __('Check that the link is missing in the noindex tag - (0 - no/1 - yes)') }}<br>
-                        {{ __('Separate the lines using Shift + Enter') }}
-                    </span>
+
+    <div class="cabinet-backlink-page">
+        @include('backlink.partials.module-nav', ['active' => 'add-link', 'project' => $project])
+
+        @include('backlink.partials.free-tariff-email-notice')
+
+        <div class="cabinet-bl-lead px-4 py-3">
+            <div class="d-flex gap-3 align-items-start">
+                <span class="cabinet-bl-lead__icon" aria-hidden="true">
+                    <i class="bi bi-plus-lg"></i>
                 </span>
-            </span>
-            <p>{{ __('You can') }} <a href="#" class="text-info">{{ __('use a simplified format') }}</a></p>
-        </div>
-        <div class='pt-3'>
-            <input type="submit" class="btn btn-secondary" value="{{ __('Add to Tracking') }}">
-            <a href='{{ route('backlink') }}' class='btn btn-default'>{{ __('To my projects') }}</a>
-            <a href='{{ route('show.backlink', $id) }}' class='btn btn-default'>{{ __('Back') }}</a>
-        </div>
-    </div>
-    {!! Form::close() !!}
-    <div style="display: none" class="simplified-form">
-        <p>{{ __('You can') }} <a href="#" class="text-info express">{{ __('use the accelerated format') }}</a></p>
-        {!! Form::open(['action' =>'BacklinkController@storeLink', 'method' => 'POST'])!!}
-        <input type="hidden" name="id" value="{{ $id }}">
-        <input type="hidden" name="countRows" id="countRows" value="1">
-        <table id="example2"
-               class="table table-bordered table-hover dataTable dtr-inline add-backlink">
-            <thead>
-            <tr>
-                <th style="vertical-align: middle; text-align: center;">{{ __('Link to the page of the donor website') }}</th>
-                <th style="vertical-align: middle; text-align: center;">{{ __('The link that the script will search for') }}</th>
-                <th style="vertical-align: middle; text-align: center;">{{ __('Anchor') }}</th>
-                <th style="vertical-align: middle; text-align: center;">{{ __('Check that the rel attribute with the nofollow property is not present in the link') }}</th>
-                <th style="vertical-align: middle; text-align: center;">{{ __('Check that the link is missing in the noindex tag') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr>
-                <td>
-                    {!! Form::text('site_donor_1', null, ['class' => 'form-control backlink','required']) !!}
-                </td>
-                <td>
-                    {!! Form::text('link_1', null, ['class' => 'form-control backlink','required']) !!}
-                </td>
-                <td>
-                    {!! Form::text('anchor_1', null, ['class' => 'form-control backlink','required']) !!}
-                </td>
-                <td>
-                    {!! Form::select('nofollow_1', ['1' => __('Yes'), '0' => __('No')], null, ['class' => 'form-select rounded-0']) !!}
-                </td>
-                <td>
-                    {!! Form::select('noindex_1', ['1' => __('Yes'), '0' => __('No')], null, ['class' => 'form-select rounded-0']) !!}
-                </td>
-            </tr>
-            </tbody>
-        </table>
-        <div class="d-flex justify-content-between">
-            <div class="buttons">
-                <input type="submit" class="btn btn-secondary mr-2" value="{{ __('Add to Tracking') }}">
-                <input type="button" class="btn btn-default mr-2" id="addRow" value="{{ __('Add row') }}">
-                <input type="button" class="btn btn-default" id="removeRow" value="{{ __('Delete row') }}"
-                       style="display: none">
+                <div>
+                    <p class="mb-1 fw-semibold text-body">{{ __('Add link') }}</p>
+                    <p class="mb-0 small text-secondary">{{ __('Backlink add links lead hint') }}</p>
+                </div>
             </div>
-            <div>
-                <a href='{{ route('backlink') }}' class='btn btn-default'>{{ __('To my projects') }}</a>
-                <a href='{{ route('show.backlink', $id) }}' class='btn btn-default'>{{ __('Back') }}</a>
+        </div>
+
+        @include('backlink.partials.mode-nav')
+
+        {!! Form::open(['action' => 'BacklinkController@storeLink', 'method' => 'POST', 'class' => 'cabinet-bl-express-form']) !!}
+        <input type="hidden" name="id" value="{{ $id }}">
+        <div class="cabinet-bl-form-panel">
+            <div class="mb-3">
+                <label class="form-label" for="params">{{ __('Loading links with a list') }} <span class="text-danger">*</span></label>
+                <p class="form-text mb-2">{{ __('Backlink format help intro') }} <code class="user-select-all">{{ __('Backlink format example') }}</code></p>
+                {!! Form::textarea('params', null, [
+                    'class' => 'form-control font-monospace',
+                    'id' => 'params',
+                    'required' => 'required',
+                    'rows' => 8,
+                    'placeholder' => __('Backlink format example'),
+                ]) !!}
+            </div>
+
+            @include('backlink.partials.format-help')
+
+            <div class="cabinet-bl-form-footer">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg me-1" aria-hidden="true"></i>{{ __('Add to Tracking') }}
+                </button>
+                <a href="{{ route('show.backlink', $id) }}" class="btn btn-outline-secondary">{{ __('Back') }}</a>
+                <a href="{{ route('backlink') }}" class="btn btn-outline-secondary">{{ __('To my projects') }}</a>
             </div>
         </div>
         {!! Form::close() !!}
+
+        <div class="cabinet-bl-simplified-form">
+            {!! Form::open(['action' => 'BacklinkController@storeLink', 'method' => 'POST']) !!}
+            <input type="hidden" name="id" value="{{ $id }}">
+            <input type="hidden" name="countRows" id="cabinet-bl-count-rows" value="1">
+
+            <div class="cabinet-bl-table-wrap mb-3">
+                <table id="cabinet-bl-simplified-table" class="table table-sm cabinet-bl-table">
+                    <thead>
+                    <tr>
+                        <th class="cabinet-bl-col-wide">{{ __('Backlink col donor') }}</th>
+                        <th class="cabinet-bl-col-wide">{{ __('Backlink col acceptor') }}</th>
+                        <th>{{ __('Backlink col anchor short') }}</th>
+                        <th>{{ __('Backlink col nofollow short') }}</th>
+                        <th>{{ __('Backlink col noindex short') }}</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr id="cabinet-bl-row-1">
+                        <td>{!! Form::text('site_donor_1', null, ['class' => 'form-control', 'required']) !!}</td>
+                        <td>{!! Form::text('link_1', null, ['class' => 'form-control', 'required']) !!}</td>
+                        <td>{!! Form::text('anchor_1', null, ['class' => 'form-control', 'required']) !!}</td>
+                        <td>{!! Form::select('nofollow_1', ['1' => __('Yes'), '0' => __('No')], null, ['class' => 'form-select']) !!}</td>
+                        <td>{!! Form::select('noindex_1', ['1' => __('Yes'), '0' => __('No')], null, ['class' => 'form-select']) !!}</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="cabinet-bl-form-footer justify-content-between">
+                <div class="cabinet-bl-toolbar__actions">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg me-1" aria-hidden="true"></i>{{ __('Add to Tracking') }}
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="cabinet-bl-add-row">
+                        <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>{{ __('Add row') }}
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="cabinet-bl-remove-row" style="display: none">
+                        <i class="bi bi-dash-lg me-1" aria-hidden="true"></i>{{ __('Delete row') }}
+                    </button>
+                </div>
+                <div class="cabinet-bl-toolbar__actions">
+                    <a href="{{ route('show.backlink', $id) }}" class="btn btn-outline-secondary">{{ __('Back') }}</a>
+                    <a href="{{ route('backlink') }}" class="btn btn-outline-secondary">{{ __('To my projects') }}</a>
+                </div>
+            </div>
+            {!! Form::close() !!}
+        </div>
     </div>
+
     @slot('js')
-        <script>
-            var countRows = 1
-
-            $('.text-info').click(function () {
-                $('.express-form').hide(300)
-                $('.simplified-form').show(300)
-            });
-            $('.express').click(function () {
-                $('.express-form').show(300)
-                $('.simplified-form').hide(300)
-            });
-            $('#addRow').click(function () {
-                $('#removeRow').show(100)
-                countRows++
-                $('#countRows').val(countRows)
-                $('#example2 tbody').append(
-                    '<tr id="tr-id-' + countRows + '">' +
-                    '<td><input type="text" name="site_donor_' + countRows + '" class="form form-control" required></td>' +
-                    '<td><input type="text" name="link_' + countRows + '" class="form form-control" required></td>' +
-                    '<td><input type="text" name="anchor_' + countRows + '" class="form form-control" required></td>' +
-                    '<td><select class="form-select rounded-0" name="nofollow_' + countRows + '" id=""><option value="1">{{ __("Yes") }}</option><option value="0">{{ __("No") }}</option></select></td>' +
-                    '<td><select class="form-select rounded-0" name="noindex_' + countRows + '" id=""><option value="1">{{ __("Yes") }}</option><option value="0">{{ __("No") }}</option></select></td>' +
-                    '</tr>'
-                );
-            });
-
-            $('#removeRow').click(function () {
-                $('#tr-id-' + countRows).remove();
-                countRows--;
-                $('#countRows').val(countRows)
-                if (countRows === 1) {
-                    $('#removeRow').hide(100)
-                }
-            });
-
-        </script>
+        @include('backlink.partials.form-mode-js', ['syncMonitoring' => false])
     @endslot
 @endcomponent

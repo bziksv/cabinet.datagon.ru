@@ -1,71 +1,88 @@
-@component('component.card', ['title' => __('Партнёры')])
+@component('component.card', ['title' => __('Partners')])
     @slot('css')
-        <link rel="stylesheet" type="text/css"
-              href="{{ asset('plugins/keyword-generator/css/font-awesome-4.7.0/css/font-awesome.css') }}"/>
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/keyword-generator/css/style.css') }}"/>
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/jqcloud/css/jqcloud.css') }}"/>
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/datatable.css') }}"/>
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/toastr/toastr.css') }}"/>
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/relevance-analysis/css/style.css') }}"/>
-        <style>
-            .card-header::after {
-                display: none;
-            }
-
-            .fa {
-                cursor: pointer;
-                opacity: .5;
-            }
-
-            .fa:hover {
-                opacity: 1;
-            }
-
-            .card-img-top {
-                height: 180px;
-                width: 100%;
-                display: block;
-                object-fit: contain;
-            }
-        </style>
+        @include('partners.partials.styles')
     @endslot
-    <div class="card-body">
-        @if($admin)
-            <div class="mb-3">
-                <a href="{{ route('partners.add.group') }}" class="btn btn-outline-secondary">{{ __('Add group') }}</a>
-                <a href="{{ route('partners.add.item') }}" class="btn btn-outline-secondary">{{ __('Add partner') }}</a>
-                <a href="{{ route('partners.admin') }}"
-                   class="btn btn-outline-secondary">{{ __('Partners (admins)') }}</a>
-                <a href="{{ route('partners') }}" class="btn btn-outline-secondary">{{ __('Partners (users)') }}</a>
-            </div>
-        @endif
-        @foreach($groups as $elem)
-            <div class="row d-flex justify-content-center mb-5">
-                <h2 class="text-muted w-100 text-center">{{ $elem['name_'. $lang] }}</h2>
-                @foreach($elem['items'] as $item)
-                    <div class="card @if(count($elem['items']) > 1) mr-3 @endif" style="width: 20rem;">
-                        <img class="card-img-top" src="{{ cabinet_storage_url($item['image']) }}" alt="{{ $item['name_'. $lang] }}">
-                        <div class="card-footer d-flex flex-column h-100">
-                            <div class="h-100 d-flex flex-column">
-                                <div class="d-flex flex-column justify-content-start">
-                                    <h3 class="card-title">{{ $item['name_'. $lang] }}</h3>
-                                    <p class="card-text">{{ $item['description_'. $lang] }}</p>
-                                </div>
-                            </div>
-                            <div class="d-flex justify-content-end click_tracking">
-                                <a href="/partners/r/{{ $item['short_link_' . $lang] }}"
-                                   class="btn btn-secondary click_tracking"
-                                   target="_blank" data-click="{{ $item['name_'. $lang] }}"> >>> </a>
-                            </div>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-        @endforeach
-    </div>
 
-    <div class="mt-5">
-        {{ __('If you know a good service and are ready to share it, then write to ') }}
-        <a href="mailto:info@redbox.su">info@redbox.su</a>
+    <div class="cabinet-partners-page">
+        @if($admin)
+            @include('partners.partials.admin-nav', ['active' => 'users', 'admin' => true])
+        @endif
+
+        <div class="cabinet-partners-lead px-4 py-3">
+            <div class="d-flex gap-3 align-items-start">
+                <span class="cabinet-partners-lead__icon" aria-hidden="true">
+                    <i class="bi bi-handshake"></i>
+                </span>
+                <div>
+                    <p class="mb-1 fw-semibold text-body">{{ __('Partners catalog lead title') }}</p>
+                    <p class="mb-0 small text-secondary">{{ __('Partners catalog lead hint') }}</p>
+                </div>
+            </div>
+        </div>
+
+        @php
+            $groupsList = collect($groups);
+            $partnersTotal = $groupsList->sum(fn ($g) => count($g['items'] ?? []));
+        @endphp
+
+        @if($partnersTotal === 0)
+            <div class="cabinet-partners-empty">
+                <i class="bi bi-inbox display-6 text-secondary opacity-50 d-block mb-2" aria-hidden="true"></i>
+                <p class="mb-0">{{ __('Partners catalog empty') }}</p>
+            </div>
+        @else
+            @foreach($groupsList as $elem)
+                @php
+                    $groupName = $elem['name_' . $lang] ?? $elem['name_ru'] ?? '';
+                    $items = $elem['items'] ?? [];
+                @endphp
+                @if(count($items) > 0)
+                    <section class="cabinet-partners-group" aria-labelledby="partners-group-{{ $elem['id'] ?? $loop->index }}">
+                        <h2 id="partners-group-{{ $elem['id'] ?? $loop->index }}" class="cabinet-partners-group__title mb-3">
+                            {{ $groupName }}
+                            <span class="badge text-bg-secondary ms-1 fw-normal">{{ count($items) }}</span>
+                        </h2>
+
+                        <div class="cabinet-partners-grid">
+                            @foreach($items as $item)
+                                @php
+                                    $itemName = $item['name_' . $lang] ?? $item['name_ru'] ?? '';
+                                    $itemDesc = $item['description_' . $lang] ?? $item['description_ru'] ?? '';
+                                    $shortLink = $item['short_link_' . $lang] ?? $item['short_link_ru'] ?? '';
+                                @endphp
+                                <article class="cabinet-partners-card">
+                                    <div class="cabinet-partners-card__logo">
+                                        <img src="{{ cabinet_storage_url($item['image']) }}"
+                                             alt="{{ $itemName }}"
+                                             loading="lazy"
+                                             decoding="async">
+                                    </div>
+                                    <div class="cabinet-partners-card__body">
+                                        <h3 class="cabinet-partners-card__title">{{ $itemName }}</h3>
+                                        @if($itemDesc !== '')
+                                            <p class="cabinet-partners-card__text">{{ $itemDesc }}</p>
+                                        @endif
+                                    </div>
+                                    <div class="cabinet-partners-card__footer">
+                                        <a href="{{ url('/partners/r/' . $shortLink) }}"
+                                           class="btn btn-primary btn-sm cabinet-partners-card__link click_tracking"
+                                           target="_blank"
+                                           rel="noopener noreferrer"
+                                           data-click="{{ $itemName }}">
+                                            <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>{{ __('Partners go to site') }}
+                                        </a>
+                                    </div>
+                                </article>
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
+            @endforeach
+        @endif
+
+        <div class="cabinet-partners-suggest px-4 py-3 small text-secondary">
+            {{ __('If you know a good service and are ready to share it, then write to ') }}
+            <a href="mailto:info@datagon.ru" class="fw-medium">info@datagon.ru</a>
+        </div>
     </div>
 @endcomponent

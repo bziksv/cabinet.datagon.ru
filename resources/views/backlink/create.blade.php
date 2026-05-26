@@ -1,186 +1,205 @@
 @component('component.card', ['title' => __('Add link tracking')])
     @slot('css')
-        <link rel="stylesheet" type="text/css"
-              href="{{ asset('plugins/list-comparison/css/font-awesome-4.7.0/css/font-awesome.css') }}"/>
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/common.css') }}"/>
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/toastr/toastr.css') }}"/>
-        <!-- Select2 -->
-        <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/backlink/css/backlink.css') }}">
-        <style>
-            .BacklinkProject, .BacklinkLinks {
-                background: oldlace;
-            }
-        </style>
+        @include('backlink.partials.styles')
     @endslot
-    {!! Form::open(['action' =>'BacklinkController@store', 'method' => 'POST', 'class' => 'express-form'])!!}
-    <div class='col-md-6'>
-        <div class='form-group required'>
-            {!! Form::label(__('Project name')) !!}
-            {!! Form::text('project_name', null, ['class' => 'form form-control', 'required', 'placeholder' => __('Project name')]) !!}
-        </div>
-        <div class='form-group'>
-            @include('backlink._monitoring_options', ['options' => $monitoring, 'value' => null, 'class' => ['form-control']])
-        </div>
-        <div class='form-group required'>
-            {!! Form::label(__('Loading links with a list')) !!}
-            {!! Form::textarea('params', null,[
-            'class' => 'form-control',
-            'required',
-            'placeholder' => 'donor.ru/1::akceptor.ru/2::текст ссылки::1::1::1::1'
-            ]) !!}
-            <span class="__helper-link ui_tooltip_w">
-                {{ __('Decoding of the design') }}
-            <i class="fa fa-question-circle"></i>
-                <span class="ui_tooltip __right __l">
-                    <span class="ui_tooltip_content" style="width: 600px">
-                        <p>
-                            donor.ru/url/::akceptor.ru/another/url/::anchor::1::1
-                        </p>
-                        donor.ru/url/ - {{ __('The page of the site where the link will be searched') }}
-                        akceptor.ru/another/url/ - {{ __('The link that the script will search for') }}<br>
-                        текст ссылки - {{ __('Anchor') }}<br>
-                        {{ __('Check that the rel attribute with the nofollow property is not present in the link  - (0 - no/1 - yes)') }}<br>
-                        {{ __('Check that the link is missing in the noindex tag - (0 - no/1 - yes)') }}<br>
-                        {{ __('Separate the lines using Shift + Enter') }}
-                    </span>
+
+    <div class="cabinet-backlink-page">
+        @include('backlink.partials.module-nav', ['active' => 'create'])
+
+        @include('backlink.partials.free-tariff-email-notice')
+
+        <div class="cabinet-bl-lead px-4 py-3">
+            <div class="d-flex gap-3 align-items-start">
+                <span class="cabinet-bl-lead__icon" aria-hidden="true">
+                    <i class="bi bi-plus-circle"></i>
                 </span>
-            </span>
-            <p>{{ __('You can') }} <a href="#" class="text-info">{{ __('use a simplified format') }}</a></p>
-        </div>
-        <div class='pt-3'>
-            <button class='btn btn-secondary mr-2' type='submit'>{{ __('Add to Tracking') }}</button>
-            <a href='{{ route('backlink') }}' class='btn btn-default'>{{ __('To my projects') }}</a>
-        </div>
-    </div>
-    {!! Form::close() !!}
-    <div style="display: none" class="simplified-form">
-        <p>{{ __('You can') }} <a href="#" class="express">{{ __('use the accelerated format') }}</a></p>
-        {!! Form::open(['action' =>'BacklinkController@store', 'method' => 'POST'])!!}
-        <div class='form-group required w-50'>
-            {!! Form::label(__('Project name')) !!}
-            {!! Form::text('project_name', null, [
-            'class' => 'form form-control',
-             'placeholder' => __('Project name'),
-            'required',
-            ]) !!}
-        </div>
-        <div class='form-group w-50'>
-            @include('backlink._monitoring_options', ['options' => $monitoring, 'value' => null, 'class' => ['form-control']])
-        </div>
-        <input type="hidden" name="countRows" id="countRows" value="1">
-        <table id="example2"
-               class="table table-bordered table-hover dataTable dtr-inline">
-            <thead>
-            <tr>
-                <th style="vertical-align: middle; text-align: center;">{{ __('Link to the page of the donor website') }}</th>
-                <th style="vertical-align: middle; text-align: center;">{{ __('The link that the script will search for') }}</th>
-                <th style="vertical-align: middle; text-align: center;">{{ __('Anchor') }}</th>
-                <th style="vertical-align: middle; text-align: center;">{{ __('Check that the rel attribute with the nofollow property is not present in the link') }}</th>
-                <th style="vertical-align: middle; text-align: center;">{{ __('Check that the link is missing in the noindex tag') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr>
-                <td>
-                    {!! Form::text('site_donor_1', null, ['class' => 'form-control backlink','required']) !!}
-                </td>
-                <td>
-                    {!! Form::text('link_1', null, ['class' => 'form-control backlink','required']) !!}
-                </td>
-                <td>
-                    {!! Form::text('anchor_1', null, ['class' => 'form-control backlink','required']) !!}
-                </td>
-                <td>
-                    {!! Form::select('nofollow_1', ['1' => __('Yes'), '0' => __('No')], null, ['class' => 'form-select rounded-0']) !!}
-                </td>
-                <td>
-                    {!! Form::select('noindex_1', ['1' => __('Yes'), '0' => __('No')], null, ['class' => 'form-select rounded-0']) !!}
-                </td>
-            </tr>
-            </tbody>
-        </table>
-        <div class="d-flex justify-content-between">
-            <div class="buttons">
-                <input type="submit" class="btn btn-secondary mr-2" value="{{ __('Add to Tracking') }}">
-                <input type="button" class="btn btn-default mr-2" id="addRow" value="{{ __('Add row') }}">
-                <input type="button" class="btn btn-default" id="removeRow" value="{{ __('Delete row') }}"
-                       style="display: none">
+                <div>
+                    <p class="mb-1 fw-semibold text-body">{{ __('Backlink create lead title') }}</p>
+                    <p class="mb-0 small text-secondary">{{ __('Backlink create lead hint') }}</p>
+                </div>
             </div>
-            <a href='{{ route('backlink') }}' class='btn btn-default'> {{ __('To my projects') }}</a>
         </div>
+
+        @include('backlink.partials.steps-nav', [
+            'navLabel' => __('Backlink create steps nav'),
+            'steps' => [
+                ['n' => 1, 'title' => __('Backlink step 1 title'), 'anchor' => 'cabinet-bl-step-1', 'active' => true],
+                ['n' => 2, 'title' => __('Backlink step 2 title'), 'anchor' => 'cabinet-bl-step-2'],
+                ['n' => 3, 'title' => __('Backlink step 3 title'), 'anchor' => 'cabinet-bl-step-3'],
+            ],
+        ])
+
+        {!! Form::open(['action' => 'BacklinkController@store', 'method' => 'POST', 'class' => 'cabinet-bl-express-form']) !!}
+        <section class="cabinet-bl-step" id="cabinet-bl-step-1" aria-labelledby="cabinet-bl-step-1-label">
+            @include('backlink.partials.step-head', [
+                'n' => 1,
+                'anchor' => 'cabinet-bl-step-1',
+                'title' => __('Backlink step 1 title'),
+                'hint' => __('Backlink step 1 hint'),
+            ])
+            <div class="cabinet-bl-step__body cabinet-bl-form-panel">
+                <div class="mb-3">
+                    <label class="form-label" for="project_name">{{ __('Project name') }} <span class="text-danger">*</span></label>
+                    {!! Form::text('project_name', null, [
+                        'class' => 'form-control',
+                        'id' => 'project_name',
+                        'required',
+                        'placeholder' => __('Project name'),
+                    ]) !!}
+                </div>
+
+                @include('backlink.partials.monitoring-field', [
+                    'options' => $monitoring,
+                    'value' => null,
+                    'class' => ['form-select'],
+                ])
+            </div>
+        </section>
+
+        <section class="cabinet-bl-step" id="cabinet-bl-step-2" aria-labelledby="cabinet-bl-step-2-label">
+            @include('backlink.partials.step-head', [
+                'n' => 2,
+                'anchor' => 'cabinet-bl-step-2',
+                'title' => __('Backlink step 2 title'),
+                'hint' => __('Backlink step 2 hint'),
+            ])
+            <div class="cabinet-bl-step__body">
+                @include('backlink.partials.mode-nav')
+            </div>
+        </section>
+
+        <section class="cabinet-bl-step" id="cabinet-bl-step-3" aria-labelledby="cabinet-bl-step-3-label">
+            @include('backlink.partials.step-head', [
+                'n' => 3,
+                'anchor' => 'cabinet-bl-step-3',
+                'title' => __('Backlink step 3 title'),
+                'hint' => __('Backlink step 3 hint express'),
+            ])
+            <div class="cabinet-bl-step__body cabinet-bl-form-panel">
+                <div class="mb-3">
+                    <label class="form-label" for="params">{{ __('Loading links with a list') }} <span class="text-danger">*</span></label>
+                    <p class="form-text mb-2">{{ __('Backlink format help intro') }} <code class="user-select-all">{{ __('Backlink format example') }}</code></p>
+                    {!! Form::textarea('params', null, [
+                        'class' => 'form-control font-monospace',
+                        'id' => 'params',
+                        'required',
+                        'rows' => 8,
+                        'placeholder' => __('Backlink format example'),
+                    ]) !!}
+                </div>
+
+                @include('backlink.partials.format-help')
+
+                <div class="cabinet-bl-form-footer">
+                    <button class="btn btn-primary" type="submit">
+                        <i class="bi bi-check-lg me-1" aria-hidden="true"></i>{{ __('Add to Tracking') }}
+                    </button>
+                    <a href="{{ route('backlink') }}" class="btn btn-outline-secondary">{{ __('To my projects') }}</a>
+                </div>
+            </div>
+        </section>
         {!! Form::close() !!}
+
+        <div class="cabinet-bl-simplified-form">
+            {!! Form::open(['action' => 'BacklinkController@store', 'method' => 'POST']) !!}
+            <section class="cabinet-bl-step" id="cabinet-bl-step-1-table" aria-labelledby="cabinet-bl-step-1-table-label">
+                @include('backlink.partials.step-head', [
+                    'n' => 1,
+                    'anchor' => 'cabinet-bl-step-1-table',
+                    'title' => __('Backlink step 1 title'),
+                    'hint' => __('Backlink step 1 hint'),
+                ])
+                <div class="cabinet-bl-step__body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="project_name_table">{{ __('Project name') }} <span class="text-danger">*</span></label>
+                            {!! Form::text('project_name', null, [
+                                'class' => 'form-control',
+                                'id' => 'project_name_table',
+                                'placeholder' => __('Project name'),
+                                'required',
+                            ]) !!}
+                        </div>
+                        <div class="col-md-6">
+                            @include('backlink.partials.monitoring-field', [
+                                'options' => $monitoring,
+                                'value' => null,
+                                'class' => ['form-select'],
+                                'wrapperClass' => 'mb-0',
+                                'fieldId' => 'monitoring_project_id_table',
+                            ])
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="cabinet-bl-step" id="cabinet-bl-step-2-table" aria-labelledby="cabinet-bl-step-2-table-label">
+                @include('backlink.partials.step-head', [
+                    'n' => 2,
+                    'anchor' => 'cabinet-bl-step-2-table',
+                    'title' => __('Backlink step 2 title'),
+                    'hint' => __('Backlink step 2 hint'),
+                ])
+                <div class="cabinet-bl-step__body">
+                    @include('backlink.partials.mode-nav')
+                </div>
+            </section>
+
+            <section class="cabinet-bl-step" id="cabinet-bl-step-3-table" aria-labelledby="cabinet-bl-step-3-table-label">
+                @include('backlink.partials.step-head', [
+                    'n' => 3,
+                    'anchor' => 'cabinet-bl-step-3-table',
+                    'title' => __('Backlink step 3 title'),
+                    'hint' => __('Backlink step 3 hint table'),
+                ])
+                <div class="cabinet-bl-step__body">
+                    <input type="hidden" name="countRows" id="cabinet-bl-count-rows" value="1">
+
+                    <div class="cabinet-bl-table-wrap mb-3">
+                        <table id="cabinet-bl-simplified-table" class="table table-sm cabinet-bl-table">
+                            <thead>
+                            <tr>
+                                <th class="cabinet-bl-col-wide">{{ __('Backlink col donor') }}</th>
+                                <th class="cabinet-bl-col-wide">{{ __('Backlink col acceptor') }}</th>
+                                <th>{{ __('Backlink col anchor short') }}</th>
+                                <th>{{ __('Backlink col nofollow short') }}</th>
+                                <th>{{ __('Backlink col noindex short') }}</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr id="cabinet-bl-row-1">
+                                <td>{!! Form::text('site_donor_1', null, ['class' => 'form-control', 'required']) !!}</td>
+                                <td>{!! Form::text('link_1', null, ['class' => 'form-control', 'required']) !!}</td>
+                                <td>{!! Form::text('anchor_1', null, ['class' => 'form-control', 'required']) !!}</td>
+                                <td>{!! Form::select('nofollow_1', ['1' => __('Yes'), '0' => __('No')], null, ['class' => 'form-select']) !!}</td>
+                                <td>{!! Form::select('noindex_1', ['1' => __('Yes'), '0' => __('No')], null, ['class' => 'form-select']) !!}</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="cabinet-bl-form-footer justify-content-between">
+                        <div class="cabinet-bl-toolbar__actions">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg me-1" aria-hidden="true"></i>{{ __('Add to Tracking') }}
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="cabinet-bl-add-row">
+                                <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>{{ __('Add row') }}
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="cabinet-bl-remove-row" style="display: none">
+                                <i class="bi bi-dash-lg me-1" aria-hidden="true"></i>{{ __('Delete row') }}
+                            </button>
+                        </div>
+                        <a href="{{ route('backlink') }}" class="btn btn-outline-secondary">{{ __('To my projects') }}</a>
+                    </div>
+                </div>
+            </section>
+            {!! Form::close() !!}
+        </div>
     </div>
 
     @slot('js')
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
-
-        <script>
-            let countRows = 1
-            let expressInput = $('#app > div > div > div.card-body > form > div > div:nth-child(1) > input')
-            let expressSelect = $('#app > div > div > div.card-body > form > div > div:nth-child(2) > select')
-            let simplifiedInput = $('#app > div > div > div.card-body > div > form > div.form-group.required.w-50 > input')
-            let simplifiedSelect = $('#app > div > div > div.card-body > div > form > div:nth-child(3) > select')
-
-            $('.text-info').click(function () {
-                simplifiedInput.val(expressInput.val())
-                $('.express-form').hide(300)
-                $('.simplified-form').show(300)
-            });
-
-            $('.express').click(function () {
-                expressInput.val(simplifiedInput.val())
-                $('.express-form').show(300)
-                $('.simplified-form').hide(300)
-            });
-
-            // Добавляем обработчик события change для expressSelect
-            expressSelect.on('select2:select', function (e) {
-                let selectedValue = e.params.data.id; // Получаем выбранное значение
-                simplifiedSelect.val(selectedValue).trigger('change'); // Устанавливаем и активируем событие change для второго select-элемента
-            });
-
-            // Добавляем обработчик события change для simplifiedSelect
-            simplifiedSelect.on('select2:select', function (e) {
-                let selectedValue = e.params.data.id; // Получаем выбранное значение
-                expressSelect.val(selectedValue).trigger('change'); // Устанавливаем и активируем событие change для первого select-элемента
-            });
-
-            $('#addRow').click(function () {
-                $('#removeRow').show(100)
-                countRows++
-                $('#countRows').val(countRows)
-                $('#example2 tbody').append(
-                    '<tr id="tr-id-' + countRows + '">' +
-                    '<td><input type="text" name="site_donor_' + countRows + '" class="form form-control" required></td>' +
-                    '<td><input type="text" name="link_' + countRows + '" class="form form-control" required></td>' +
-                    '<td><input type="text" name="anchor_' + countRows + '" class="form form-control" required></td>' +
-                    '<td><select class="form-select rounded-0" name="nofollow_' + countRows + '" id=""><option value="1">{{ __("Yes") }}</option><option value="0">{{ __("No") }}</option></select></td>' +
-                    '<td><select class="form-select rounded-0" name="noindex_' + countRows + '" id=""><option value="1">{{ __("Yes") }}</option><option value="0">{{ __("No") }}</option></select></td>' +
-                    '</tr>'
-                );
-            });
-
-            $('#removeRow').click(function () {
-                $('#tr-id-' + countRows).remove();
-                countRows--;
-                $('#countRows').val(countRows)
-                if (countRows == 1) {
-                    $('#removeRow').hide(100)
-                }
-            });
-
-            $('.monitoring-options').select2({
-                selectOnClose: true,
-                sorter: function (el) {
-                    return el.sort((a, b) => {
-                        a = a.text.toLowerCase();
-                        b = b.text.toLowerCase();
-                        return ((a < b) ? -1 : ((a > b) ? 1 : 0));
-                    });
-                },
-            });
-        </script>
+        @include('backlink.partials.form-mode-js', ['syncMonitoring' => true])
     @endslot
 @endcomponent

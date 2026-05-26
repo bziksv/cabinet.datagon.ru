@@ -1,120 +1,63 @@
 @component('component.card', ['title' => __('Add partner')])
-    <div class="card-body">
-        <div class="mb-3">
-            <a href="{{ route('partners.add.group') }}" class="btn btn-outline-secondary">{{ __('Add group') }}</a>
-            <a href="{{ route('partners.add.item') }}" class="btn btn-outline-secondary">{{ __('Add partner') }}</a>
-            <a href="{{ route('partners.admin') }}"
-               class="btn btn-outline-secondary">{{ __('Partners (admins)') }}</a>
-            <a href="{{ route('partners') }}" class="btn btn-outline-secondary">{{ __('Partners (users)') }}</a>
+    @slot('css')
+        @include('partners.partials.styles')
+    @endslot
+
+    <div class="cabinet-partners-page">
+        @include('partners.partials.admin-nav', ['active' => 'add-item', 'admin' => true])
+
+        <div class="card shadow-sm border cabinet-partners-form-card">
+            <div class="card-body">
+                <p class="small text-secondary mb-3">{{ __('Partners add item hint') }}</p>
+
+                <form action="{{ route('partners.save.item') }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+
+                    <div class="mb-3">
+                        <label class="form-label" for="partners_groups_id">{{ __('Group Name') }}</label>
+                        <select name="partners_groups_id" id="partners_groups_id" class="form-select form-select-sm" required>
+                            @foreach($groups as $group)
+                                <option value="{{ $group->id }}" @if(old('partners_groups_id') == $group->id) selected @endif>
+                                    {{ $group->name_ru }} / {{ $group->name_en }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="position">{{ __('Position') }}</label>
+                        <input type="number" name="position" id="position" class="form-control form-control-sm" required value="{{ old('position') }}">
+                        <p class="form-text small mb-0">{{ __('Partners position hint') }}</p>
+                    </div>
+
+                    @include('partners.partials.locale-fields', ['prefix' => 'ru', 'visible' => (bool) old('auditorium_ru')])
+                    @include('partners.partials.locale-fields', ['prefix' => 'en', 'visible' => (bool) old('auditorium_en')])
+
+                    <div class="mb-3">
+                        <label class="form-label" for="image">{{ __('Image') }}</label>
+                        <input type="file"
+                               name="image"
+                               id="image"
+                               class="form-control form-control-sm"
+                               accept=".jpg,.jpeg,.png"
+                               required>
+                        <p class="form-text small mb-0">JPEG, PNG · max 2 MB</p>
+                    </div>
+
+                    @include('partners.partials.form-errors')
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="bi bi-check-lg me-1" aria-hidden="true"></i>{{ __('Add') }}
+                        </button>
+                        <a href="{{ route('partners.admin') }}" class="btn btn-outline-secondary btn-sm">{{ __('Cancel') }}</a>
+                    </div>
+                </form>
+            </div>
         </div>
-        <form action="{{ route('partners.save.item') }}" method="POST" class="w-50"
-              enctype="multipart/form-data">
-            @csrf
-
-            <div class="form-group required">
-                <label>{{ __('Group Name') }}</label>
-                <select name="partners_groups_id" id="partners_groups_id" class="form-select">
-                    @foreach($groups as $group)
-                        <option value="{{ $group->id }}">{{ $group->name_ru }} / {{ $group->name_en }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div class="form-group required">
-                <div>
-                    <label for="auditorium_ru">Ru</label>
-                    <input type="checkbox" name="auditorium_ru" id="auditorium_ru">
-                </div>
-
-                <div id="ru" style="display: none">
-                    <div class="form-group required">
-                        <label>{{ __('Partner name') }} (ru)</label>
-                        <input type="text" name="name_ru" class="form form-control ru-input">
-                    </div>
-
-                    <div class="form-group required">
-                        <label>{{ __('Link') }} (ru)</label>
-                        <input type="text" name="link_ru" class="form form-control ru-input">
-                    </div>
-
-                    <div class="form-group required">
-                        <label>{{ __('Partner description') }} (ru)</label>
-                        <textarea name="description_ru" cols="8" rows="8"
-                                  class="form form-control ru-input"></textarea>
-                    </div>
-                </div>
-
-                <div>
-                    <label for="auditorium_en">Eng</label>
-                    <input type="checkbox" name="auditorium_en" id="auditorium_en">
-                </div>
-
-                <div id="en" style="display: none">
-                    <div class="form-group required">
-                        <label>{{ __('Partner name') }} (en)</label>
-                        <input type="text" name="name_en" class="form form-control en-input">
-                    </div>
-
-                    <div class="form-group required">
-                        <label>{{ __('Link') }} (en)</label>
-                        <input type="text" name="link_en" class="form form-control en-input">
-                    </div>
-
-                    <div class="form-group required">
-                        <label>{{ __('Partner description') }} (en)</label>
-                        <textarea name="description_en" cols="8" rows="8" class="form form-control en-input"></textarea>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-group required">
-                <label>{{ __('Position') }}</label>
-                <input type="number" name="position" class="form form-control" required>
-            </div>
-
-
-            <div class="form-group">
-                {!! Form::label('image', __('Image')) !!}
-                <div class="input-group">
-                    <div class="custom-file">
-                        {!! Form::file('image', ['class' => 'custom-file-input', 'accept' => '.jpg, .jpeg, .png']) !!}
-                        {!! Form::label('image', __('Choose img'), ['class' => 'custom-file-label', 'for' => 'customFile']) !!}
-                    </div>
-                </div>
-            </div>
-
-            @if ($errors->any())
-                <div class="mb-3 mt-3">
-                    @foreach ($errors->all() as $error)
-                        <div class="text-danger">{{ $error }}</div>
-                    @endforeach
-                </div>
-            @endif
-
-            <input type="submit" class="btn btn-secondary" value="{{ __('Add') }}">
-        </form>
     </div>
-    @slot('js')
-        <script>
-            $('#auditorium_ru').on('click', function () {
-                if ($(this).is(':checked')) {
-                    $('#ru').show(300)
-                    $('.ru-input').prop('required', true);
-                } else {
-                    $('#ru').hide(300)
-                    $('.ru-input').prop('required', false);
-                }
-            })
 
-            $('#auditorium_en').on('click', function () {
-                if ($(this).is(':checked')) {
-                    $('#en').show(300)
-                    $('.en-input').prop('required', true);
-                } else {
-                    $('#en').hide(300)
-                    $('.en-input').prop('required', false);
-                }
-            })
-        </script>
+    @slot('js')
+        @include('partners.partials.locale-fields-js')
     @endslot
 @endcomponent

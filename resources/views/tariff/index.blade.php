@@ -72,10 +72,13 @@
     $siteMonEmailRow = $makeEmailAlertsRow('site-mon-email');
     $domainInfoEmailLabel = __('Domain information email alerts');
     $domainInfoEmailRow = $makeEmailAlertsRow('domain-info-email');
+    $backlinkEmailLabel = __('Backlink email alerts');
+    $backlinkEmailRow = $makeEmailAlertsRow('backlink-email');
 
     $orderedFeatureRows = [];
     $siteMonInserted = false;
     $domainInfoInserted = false;
+    $backlinkInserted = false;
     foreach ($featureRows as $featureName => $row) {
         $orderedFeatureRows[$featureName] = $row;
         $featureLower = mb_strtolower($featureName);
@@ -95,12 +98,23 @@
             $orderedFeatureRows[$domainInfoEmailLabel] = $domainInfoEmailRow;
             $domainInfoInserted = true;
         }
+        if (!$backlinkInserted && (
+            Str::contains($featureLower, 'размещенных ссылок')
+            || Str::contains($featureLower, 'размещённых ссылок')
+            || Str::contains($featureName, 'Backlink')
+        )) {
+            $orderedFeatureRows[$backlinkEmailLabel] = $backlinkEmailRow;
+            $backlinkInserted = true;
+        }
     }
     if (!$siteMonInserted) {
         $orderedFeatureRows[$siteMonEmailLabel] = $siteMonEmailRow;
     }
     if (!$domainInfoInserted) {
         $orderedFeatureRows[$domainInfoEmailLabel] = $domainInfoEmailRow;
+    }
+    if (!$backlinkInserted) {
+        $orderedFeatureRows[$backlinkEmailLabel] = $backlinkEmailRow;
     }
     $featureRows = $orderedFeatureRows;
 @endphp

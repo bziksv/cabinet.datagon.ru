@@ -119,7 +119,39 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function sendBrokenLinkNotification($request, $link)
     {
-        $this->notify(new BrokenLinkNotification($request, $link));
+        $this->sendBrokenLinkAlerts($request, $link);
+    }
+
+    /**
+     * Оповещения по проблемной ссылке: Telegram (все тарифы при подключённом боте), email — платные.
+     */
+    public function sendBrokenLinkAlerts($error, $link): void
+    {
+        if ($this->canReceiveBacklinkEmail()) {
+            $this->notify(new BrokenLinkNotification($error, $link));
+        }
+
+    }
+
+    /**
+     * Telegram: одно сообщение на проект (сводка по числу проблемных ссылок).
+     */
+    public function sendBrokenLinkProjectTelegram(ProjectTracking $project, int $problemCount, bool $isTest = false): void
+    {
+        if (!config('cabinet-backlink.notifications.telegram_enabled', true) || !$this->isTelegramConnected()) {
+            return;
+        }
+
+        TelegramBot::brokenLinkProjectNotification($project, $this->chat_id, $problemCount, $isTest);
+    }
+
+    public function receivesBacklinkExternalAlerts(): bool
+    {
+        if (config('cabinet-backlink.notifications.telegram_enabled', true) && $this->isTelegramConnected()) {
+            return true;
+        }
+
+        return $this->canReceiveBacklinkEmail();
     }
 
     /**
@@ -145,6 +177,14 @@ class User extends Authenticatable implements MustVerifyEmail
      * Email-оповещения «Срок регистрации доменов» — только на платных тарифах.
      */
     public function canReceiveDomainInformationEmail(): bool
+    {
+        return !$this->onFreeTariff();
+    }
+
+    /**
+     * Email-оповещения «Отслеживание ссылок» — только на платных тарифах.
+     */
+    public function canReceiveBacklinkEmail(): bool
     {
         return !$this->onFreeTariff();
     }

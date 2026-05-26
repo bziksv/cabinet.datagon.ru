@@ -32,12 +32,116 @@ class BacklinkController extends Controller
     public function index()
     {
         $backlinks = ProjectTracking::where('user_id', '=', Auth::id())->get();
+        $user = Auth::user();
+        $onFreeTariff = $user->onFreeTariff();
+        $telegramConnected = $user->isTelegramConnected();
 
         if (count($backlinks) === 0) {
             return $this->createView();
         }
 
-        return view('backlink.index', compact('backlinks'));
+        $isAdmin = User::isUserAdmin();
+        $brokenLinksCount = $isAdmin
+            ? LinkTracking::whereIn('project_tracking_id', $backlinks->pluck('id'))->where('broken', true)->count()
+            : 0;
+
+        return view('backlink.index', compact(
+            'backlinks',
+            'onFreeTariff',
+            'telegramConnected',
+            'isAdmin',
+            'brokenLinksCount'
+        ));
+    }
+
+    /**
+     * Тест Telegram-оповещений по проблемным ссылкам (только admin).
+     */
+    public function testTelegramAlerts(Request $request): RedirectResponse
+    {
+        if (!User::isUserAdmin()) {
+            abort(403);
+        }
+
+        /** @var User $user */
+        $user = Auth::user();
+
+        if (!$user->isTelegramConnected()) {
+            flash()->overlay(__('Backlink test telegram no bot'), __('Error'))->error();
+
+            return Redirect::to(route('profile.index') . '#telegram');
+        }
+
+        $projectIds = ProjectTracking::where('user_id', $user->id)->pluck('id');
+        if ($projectIds->isEmpty()) {
+            flash()->overlay(__('Backlink test telegram no projects'), ' ')->warning();
+
+            return Redirect::route('backlink');
+        }
+
+        $links = LinkTracking::with('project')
+            ->whereIn('project_tracking_id', $projectIds)
+            ->where('broken', true)
+            ->get();
+
+        if ($links->isEmpty()) {
+            flash()->overlay(__('Backlink test telegram no broken'), ' ')->info();
+
+            return Redirect::route('backlink');
+        }
+
+        $crone = new CroneController();
+        $projectsNotified = 0;
+        $linksSkipped = 0;
+        $maxProjects = (int) config('cabinet-backlink.notifications.test_max_per_run', 10);
+
+        foreach ($links->groupBy('project_tracking_id') as $projectId => $projectLinks) {
+            if ($projectsNotified >= $maxProjects) {
+                break;
+            }
+
+            $project = ProjectTracking::find($projectId);
+            if (!$project) {
+                continue;
+            }
+
+            $problemCount = 0;
+            foreach ($projectLinks as $link) {
+                $crone->result = [];
+                $crone->analyseLink(
+                    $link->site_donor,
+                    $link->link,
+                    $link->anchor,
+                    (bool) $link->nofollow,
+                    (bool) $link->noindex
+                );
+
+                if (isset($crone->result['error'])) {
+                    $problemCount++;
+                } else {
+                    $linksSkipped++;
+                }
+            }
+
+            if ($problemCount > 0) {
+                $user->sendBrokenLinkProjectTelegram($project, $problemCount, true);
+                $projectsNotified++;
+            } else {
+                $user->sendBrokenLinkProjectTelegram($project, 0, true);
+                $projectsNotified++;
+            }
+        }
+
+        if ($projectsNotified > 0) {
+            flash()->overlay(
+                __('Backlink test telegram sent', ['count' => $projectsNotified, 'skipped' => $linksSkipped]),
+                ' '
+            )->success();
+        } else {
+            flash()->overlay(__('Backlink test telegram none sent', ['skipped' => $linksSkipped]), ' ')->warning();
+        }
+
+        return Redirect::route('backlink');
     }
 
     public function createView()
@@ -59,13 +163,25 @@ class BacklinkController extends Controller
         }
 
         $monitoring = $this->getMonitoringOptions();
+        $onFreeTariff = $user->onFreeTariff();
+        $telegramConnected = $user->isTelegramConnected();
 
-        return view('backlink.create', compact('monitoring'));
+        return view('backlink.create', compact('monitoring', 'onFreeTariff', 'telegramConnected'));
     }
 
     public function addLinkView($id)
     {
-        return view('backlink.add-backlink', compact('id'));
+        $project = ProjectTracking::findOrFail($id);
+
+        if ($project->user_id !== Auth::id() && !User::isUserAdmin()) {
+            return abort(403);
+        }
+
+        $user = Auth::user();
+        $onFreeTariff = $user->onFreeTariff();
+        $telegramConnected = $user->isTelegramConnected();
+
+        return view('backlink.add-backlink', compact('id', 'project', 'onFreeTariff', 'telegramConnected'));
     }
 
     public function remove($id): RedirectResponse
@@ -85,8 +201,11 @@ class BacklinkController extends Controller
         }
 
         $monitoring = $this->getMonitoringOptions();
+        $user = Auth::user();
+        $onFreeTariff = $user->onFreeTariff();
+        $telegramConnected = $user->isTelegramConnected();
 
-        return view('backlink.show', compact('project', 'monitoring'));
+        return view('backlink.show', compact('project', 'monitoring', 'onFreeTariff', 'telegramConnected'));
     }
 
     public function storeLink(Request $request): RedirectResponse
@@ -436,10 +555,11 @@ class BacklinkController extends Controller
     {
         /** @var User $user */
         $user = Auth::user();
-        $options = [null => ' ' . __('Select an option')];
+        $options = ['' => __('Backlink monitoring placeholder')];
 
-        foreach ($user->monitoringProjects as $item)
+        foreach ($user->monitoringProjects as $item) {
             $options[$item['id']] = $item['name'];
+        }
 
         return $options;
     }

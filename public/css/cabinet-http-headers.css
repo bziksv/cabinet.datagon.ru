@@ -1,0 +1,152 @@
+/* HTTP-заголовки — AdminLTE 4 / BS5 */
+
+.cabinet-hh-page {
+    --cabinet-hh-radius: 0.75rem;
+    --cabinet-hh-gap: 1.25rem;
+}
+
+.cabinet-hh-page > * + * {
+    margin-top: var(--cabinet-hh-gap);
+}
+
+.cabinet-hh-lead {
+    border-radius: var(--cabinet-hh-radius);
+    border: 1px solid var(--bs-border-color);
+    background: linear-gradient(135deg, var(--bs-body-bg) 0%, var(--bs-tertiary-bg) 100%);
+}
+
+.cabinet-hh-lead__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.625rem;
+    background: rgba(var(--bs-primary-rgb), 0.12);
+    color: var(--bs-primary);
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.cabinet-hh-module-nav {
+    border-radius: var(--cabinet-hh-radius);
+}
+
+.cabinet-hh-module-nav__list .nav-link {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.cabinet-hh-module-nav__list .nav-link:not(.active) {
+    color: var(--bs-secondary-color);
+}
+
+.cabinet-hh-panel {
+    border-radius: var(--cabinet-hh-radius);
+    border: 1px solid var(--bs-border-color);
+}
+
+.cabinet-hh-panel .card-header {
+    background: var(--bs-tertiary-bg);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.cabinet-hh-step-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.cabinet-hh-step-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: var(--bs-primary);
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.cabinet-hh-kpi .info-box {
+    min-height: 100%;
+    border-radius: var(--cabinet-hh-radius);
+}
+
+.cabinet-hh-codes-summary .badge {
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.cabinet-hh-results-table thead th {
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+.cabinet-hh-results-table tbody td {
+    font-size: 0.875rem;
+    vertical-align: middle;
+}
+
+.cabinet-hh-results-table .cabinet-hh-url-cell {
+    word-break: break-all;
+    max-width: 28rem;
+}
+
+.cabinet-hh-progress {
+    height: 0.5rem;
+    border-radius: 1rem;
+}
+
+.cabinet-hh-page .dt-buttons {
+    padding: 0.5rem 0 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.cabinet-hh-page .dt-buttons .btn {
+    font-size: 0.8125rem;
+}
+
+.cabinet-hh-share .input-group-text {
+    cursor: pointer;
+}
+
+.cabinet-hh-share .input-group-text:hover {
+    background: var(--bs-tertiary-bg);
+}
+
+.cabinet-hh-result-card .table {
+    margin-bottom: 0;
+    font-size: 0.875rem;
+}
+
+.cabinet-hh-result-card .table td:first-child {
+    width: 30%;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.cabinet-hh-html-card .CodeMirror {
+    border: 0;
+    border-radius: 0 0 var(--cabinet-hh-radius) var(--cabinet-hh-radius);
+    min-height: 12rem;
+    font-size: 0.8125rem;
+}
+
+.cabinet-hh-settings-page .cabinet-hh-module-nav {
+    margin-bottom: 1rem;
+}
+
+#response-code {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cabinet-hh-gap);
+}

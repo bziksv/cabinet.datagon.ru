@@ -92,3 +92,4 @@ Route::post('demo/klasterizator-klyuchevykh-slov/poll', 'Api\\Demo\\ClusterDemoC
 Route::post('demo/monitoring-saytov/run', 'Api\\Demo\\SiteMonitoringDemoController@run');
 Route::post('demo/proverka-meta-tegov-online/run', 'Api\\Demo\\MetaTagsDemoController@run');
 Route::post('demo/otslezhivanie-sroka-registratsii-domenov/run', 'Api\\Demo\\DomainInformationDemoController@run');
+Route::post('demo/otslezhivanie-ssylok/run', 'Api\\Demo\\BacklinkDemoController@run');

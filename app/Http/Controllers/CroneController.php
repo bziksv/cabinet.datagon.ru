@@ -6,6 +6,7 @@ use App\DomainInformation;
 use App\DomainMonitoring;
 use App\LinkTracking;
 use App\ProjectTracking;
+use App\User;
 use Illuminate\Support\Facades\Log;
 use PHPUnit\Exception;
 
@@ -51,9 +52,12 @@ class CroneController extends Controller
     public function scanBrokenLinks()
     {
         try {
-            $links = LinkTracking::where('broken', '=', true)->get();
+            $links = LinkTracking::with('project.user')->where('broken', '=', true)->get();
+            $telegramByUserProject = [];
+
             foreach ($links->chunk(5) as $links) {
                 foreach ($links as $link) {
+                    $this->result = [];
                     $this->analyseLink(
                         $link->site_donor,
                         $link->link,
@@ -63,13 +67,36 @@ class CroneController extends Controller
                     );
                     if (isset($this->result['error'])) {
                         if (!(boolean)$link->mail_sent) {
-                            $link->project->user->sendBrokenLinkNotification($this->result['error'], $link);
+                            $user = $link->project ? $link->project->user : null;
+                            if ($user) {
+                                $user->sendBrokenLinkAlerts($this->result['error'], $link);
+                                $projectId = $link->project_tracking_id;
+                                if (!isset($telegramByUserProject[$user->id][$projectId])) {
+                                    $telegramByUserProject[$user->id][$projectId] = [
+                                        'project' => $link->project,
+                                        'count' => 0,
+                                    ];
+                                }
+                                $telegramByUserProject[$user->id][$projectId]['count']++;
+                            }
                             $this->saveResult($link, true, true);
                         } else {
                             $this->saveResult($link, true);
                         }
                     } else {
                         $this->saveResult($link, false, false);
+                    }
+                }
+            }
+
+            foreach ($telegramByUserProject as $userId => $projects) {
+                $user = User::find($userId);
+                if (!$user) {
+                    continue;
+                }
+                foreach ($projects as $data) {
+                    if ($data['count'] > 0 && $data['project']) {
+                        $user->sendBrokenLinkProjectTelegram($data['project'], $data['count'], false);
                     }
                 }
             }

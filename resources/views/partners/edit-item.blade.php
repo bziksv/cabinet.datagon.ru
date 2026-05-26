@@ -1,140 +1,74 @@
 @component('component.card', ['title' => __('Edit information about partner ')])
-    <div class="card-body">
-        <div class="mb-3">
-            <a href="{{ route('partners.add.group') }}" class="btn btn-outline-secondary">{{ __('Add group') }}</a>
-            <a href="{{ route('partners.add.item') }}" class="btn btn-outline-secondary">{{ __('Add partner') }}</a>
-            <a href="{{ route('partners.admin') }}" class="btn btn-outline-secondary">{{ __('Partners (admins)') }}</a>
-            <a href="{{ route('partners') }}" class="btn btn-outline-secondary">{{ __('Partners (users)') }}</a>
+    @slot('css')
+        @include('partners.partials.styles')
+    @endslot
+
+    <div class="cabinet-partners-page">
+        @include('partners.partials.admin-nav', ['active' => 'admin', 'admin' => true])
+
+        <div class="card shadow-sm border cabinet-partners-form-card">
+            <div class="card-body">
+                <form action="{{ route('partners.save.edit.item') }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <input type="hidden" name="id" value="{{ $item->id }}">
+
+                    <div class="mb-3">
+                        <label class="form-label" for="partners_groups_id">{{ __('Group Name') }}</label>
+                        <select name="partners_groups_id" id="partners_groups_id" class="form-select form-select-sm" required>
+                            @foreach($groups as $group)
+                                <option value="{{ $group->id }}" @if(old('partners_groups_id', $item->partners_groups_id) == $group->id) selected @endif>
+                                    {{ $group->name_ru }} / {{ $group->name_en }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="position">{{ __('Position') }}</label>
+                        <input type="number" name="position" id="position" class="form-control form-control-sm" required value="{{ old('position', $item->position) }}">
+                    </div>
+
+                    @include('partners.partials.locale-fields', [
+                        'prefix' => 'ru',
+                        'visible' => (bool) old('auditorium_ru', $item->auditorium_ru),
+                        'item' => $item,
+                    ])
+                    @include('partners.partials.locale-fields', [
+                        'prefix' => 'en',
+                        'visible' => (bool) old('auditorium_en', $item->auditorium_en),
+                        'item' => $item,
+                    ])
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ __('Current Image') }}</label>
+                        <div class="mb-2">
+                            <img class="cabinet-partners-preview-img"
+                                 src="{{ cabinet_storage_url($item['image']) }}"
+                                 alt="{{ $item['name_ru'] ?? '' }}">
+                        </div>
+                        <label class="form-label" for="image">{{ __('Image') }}</label>
+                        <input type="file"
+                               name="image"
+                               id="image"
+                               class="form-control form-control-sm"
+                               accept=".jpg,.jpeg,.png">
+                        <p class="form-text small mb-0">{{ __('Choose new img') }}</p>
+                    </div>
+
+                    @include('partners.partials.form-errors')
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="bi bi-check-lg me-1" aria-hidden="true"></i>{{ __('Save') }}
+                        </button>
+                        <a href="{{ route('partners.admin') }}" class="btn btn-outline-secondary btn-sm">{{ __('Cancel') }}</a>
+                    </div>
+                </form>
+            </div>
         </div>
-        <form action="{{ route('partners.save.edit.item') }}" method="POST" class="w-50"
-              enctype="multipart/form-data">
-            @csrf
-
-            <div class="form-group required">
-                <label>{{ __('Group Name') }}</label>
-                <select name="partners_groups_id" id="partners_groups_id" class="form-select">
-                    <option value="{{ $item->partner->id }}">
-                        {{ $item->partner->name_ru }}/ {{ $item->partner->name_en }}
-                    </option>
-                    @foreach($groups as $group)
-                        @if($item->partner->id === $group->id)
-                            @continue
-                        @endif
-                        <option value="{{ $group->id }}">{{ $group->name_ru }} / {{ $group->name_en }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div class="form-group required">
-                <label>{{ __('Position') }}</label>
-                <input type="number" name="position" class="form form-control" value="{{ $item->position }}"
-                       required>
-            </div>
-
-            <div class="form-group required">
-                <div>
-                    <label for="auditorium_ru">Ru</label>
-                    <input type="checkbox" name="auditorium_ru" id="auditorium_ru"
-                           @if($item['auditorium_ru']) checked @endif>
-                </div>
-
-                <div id="ru" @if(!$item['auditorium_ru']) style="display: none" @endif>
-                    <div class="form-group required">
-                        <label>{{ __('Partner name') }} (ru)</label>
-                        <input type="text" name="name_ru" class="form form-control ru-input"
-                               value="{{ $item['name_ru'] }}">
-                    </div>
-
-                    <div class="form-group required">
-                        <label>{{ __('Link') }} (ru)</label>
-                        <input type="text" name="link_ru" class="form form-control ru-input"
-                               value="{{ $item['link_ru'] }}">
-                    </div>
-
-                    <div class="form-group required">
-                        <label>{{ __('Partner description') }} (ru)</label>
-                        <textarea name="description_ru" cols="8" rows="8"
-                                  class="form form-control ru-input">{{ $item['description_ru'] }}</textarea>
-                    </div>
-                </div>
-
-                <div>
-                    <label for="auditorium_en">Eng</label>
-                    <input type="checkbox" name="auditorium_en" id="auditorium_en"
-                           @if($item['auditorium_en']) checked @endif>
-                </div>
-
-                <div id="en" @if(!$item['auditorium_en']) style="display: none" @endif>
-                    <div class="form-group required">
-                        <label>{{ __('Partner name') }} (en)</label>
-                        <input type="text" name="name_en" class="form form-control en-input"
-                               value="{{ $item['name_en'] }}">
-                    </div>
-
-                    <div class="form-group required">
-                        <label>{{ __('Link') }} (en)</label>
-                        <input type="text" name="link_en" class="form form-control en-input"
-                               value="{{ $item['link_en'] }}">
-                    </div>
-
-                    <div class="form-group required">
-                        <label>{{ __('Partner description') }} (en)</label>
-                        <textarea name="description_en" cols="8" rows="8"
-                                  class="form form-control en-input">{{ $item['description_en'] }}</textarea>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <div>
-                    <label>{{ __('Current Image') }}</label>
-                    <img class="card-img-top" src="{{ cabinet_storage_url($item['image']) }}" alt="{{ $item['name_ru'] }}"
-                         style="width: 100px; height: 100px;">
-                </div>
-
-                {!! Form::label('image', __('Image')) !!}
-                <div class="input-group">
-                    <div class="custom-file">
-                        {!! Form::file('image', ['class' => 'custom-file-input', 'id' => 'customFile', 'accept' => '.jpg, .jpeg, .png']) !!}
-                        {!! Form::label('image', __('Choose new img'), ['class' => 'custom-file-label', 'for' => 'customFile']) !!}
-                    </div>
-                </div>
-            </div>
-
-            @if ($errors->any())
-                <div class="mb-3 mt-3">
-                    @foreach ($errors->all() as $error)
-                        <div class="text-danger">{{ $error }}</div>
-                    @endforeach
-                </div>
-            @endif
-
-            <input type="hidden" name="id" value="{{ $item->id }}">
-
-            <input type="submit" class="btn btn-secondary" value="{{ __('Save') }}">
-        </form>
     </div>
-    @slot('js')
-        <script>
-            $('#auditorium_ru').on('click', function () {
-                if ($(this).is(':checked')) {
-                    $('#ru').show(300)
-                    $('.ru-input').prop('required', true);
-                } else {
-                    $('#ru').hide(300)
-                    $('.ru-input').prop('required', false);
-                }
-            })
 
-            $('#auditorium_en').on('click', function () {
-                if ($(this).is(':checked')) {
-                    $('#en').show(300)
-                    $('.en-input').prop('required', true);
-                } else {
-                    $('#en').hide(300)
-                    $('.en-input').prop('required', false);
-                }
-            })
-        </script>
+    @slot('js')
+        @include('partners.partials.locale-fields-js')
     @endslot
 @endcomponent

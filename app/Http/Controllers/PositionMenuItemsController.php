@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\MenuItemsPosition;
 use App\Services\MenuProjectRegistry;
-use App\Services\MenuUnpublishedModules;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,13 +14,9 @@ class PositionMenuItemsController extends Controller
     {
         MenuProjectRegistry::ensureAllLoaded();
         $items = MenuItemsPosition::sortMenu();
-        $menuExtras = MenuUnpublishedModules::summaryForUser();
 
         return view('positions.index', [
             'items' => $items,
-            'unpublishedModules' => $menuExtras['catalogHidden'],
-            'moduleExtraPages' => $menuExtras['moduleExtraPages'],
-            'outsideCatalog' => $menuExtras['outsideCatalog'],
         ]);
     }
 

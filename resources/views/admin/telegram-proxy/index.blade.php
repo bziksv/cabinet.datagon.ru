@@ -352,7 +352,16 @@
                         <tbody>
                         @foreach($modules as $module)
                             <tr>
-                                <td class="fw-medium">{{ $module['title'] }}</td>
+                                <td class="fw-medium">
+                                    @if(!empty($module['notify_hint']))
+                                        <span class="cabinet-tg-module-name"
+                                              data-bs-toggle="tooltip"
+                                              data-bs-placement="top"
+                                              title="{{ $module['notify_hint'] }}">{{ $module['title'] }}</span>
+                                    @else
+                                        {{ $module['title'] }}
+                                    @endif
+                                </td>
                                 <td class="small">
                                     @if(!empty($module['url']))
                                         <a href="{{ $module['url'] }}">{{ $module['url'] }}</a>
@@ -380,6 +389,14 @@
 @section('js')
 <script>
 (function () {
+    if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+        document.querySelectorAll('.cabinet-telegram-proxy-page [data-bs-toggle="tooltip"]').forEach(function (el) {
+            if (!bootstrap.Tooltip.getInstance(el)) {
+                new bootstrap.Tooltip(el);
+            }
+        });
+    }
+
     var $pre = $('#cabinet-tg-proxy-debug-log');
     $('#cabinet-tg-proxy-debug-copy').on('click', function () {
         var text = $pre.text();

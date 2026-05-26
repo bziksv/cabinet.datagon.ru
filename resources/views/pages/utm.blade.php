@@ -1,22 +1,29 @@
-@component('component.card', ['title' => __('UTM Marks')])
+@component('component.card', [
+    'title' => __('UTM Marks'),
+    'titleHtml' => e(__('UTM Marks')) . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-utm-marks'])->render(),
+])
 
     @slot('css')
-        <link rel='stylesheet' id='swpc-main-css' href='{{ asset('plugins/utm-marks/css/style.css') }}' type='text/css'
-              media='all'/>
-
+        {{-- Сначала legacy, поверх — cabinet (иначе float/кнопки из style.css ломают вёрстку) --}}
+        <link rel="stylesheet" href="{{ asset('plugins/utm-marks/css/style.css') }}" media="all">
+        <link rel="stylesheet" href="{{ asset('css/cabinet-utm-marks.css') }}?v={{ @filemtime(public_path('css/cabinet-utm-marks.css')) ?: time() }}">
         <style>
-            .UTM {
+            #header-nav-bar .cabinet-header-limits-menu tr.UtmMarks {
                 background: oldlace;
             }
         </style>
     @endslot
 
-    <div class="grid urlBuilder mt-base">
-        <div class="grid_c grid_c-1of2">
+    <div class="cabinet-utm-page">
+        <p class="cabinet-utm-lead text-secondary mb-4">
+            {{ __('Build a tracking URL with utm_source, utm_medium, utm_campaign and optional parameters. Choose a template for Yandex.Direct, Google Ads, VK or myTarget — or fill in the fields manually.') }}
+        </p>
+
+    <div class="urlBuilder">
             <div class="urlBuilder_form">
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="urlBuilder_step">{{ __('Step 1. Landing page') }}</div>
+                <div class="row g-3 align-items-start">
+                    <div class="col-md-8">
+                        <div class="urlBuilder_step" data-step="1">{{ __('Step 1. Landing page') }}</div>
                         <div class="urlBuilder_el urlBuilder_el-url">
                             <div class="urlBuilder_el_label">
                                 {{ __('Enter the page address:') }}
@@ -24,7 +31,7 @@
                             </div>
                             <div class="urlBuilder_el_input">
                                 <input id="urlBuilderUrl" type="text"></div>
-                            <div class="urlBuilder_el_tip">Пример: https://prime-ltd.su/nashi-servisyi/</div>
+                            <div class="urlBuilder_el_tip">{{ __('Example') }}: https://example.com/landing/</div>
                         </div>
 
                         <div class="urlBuilder_el urlBuilder_el-urls hide">
@@ -46,23 +53,17 @@
                         <div class="urlBuilder_tpl">
                             <div class="urlBuilder_tpl_title">{{ __('Sample:') }}</div>
                             <div class="urlBuilder_tpl_items">
-                                <span class="active btn btn-secondary btn-flat click_tracking" data-id="custom" data-click="Arbitrary">{{ __('Arbitrary') }}</span>
-                                <span data-id="direct"
-                                      class="btn btn-secondary btn-flat click_tracking" data-click="Yandex_Direct">{{ __('Yandex.Direct') }}</span>
-                                <span data-id="adwords"
-                                      class="btn btn-secondary btn-flat click_tracking" data-click="Google AdWords">{{ __('Google AdWords') }}</span>
-                                <span data-id="vk" class="btn btn-secondary btn-flat click_tracking" data-click="VK targeting">{{ __('VK targeting') }}</span>
-                                <span data-id="mailru" class="btn btn-secondary btn-flat click_tracking" data-click="myTarget">{{ __('myTarget') }}</span>
+                                <span class="active click_tracking" data-id="custom" data-click="Вручную">{{ __('Arbitrary') }}</span>
+                                <span data-id="direct" class="click_tracking" data-click="Yandex_Direct">{{ __('Yandex.Direct') }}</span>
+                                <span data-id="adwords" class="click_tracking" data-click="Google AdWords">{{ __('Google AdWords') }}</span>
+                                <span data-id="vk" class="click_tracking" data-click="VK targeting">{{ __('VK targeting') }}</span>
+                                <span data-id="mailru" class="click_tracking" data-click="myTarget">{{ __('myTarget') }}</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="urlBuilder_step">{{ __('Step 2. Basic parameters') }}</div>
-                    </div>
-                </div>
+                <div class="urlBuilder_step" data-step="2">{{ __('Step 2. Basic parameters') }}</div>
 
                 <div class="urlBuilder_el">
 
@@ -86,10 +87,10 @@
 
                             <div class="col-md-4">
                                 <div class="urlBuilder_el_input_items">
-                                    <span class="btn btn-secondary btn-flat">yandex</span>
-                                    <span class="btn btn-secondary btn-flat">google</span>
-                                    <span class="btn btn-secondary btn-flat">vk</span>
-                                    <span class="btn btn-secondary btn-flat">target-mail</span>
+                                    <span>yandex</span>
+                                    <span>google</span>
+                                    <span>vk</span>
+                                    <span>target-mail</span>
                                 </div>
                             </div>
 
@@ -138,11 +139,11 @@
 
                             <div class="col-md-4">
                                 <div class="urlBuilder_el_input_items">
-                                    <span class="btn btn-secondary btn-flat">cpc</span>
-                                    <span class="btn btn-secondary btn-flat">cpv</span>
-                                    <span class="btn btn-secondary btn-flat">cpm</span>
-                                    <span class="btn btn-secondary btn-flat">email</span>
-                                    <span class="btn btn-secondary btn-flat">banner</span>
+                                    <span>cpc</span>
+                                    <span>cpv</span>
+                                    <span>cpm</span>
+                                    <span>email</span>
+                                    <span>banner</span>
                                 </div>
                             </div>
 
@@ -195,9 +196,9 @@
 
                             <div class="col-md-4">
                                 <div class="urlBuilder_el_input_items">
-                                    <span class="btn btn-secondary btn-flat">{campaign_id}</span>
-                                    <span class="btn btn-secondary btn-flat">{campaignid}</span>
-                                    <span class="btn btn-secondary btn-flat">@{{campaign_id}}</span>
+                                    <span>{campaign_id}</span>
+                                    <span>{campaignid}</span>
+                                    <span>@{{campaign_id}}</span>
                                 </div>
                             </div>
 
@@ -226,11 +227,7 @@
 
                 </div>
 
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="urlBuilder_step">{{ __('Step 3. Additional parameters') }}</div>
-                    </div>
-                </div>
+                <div class="urlBuilder_step" data-step="3">{{ __('Step 3. Additional parameters') }}</div>
 
                 <div class="urlBuilder_el">
 
@@ -254,9 +251,9 @@
 
                             <div class="col-md-4">
                                 <div class="urlBuilder_el_input_items">
-                                    <span class="btn btn-secondary btn-flat">{ad_id}</span>
-                                    <span class="btn btn-secondary btn-flat">{creative}</span>
-                                    <span class="btn btn-secondary btn-flat">@{{banner_id}}</span>
+                                    <span>{ad_id}</span>
+                                    <span>{creative}</span>
+                                    <span>@{{banner_id}}</span>
                                 </div>
                             </div>
                         </div>
@@ -270,7 +267,7 @@
                             <div class="urlBuilder_help_tab active" data-tab="yandex">{{ __('Yandex.Direct') }}</div>
                             <div class="urlBuilder_help_tab" data-tab="google">{{ __('Google AdWords') }}</div>
                             <div class="urlBuilder_help_tab" data-tab="vk">{{ __('VK targeting') }}</div>
-                            <div class="urlBuilder_help_tab" data-tab="target-mail">{{ __('myTarget') }}</div>
+                            <div class="urlBuilder_help_tab" data-tab="targetmailru">{{ __('myTarget') }}</div>
                         </div>
                         <div class="urlBuilder_help_tabBody urlBuilder_help_tabBody-yandex">
                             <p><b class="urlBuilder_help_term active" data-add-term="1">{ad_id}</b> — {{ __('Ad ID') }}
@@ -352,7 +349,7 @@
                                 — {{ __('Placement category') }}</p>
                             <p><b class="urlBuilder_help_term active" data-add-term="1">{param1}</b>
                                 — {{__('Ad parameter')}} 1</p>
-                            <p><b class="urlBuilder_help_term active" data-add-term="1">{param2e}</b>
+                            <p><b class="urlBuilder_help_term active" data-add-term="1">{param2}</b>
                                 — {{__('Ad parameter')}} 2</p>
                             <p><b class="urlBuilder_help_term active" data-add-term="1">{random}</b>
                                 — {{ __('Random number generated by google server (unsigned 64 bit integer)') }}</p>
@@ -367,7 +364,7 @@
                             <p><b class="urlBuilder_help_term active" data-add-term="1">{ad_id}</b> — {{ __('Ad ID') }}
                             </p>
                         </div>
-                        <div class="urlBuilder_help_tabBody urlBuilder_help_tabBody-target-mail hide">
+                        <div class="urlBuilder_help_tabBody urlBuilder_help_tabBody-targetmailru hide">
                             <p><b class="urlBuilder_help_term active" data-add-term="1">@{{advertiser_id}}</b>
                                 — {{ __('Advertiser ID') }}</p>
                             <p><b class="urlBuilder_help_term active" data-add-term="1">@{{campaign_id}}</b>
@@ -416,8 +413,8 @@
                             </div>
                             <div class="col-md-4">
                                 <div class="urlBuilder_el_input_items">
-                                    <span class="btn btn-secondary btn-flat">{keyword}</span>
-                                    <span class="btn btn-secondary btn-flat">@{{geo}}.@{{gender}}.@{{age}}</span>
+                                    <span>{keyword}</span>
+                                    <span>@{{geo}}.@{{gender}}.@{{age}}</span>
                                 </div>
                             </div>
                         </div>
@@ -463,7 +460,7 @@
                 </div>
 
                 <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-12">
 
                         <div class="urlBuilder_el">
                             <span class="urlBuilder_el_check click_tracking" data-click="add openstat" id="urlBuilderOpenstat">
@@ -774,9 +771,9 @@
                                     </span>
                                 </div>
                                 <div class="urlBuilder_el_param">
-                                    <span class="urlBuilder_el_check" data-param-key="ga_param2e"
-                                          data-param-value="{param2e}">
-                                        <i class="fa fa-square-o"></i><i class="fa fa-square"></i> <b>{param2e}</b>
+                                    <span class="urlBuilder_el_check" data-param-key="ga_param2"
+                                          data-param-value="{param2}">
+                                        <i class="fa fa-square-o"></i><i class="fa fa-square"></i> <b>{param2}</b>
                                         <p>{{ __('Ad parameter') }} 2</p>
                                     </span>
                                 </div>
@@ -919,9 +916,12 @@
                             </div>
                         </div>
 
-                        <div class="urlBuilder_el">
-                            <div class="btn btn-secondary urlBuilder_go">{{ __('Create URL') }}</div>
-                            <div class="urlBuilder_error"></div>
+                        <div class="urlBuilder_el urlBuilder_actions">
+                            <button type="button" class="btn btn-primary urlBuilder_go">
+                                <i class="bi bi-link-45deg me-1" aria-hidden="true"></i>
+                                {{ __('Create URL') }}
+                            </button>
+                            <div class="urlBuilder_error" role="alert"></div>
                         </div>
 
                     </div>
@@ -935,16 +935,24 @@
                             <textarea readonly="true" wrap="off"></textarea>
                         </div>
                         <div class="urlBuilder_result_buttons">
-                            <span class="btn btn-secondary swpmodal-close">{{ __('Close') }}</span>
+                            <button type="button" class="btn btn-primary swpmodal-close">{{ __('Close') }}</button>
                         </div>
                     </div>
                 </div>
 
             </div>
-        </div>
+    </div>
     </div>
 
     @slot('js')
         <script type="text/javascript" src="{{ asset('plugins/utm-marks/js/url-builder.min.js') }}"></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                if (typeof bootstrap === 'undefined' || !bootstrap.Tooltip) return;
+                document.querySelectorAll('.cabinet-utm-page [data-bs-toggle="tooltip"]').forEach(function (el) {
+                    bootstrap.Tooltip.getOrCreateInstance(el);
+                });
+            });
+        </script>
     @endslot
 @endcomponent

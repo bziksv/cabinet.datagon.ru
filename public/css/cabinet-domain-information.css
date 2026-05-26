@@ -11,8 +11,12 @@
     margin-bottom: var(--cabinet-di-gap);
 }
 
+.cabinet-di-page > .d-flex:has(.cabinet-telegram-notify-notice),
 .cabinet-di-page > .cabinet-di-free-email-notice,
-.cabinet-di-page > .cabinet-di-cabinet-only-notice {
+.cabinet-di-page > .cabinet-di-cabinet-only-notice,
+.cabinet-di-page > .cabinet-telegram-notify-notice,
+.cabinet-di-page .d-flex > .cabinet-telegram-notify-notice,
+.cabinet-site-mon-create .cabinet-di-cabinet-only-notice {
     margin-bottom: var(--cabinet-di-gap);
 }
 

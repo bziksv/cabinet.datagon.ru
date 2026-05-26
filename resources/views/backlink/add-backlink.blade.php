@@ -6,7 +6,10 @@
     <div class="cabinet-backlink-page">
         @include('backlink.partials.module-nav', ['active' => 'add-link', 'project' => $project])
 
-        @include('backlink.partials.free-tariff-email-notice')
+        <div class="d-flex flex-column gap-2">
+            @include('backlink.partials.free-tariff-email-notice')
+            @include('partials.cabinet-telegram-notify-notice', ['extraClass' => 'cabinet-bl-telegram-notice'])
+        </div>
 
         <div class="cabinet-bl-lead px-4 py-3">
             <div class="d-flex gap-3 align-items-start">

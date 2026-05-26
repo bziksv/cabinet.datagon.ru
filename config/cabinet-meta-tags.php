@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => '1.2.17s',
+    'version' => '1.2.18s',
 
     /** Поля «мета» при сравнении снимков — красная подсветка; остальное (h1, h2, a…) — жёлтая */
     'compare_meta_fields' => ['title', 'description', 'keywords', 'canonical', 'noindex', 'robots'],

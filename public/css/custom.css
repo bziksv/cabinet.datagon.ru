@@ -491,6 +491,7 @@ body > .cabinet-admin-gear__menu.is-open {
 .cabinet-module-main-card > .card-body:has(.cabinet-cluster-v2-page),
 .cabinet-module-main-card > .card-body:has(.cabinet-cluster-page) {
     padding: 0;
+    overflow-x: clip;
 }
 
 .cabinet-module-main-card:has(.cabinet-cluster-v2-page) > .card-header,

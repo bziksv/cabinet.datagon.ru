@@ -9,6 +9,7 @@
 
     <div class="cabinet-mt-page cabinet-mt-settings-page">
         @include('meta-tags.partials.module-nav', ['active' => 'settings'])
+        @include('partials.cabinet-telegram-notify-notice', ['extraClass' => 'cabinet-mt-telegram-notice mb-3'])
 
         @if (session('status'))
             <div class="alert alert-success">{{ session('status') }}</div>

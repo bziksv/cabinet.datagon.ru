@@ -9,6 +9,7 @@
 
     <div class="cabinet-mt-page">
         @include('meta-tags.partials.module-nav', ['active' => 'module'])
+        @include('partials.cabinet-telegram-notify-notice', ['extraClass' => 'cabinet-mt-telegram-notice mb-3'])
         @include('meta-tags.partials.how-to-steps')
 
         <meta-tags :lang='@json($lang)' :tags-options='@json($tagsOptions)'></meta-tags>

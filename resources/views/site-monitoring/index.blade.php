@@ -34,7 +34,10 @@
     </div>
     <div class="cabinet-site-mon-page">
         @include('site-monitoring.partials.module-nav', ['active' => 'projects', 'admin' => $admin ?? false])
-        @include('site-monitoring.partials.free-tariff-email-notice')
+        <div class="d-flex flex-column gap-2">
+            @include('site-monitoring.partials.free-tariff-email-notice')
+            @include('partials.cabinet-telegram-notify-notice', ['extraClass' => 'cabinet-sm-cabinet-only-notice'])
+        </div>
 
         @include('site-monitoring.partials.list-kpi', ['summary' => $listSummary])
 
@@ -226,12 +229,6 @@
                 </div>
             </div>
         @endforeach
-
-    @if(!auth()->user()->isTelegramConnected())
-        <div class="mt-3">
-            @include('site-monitoring.partials.cabinet-only-notify-notice')
-        </div>
-    @endif
 
         @include('site-monitoring.partials.stats-modal')
     </div>

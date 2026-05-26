@@ -93,3 +93,4 @@ Route::post('demo/monitoring-saytov/run', 'Api\\Demo\\SiteMonitoringDemoControll
 Route::post('demo/proverka-meta-tegov-online/run', 'Api\\Demo\\MetaTagsDemoController@run');
 Route::post('demo/otslezhivanie-sroka-registratsii-domenov/run', 'Api\\Demo\\DomainInformationDemoController@run');
 Route::post('demo/otslezhivanie-ssylok/run', 'Api\\Demo\\BacklinkDemoController@run');
+Route::post('demo/http-headers/run', 'Api\\Demo\\HttpHeadersDemoController@run');

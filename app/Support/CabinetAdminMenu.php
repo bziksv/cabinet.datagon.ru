@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Auth;
  */
 class CabinetAdminMenu
 {
-    /** main_projects.id — порядок в выпадающем списке шестерёнки */
+    /** main_projects.id — пункты шестерёнки (в меню сортируются по алфавиту по title). */
     public const PROJECT_IDS = [16, 26, 29, 17, 27, 33, 31];
 
     /** Скрыты из шестерёнки, но остаются в PROJECT_IDS (не дублируются в сайдбаре). 17 = /html/ (LTE demo), без badge-версии. */
@@ -52,14 +52,12 @@ class CabinetAdminMenu
         }
 
         $gearIds = array_values(array_diff(self::PROJECT_IDS, self::GEAR_HIDDEN_IDS));
-        $ids = implode(',', array_map('intval', $gearIds));
 
         $projects = MainProject::query()
             ->whereIn('id', $gearIds)
-            ->orderByRaw("FIELD(id, {$ids})")
             ->get(['id', 'title', 'link']);
 
-        self::$itemsCache = $projects->map(static function (MainProject $project) {
+        $items = $projects->map(static function (MainProject $project) {
             $link = localize_cabinet_url($project->link);
 
             return [
@@ -72,7 +70,7 @@ class CabinetAdminMenu
         })->values()->all();
 
         if (\Illuminate\Support\Facades\Route::has('admin.telegram-proxy.index')) {
-            self::$itemsCache[] = [
+            $items[] = [
                 'id' => 0,
                 'title' => __('Telegram proxy management'),
                 'link' => route('admin.telegram-proxy.index'),
@@ -81,7 +79,7 @@ class CabinetAdminMenu
         }
 
         if (\Illuminate\Support\Facades\Route::has('admin.xml-providers.index')) {
-            self::$itemsCache[] = [
+            $items[] = [
                 'id' => 0,
                 'title' => __('XML services management'),
                 'link' => route('admin.xml-providers.index'),
@@ -89,7 +87,28 @@ class CabinetAdminMenu
             ];
         }
 
+        self::$itemsCache = self::sortItemsByTitle($items);
+
         return self::$itemsCache;
+    }
+
+    /**
+     * @param array<int, array{id:int,title:string,link:string,external:bool}> $items
+     * @return array<int, array{id:int,title:string,link:string,external:bool}>
+     */
+    private static function sortItemsByTitle(array $items): array
+    {
+        $collator = class_exists(\Collator::class) ? new \Collator('ru_RU') : null;
+
+        usort($items, static function (array $a, array $b) use ($collator) {
+            if ($collator !== null) {
+                return $collator->compare($a['title'], $b['title']);
+            }
+
+            return strcasecmp($a['title'], $b['title']);
+        });
+
+        return $items;
     }
 
     /**

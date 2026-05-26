@@ -11,8 +11,11 @@
     margin-bottom: var(--cabinet-sm-gap);
 }
 
+.cabinet-site-mon-page > .d-flex:has(.cabinet-telegram-notify-notice),
 .cabinet-site-mon-page > .cabinet-sm-free-email-notice,
-.cabinet-site-mon-page > .cabinet-sm-cabinet-only-notice {
+.cabinet-site-mon-page > .cabinet-sm-cabinet-only-notice,
+.cabinet-site-mon-page > .cabinet-telegram-notify-notice,
+.cabinet-site-mon-create .cabinet-telegram-notify-notice {
     margin-bottom: var(--cabinet-sm-gap);
 }
 

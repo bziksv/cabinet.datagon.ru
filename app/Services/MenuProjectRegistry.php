@@ -7,7 +7,7 @@ use App\User;
 use Illuminate\Support\Collection;
 
 /**
- * Один запрос main_projects на HTTP-запрос (configuration-menu + sortMenu + MenuUnpublishedModules).
+ * Один запрос main_projects на HTTP-запрос (configuration-menu + sortMenu).
  */
 class MenuProjectRegistry
 {

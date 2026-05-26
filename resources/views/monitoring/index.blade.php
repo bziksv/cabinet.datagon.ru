@@ -95,6 +95,8 @@
 
     @endslot
 
+    @include('partials.cabinet-telegram-notify-notice', ['extraClass' => 'mb-3'])
+
     <div class="row mb-1">
         @include('monitoring.partials._buttons')
     </div>

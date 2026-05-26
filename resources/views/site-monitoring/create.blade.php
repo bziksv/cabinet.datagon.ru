@@ -12,7 +12,7 @@
 
         <div class="d-flex flex-column gap-2 mb-3">
             @include('site-monitoring.partials.free-tariff-email-notice')
-            @include('site-monitoring.partials.cabinet-only-notify-notice')
+            @include('partials.cabinet-telegram-notify-notice', ['extraClass' => 'cabinet-sm-cabinet-only-notice'])
         </div>
 
         <p class="text-secondary small mb-2">{{ __('Site monitoring create lead short') }}</p>

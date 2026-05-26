@@ -14,6 +14,8 @@
     <div class="cabinet-cluster-v2-page" id="cabinet-cluster-v2-root">
         @include('cluster.partials.module-nav', ['active' => 'analyzer', 'admin' => $admin])
 
+        @include('partials.cabinet-telegram-notify-notice', ['extraClass' => 'cabinet-cluster-v2-telegram-notice mb-3'])
+
         <div id="toast-container" class="toast-top-right success-message">
             <div class="toast toast-success" aria-live="polite" style="display:none;">
                 <div class="toast-message success-msg"></div>

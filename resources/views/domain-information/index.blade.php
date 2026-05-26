@@ -32,7 +32,10 @@
     </div>
 
     <div class="cabinet-di-page">
-        @include('domain-information.partials.free-tariff-email-notice')
+        <div class="d-flex flex-column gap-2">
+            @include('domain-information.partials.free-tariff-email-notice')
+            @include('partials.cabinet-telegram-notify-notice', ['extraClass' => 'cabinet-di-cabinet-only-notice'])
+        </div>
 
         @include('domain-information.partials.list-kpi', ['summary' => $listSummary])
 
@@ -184,15 +187,6 @@
                 </div>
             </div>
         @endforeach
-
-        @if(!auth()->user()->isTelegramConnected())
-            <p class="small text-secondary mt-3 mb-0">
-                {{ __('Want to') }}
-                <a href="{{ route('profile.index') }}" target="_blank" rel="noopener noreferrer">
-                    {{ __('receive notifications from our telegram bot') }}
-                </a>?
-            </p>
-        @endif
 
         @include('domain-information.partials.stats-modal')
     </div>

@@ -46,6 +46,9 @@ class TelegramProxyAdminController extends Controller
             }
 
             $module['title'] = __($module['title']);
+            if (!empty($module['notify_hint'])) {
+                $module['notify_hint'] = __($module['notify_hint']);
+            }
 
             return $module;
         });

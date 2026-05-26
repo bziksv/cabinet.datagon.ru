@@ -136,13 +136,13 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Telegram: одно сообщение на проект (сводка по числу проблемных ссылок).
      */
-    public function sendBrokenLinkProjectTelegram(ProjectTracking $project, int $problemCount, bool $isTest = false): void
+    public function sendBrokenLinkProjectTelegram(ProjectTracking $project, int $problemCount, bool $isTest = false): bool
     {
         if (!config('cabinet-backlink.notifications.telegram_enabled', true) || !$this->isTelegramConnected()) {
-            return;
+            return false;
         }
 
-        TelegramBot::brokenLinkProjectNotification($project, $this->chat_id, $problemCount, $isTest);
+        return TelegramBot::brokenLinkProjectNotification($project, $this->chat_id, $problemCount, $isTest);
     }
 
     public function receivesBacklinkExternalAlerts(): bool

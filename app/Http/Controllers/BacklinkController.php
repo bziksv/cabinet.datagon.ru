@@ -90,13 +90,22 @@ class BacklinkController extends Controller
             return Redirect::route('backlink');
         }
 
+        if (empty(config('app.telegram_bot_token'))) {
+            flash()->overlay(__('Backlink test telegram no token'), __('Error'))->error();
+
+            return Redirect::route('backlink');
+        }
+
         $crone = new CroneController();
-        $projectsNotified = 0;
+        $telegramOk = 0;
+        $telegramFail = 0;
         $linksSkipped = 0;
+        $lastApiError = '';
         $maxProjects = (int) config('cabinet-backlink.notifications.test_max_per_run', 10);
+        $projectsAttempted = 0;
 
         foreach ($links->groupBy('project_tracking_id') as $projectId => $projectLinks) {
-            if ($projectsNotified >= $maxProjects) {
+            if ($projectsAttempted >= $maxProjects) {
                 break;
             }
 
@@ -123,22 +132,35 @@ class BacklinkController extends Controller
                 }
             }
 
-            if ($problemCount > 0) {
-                $user->sendBrokenLinkProjectTelegram($project, $problemCount, true);
-                $projectsNotified++;
+            $projectsAttempted++;
+            $countToReport = $problemCount > 0 ? $problemCount : 0;
+            if ($user->sendBrokenLinkProjectTelegram($project, $countToReport, true)) {
+                $telegramOk++;
             } else {
-                $user->sendBrokenLinkProjectTelegram($project, 0, true);
-                $projectsNotified++;
+                $telegramFail++;
+                $lastApiError = \App\Services\TelegramBotService::$lastError;
             }
         }
 
-        if ($projectsNotified > 0) {
+        if ($telegramOk > 0 && $telegramFail === 0) {
             flash()->overlay(
-                __('Backlink test telegram sent', ['count' => $projectsNotified, 'skipped' => $linksSkipped]),
+                __('Backlink test telegram sent', ['count' => $telegramOk, 'skipped' => $linksSkipped]),
                 ' '
             )->success();
+        } elseif ($telegramOk > 0) {
+            flash()->overlay(
+                __('Backlink test telegram partial', [
+                    'ok' => $telegramOk,
+                    'fail' => $telegramFail,
+                    'error' => $lastApiError,
+                ]),
+                ' '
+            )->warning();
         } else {
-            flash()->overlay(__('Backlink test telegram none sent', ['skipped' => $linksSkipped]), ' ')->warning();
+            flash()->overlay(
+                __('Backlink test telegram failed', ['error' => $lastApiError ?: __('Unknown error')]),
+                __('Error')
+            )->error();
         }
 
         return Redirect::route('backlink');

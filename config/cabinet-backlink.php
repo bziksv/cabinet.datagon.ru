@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => '1.0.3s',
+    'version' => '1.0.4s',
 
     /** Демо на datagon.ru/otslezhivanie-ssylok/ — POST api/demo/otslezhivanie-ssylok/run */
     'demo' => [

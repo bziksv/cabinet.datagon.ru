@@ -11,6 +11,9 @@ class TelegramBotService
     protected $token;
     protected $chat_id;
 
+    /** Последняя ошибка API (для flash в админке, без токена). */
+    public static $lastError = '';
+
     public function __construct(int $chat_id)
     {
         $this->token = config('app.telegram_bot_token');
@@ -24,6 +27,22 @@ class TelegramBotService
 
     public function sendMsg(string $text, ?array $replyMarkup = null): bool
     {
+        self::$lastError = '';
+
+        if ($this->token === null || $this->token === '') {
+            self::$lastError = 'TELEGRAM_BOT_TOKEN не задан в .env на сервере';
+            Log::warning('Telegram sendMessage: empty bot token');
+
+            return false;
+        }
+
+        if (!function_exists('curl_init')) {
+            self::$lastError = 'На сервере не включено расширение PHP curl';
+            Log::warning('Telegram sendMessage: curl extension missing');
+
+            return false;
+        }
+
         $payload = [
             'text' => $text,
             'chat_id' => $this->getChatId(),
@@ -52,11 +71,24 @@ class TelegramBotService
         $curlError = curl_error($ch);
         curl_close($ch);
 
-        if ($body === false || $httpCode !== 200) {
-            Log::warning('Telegram sendMessage failed', [
-                'http_code' => $httpCode,
+        if ($body === false) {
+            self::$lastError = $curlError !== '' ? $curlError : 'Нет ответа от api.telegram.org';
+            Log::warning('Telegram sendMessage curl failed', [
                 'curl_error' => $curlError,
-                'response' => is_string($body) ? mb_substr($body, 0, 500) : null,
+                'chat_id' => $this->getChatId(),
+            ]);
+
+            return false;
+        }
+
+        $decoded = json_decode($body, true);
+        if ($httpCode !== 200 || !is_array($decoded) || empty($decoded['ok'])) {
+            $description = is_array($decoded) ? ($decoded['description'] ?? '') : '';
+            self::$lastError = $description !== '' ? $description : ('HTTP ' . $httpCode);
+            Log::warning('Telegram sendMessage API error', [
+                'http_code' => $httpCode,
+                'description' => $description,
+                'response' => mb_substr($body, 0, 500),
                 'chat_id' => $this->getChatId(),
             ]);
 

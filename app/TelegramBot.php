@@ -120,7 +120,7 @@ class TelegramBot extends Model
         $chatId,
         int $problemCount,
         bool $isTest = false
-    ): void {
+    ): bool {
         $cabinetUrl = url(route('show.backlink', ['id' => $project->id], false));
         $cabinetUrlAttr = self::escapeTelegramHtml($cabinetUrl);
         $linkLabel = self::escapeTelegramHtml(__('Backlink telegram open project'));
@@ -159,7 +159,7 @@ class TelegramBot extends Model
             $replyMarkup = null;
         }
 
-        (new TelegramBotService($chatId))->sendMsg(implode("\n", $lines), $replyMarkup);
+        return (new TelegramBotService($chatId))->sendMsg(implode("\n", $lines), $replyMarkup);
     }
 
     private static function escapeTelegramHtml(string $text): string

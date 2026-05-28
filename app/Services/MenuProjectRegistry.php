@@ -50,4 +50,16 @@ class MenuProjectRegistry
     {
         self::$allOrdered = null;
     }
+
+    /**
+     * Метка состава меню: при новом пункте в main_projects сбрасываем session-кэш сайдбара.
+     */
+    public static function structureStamp(): string
+    {
+        $all = self::ensureAllLoaded();
+
+        $maxUpdated = $all->max('updated_at');
+
+        return $all->count() . ':' . ($maxUpdated ? $maxUpdated->getTimestamp() : 0) . ':' . (int) $all->max('id');
+    }
 }

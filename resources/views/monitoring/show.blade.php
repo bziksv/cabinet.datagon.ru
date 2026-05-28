@@ -114,38 +114,6 @@
 
     @include('monitoring.keywords.modal.main')
 
-    <div class="modal fade" id="setRelation" tabindex="-1" aria-labelledby="setRelationLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="setRelationLabel">Свзязать проекты</h5>
-                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label for="this">Текущий проект</label>
-                        <input type="text" class="form form-control" value="{{ $project->url }}" readonly>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="checklists">Чеклист</label>
-                        <select name="checklists" id="checklists" class="form-select">
-                            @foreach(\App\Checklist::where('user_id', \Illuminate\Support\Facades\Auth::id())->get() as $checklist)
-                                <option value="{{ $checklist->id }}">{{ $checklist->url }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-success" id="set-relation">{{ __('Save') }}</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     @slot('js')
         <!-- Toastr -->
         <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
@@ -170,31 +138,11 @@
         <script src="{{ asset('plugins/chart.js/3.9.1/plugins/chartjs-plugin-datalabels.js') }}"></script>
 
         <script>
-            $(document).on('click', '#set-relation', function () {
-                if ($('#checklists').val() == null) {
-                    alert('Вам нужно указать чеклист')
-                    return;
-                }
-
-                $.ajax({
-                    type: 'post',
-                    url: "{{ route('checklist.monitoring.relation') }}",
-                    data: {
-                        _token: $('meta[name="csrf-token"]').attr('content'),
-                        checklistId: $('#checklists').val(),
-                        monitoringId: {{ $project->id }}
-                    },
-                    success: function () {
-                        window.location.reload()
-                    },
-                    error: function (response) {
-
-                    }
-                })
-            })
-
             $(document).ready(function () {
                 let $buttonElement = $('button.change-tag');
+                if ($buttonElement.length === 0) {
+                    return;
+                }
                 let $aElement = $('<a></a>');
                 $aElement.attr('href', $buttonElement.attr('href'));
                 $aElement.attr('target', $buttonElement.attr('target'));

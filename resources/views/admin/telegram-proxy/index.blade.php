@@ -114,6 +114,7 @@
                         <thead class="table-light">
                         <tr>
                             <th>{{ __('Name') }}</th>
+                            <th>{{ __('Telegram proxy supplier') }}</th>
                             <th>{{ __('Priority') }}</th>
                             <th>{{ __('Status') }}</th>
                             <th class="text-center">{{ __('HTTP') }}</th>
@@ -132,6 +133,13 @@
                                 <td>
                                     <span class="fw-medium">{{ $row['label'] }}</span>
                                     <div class="small"><code>{{ $row['url_masked'] }}</code></div>
+                                </td>
+                                <td class="small">
+                                    @if(!empty($row['supplier']))
+                                        {{ $row['supplier'] }}
+                                    @else
+                                        <span class="text-secondary">—</span>
+                                    @endif
                                 </td>
                                 <td class="small">{{ $row['priority'] }}</td>
                                 <td class="small">
@@ -172,18 +180,22 @@
                             </tr>
                             @if($editRow)
                                 <tr class="collapse cabinet-tg-proxy-edit-row" id="{{ $editCollapseId }}">
-                                    <td colspan="6" class="bg-body-tertiary border-top-0 pt-0 pb-3">
+                                    <td colspan="7" class="bg-body-tertiary border-top-0 pt-0 pb-3">
                                         <form action="{{ route('admin.telegram-proxy.proxies.update', $row['id']) }}" method="post" class="row g-2 align-items-end mt-2">
                                             @csrf
                                             @method('PUT')
                                             <div class="col-12">
                                                 <span class="small fw-semibold text-secondary">{{ __('Telegram proxy edit') }}</span>
                                             </div>
-                                            <div class="col-12 col-md-3">
+                                            <div class="col-12 col-md-2">
                                                 <label class="form-label small mb-1">{{ __('Name') }}</label>
                                                 <input type="text" class="form-control form-control-sm" name="label" required maxlength="120" value="{{ $editRow['label'] }}">
                                             </div>
-                                            <div class="col-12 col-md-5">
+                                            <div class="col-12 col-md-2">
+                                                <label class="form-label small mb-1">{{ __('Telegram proxy supplier') }}</label>
+                                                <input type="text" class="form-control form-control-sm" name="supplier" maxlength="120" value="{{ $editRow['supplier'] ?? '' }}" placeholder="{{ __('Telegram proxy supplier placeholder') }}">
+                                            </div>
+                                            <div class="col-12 col-md-4">
                                                 <label class="form-label small mb-1">URL</label>
                                                 <input type="text" class="form-control form-control-sm font-monospace" name="url" required maxlength="500" value="{{ $editRow['url'] }}">
                                             </div>
@@ -206,7 +218,7 @@
                             @endif
                         @empty
                             <tr>
-                                <td colspan="6" class="small text-secondary p-3">
+                                <td colspan="7" class="small text-secondary p-3">
                                     {{ __('Telegram proxy list empty') }}
                                 </td>
                             </tr>
@@ -219,11 +231,15 @@
                 <h4 class="h6 mb-3">{{ __('Telegram proxy add') }}</h4>
                 <form action="{{ route('admin.telegram-proxy.proxies.store') }}" method="post" class="row g-2 align-items-end">
                     @csrf
-                    <div class="col-12 col-md-3">
+                    <div class="col-12 col-md-2">
                         <label class="form-label small mb-1" for="tg-proxy-label">{{ __('Name') }}</label>
                         <input type="text" class="form-control form-control-sm" id="tg-proxy-label" name="label" required maxlength="120" placeholder="s3 backup">
                     </div>
-                    <div class="col-12 col-md-5">
+                    <div class="col-12 col-md-2">
+                        <label class="form-label small mb-1" for="tg-proxy-supplier">{{ __('Telegram proxy supplier') }}</label>
+                        <input type="text" class="form-control form-control-sm" id="tg-proxy-supplier" name="supplier" maxlength="120" placeholder="{{ __('Telegram proxy supplier placeholder') }}">
+                    </div>
+                    <div class="col-12 col-md-4">
                         <label class="form-label small mb-1" for="tg-proxy-url">URL</label>
                         <input type="text" class="form-control form-control-sm font-monospace" id="tg-proxy-url" name="url" required maxlength="500" placeholder="socks5h://user:pass@host:port">
                     </div>

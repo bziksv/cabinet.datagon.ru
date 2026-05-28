@@ -1,16 +1,13 @@
-<div class="root">
+<div class="root cabinet-kw-legacy-popup">
     <div>
-        <div class="prime-lightbox __alt __type-base" {% if customWidth %}style="width: {{ customWidth }}px;"{% endif %}>
-            <div class="base-popup_close"><span class="close-popup-control"><img src="plugins/keyword-generator/img/close.svg" alt=""></span></div>
-            <div class="container">
-                <h2 class="base-popup_header">{{ header ? header : 'Внимание' }}</h2>
-                <div class="base-popup_content">{{ content ? content : ''}}</div>
-                <div class="base-popup_controls">
-                    <a href="#" class="ui_btn base-popup_controls_action">{{ actionButtonLabel }}</a>
-                    <a href="#" class="__dashed base-popup_controls_close-btn">Закрыть</a>
-                </div>
+        <div class="cabinet-kw-dialog prime-lightbox __alt __type-base base-popup-modal" {% if customWidth %}style="max-width: {{ customWidth }}px;"{% endif %}>
+            <button type="button" class="btn-close base-popup_close" aria-label="Закрыть"></button>
+            <h2 class="cabinet-kw-dialog__title base-popup_header">{{ header ? header : 'Внимание' }}</h2>
+            <div class="cabinet-kw-dialog__text base-popup_content">{{ content ? content : '' }}</div>
+            <div class="cabinet-kw-dialog__actions base-popup_controls">
+                <button type="button" class="btn btn-outline-secondary base-popup_controls_close-btn">Закрыть</button>
+                <a href="#" class="btn btn-danger base-popup_controls_action">{{ actionButtonLabel }}</a>
             </div>
         </div>
     </div>
 </div>
-

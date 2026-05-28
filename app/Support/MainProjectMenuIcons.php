@@ -36,6 +36,8 @@ class MainProjectMenuIcons
         7 => '<i class="fas fa-code"></i>',
         // Мониторинг позиций (было ок)
         32 => '<i class="fas fa-chart-line"></i>',
+        // Мониторинг позиций v2 (рядом в меню)
+        39 => '<i class="fas fa-chart-line"></i>',
         // Мониторинг сайтов (было fa-edit — как у HTML)
         13 => '<i class="fas fa-heartbeat"></i>',
         // Срок регистрации домена (было ок)

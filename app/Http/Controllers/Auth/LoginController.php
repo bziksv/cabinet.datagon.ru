@@ -69,6 +69,7 @@ class LoginController extends Controller
             'cabinet_menu_modules_v2',
             'cabinet_menu_modules_v3',
             'cabinet_menu_modules_v4',
+            'cabinet_menu_modules_v4_stamp',
             'cabinet_home_projects',
         ]);
 
@@ -90,6 +91,7 @@ class LoginController extends Controller
                 'cabinet_menu_modules_v2',
             'cabinet_menu_modules_v3',
             'cabinet_menu_modules_v4',
+                'cabinet_menu_modules_v4_stamp',
                 'cabinet_home_projects',
             ]);
         }

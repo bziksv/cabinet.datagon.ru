@@ -12,6 +12,9 @@ class Mastered
     protected $positions;
     protected $price;
 
+    /** @var \Illuminate\Support\Collection<int, MonitoringKeywordPrice>|null keyword_id => row */
+    protected $priceByKeyword;
+
     private $top1;
     private $top3;
     private $top5;
@@ -20,9 +23,13 @@ class Mastered
     private $top50;
     private $top100;
 
-    public function __construct(Collection $positions)
+    /**
+     * @param Collection|null $priceByKeyword предзагруженные цены (monitoring_keyword_id => row)
+     */
+    public function __construct(Collection $positions, $priceByKeyword = null)
     {
         $this->price = new MonitoringKeywordPrice;
+        $this->priceByKeyword = $priceByKeyword;
         $this->positions = $positions;
 
         foreach ($this->positions as $position)
@@ -159,6 +166,12 @@ class Mastered
 
     private function getPrice($queryId, $engineId, $value)
     {
+        if ($this->priceByKeyword !== null) {
+            $row = $this->priceByKeyword->get($queryId);
+
+            return $row ? ($row->{$value} ?? 0) : 0;
+        }
+
         return $this->price->where('monitoring_keyword_id', $queryId)->where('monitoring_searchengine_id', $engineId)->value($value);
     }
 

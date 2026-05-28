@@ -10,13 +10,18 @@ use Illuminate\Support\Facades\Auth;
 
 class PositionMenuItemsController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        if ($request->boolean('refresh_sidebar')) {
+            cabinet_clear_menu_session_cache();
+        }
+
         MenuProjectRegistry::ensureAllLoaded();
         $items = MenuItemsPosition::sortMenu();
 
         return view('positions.index', [
             'items' => $items,
+            'sidebarMenuStale' => $request->boolean('refresh_sidebar'),
         ]);
     }
 
@@ -37,6 +42,6 @@ class PositionMenuItemsController extends Controller
 
         cabinet_clear_menu_session_cache();
 
-        return response()->json([], 200);
+        return response()->json(['ok' => true], 200);
     }
 }

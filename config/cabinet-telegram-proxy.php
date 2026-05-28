@@ -5,5 +5,5 @@
  * Общие настройки Telegram (модули, debug, файл прокси): config/cabinet-telegram.php
  */
 return [
-    'version' => '1.1.1s',
+    'version' => '1.1.2s',
 ];

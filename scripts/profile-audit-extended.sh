@@ -27,8 +27,6 @@ PATHS=(
   "/main-projects/statistics/37"
   "/http-headers/settings"
   "/cluster-projects"
-  "/get-checklist-archive"
-  "/checklist-tasks/23"
   "/visit-statistics/4"
   "/create-description"
   "/edit-description/4"

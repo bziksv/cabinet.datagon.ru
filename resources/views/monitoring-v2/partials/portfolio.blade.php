@@ -1,0 +1,55 @@
+@if($count < 1)
+    <section class="cabinet-mon-v2-portfolio cabinet-mon-v2-portfolio--empty">
+        <p class="mb-0 text-secondary">{{ __('Monitoring v2 dash empty') }}</p>
+    </section>
+@else
+    <section class="cabinet-mon-v2-portfolio" id="cabinet-mon-v2-dashboard" aria-label="{{ __('Monitoring v2 dash title') }}">
+        <div class="cabinet-mon-v2-portfolio__bar">
+            <div class="cabinet-mon-v2-portfolio__intro">
+                <h2 class="cabinet-mon-v2-portfolio__title mb-0">{{ __('Monitoring v2 portfolio title') }}</h2>
+                <p class="cabinet-mon-v2-portfolio__subtitle mb-0">{{ __('Monitoring v2 dash subtitle') }}</p>
+            </div>
+            <div class="cabinet-mon-v2-portfolio__kpis" role="list">
+                <div class="cabinet-mon-v2-kpi" role="listitem">
+                    <span class="cabinet-mon-v2-kpi__value" data-dash="projects">{{ $count }}</span>
+                    <span class="cabinet-mon-v2-kpi__label">{{ __('Projects count') }}</span>
+                </div>
+                <div class="cabinet-mon-v2-kpi cabinet-mon-v2-kpi--accent" role="listitem">
+                    <span class="cabinet-mon-v2-kpi__value" data-dash="avgTop10">—</span>
+                    <span class="cabinet-mon-v2-kpi__label">{{ __('Monitoring v2 dash avg top10') }}</span>
+                </div>
+                <div class="cabinet-mon-v2-kpi" role="listitem">
+                    <span class="cabinet-mon-v2-kpi__value" data-dash="avgMiddle">—</span>
+                    <span class="cabinet-mon-v2-kpi__label">{{ __('Monitoring v2 dash avg position') }}</span>
+                </div>
+                <div class="cabinet-mon-v2-kpi" role="listitem">
+                    <span class="cabinet-mon-v2-kpi__value" data-dash="words">—</span>
+                    <span class="cabinet-mon-v2-kpi__label">{{ __('Words') }}</span>
+                </div>
+                <div class="cabinet-mon-v2-kpi" role="listitem">
+                    <span class="cabinet-mon-v2-kpi__value" data-dash="weak">—</span>
+                    <span class="cabinet-mon-v2-kpi__label">{{ __('Monitoring v2 dash weak') }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="cabinet-mon-v2-portfolio__chart-panel">
+            <div class="cabinet-mon-v2-portfolio__chart-toolbar">
+                <div class="btn-group btn-group-sm cabinet-mon-v2-dash-view" role="group" aria-label="{{ __('Monitoring v2 dash chart mode') }}">
+                    <button type="button" class="btn btn-light active" data-dash-chart="leaders">{{ __('Monitoring v2 dash chart leaders') }}</button>
+                    <button type="button" class="btn btn-light" data-dash-chart="distribution">{{ __('Monitoring v2 dash chart distribution') }}</button>
+                    <button type="button" class="btn btn-light" data-dash-chart="portfolio">{{ __('Monitoring v2 dash chart portfolio') }}</button>
+                </div>
+                <div class="btn-group btn-group-sm cabinet-mon-v2-dash-metric d-none" id="cabinet-mon-v2-dash-metric" role="group" aria-label="{{ __('Monitoring v2 dash metric label') }}">
+                    <button type="button" class="btn btn-light active" data-dash-metric="top10">{{ __('TOP') }}‑10</button>
+                    <button type="button" class="btn btn-light" data-dash-metric="top30">{{ __('TOP') }}‑30</button>
+                    <button type="button" class="btn btn-light" data-dash-metric="middle">{{ __('Position') }}</button>
+                </div>
+            </div>
+            <div class="cabinet-mon-v2-portfolio__canvas">
+                <canvas id="cabinet-mon-v2-chart-main" height="320" aria-hidden="true"></canvas>
+            </div>
+            <p class="cabinet-mon-v2-portfolio__hint mb-0" id="cabinet-mon-v2-dash-hint">{{ __('Monitoring v2 dash hint all') }}</p>
+        </div>
+    </section>
+@endif

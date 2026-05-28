@@ -1,4 +1,7 @@
-<aside class="app-sidebar bg-body-secondary shadow cabinet-sidebar" data-bs-theme="dark">
+<aside class="app-sidebar bg-body-secondary shadow cabinet-sidebar"
+       data-bs-theme="dark"
+       data-enable-persistence="true"
+       data-sidebar-breakpoint="992">
     <div class="sidebar-brand">
         <a href="{{ route('home') }}" class="brand-link cabinet-brand">
             <img src="{{ asset('img/logo-icon.svg') }}" alt="Датагон" class="brand-image opacity-75 shadow cabinet-brand__icon">

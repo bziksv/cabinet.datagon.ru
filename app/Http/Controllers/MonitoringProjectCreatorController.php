@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Events\MonitoringProjectCreated;
+use App\Classes\Monitoring\ProjectFaviconService;
 use App\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
@@ -49,10 +50,20 @@ class MonitoringProjectCreatorController extends Controller
 
         /** @var User $user */
         $user = $this->user;
-        $user->monitoringProjects()->find($id)->update([
+        $project = $user->monitoringProjects()->find($id);
+        $oldUrl = $project->url;
+        $project->update([
             'name' => $request->input('name'),
             'url' => $request->input('url'),
         ]);
+
+        if ($oldUrl !== $project->url) {
+            try {
+                app(ProjectFaviconService::class)->refresh($project-> true);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
 
         return $id;
     }

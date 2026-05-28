@@ -1,13 +1,13 @@
 <div class="root">
     <div class="list-w-img-container">
-        <div class="list">
-            <div class="base-popup_close deleteThis">
-            <span class="close-popup-control">
-                <img src="plugins/keyword-generator/img/close.svg" alt="">
-            </span>
-            </div>
-            <div>
-                <a class="item-title" data-text="word-list"></a>
+        <div class="list cabinet-kw-list-card">
+            <div class="cabinet-kw-list-head">
+                <input type="text" class="listName" value="" data-text="word-list" />
+                <button type="button" class="deleteThis cabinet-kw-list-remove" title="">
+                    <span class="close-popup-control" aria-hidden="true">
+                        <img src="plugins/keyword-generator/img/close.svg" alt="">
+                    </span>
+                </button>
             </div>
             <textarea
                     wrap="off"
@@ -15,9 +15,11 @@
                     class="wordList"
                     data-text="word-placeholder"
                     placeholder=""></textarea>
-            <div class="optionsHeader">
-                <a class="arrowDown additionalOptions __dashed" href="#" data-text="Additionally"></a>
-                <div class="wordQuantityContainer"><a><span data-text="Words"></span>: <a class="wordQuantity"></a></a></div>
+            <div class="optionsHeader cabinet-kw-list-foot">
+                <a class="arrow arrowDown additionalOptions __dashed" href="#" data-text="Additionally"></a>
+                <div class="wordQuantityContainer">
+                    <span data-text="Words"></span><span class="cabinet-kw-word-qty-sep">: </span><span class="wordQuantity">0</span>
+                </div>
             </div>
             <div class="additionalOptionsList">
                 <label class="ui_label __no-select">
@@ -26,9 +28,9 @@
                     <span class="ui_checkbox_fake-input"></span>
                 </span>
                     <span data-text="Add"></span> !
-                    <span class="__helper-link ui_tooltip_w">
+                    <span class="__helper-link ui_tooltip_w cabinet-kw-tip">
                     <i class="fa fa-question-circle"></i>
-                    <span class="ui_tooltip __right __l">
+                    <span class="ui_tooltip __bottom __l">
                         <span class="ui_tooltip_content" data-text="Use-to-set"></span>
                     </span>
                 </span>
@@ -40,9 +42,9 @@
                     <span class="ui_checkbox_fake-input"></span>
                 </span>
                     <span data-text="Add"></span> +
-                    <span class="__helper-link ui_tooltip_w">
+                    <span class="__helper-link ui_tooltip_w cabinet-kw-tip">
                     <i class="fa fa-question-circle"></i>
-                    <span class="ui_tooltip __right __l">
+                    <span class="ui_tooltip __bottom __l">
                         <span class="ui_tooltip_content" data-text="Broad-match"></span>
                     </span>
                 </span>
@@ -54,7 +56,7 @@
                     <span class="ui_checkbox_fake-input"></span>
                 </span>
                     <span data-text="Add-source-list"></span>
-                    <span class="__helper-link ui_tooltip_w">
+                    <span class="__helper-link ui_tooltip_w cabinet-kw-tip">
                     <i class="fa fa-question-circle"></i>
                     <span class="ui_tooltip __right">
                         <span class="ui_tooltip_content" data-text="Words-from-this-list"></span>
@@ -68,7 +70,7 @@
                     <span class="ui_checkbox_fake-input"></span>
                 </span>
                     <span data-text="Combine-without"></span>
-                    <span class="__helper-link ui_tooltip_w">
+                    <span class="__helper-link ui_tooltip_w cabinet-kw-tip">
                     <i class="fa fa-question-circle"></i>
                     <span class="ui_tooltip __right">
                         <span class="ui_tooltip_content" data-text="Variants-without-words"></span>

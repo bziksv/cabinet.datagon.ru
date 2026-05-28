@@ -12,7 +12,6 @@ class SimpleButtonsFactory
             (new ProjectButton($user, $project))->get(),
             (new CompetitorButton($user, $project))->get(),
             (new TopAnalysisButton($user, $project))->get(),
-            (new PromotionPlanButtons($user, $project))->get(),
             (new SiteAuditButtons($user, $project))->get(),
             (new LinkTrackingButtons($user, $project))->get(),
         ];

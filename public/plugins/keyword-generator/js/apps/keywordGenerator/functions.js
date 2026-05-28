@@ -123,12 +123,14 @@ define([
             setCombinations(elements);
         }
 
-        require(['popup', 'tpl!templates/base-popup'], function (popup, tpl) {
+        require(['popup', 'tpl!templates/base-popup_result'], function (popup, tpl) {
+            var headerTitle = $('.words-localized #Result-popup-title').val() || 'Результат';
             popup({
                 template: tpl,
                 templateData: {
+                    header: headerTitle,
                     content: content,
-                    customWidth: 800
+                    customWidth: 720
                 },
                 onRenderCallback: onRenderCallback
             });

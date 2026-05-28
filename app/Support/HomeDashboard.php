@@ -123,11 +123,64 @@ class HomeDashboard
         ];
     }
 
+    /**
+     * Модуль ведёт не в кабинет (новая вкладка + бейдж на главной).
+     * Не помечаем абсолютные URL того же хоста (lk / cabinet / APP_URL).
+     */
     protected static function isExternalLink(string $raw, string $localized): bool
     {
-        return strpos($raw, 'http') === 0
-            || strpos($localized, 'http') === 0
-            || strpos($raw, 'docs.google.com') !== false;
+        foreach (array_unique(array_filter([$raw, $localized])) as $url) {
+            if (stripos($url, 'docs.google.com') !== false) {
+                return true;
+            }
+            if (preg_match('#^https?://#i', $url) && !self::isInternalCabinetUrl($url)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected static function isInternalCabinetUrl(string $url): bool
+    {
+        if ($url === '' || $url === '#') {
+            return true;
+        }
+
+        if ($url[0] === '/' && (strlen($url) < 2 || $url[1] !== '/')) {
+            return true;
+        }
+
+        $host = parse_url($url, PHP_URL_HOST);
+        if (!is_string($host) || $host === '') {
+            return true;
+        }
+
+        $host = strtolower($host);
+
+        return in_array($host, self::cabinetHosts(), true);
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected static function cabinetHosts(): array
+    {
+        static $hosts;
+
+        if ($hosts !== null) {
+            return $hosts;
+        }
+
+        $list = ['lk.redbox.su', 'cabinet.datagon.ru', 'localhost', '127.0.0.1'];
+        $appHost = parse_url(rtrim((string) config('app.url'), '/'), PHP_URL_HOST);
+        if (is_string($appHost) && $appHost !== '') {
+            $list[] = $appHost;
+        }
+
+        $hosts = array_values(array_unique(array_map('strtolower', $list)));
+
+        return $hosts;
     }
 
     protected static function normalizeColor(?string $color): string

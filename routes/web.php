@@ -80,6 +80,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         'index', 'store', 'update'
     ]);
 
+    Route::get('/admin/database', 'DatabaseAdminController@index')->name('admin.database.index');
+    Route::get('/admin/database/preview/{table}', 'DatabaseAdminController@previewRows')->name('admin.database.preview');
+    Route::post('/admin/database/refresh', 'DatabaseAdminController@refresh')->name('admin.database.refresh');
+    Route::post('/admin/database/probe-dates', 'DatabaseAdminController@probeDates')->name('admin.database.probe-dates');
+
     Route::get('/admin/xml-providers', 'XmlProvidersAdminController@index')->name('admin.xml-providers.index');
     Route::post('/admin/xml-providers/refresh', 'XmlProvidersAdminController@refresh')->name('admin.xml-providers.refresh');
 
@@ -410,6 +415,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/monitoring/{id}/copy', 'MonitoringController@copy')->name('monitoring.copy');
 
+    Route::get('monitoring-v2', 'MonitoringV2Controller@index')->name('monitoring.v2');
+    Route::get('monitoring-v2/favicon', 'MonitoringV2Controller@favicon')->name('monitoring.v2.favicon');
+    Route::post('monitoring-v2/projects/list', 'MonitoringV2Controller@listProjects')->name('monitoring.v2.projects.list');
+    Route::post('monitoring-v2/preferences/list-columns', 'MonitoringV2Controller@saveListColumns')->name('monitoring.v2.preferences.list-columns');
+    Route::post('monitoring-v2/snapshots/fill', 'MonitoringV2Controller@fillSnapshots')->name('monitoring.v2.snapshots.fill');
+    Route::post('monitoring-v2/favicons/fill', 'MonitoringV2Controller@fillFavicons')->name('monitoring.v2.favicons.fill');
+
     Route::resource('monitoring', 'MonitoringController');
 
     Route::get('/monitoring/{id}/count', 'MonitoringController@getCountProject');
@@ -424,9 +436,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/monitoring/competitors/check-analyse-state', 'MonitoringController@checkChangesDatesState')->name('monitoring.changes.dates.check');
     Route::post('/monitoring/competitors/remove-analyse', 'MonitoringController@removeChangesDatesState')->name('monitoring.changes.dates.remove');
     Route::get('/monitoring/competitors/result-analyse/{project}', 'MonitoringController@resultChangesDatesState')->name('monitoring.changes.dates.result');
-    Route::post('/checklist-monitoring-relation', 'MonitoringController@checklistMonitoringRelation')->name('checklist.monitoring.relation');
-
-
     Route::get('/monitoring/top-100/{project}', 'MonitoringTopController@index')->name('monitoring.top100');
     Route::post('/monitoring/get-top/sites', 'MonitoringTopController@getTopSites')->name('monitoring.get.top.sites');
 
@@ -517,6 +526,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/save-html', 'ClusterController@saveTree')->name('save.clusters.tree');
 
     Route::get('/configuration-menu', 'PositionMenuItemsController@index')->name('menu.config');
+    Route::redirect('/configuration-menu-v2', '/configuration-menu', 301);
+    Route::redirect('/configuration-menu-classic', '/configuration-menu', 301);
     Route::post('/configuration-menu', 'PositionMenuItemsController@edit')->name('configuration.menu');
     Route::post('/restore-configuration-menu', 'PositionMenuItemsController@remove')->name('restore.configuration.menu');
 
@@ -535,54 +546,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/partners/r/{short_link}', 'PartnersController@redirect')->name('partners.redirect');
 
     Route::post('/click-tracking', 'HomeController@clickTracking')->name('click.tracking');
-
-    Route::get('/checklist', 'CheckListController@index')->name('checklist');
-    Route::get('/checklist-tasks/{checklist}', 'CheckListController@tasks')->name('checklist.tasks');
-    Route::get('/get-all-checklist/', 'CheckListController@getAllChecklists')->name('get.all.checklists');
-    Route::post('/store-checklist', 'CheckListController@store')->name('store.checklist');
-    Route::post('/update-checklist', 'CheckListController@update')->name('update.checklist');
-    Route::post('/add-subtasks', 'CheckListController@addSubtasks')->name('add.new.subtasks');
-    Route::post('/store-stub', 'CheckListController@storeStub')->name('store.stub');
-    Route::post('/edit-stub', 'CheckListController@editStub')->name('edit.stub');
-    Route::post('/get-checklist', 'CheckListController@getChecklists')->name('get.checklists');
-    Route::post('/get-checklist-kanban', 'CheckListController@getChecklistsKanban')->name('get.checklistsKanban');
-    Route::post('/save-checklist-kanban', 'CheckListController@saveChecklistsKanban')->name('save.checklistsKanban');
-    Route::get('/move-checklist-to-archive/{project}', 'CheckListController@inArchive')->name('in.archive');
-    Route::get('/restore-checklist/{project}', 'CheckListController@restore')->name('restore.checklist');
-    Route::get('/get-checklist-archive', 'CheckListController@archive')->name('checklist.archive');
-    Route::post('/checklist-tasks', 'CheckListController@getTasks')->name('checklist.tasks');
-    Route::get('/checklist-task/{task}', 'CheckListController@getTask')->name('checklist.task');
-    Route::post('/edit-checklist-task', 'CheckListController@editTask')->name('edit.checklist.task');
-    Route::get('/get-repeat-tasks', 'CheckListController@getRepeatTasks')->name('get.repeat.tasks');
-    Route::post('/edit-repeat-task', 'CheckListController@editRepeatTask')->name('edit.repeat.task');
-    Route::post('/remove-repeat-task', 'CheckListController@removeRepeatTask')->name('remove.repeat.task');
-    Route::post('/store-repeat-tasks', 'CheckListController@storeRepeatTasks')->name('store.repeat.tasks');
-
-    Route::get('/remove-checklist/{project}', 'CheckListController@destroy')->name('destroy');
-    Route::post('/create-label', 'CheckListController@createLabel')->name('create.label');
-    Route::get('/remove-label/{label}', 'CheckListController@removeLabel')->name('remove.label');
-    Route::post('/edit-label/', 'CheckListController@editLabel')->name('edit.label');
-
-    Route::post('/add-checklists-labels-relations', 'CheckListController@createRelation')->name('create.checklist.relation');
-    Route::post('/remove-checklist-relation/', 'CheckListController@removeRelation')->name('remove.checklist.relation');
-
-    Route::post('/remove-checklist-task/', 'CheckListController@removeTask')->name('remove.checklist.task');
-    Route::post('/add-new-tasks/', 'CheckListController@addNewTasks')->name('add.new.tasks.in.checklist');
-
-    Route::get('/get-checklists-stubs', 'CheckListController@getStubs')->name('checklist.stubs');
-    Route::get('/remove-checklist-stub/{stub}', 'CheckListController@removeStub')->name('checklist.remove.stub');
-    Route::post('/get-checklists-classic-stubs', 'CheckListController@getClassicStubs')->name('checklist.classic.stubs');
-    Route::post('/get-checklists-personal-stubs', 'CheckListController@getPersonalStubs')->name('checklist.personal.stubs');
-
-    Route::get('/checklist/get-analyse-relevance-projects', 'CheckListController@relevanceProjects')->name('checklist.relevance.projects');
-    Route::get('/checklist/get-metatags-projects', 'CheckListController@metaTagsProjects')->name('checklist.metatags.projects');
-    Route::get('/checklist/get-monitoring-projects', 'CheckListController@monitoringProjects')->name('checklist.monitoring.projects');
-    Route::get('/checklist/get-domain-monitoring-projects', 'CheckListController@monitoringSites')->name('checklist.domain.monitoring.projects');
-    Route::get('/checklist/notifications', 'CheckListController@getNotifications')->name('checklist.notifications');
-    Route::get('/checklist/read-notification/{notification}', 'CheckListController@readNotification')->name('checklist.read.notification');
-    Route::get('/checklist/delete-notification/{notification}', 'CheckListController@deleteNotification')->name('checklist.delete.notification');
-
-    Route::post('/checklist/multiply-create', 'CheckListController@multiplyCreate')->name('checklist.multiply.create');
 
     Route::get('/ai-generation/story', 'AiController@story')->name('ai.generation.story');
     Route::get('/ai-generation/all-history', 'AiController@allHistory')->name('ai.generation.all.story');

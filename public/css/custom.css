@@ -474,6 +474,19 @@ body > .cabinet-admin-gear__menu.is-open {
     display: block;
     margin-left: 50px;
 }
+.cabinet-module-description .card-body iframe,
+.cabinet-module-description .card-body video,
+.cabinet-module-description .card-body embed,
+.cabinet-module-description .card-body object {
+    max-width: 100%;
+    height: auto;
+}
+
+.cabinet-module-description .card-body img {
+    max-width: 100%;
+    height: auto;
+}
+
 .cabinet-module-description__avatar {
     width: 40px;
     height: 40px;
@@ -1194,14 +1207,7 @@ img.img-flag {
     vertical-align: sub;
 }
 
-/* Сайдбар: раскрытие папок без AdminLTE Treeview (конфликтовал с кастомным JS) */
-.cabinet-sidebar-menu li.has-treeview > .nav-treeview {
-    display: none;
-}
-
-.cabinet-sidebar-menu li.has-treeview.menu-open > .nav-treeview {
-    display: block;
-}
+/* Сайдбар: папки — AdminLTE 4 Treeview; display задаёт .sidebar-menu .menu-open > .nav-treeview в adminlte.css */
 
 .cabinet-sidebar-menu li.folder > a.sidebar-folder-toggle {
     cursor: pointer;

@@ -1,0 +1,221 @@
+/* Калькулятор ROI — AdminLTE 4 / BS5 */
+
+.cabinet-roi-page {
+    --cabinet-roi-radius: 0.5rem;
+}
+
+#header-nav-bar .cabinet-header-limits-menu tr.ROI,
+#header-nav-bar .cabinet-header-limits-menu tr.RoiCalculator {
+    background: oldlace;
+}
+
+.cabinet-roi-page .cabinet-roi-lead {
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    color: var(--bs-secondary-color);
+    max-width: 52rem;
+    margin-bottom: 1rem;
+}
+
+.cabinet-roi-page .cabinet-roi-tabs {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 1.25rem;
+}
+
+.cabinet-roi-page .cabinet-roi-tabs .btn-info {
+    border-radius: var(--cabinet-roi-radius);
+    font-weight: 600;
+}
+
+.cabinet-roi-page .cabinet-roi-tabs .btn-info:not(.active) {
+    color: var(--bs-primary);
+    background: transparent;
+    border: 1px solid var(--bs-primary);
+}
+
+.cabinet-roi-page .cabinet-roi-tabs .btn-info.active {
+    color: #fff;
+    background: var(--bs-primary);
+    border-color: var(--bs-primary);
+}
+
+.cabinet-roi-page .cabinet-roi-panel {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.cabinet-roi-page .cabinet-roi-form-card .card-title {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.cabinet-roi-page .cabinet-roi-form-card .form-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-bottom: 0.35rem;
+    color: var(--bs-body-color);
+}
+
+.cabinet-roi-page .cabinet-roi-form-card .form-label::before {
+    display: none;
+}
+
+.cabinet-roi-page .cabinet-roi-form-card .form-control {
+    margin-bottom: 0.75rem;
+    border-radius: var(--cabinet-roi-radius);
+}
+
+.cabinet-roi-page .cabinet-roi-form-card .form-control.input-lg {
+    font-size: 1rem;
+    padding: 0.5rem 0.75rem;
+}
+
+.cabinet-roi-page .cabinet-roi-field--cost .form-label {
+    color: var(--bs-danger);
+}
+
+.cabinet-roi-page .cabinet-roi-field--traffic .form-label {
+    color: var(--bs-warning);
+}
+
+.cabinet-roi-page .cabinet-roi-field--conv .form-label {
+    color: var(--bs-success);
+}
+
+.cabinet-roi-page .cabinet-roi-field--check .form-label {
+    color: var(--bs-info);
+}
+
+.cabinet-roi-page .cabinet-roi-metrics-wrap {
+    border: 1px solid var(--bs-border-color-translucent);
+    border-radius: var(--cabinet-roi-radius);
+    background: var(--bs-tertiary-bg);
+    padding: 1rem;
+    min-height: 100%;
+}
+
+.cabinet-roi-page .cabinet-roi-metrics-wrap__title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--bs-secondary-color);
+    margin: 0 0 0.75rem;
+}
+
+.cabinet-roi-page .cabinet-roi-metric {
+    height: 100%;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--cabinet-roi-radius);
+    background: var(--bs-body-bg);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    overflow: hidden;
+}
+
+.cabinet-roi-page .cabinet-roi-metric--danger {
+    border-top: 3px solid var(--bs-danger);
+}
+
+.cabinet-roi-page .cabinet-roi-metric--warning {
+    border-top: 3px solid var(--bs-warning);
+}
+
+.cabinet-roi-page .cabinet-roi-metric--success {
+    border-top: 3px solid var(--bs-success);
+}
+
+.cabinet-roi-page .cabinet-roi-metric__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 0.65rem;
+    padding: 0.65rem 0.75rem 0.45rem;
+    background: var(--bs-tertiary-bg);
+    border-bottom: 1px solid var(--bs-border-color-translucent);
+}
+
+.cabinet-roi-page .cabinet-roi-metric__code {
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--bs-emphasis-color);
+    border: 0 !important;
+    padding: 0 !important;
+}
+
+.cabinet-roi-page .cabinet-roi-metric__label {
+    font-size: 0.8125rem;
+    line-height: 1.35;
+    color: var(--bs-secondary-color);
+    vertical-align: baseline !important;
+    padding: 0 !important;
+}
+
+.cabinet-roi-page .cabinet-roi-metric__body {
+    padding: 0.85rem 0.75rem;
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--bs-emphasis-color);
+    font-variant-numeric: tabular-nums;
+}
+
+.cabinet-roi-page .cabinet-roi-metric__unit {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-left: 0.15rem;
+    color: var(--bs-secondary-color);
+}
+
+/* Подсветка ROI / выручки (классы из calc.js) */
+.cabinet-roi-page .box-name.bg-green,
+.cabinet-roi-page #bg-change-roi.bg-green,
+.cabinet-roi-page #bg-change-prroi.bg-green {
+    color: var(--bs-success) !important;
+}
+
+.cabinet-roi-page .box-name.bg-yellow,
+.cabinet-roi-page #bg-change-roi.bg-yellow {
+    color: var(--bs-warning) !important;
+}
+
+.cabinet-roi-page .box-name.bg-red,
+.cabinet-roi-page #bg-change-roi.bg-red,
+.cabinet-roi-page #bg-change-prrev.bg-red {
+    color: var(--bs-danger) !important;
+}
+
+.cabinet-roi-page .cabinet-roi-metric:has(.box-name.bg-green) {
+    border-top-color: var(--bs-success);
+}
+
+.cabinet-roi-page .cabinet-roi-metric:has(.box-name.bg-yellow) {
+    border-top-color: var(--bs-warning);
+}
+
+.cabinet-roi-page .cabinet-roi-metric:has(.box-name.bg-red) {
+    border-top-color: var(--bs-danger);
+}
+
+/* Скрыть legacy-сетку */
+.cabinet-roi-page .content {
+    padding: 0;
+    margin: 0;
+}
+
+.cabinet-roi-page .centered {
+    text-align: left;
+}
+
+.cabinet-roi-page .boxes {
+    padding: 0 !important;
+    background: transparent !important;
+}
+
+.cabinet-roi-page .box.box-solid {
+    display: none;
+}

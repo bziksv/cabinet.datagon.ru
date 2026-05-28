@@ -1,0 +1,47 @@
+.cabinet-database-admin-page .db-summary-card {
+    border-left: 4px solid var(--bs-primary);
+}
+
+.cabinet-database-admin-page .db-summary-card--warn {
+    border-left-color: var(--bs-warning);
+}
+
+.cabinet-database-admin-page .db-summary-card--danger {
+    border-left-color: var(--bs-danger);
+}
+
+.cabinet-database-admin-page .db-table-name {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.875rem;
+}
+
+.cabinet-database-admin-page .db-row-orphan {
+    --bs-table-bg: rgba(var(--bs-warning-rgb), 0.08);
+}
+
+.cabinet-database-admin-page .db-row-large td:first-child {
+    border-left: 3px solid var(--bs-danger);
+}
+
+.cabinet-database-admin-page .db-fk-list {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+    margin: 0;
+    padding-left: 1rem;
+}
+
+.cabinet-database-admin-page .db-filter-pills .btn {
+    font-size: 0.8125rem;
+}
+
+.cabinet-database-admin-page .db-sticky-toolbar {
+    position: sticky;
+    top: 0.5rem;
+    z-index: 10;
+    background: var(--bs-body-bg);
+    padding-bottom: 0.5rem;
+}
+
+.cabinet-database-admin-page .db-preview-panel pre {
+    font-size: 0.75rem;
+}

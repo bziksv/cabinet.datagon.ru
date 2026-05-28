@@ -46,7 +46,7 @@ class TelegramProxyRegistry
     }
 
     /**
-     * @return array<int, array{id: string, label: string, url: string, enabled: bool, priority: int}>
+     * @return array<int, array{id: string, label: string, supplier: ?string, url: string, enabled: bool, priority: int}>
      */
     public static function all(): array
     {
@@ -59,6 +59,7 @@ class TelegramProxyRegistry
                 return [
                     'id' => $row->id,
                     'label' => $row->label,
+                    'supplier' => $row->supplier !== null && $row->supplier !== '' ? (string) $row->supplier : null,
                     'url' => $row->url,
                     'enabled' => (bool) $row->enabled,
                     'priority' => (int) $row->priority,
@@ -103,7 +104,7 @@ class TelegramProxyRegistry
     }
 
     /**
-     * @param array<int, array{id?: string, label: string, url: string, enabled?: bool, priority?: int}> $proxies
+     * @param array<int, array{id?: string, label: string, supplier?: ?string, url: string, enabled?: bool, priority?: int}> $proxies
      */
     public static function save(array $proxies): void
     {
@@ -113,9 +114,11 @@ class TelegramProxyRegistry
             if ($url === '' || !self::isValidProxyUrl($url)) {
                 continue;
             }
+            $supplier = trim((string) ($row['supplier'] ?? ''));
             $normalized[] = [
                 'id' => (string) ($row['id'] ?? (string) Str::uuid()),
                 'label' => trim((string) ($row['label'] ?? 'Proxy')) ?: 'Proxy',
+                'supplier' => $supplier !== '' ? $supplier : null,
                 'url' => $url,
                 'enabled' => !isset($row['enabled']) || (bool) $row['enabled'],
                 'priority' => (int) ($row['priority'] ?? 0),
@@ -133,6 +136,7 @@ class TelegramProxyRegistry
                     ['id' => $row['id']],
                     [
                         'label' => $row['label'],
+                        'supplier' => $row['supplier'],
                         'url' => $row['url'],
                         'priority' => $row['priority'],
                         'enabled' => $row['enabled'],
@@ -155,12 +159,14 @@ class TelegramProxyRegistry
         self::syncLegacyConfig();
     }
 
-    public static function add(string $label, string $url, int $priority = 50, bool $enabled = true): void
+    public static function add(string $label, string $url, int $priority = 50, bool $enabled = true, ?string $supplier = null): void
     {
         $all = self::all();
+        $supplier = trim((string) $supplier);
         $all[] = [
             'id' => (string) Str::uuid(),
             'label' => $label,
+            'supplier' => $supplier !== '' ? $supplier : null,
             'url' => trim($url),
             'enabled' => $enabled,
             'priority' => $priority,
@@ -168,15 +174,17 @@ class TelegramProxyRegistry
         self::save($all);
     }
 
-    public static function update(string $id, string $label, string $url, int $priority, bool $enabled): bool
+    public static function update(string $id, string $label, string $url, int $priority, bool $enabled, ?string $supplier = null): bool
     {
         $all = self::all();
         $updated = false;
+        $supplier = trim((string) $supplier);
         foreach ($all as $i => $row) {
             if ($row['id'] !== $id) {
                 continue;
             }
             $all[$i]['label'] = trim($label) !== '' ? trim($label) : 'Proxy';
+            $all[$i]['supplier'] = $supplier !== '' ? $supplier : null;
             $all[$i]['url'] = trim($url);
             $all[$i]['priority'] = $priority;
             $all[$i]['enabled'] = $enabled;
@@ -230,7 +238,7 @@ class TelegramProxyRegistry
     }
 
     /**
-     * @return array{id: string, label: string, url_masked: string, enabled: bool, priority: int, probe: array}
+     * @return array{id: string, label: string, supplier: ?string, url_masked: string, enabled: bool, priority: int, probe: array}
      */
     public static function rowWithProbe(array $proxy, TelegramConnectivityService $connectivity): array
     {
@@ -239,6 +247,7 @@ class TelegramProxyRegistry
         return [
             'id' => $proxy['id'],
             'label' => $proxy['label'],
+            'supplier' => $proxy['supplier'] ?? null,
             'url_masked' => TelegramConnectivityService::maskProxyUrl($proxy['url']),
             'enabled' => $proxy['enabled'],
             'priority' => $proxy['priority'],

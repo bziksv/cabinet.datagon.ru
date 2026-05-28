@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\ChecklistMonitoringRelation;
 use App\Classes\Monitoring\Helper;
 use App\Classes\Monitoring\Mastered;
 use App\Classes\Monitoring\PanelButtons\SimpleButtonsFactory;
@@ -24,6 +23,7 @@ use App\MonitoringCompetitor;
 use App\MonitoringCompetitorsResult;
 use App\MonitoringDataTableColumnsProject;
 use App\MonitoringKeyword;
+use App\MonitoringKeywordPrice;
 use App\MonitoringPosition;
 use App\MonitoringProject;
 use App\MonitoringProjectColumnsSetting;
@@ -224,20 +224,61 @@ class MonitoringController extends Controller
 
     public function getProjects(Request $request)
     {
-        $page = ($request->input('start') / $request->input('length')) + 1;
+        $length = max(1, (int) $request->input('length', 1));
+        $start = max(0, (int) $request->input('start', 0));
+        if ($length > 15) {
+            set_time_limit(180);
+        }
+        $page = (int) floor($start / $length) + 1;
 
         /** @var User $user */
         $user = $this->user;
         $model = $user->monitoringProjectsDataTable();
 
-        $projects = $this->extendFields($model->paginate($request->input('length', 1), ['*'], 'page', $page));
+        $projects = $this->extendFields($model->paginate($length, ['*'], 'page', $page));
 
-        if($projects->isNotEmpty()) {
-            $PD = new ProjectData($projects->first());
-            $PD->extension();
-        }
+        $this->enrichProjectsForList($projects);
 
         return $projects->items();
+    }
+
+    /**
+     * Метрики из кэша (monitoring_data_table_columns_projects) + колонки UI без тяжёлого пересчёта.
+     *
+     * @param \Illuminate\Support\Collection|\Illuminate\Contracts\Pagination\Paginator $projects
+     */
+    public function enrichProjectsForList($projects): void
+    {
+        $collection = $projects instanceof \Illuminate\Pagination\AbstractPaginator
+            ? $projects->getCollection()
+            : collect($projects);
+
+        if ($collection->isEmpty()) {
+            return;
+        }
+
+        $cached = MonitoringDataTableColumnsProject::query()
+            ->whereIn('monitoring_project_id', $collection->pluck('id'))
+            ->get()
+            ->keyBy('monitoring_project_id');
+
+        $metricKeys = [
+            'words', 'middle', 'top3', 'top5', 'top10', 'top30', 'top100',
+            'mastered', 'mastered_percent',
+        ];
+
+        foreach ($collection as $project) {
+            apply_team_permissions($project->id);
+
+            if ($row = $cached->get($project->id)) {
+                $project->fill($row->only($metricKeys));
+            }
+
+            $project->users_column = view('monitoring.partials.users-column', ['project' => $project])->render();
+            $project->dropdown_menu = view('monitoring.partials.dropdown-menu', ['project' => $project])->render();
+
+            apply_global_team_permissions();
+        }
     }
 
     public function searchColumnByName(string $name, array $columns)
@@ -270,7 +311,7 @@ class MonitoringController extends Controller
         return $collection;
     }
 
-    protected function extendFields($projects)
+    public function extendFields($projects)
     {
         $projects->transform(function ($item) {
             $item->load(['searchengines' => function ($query) {
@@ -298,31 +339,21 @@ class MonitoringController extends Controller
         /** @var User $user */
         $user = $this->user;
 
-        $project = $user->monitoringProjects()->find($project_id);
-        $engines = $project->searchengines()->with('location')->get();
-        $section = $project->groups()->find($group_id);
+        $html = app(\App\Classes\Monitoring\MonitoringChildRowsService::class)
+            ->htmlForProject($user, $project_id, $group_id);
 
-        $groups = collect([]);
-        foreach ($engines as $engine) {
-            $engine->data = collect([]);
-            $positions = $engine->positions()->whereNotNull('position');
-
-            if ($section)
-                $positions->whereIn('monitoring_keyword_id', $section->keywords->pluck('id'));
-
-            foreach ($this->subtractionMonths as $month) {
-                if ($grouped = $this->groupPositionsByMonth($positions, $month)) {
-                    $engine->data->push($this->calculateTopPercent($grouped, $engine));
-                }
-            }
-
-            $groups->push($engine);
-        }
-
-        return view('monitoring.partials._child_rows', compact('groups'));
+        return response($html);
     }
 
-    private function calculateTopPercent(Collection $positions, $model)
+    public function getSubtractionMonths(): array
+    {
+        return $this->subtractionMonths;
+    }
+
+    /**
+     * @param Collection|null $priceByKeyword предзагруженные цены (monitoring_keyword_id => row)
+     */
+    public function calculateTopPercent(Collection $positions, $model, $priceByKeyword = null)
     {
         $engine = clone $model;
 
@@ -337,6 +368,9 @@ class MonitoringController extends Controller
         ];
 
         $pos = $this->getLastCoupleOfPositions($positions);
+        if ($priceByKeyword === null) {
+            $priceByKeyword = $this->preloadKeywordPrices($model->id, $pos);
+        }
 
         foreach ($percents as $name => $percent) {
             $first = Helper::calculateTopPercentByPositions($pos->pluck('first.position'), $percent);
@@ -346,7 +380,7 @@ class MonitoringController extends Controller
         $engine->middle_position = round($pos->pluck('first')->sum('position') / $pos->pluck('first')->count(), 2);
         $engine->latest_created = $pos->pluck('first')->last()->created_at;
 
-        $mastered = new Mastered($pos->pluck('first'));
+        $mastered = new Mastered($pos->pluck('first'), $priceByKeyword);
         $engine->mastered = $mastered->total();
         $engine->mastered_percent = $mastered->percentOf($engine->project['budget']);
         $engine->mastered_percent_day = $mastered->percentOfDay($engine->project['budget']);
@@ -356,18 +390,40 @@ class MonitoringController extends Controller
 
     public function getLastCoupleOfPositions(Collection $positions)
     {
-        $positions = $positions->groupBy('monitoring_keyword_id')->transform(function ($pos) {
-            $p = $pos->sortByDesc('created_at')->values();
+        $couples = [];
+        foreach ($positions as $row) {
+            $kid = $row->monitoring_keyword_id;
+            if (!isset($couples[$kid])) {
+                $couples[$kid] = ['first' => $row, 'last' => null];
+            } elseif ($couples[$kid]['last'] === null) {
+                $couples[$kid]['last'] = $row;
+            }
+        }
 
-            if ($p->count() > 1)
-                return collect(['first' => $p[0], 'last' => $p[1]]);
-            elseif ($p->count())
-                return collect(['first' => $p[0], 'last' => []]);
-            else
-                return collect(['first' => [], 'last' => []]);
+        return collect($couples)->map(function ($pair) {
+            return collect([
+                'first' => $pair['first'],
+                'last' => $pair['last'] ?: [],
+            ]);
         });
+    }
 
-        return $positions;
+    /**
+     * @param Collection $pos результат getLastCoupleOfPositions
+     */
+    private function preloadKeywordPrices(int $engineId, Collection $pos)
+    {
+        $keywordIds = $pos->pluck('first.monitoring_keyword_id')->filter()->unique()->values();
+
+        if ($keywordIds->isEmpty()) {
+            return collect([]);
+        }
+
+        return MonitoringKeywordPrice::query()
+            ->where('monitoring_searchengine_id', $engineId)
+            ->whereIn('monitoring_keyword_id', $keywordIds)
+            ->get()
+            ->keyBy('monitoring_keyword_id');
     }
 
     public function groupPositionsByMonth($positions, int $subMonth = null)
@@ -857,14 +913,4 @@ class MonitoringController extends Controller
         return array_column($project->competitors->toArray(), 'url');
     }
 
-    public function checklistMonitoringRelation(Request $request)
-    {
-        ChecklistMonitoringRelation::where('monitoring_id', $request->monitoringId)
-            ->delete();
-
-        return ChecklistMonitoringRelation::create([
-            'monitoring_id' => $request->monitoringId,
-            'checklist_id' => $request->checklistId,
-        ]);
-    }
 }

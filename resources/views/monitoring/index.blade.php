@@ -305,8 +305,6 @@
                             axios.get(`/monitoring/${data.id}/child-rows/get`).then(function (response) {
                                 let content = $(response.data);
 
-                                window.pleaseWait.finish();
-
                                 $.each(content.find('.top'), function (i, el) {
 
                                     let str = $(el).text();
@@ -324,6 +322,12 @@
                                     animation: false,
                                     trigger: 'hover',
                                 });
+                            }).catch(function () {
+                                toastr.error(@json(__('Monitoring v2 regions load error')));
+                            }).finally(function () {
+                                if (window.pleaseWait && typeof window.pleaseWait.finish === 'function') {
+                                    window.pleaseWait.finish();
+                                }
                             });
 
                             tr.addClass('shown');
@@ -356,26 +360,39 @@
                 }
             });
 
-            for(let i = 0; i < PROJECTS_COUNT; i++)
-            {
+            const MON_CHUNK = 30;
+            let monStart = 0;
+
+            function loadMonitoringChunk() {
+                if (monStart >= PROJECTS_COUNT) {
+                    return;
+                }
+                const chunkLen = Math.min(MON_CHUNK, PROJECTS_COUNT - monStart);
                 $.ajax({
                     type: 'POST',
                     url: '/monitoring/projects/get',
-                    data:  {
-                        length: 1,
-                        start: i,
+                    data: {
+                        length: chunkLen,
+                        start: monStart,
                     },
-                    success: (response) =>
-                    {
-                        if(!response.length)
-                            return false;
-
-                        table.row.add(response[0]).draw(false);
-
-                        $('[data-bs-toggle="tooltip"]').tooltip();
+                    success: (response) => {
+                        if (response && response.length) {
+                            response.forEach((row) => {
+                                table.row.add(row).draw(false);
+                            });
+                            $('[data-bs-toggle="tooltip"]').tooltip();
+                        }
+                        monStart += chunkLen;
+                        loadMonitoringChunk();
+                    },
+                    error: () => {
+                        monStart += chunkLen;
+                        loadMonitoringChunk();
                     },
                 });
             }
+
+            loadMonitoringChunk();
 
             search(table);
 

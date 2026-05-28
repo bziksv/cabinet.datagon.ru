@@ -26,6 +26,15 @@
     <script src="{{ asset('plugins/jquery/jquery.min.js') }}"></script>
 </head>
 <body class="layout-fixed sidebar-expand-lg sidebar-mini bg-body-tertiary">
+<script>
+    (function () {
+        try {
+            if (localStorage.getItem('lte.sidebar.state') === 'sidebar-collapse') {
+                document.body.classList.add('sidebar-collapse');
+            }
+        } catch (e) { /* private mode */ }
+    })();
+</script>
 @if(config('app.env') !== 'local')
 <noscript>
     <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PS4GF7H"
@@ -143,24 +152,64 @@
 
 <script>
     $(document).ready(function () {
-        let player;
-        $('#video-course').on('click', function () {
-            player = new YT.Player('video-course', {
-                videoId: $(this).attr('data-id'),
-                playerVars: {'autoplay': 1},
-                events: {'onReady': onPlayerReady}
-            });
-        });
-        $('.video-course').on('click', function () {
-            player = new YT.Player($(this).attr('id'), {
-                videoId: $(this).attr('data-id'),
-                playerVars: {'autoplay': 1},
-                events: {'onReady': onPlayerReady}
-            });
-        });
-        function onPlayerReady(event) {
-            event.target.playVideo();
+        var ytApiLoading = false;
+        var ytApiQueue = [];
+
+        function playModuleVideo($el) {
+            var localSrc = $el.attr('data-local');
+            if (localSrc) {
+                $el.html(
+                    '<video class="w-100 module-video-selfhosted" controls autoplay playsinline src="'
+                    + localSrc.replace(/"/g, '&quot;') + '"></video>'
+                );
+                return;
+            }
+
+            var videoId = $el.attr('data-id');
+            var elementId = $el.attr('id') || 'video-course';
+            if (!videoId) {
+                return;
+            }
+
+            function startYoutube() {
+                if (typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
+                    return;
+                }
+                new YT.Player(elementId, {
+                    videoId: videoId,
+                    playerVars: {autoplay: 1},
+                    events: {
+                        onReady: function (event) {
+                            event.target.playVideo();
+                        }
+                    }
+                });
+            }
+
+            if (typeof YT !== 'undefined' && typeof YT.Player !== 'undefined') {
+                startYoutube();
+                return;
+            }
+
+            ytApiQueue.push(startYoutube);
+            if (ytApiLoading) {
+                return;
+            }
+            ytApiLoading = true;
+            window.onYouTubeIframeAPIReady = function () {
+                ytApiLoading = false;
+                var q = ytApiQueue.slice();
+                ytApiQueue = [];
+                q.forEach(function (fn) { fn(); });
+            };
+            var tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            document.head.appendChild(tag);
         }
+
+        $(document).on('click', '#video-course, .video-course', function () {
+            playModuleVideo($(this));
+        });
     });
 </script>
 
@@ -176,9 +225,13 @@
         </script>
     @endif
     @if(config('app.env') === 'local')
+        <script>window.cabinetPleaseWaitMessage = @json(__('Cabinet please wait message'));</script>
         <script src="{{ asset('js/app.js') }}?v=no-ws-{{ @filemtime(public_path('js/app.js')) }}"></script>
+        @include('partials.cabinet-please-wait-override')
     @else
+        <script>window.cabinetPleaseWaitMessage = @json(__('Cabinet please wait message'));</script>
         <script src="{{ mix('js/app.js') }}"></script>
+        @include('partials.cabinet-please-wait-override')
     @endif
 @endunless
 

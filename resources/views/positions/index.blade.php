@@ -1,507 +1,176 @@
-@component('component.card', ['title' =>  __('Setting the order of menu items') ])
+@component('component.card', [
+    'title' => __('Setting the order of menu items'),
+])
     @slot('css')
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/keyword-generator/css/font-awesome-4.7.0/css/font-awesome.css') }}"/>
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/toastr/toastr.css') }}"/>
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/keyword-generator/css/style.css') }}"/>
-
-        <style>
-            div.sortable {
-                width: 100px;
-                background-color: lightgrey;
-                font-size: large;
-                float: left;
-                margin: 6px;
-                text-align: center;
-                border: medium solid black;
-                padding: 10px;
-            }
-
-            .moved-item {
-                cursor: move;
-                box-shadow: 0 0 2px grey;
-            }
-
-            #configurationBlock {
-                margin-bottom: 0;
-                border-radius: 0;
-                position: sticky;
-                top: 15px;
-                max-height: 85vh;
-                overflow: auto;
-            }
-
-            .emptySpace {
-                background-color: rgba(52, 58, 64, 0.27);
-                height: 40px;
-                margin: 4px;
-            }
-
-            .dragged {
-                position: absolute;
-                top: 0;
-                opacity: 0.5;
-                z-index: 2000;
-            }
-
-            .group-name {
-                background-color: rgb(52, 58, 64);
-                color: white;
-                direction: initial;
-            }
-
-            .placeholder {
-                height: 40px;
-                background-color: rgba(52, 58, 64, 0.27);
-            }
-
-            ol {
-                list-style: none;
-                padding: 0;
-            }
-
-            .w-100.pb-3 li:hover {
-                background-color: lightgrey;
-            }
-
-            .alone:hover {
-                background-color: lightgrey;
-            }
-
-            .card-header:after {
-                content: none;
-            }
-
-            .hide {
-                display: none !important;
-            }
-
-            li > i:hover {
-                color: black;
-                cursor: pointer;
-            }
-        </style>
+        <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.css') }}">
+        <link rel="stylesheet" href="{{ asset('css/cabinet-configuration-menu.css') }}?v={{ @filemtime(public_path('css/cabinet-configuration-menu.css')) ?: time() }}">
     @endslot
 
-    <div id="toast-container" class="toast-top-right success-message">
-        <div class="toast toast-success" aria-live="polite" style="display:none;">
-            <div class="toast-message success-msg"></div>
-        </div>
-    </div>
+    <div
+        id="cabinetMenuConfigRoot"
+        class="cabinet-menu-config-page"
+        data-save-url="{{ route('configuration.menu') }}"
+        data-restore-url="{{ route('restore.configuration.menu') }}"
+        data-csrf="{{ csrf_token() }}"
+        data-msg-success="{{ __('Menu configuration saved') }}"
+        data-msg-restore-success="{{ __('Menu configuration restored') }}"
+        data-msg-saving="{{ __('Menu configuration saving') }}"
+        data-msg-restoring="{{ __('Menu configuration restoring') }}"
+        data-msg-error="{{ __('Error') }}"
+        data-msg-empty-group="{{ __('The name of the group cannot be empty') }}"
+        data-msg-duplicate-group="{{ __('A group with that name already exists') }}"
+        data-msg-group-exists="{{ __('A group with that name already exists') }}"
+        data-empty-hint="{{ __('Drag modules here or create a group') }}"
+        data-tip-group-expand="{{ __('Hide or show group in the menu') }}"
+        data-tip-panel-toggle="{{ __('Expand or collapse group list') }}"
+        data-label-change="{{ __('Change') }}"
+        data-label-cancel="{{ __('Cancel') }}"
+    >
+        <p class="cabinet-menu-config-lead mb-2">
+            {{ __('Menu configuration lead') }}
+        </p>
 
-    <div id="toast-container" class="toast-top-right error-message">
-        <div class="toast toast-error" aria-live="assertive" style="display:none;">
-            <div class="toast-message error-msg">
+        <div class="row cabinet-menu-config-layout g-4">
+            <div class="col-lg-8">
+                <div class="cabinet-menu-config-board">
+                    <div class="cabinet-menu-config-board__head">
+                        <h2 class="cabinet-menu-config-board__title">{{ __('Menu structure') }}</h2>
+                        <p class="cabinet-menu-config-board__hint">{{ __('Drag items and groups to reorder') }}</p>
+                    </div>
+                    @include('positions.partials.menu-configuration-tree', ['items' => $items])
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <aside class="cabinet-menu-config-sidebar">
+                    <div class="card shadow-sm cabinet-menu-config-actions">
+                        <div class="card-header">
+                            <h3 class="card-title mb-0 h6">{{ __('Actions') }}</h3>
+                        </div>
+                        <div class="card-body d-grid gap-2">
+                            <div id="menuConfigStatus" class="alert alert-secondary py-2 px-3 small mb-0 d-none" role="status" aria-live="polite"></div>
+                            <button type="button" class="btn btn-success" id="saveChanges">
+                                <span class="cabinet-menu-config-btn__idle"><i class="bi bi-check-lg" aria-hidden="true"></i>{{ __('Save Changes') }}</span>
+                                <span class="cabinet-menu-config-btn__busy d-none"><span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>{{ __('Menu configuration saving') }}</span>
+                                <span class="cabinet-menu-config-btn__done d-none"><i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>{{ __('Menu configuration saved') }}</span>
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addNewDir">
+                                <i class="bi bi-folder-plus" aria-hidden="true"></i>{{ __('Create a group') }}
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#resetAllChanges">
+                                <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>{{ __('Return the standard layout') }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mt-3">
+                        <div class="card-body cabinet-menu-config-tips">
+                            <p class="fw-semibold text-body mb-2">{{ __('Tips') }}</p>
+                            <ul class="mb-0 ps-3">
+                                <li>{{ __('Menu configuration tip drag') }}</li>
+                                <li>{{ __('Menu configuration tip eye') }}</li>
+                                <li>{{ __('Menu configuration tip chevron') }}</li>
+                                <li>{{ __('Menu configuration tip save') }}</li>
+                                <li>{{ __('Menu configuration tip sidebar refresh') }}</li>
+                            </ul>
+                            <a href="{{ route('menu.config', ['refresh_sidebar' => 1]) }}" class="btn btn-sm btn-outline-secondary w-100 mt-2">
+                                <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>{{ __('Menu configuration refresh sidebar') }}
+                            </a>
+                            @if(!empty($sidebarMenuStale))
+                                <p class="small text-success mb-0 mt-2">{{ __('Menu configuration sidebar refreshed') }}</p>
+                            @endif
+                        </div>
+                    </div>
+                </aside>
             </div>
         </div>
-    </div>
 
-    <div class="d-flex">
-        <div id="sortContainer" class="col-6">
-            <ol class="nested_with_switch vertical">
-                @foreach($items as $key => $item)
-                    @if(array_key_exists('configurationInfo', $item))
-                        <li data-name="{{ $key }}" class="w-100 pb-3" data-action="dir">
-                            <div class="card-header group-name d-flex justify-content-between">
-                                <div>
-                                    {{ $key }}
-                                </div>
-                                <div class="btn-group btn-group-toggle w-75 hide">
-                                    <input type="text" value="{{ $key }}" class="form form-control">
-                                    <button class="btn btn-secondary change-group-name">
-                                        {{ __('Change') }}
-                                    </button>
-                                </div>
-                                <div class="d-flex justify-content-between" style="align-items: center">
-                                    <span class="__helper-link ui_tooltip_w">
-                                        <i data-bs-toggle="collapse"
-                                           aria-expanded="true"
-                                           data-bs-target="#{{ preg_replace('/[^a-zA-Zа-яА-Я]/u', '', $key) }}"
-                                           aria-controls="{{ preg_replace('/[^a-zA-Zа-яА-Я]/u', '', $key) }}"
-                                           class="fa fa-eye pr-2"
-                                           data-action="{{ $item['configurationInfo']['show'] }}"
-                                           style="color: white"></i>
-                                        <span class="ui_tooltip __bottom">
-                                            <span class="ui_tooltip_content">
-                                                Скрыть/показать группу <br><br>
-                                                <b>{{ __('This setting also affects whether the group will be expanded in the menu or not') }}</b>
-                                            </span>
-                                        </span>
-                                    </span>
-                                    <span class="__helper-link ui_tooltip_w">
-                                        <i class="fa fa-edit edit-dir-name pr-2" style="color: white"></i>
-                                        <span class="ui_tooltip __bottom">
-                                            <span class="ui_tooltip_content">
-                                                {{ __('Edit the group name') }}
-                                            </span>
-                                        </span>
-                                    </span>
-                                    <span class="__helper-link ui_tooltip_w">
-                                        <i data-bs-toggle="modal" data-bs-target="#removeModal" class="fa fa-trash remove-dir"
-                                           style="color: white"></i>
-                                        <span class="ui_tooltip __bottom">
-                                            <span class="ui_tooltip_content">
-                                                {{ __('Delete a group') }}
-                                            </span>
-                                        </span>
-                                    </span>
-                                </div>
-                            </div>
-                            <ol class="for-nest @if($item['configurationInfo']['show'] === 'true') show @else collapse @endif"
-                                id="{{ preg_replace('/[^a-zA-Zа-яА-Я]/u', '', $key) }}">
-                                @foreach($item as $k => $elem)
-                                    @if($k === 'configurationInfo')
-                                        @continue
-                                    @endif
-                                    <li class="p-2 moved-item" data-id="{{ $elem['id'] }}" data-name="{{ $elem['title'] }}">
-                                        <span class="handle ui-sortable-handle mr-2">
-                                            <i class="fas fa-ellipsis-v"></i>
-                                            <i class="fas fa-ellipsis-v"></i>
-                                        </span>
-                                        {{ __($elem['title']) }}
-                                    </li>
-                                @endforeach
-                            </ol>
-                        </li>
-                    @else
-                        <li class="p-2 moved-item alone" data-id="{{ $item['id'] }}"
-                            data-name="{{ $item['title'] }}">
-                                        <span class="handle ui-sortable-handle mr-2">
-                                            <i class="fas fa-ellipsis-v"></i>
-                                            <i class="fas fa-ellipsis-v"></i>
-                                        </span>
-                            {{ __($item['title']) }}
-                        </li>
-                    @endif
-                @endforeach
-            </ol>
-        </div>
-
-        <div id="configurationBlock" class="col-6">
-            <div class="btn-group btn-group-toggle w-100">
-                <button class="btn btn-outline-success w-25" id="saveChanges">
-                    {{ __('Save Changes') }}
-                </button>
-                <button class="btn btn-outline-primary w-25" data-bs-toggle="modal" data-bs-target="#addNewDir">
-                    {{ __('Create a group') }}
-                </button>
-                <button class="btn btn-outline-danger w-50" data-bs-toggle="modal" data-bs-target="#resetAllChanges">
-                    {{ __('Return the standard layout') }}
-                </button>
+        <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100">
+            <div class="toast align-items-center text-bg-success border-0 toast-success hide" role="alert" aria-live="polite" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body success-msg"></div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            </div>
+            <div class="toast align-items-center text-bg-danger border-0 toast-error hide" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex">
+                    <div class="toast-body error-msg"></div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="modal fade" id="addNewDir" tabindex="-1" aria-labelledby="addNewDirLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal fade" id="addNewDir" tabindex="-1" aria-labelledby="addNewDirLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="addNewDirLabel">{{ __('Enter the name of the group') }}</h5>
-                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <label for="dir">{{ __('Group name') }}</label>
-                    <input type="text" class="form form-control" name="dir" id="dir">
+                    <label class="form-label" for="dir">{{ __('Group name') }}</label>
+                    <input type="text" class="form-control" name="dir" id="dir" autocomplete="off">
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="createDirectory">
-                        {{ __('Add') }}
-                    </button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal" id="createDirectory">{{ __('Add') }}</button>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="modal fade" id="removeModal" tabindex="-1" aria-labelledby="removeModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="removeModalLabel">{{ __('Deleting a group') }}</h5>
-                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body">
-                    {{ __('All menu items located in it will be automatically taken out.') }}
-                </div>
+                <div class="modal-body">{{ __('All menu items located in it will be automatically taken out.') }}</div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
-                    <button id="removeSelectedBlock" type="button" class="btn btn-secondary"
-                            data-bs-dismiss="modal">{{ __('Remove') }}</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button id="removeSelectedBlock" type="button" class="btn btn-danger" data-bs-dismiss="modal">{{ __('Remove') }}</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="modal fade" id="resetAllChanges" tabindex="-1" aria-labelledby="resetAllChangesLabel"
-         aria-hidden="true">
-        <div class="modal-dialog">
+    <div class="modal fade" id="resetAllChanges" tabindex="-1" aria-labelledby="resetAllChangesLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="resetAllChangesLabel">{{ __('You can restore the default values') }}</h5>
-                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     {{ __('If you return the default values, the order of the menu items will be determined by the administrators.') }}
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
-                    <button id="restore" type="button" class="btn btn-danger"
-                            data-bs-dismiss="modal">{{ __('Restore standard sorting') }}</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                    <button id="restore" type="button" class="btn btn-danger">
+                        <span class="cabinet-menu-config-restore__idle">{{ __('Restore standard sorting') }}</span>
+                        <span class="cabinet-menu-config-restore__busy d-none"><span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>{{ __('Menu configuration restoring') }}</span>
+                    </button>
                 </div>
             </div>
         </div>
     </div>
+    </div>{{-- #cabinetMenuConfigRoot --}}
+
     @slot('js')
         <script src="{{ asset('plugins/sortable/sortable.min.js') }}"></script>
+        <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
+        <script src="{{ asset('js/cabinet-configuration-menu.js') }}?v={{ @filemtime(public_path('js/cabinet-configuration-menu.js')) ?: time() }}"></script>
         <script>
-            let groupBlock;
-            let oldContainer;
-            let jsonString;
-            let group = $(".nested_with_switch").sortable({
-                afterMove: function (placeholder, container) {
-                    if (oldContainer !== container) {
-                        if (oldContainer) {
-                            oldContainer.el.removeClass('active')
-                        }
-                        container.el.addClass('active');
-                        oldContainer = container;
-                    }
-                },
-                onDrop: function ($item, container, _super) {
-                    container.el.removeClass('active');
-                    _super($item, container);
-                },
-                isValidTarget: function ($item, container) {
-                    if (container.el.hasClass('block-nested')) {
-                        return false;
-                    } else {
-                        return true;
-                    }
-                }
-            });
-
-            $(".switch-container").on("click", ".switch", function (e) {
-                let method = $(this).hasClass("active") ? "enable" : "disable";
-                $(e.delegateTarget).next().sortable(method);
-            });
-
-            $('#createDirectory').on('click', function () {
-                let newDir = $('#dir')
-
-                if (issetItem(newDir.val().trim())) {
-                    errorMessage("{{ __('A group with that name already exists') }}")
-                    return;
-                }
-
-                if (newDir.val().trim() !== '') {
-                    $('.nested_with_switch.vertical').prepend(
-                        '<li data-name="' + newDir.val() + '" class="w-100 pb-3" data-action="dir">' +
-                        '    <div class="card-header group-name d-flex justify-content-between">' +
-                        '        <div>' + newDir.val() + '</div>' +
-                        '        <div class="btn-group btn-group-toggle w-75 hide">' +
-                        '            <input type="text" value="' + newDir.val() + '" class="form form-control">' +
-                        '                <button class="btn btn-secondary change-group-name">' +
-                        '                    {{ __('Change') }} ' +
-                        '                </button>' +
-                        '        </div>' +
-                        '        <div class="d-flex justify-content-between" style="align-items: center">' +
-                        '                <span class="__helper-link ui_tooltip_w">' +
-                        '                    <i data-bs-toggle="collapse"' +
-                        '                       aria-expanded="true"' +
-                        '                       data-bs-target="#' + newDir.val().replaceAll(' ', '_') + '"' +
-                        '                       aria-controls="' + newDir.val().replaceAll(' ', '_') + '"' +
-                        '                       class="fa fa-eye pr-2"' +
-                        '                       data-action="true"' +
-                        '                       style="color: white"></i>' +
-                        '                    <span class="ui_tooltip __bottom">' +
-                        '                        <span class="ui_tooltip_content">' +
-                        '                            Скрыть/показать группу <br> <br>' +
-                        '                            <b>' + "{{ __('This setting also affects whether the group will be expanded in the menu or not') }}" + '</b>' +
-                        '                        </span>' +
-                        '                    </span>' +
-                        '                </span>' +
-                        '            <span class="__helper-link ui_tooltip_w">' +
-                        '                    <i class="fa fa-edit edit-dir-name pr-2" style="color: white"></i>' +
-                        '                    <span class="ui_tooltip __bottom">' +
-                        '                        <span class="ui_tooltip_content">' + "{{ __('Edit the group name') }}" + '</span>' +
-                        '                    </span>' +
-                        '                </span>' +
-                        '            <span class="__helper-link ui_tooltip_w">' +
-                        '                    <i class="fa fa-trash remove-dir" style="color: white"></i>' +
-                        '                    <span class="ui_tooltip __bottom">' +
-                        '                        <span class="ui_tooltip_content">' + "{{ __('Delete a group') }}" + '</span>' +
-                        '                    </span>' +
-                        '                </span>' +
-                        '        </div>' +
-                        '    </div>' +
-                        '    <ol id="' + newDir.val().replaceAll(' ', '_') + '" class="for-nest show"></ol>' +
-                        '</li>'
-                    )
-                    newDir.val('')
-
-                    refreshMethod()
-                } else {
-                    errorMessage("{{ __('The name of the group cannot be empty') }}")
-                }
-
-            });
-
-            $('#saveChanges').unbind().on('click', function () {
-                saveChanges()
-            })
-
-            $('#removeSelectedBlock').on('click', function () {
-                $.each(groupBlock.children('ol').children('li'), function () {
-                    $('.nested_with_switch').prepend($(this))
-                })
-                groupBlock.remove()
-                $('#saveChanges').trigger('click')
-            })
-
-            $('#restore').on('click', function () {
-                $.ajax({
-                    type: "POST",
-                    url: "{{ route('restore.configuration.menu') }}",
-                    data: {
-                        _token: $('meta[name="csrf-token"]').attr('content'),
-                    },
-                    success: function () {
-                        location.reload();
-                    },
-                    error: function () {
-                        errorMessage("{{ __('Error') }}")
-                    }
-                });
-            })
-
-            function refreshMethod() {
-                $('.group-name').unbind().mousedown(function () {
-                    $('.for-nest').addClass('block-nested')
-                }).mouseup(function () {
-                    $('.for-nest').removeClass('block-nested')
-                });
-
-                $('.moved-item').unbind().mousedown(function () {
-                    $('.for-nest').removeClass('block-nested')
-                })
-
-                $('.edit-dir-name').unbind().on('click', function () {
-                    $(this).parent().parent().parent().children('div').eq(0).addClass('hide')
-                    $(this).parent().parent().parent().children('div').eq(1).removeClass('hide')
-                    $(this).parent().parent().parent().children('div').eq(2).addClass('hide')
-                });
-
-                $('.change-group-name').unbind().on('click', function () {
-                    let val = $(this).parent().children('input').eq(0).val()
-                    let parent = $(this).parent().parent().parent()
-                    parent.attr('data-name', val)
-                    parent.children('div').eq(0).children('div').eq(0).html(val)
-                    parent.children('div').eq(0).children('div').eq(0).removeClass('hide')
-                    parent.children('div').eq(0).children('div').eq(1).addClass('hide')
-                    parent.children('div').eq(0).children('div').eq(2).removeClass('hide')
-                    saveChanges()
-                })
-
-                $('.remove-dir').unbind().on('click', function () {
-                    groupBlock = $(this).parent().parent().parent().parent()
-                })
-
-                $('.__helper-link.ui_tooltip_w .fa.fa-eye.pr-2').unbind().on('click', function () {
-                    if ($(this).attr('data-action') === 'false') {
-                        $(this).attr('data-action', 'true')
-                    } else {
-                        $(this).attr('data-action', 'false')
-                    }
-                })
+            if (window.toastr) {
+                toastr.options = {
+                    closeButton: true,
+                    progressBar: true,
+                    positionClass: 'toast-top-right',
+                    timeOut: 5000,
+                    preventDuplicates: true,
+                };
             }
-
-            function issetItem(name) {
-                let bool = false;
-                $.each($(".nested_with_switch.vertical li"), function () {
-                    if ($(this).attr('data-name') === name) {
-                        bool = true;
-                    }
-                })
-
-                return bool;
-            }
-
-            function errorMessage(message) {
-                $('.toast.toast-error').show(300)
-                $('.toast-message.error-msg').html(message)
-                setTimeout(() => {
-                    $('.toast.toast-error').hide(300)
-                }, 5000)
-            }
-
-            function successMessage(message, timeout = 8000) {
-                $('.toast.toast-success').show(300)
-                $('.toast-message.success-msg').html(message)
-                setTimeout(() => {
-                    $('.toast.toast-success').hide(300)
-                }, timeout)
-            }
-
-            function configurationJson() {
-                let items = []
-                $.each($('.nested_with_switch.vertical').children('li'), function (key, value) {
-                    let action = $(this).attr('data-action')
-                    if (action === undefined) {
-                        let id = $(this).attr('data-id')
-                        let name = $(this).attr('data-name')
-                        let obj = {
-                            id: id,
-                            name: name,
-                        }
-                        items.push(obj)
-                    } else {
-                        let dir = [];
-                        let show = $(this).children('div').eq(0).children('div').eq(2).children('span').eq(0).children('i').eq(0).attr('data-action')
-                        dir.push({
-                            dirName: $(this).attr('data-name'),
-                            dir: true,
-                            show: show
-                        })
-                        $.each($(this).children('ol').eq(0).children('li'), function (key, value) {
-                            let id = $(this).attr('data-id')
-                            let name = $(this).attr('data-name')
-                            dir.push({
-                                id: id,
-                                name: name,
-                            })
-                        })
-                        items.push(dir)
-                    }
-                });
-
-                return items
-            }
-
-            function saveChanges() {
-                let items = configurationJson()
-
-                $.ajax({
-                    type: "POST",
-                    url: "{{ route('configuration.menu') }}",
-                    data: {
-                        _token: $('meta[name="csrf-token"]').attr('content'),
-                        menuItems: JSON.stringify(items),
-                    },
-                    success: function () {
-                        successMessage("{{ __('Successfully') }}", 1000)
-                    },
-                    error: function () {
-                        errorMessage("{{ __('Error') }}")
-                    }
-                });
-            }
-
-            refreshMethod()
         </script>
     @endslot
 @endcomponent

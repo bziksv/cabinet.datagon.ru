@@ -17,7 +17,10 @@ return [
     'enabled' => env('DEBUGBAR_ENABLED', null),
     'except' => [
         'telescope*',
-        'horizon*'
+        'horizon*',
+        // JSON + большой payload: иначе phpdebugbar-* заголовки → nginx 502
+        'monitoring-v2',
+        'monitoring-v2/*',
     ],
 
     /*
@@ -33,7 +36,7 @@ return [
      |
      */
     'storage' => [
-        'enabled'    => false,
+        'enabled'    => env('DEBUGBAR_STORAGE_ENABLED', true),
         'driver'     => 'file', // redis, file, pdo, custom
         'path'       => storage_path('debugbar'), // For file driver
         'connection' => null,   // Leave null for default connection (Redis/PDO)

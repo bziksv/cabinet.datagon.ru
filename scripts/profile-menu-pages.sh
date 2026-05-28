@@ -34,7 +34,6 @@ PATHS=(
   "/tariff"
   "/partners"
   "/history"
-  "/checklist"
 )
 
 echo "user_id=$USER_ID"

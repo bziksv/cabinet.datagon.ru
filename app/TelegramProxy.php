@@ -15,6 +15,7 @@ class TelegramProxy extends Model
     protected $fillable = [
         'id',
         'label',
+        'supplier',
         'url',
         'priority',
         'enabled',

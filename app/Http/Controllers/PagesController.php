@@ -103,7 +103,7 @@ class PagesController extends Controller
             ['id_name' => 'bg-change-roi', 'id_value' => 'rez-roi-roi', 'theme' => 'danger', 'name' => 'ROI', 'text' => __('Return on investment'), 'type' => '%'],
             ['id_name' => 'bg-change-ctr', 'id_value' => 'rez-roi-ctr', 'theme' => 'danger', 'name' => 'CTR', 'text' => __('From impressions to clicks'), 'type' => '%'],
             ['id_name' => 'bg-change-ctc', 'id_value' => 'rez-roi-ctc', 'theme' => 'danger', 'name' => 'CTC', 'text' => __('From clicks to actions'), 'type' => '%'],
-            ['id_name' => 'bg-change-ctb', 'id_value' => 'rez-roi-ctb', 'theme' => 'danger', 'name' => 'CTB', 'text' => __('From impressions to purchases'), 'type' => '%'],
+            ['id_name' => 'bg-change-ctb', 'id_value' => 'rez-roi-ctb', 'theme' => 'danger', 'name' => 'CTB', 'text' => __('From actions to purchases'), 'type' => '%'],
             ['id_name' => 'bg-change-cpm', 'id_value' => 'rez-roi-cpm', 'theme' => 'warning', 'name' => 'CPM', 'text' => __('Price per 1000 impressions'), 'type' => '₽'],
             ['id_name' => 'bg-change-cpc', 'id_value' => 'rez-roi-cpc', 'theme' => 'warning', 'name' => 'CPC', 'text' => __('Price per click'), 'type' => '₽'],
             ['id_name' => 'bg-change-cpa', 'id_value' => 'rez-roi-cpa', 'theme' => 'warning', 'name' => 'CPA', 'text' => __('Price per action'), 'type' => '₽'],

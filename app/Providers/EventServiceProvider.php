@@ -6,6 +6,7 @@ use App\Events\MonitoringProjectBeforeDelete;
 use App\Events\MonitoringProjectCreated;
 use App\Listeners\AssignAdminMonitoringRoleForAuthUser;
 use App\Listeners\AssignRoleRegisteredUser;
+use App\Listeners\RefreshMonitoringProjectFavicon;
 use App\Listeners\RemoveAllRolesMonitoringProjectUsers;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Support\Facades\Event;
@@ -29,6 +30,7 @@ class EventServiceProvider extends ServiceProvider
         ],
         MonitoringProjectCreated::class => [
             AssignAdminMonitoringRoleForAuthUser::class,
+            RefreshMonitoringProjectFavicon::class,
         ],
         MonitoringProjectBeforeDelete::class => [
             RemoveAllRolesMonitoringProjectUsers::class,

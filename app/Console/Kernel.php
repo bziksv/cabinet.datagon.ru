@@ -3,9 +3,6 @@
 namespace App\Console;
 
 use App\Classes\Cron\AutoUpdateMonitoringPositions;
-use App\Classes\Cron\checklist\ActivateTasks;
-use App\Classes\Cron\checklist\Notifications;
-use App\Classes\Cron\checklist\RepeatTasks;
 use App\Classes\Cron\ClusterCleaningResults;
 use App\Classes\Cron\DeleteUnverifiedUsers;
 use App\Classes\Cron\HttpHeadersDelete;
@@ -71,12 +68,11 @@ class Kernel extends ConsoleKernel
         $schedule->call(new ClusterCleaningResults())->dailyAt('03:10');
 
         $schedule->call(function () {
-            (new ProjectData(MonitoringProject::all()))->save();
+            $snapshot = app(\App\Classes\Monitoring\MonitoringProjectSnapshotService::class);
+            MonitoringProject::query()->orderBy('id')->chunk(25, function ($projects) use ($snapshot) {
+                $snapshot->refreshMany($projects);
+            });
         })->dailyAt(MonitoringSettings::getValue('data_projects') ?: '00:00');
-
-        $schedule->call(new Notifications())->everyMinute();
-        $schedule->call(new RepeatTasks())->everyMinute();
-        $schedule->call(new ActivateTasks())->everyMinute();
 
         $schedule->command(SearchIndicesDelete::class)->daily();
         $schedule->command(SearchIndicesRemoveAll::class)->daily();

@@ -52,14 +52,26 @@ $.ajaxSetup({
 });
 
 window.loading = function () {
+    if (window.pleaseWait && typeof window.pleaseWait.finish === 'function') {
+        try {
+            window.pleaseWait.finish();
+        } catch (e) {
+            /* предыдущий оверлей мог уже быть снят */
+        }
+        window.pleaseWait = null;
+    }
+
     let loading = require('please-wait');
 
-    let string = 'Good day to you, and thank you for using our service!';
+    let string = window.cabinetPleaseWaitMessage || 'Загрузка данных…';
 
     let msg = $('<p />').css({
-        "font-size": '20px',
-        "margin-bottom": '80px',
+        "font-size": '18px',
+        "margin": '0 0 1.5rem',
         color: '#FFF',
+        "text-align": 'center',
+        "max-width": '22rem',
+        "line-height": '1.4',
     }).addClass('loading-message').text(string);
 
     let sc = 'fold';

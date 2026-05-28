@@ -19,6 +19,6 @@
                 </button>
             </div>
         </div>
-        <div class="card-body">{!! $description->description !!}</div>
+        <div class="card-body">{!! \App\Support\ModuleVideos::rewriteDescriptionHtml($description->description) !!}</div>
     </div>
 @endif

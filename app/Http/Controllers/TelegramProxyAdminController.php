@@ -80,7 +80,8 @@ class TelegramProxyAdminController extends Controller
             $data['label'],
             $data['url'],
             $data['priority'],
-            $data['enabled']
+            $data['enabled'],
+            $data['supplier']
         );
         TelegramConnectivityService::forgetSendAttemptOrderCache();
         flash()->overlay(__('Telegram proxy saved'), ' ')->success();
@@ -109,7 +110,8 @@ class TelegramProxyAdminController extends Controller
             $data['label'],
             $data['url'],
             $data['priority'],
-            $data['enabled']
+            $data['enabled'],
+            $data['supplier']
         );
         TelegramConnectivityService::forgetSendAttemptOrderCache();
         flash()->overlay(__('Telegram proxy updated'), ' ')->success();
@@ -294,19 +296,23 @@ class TelegramProxyAdminController extends Controller
     }
 
     /**
-     * @return array{label: string, url: string, priority: int, enabled: bool}
+     * @return array{label: string, supplier: ?string, url: string, priority: int, enabled: bool}
      */
     private function validateProxyRequest(Request $request): array
     {
         $data = $request->validate([
             'label' => 'required|string|max:120',
+            'supplier' => 'nullable|string|max:120',
             'url' => 'required|string|max:500',
             'priority' => 'nullable|integer|min:0|max:999',
             'enabled' => 'nullable|boolean',
         ]);
 
+        $supplier = trim((string) ($data['supplier'] ?? ''));
+
         return [
             'label' => (string) $data['label'],
+            'supplier' => $supplier !== '' ? $supplier : null,
             'url' => trim((string) $data['url']),
             'priority' => (int) ($data['priority'] ?? 50),
             'enabled' => $request->boolean('enabled', false),

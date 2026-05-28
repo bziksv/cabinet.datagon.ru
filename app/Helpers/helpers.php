@@ -46,7 +46,13 @@ if (! function_exists('cabinet_clear_menu_session_cache')) {
             \App\MenuItemsPosition::clearSortMenuCache();
         }
 
-        foreach (['cabinet_menu_modules', 'cabinet_menu_modules_v2', 'cabinet_menu_modules_v3', 'cabinet_menu_modules_v4'] as $key) {
+        foreach ([
+            'cabinet_menu_modules',
+            'cabinet_menu_modules_v2',
+            'cabinet_menu_modules_v3',
+            'cabinet_menu_modules_v4',
+            'cabinet_menu_modules_v4_stamp',
+        ] as $key) {
             session()->forget($key);
         }
     }
@@ -144,5 +150,47 @@ if (! function_exists('cabinet_page_title')) {
         }
 
         return $pageTitle . $suffix;
+    }
+}
+
+if (! function_exists('db_admin_date_column_label')) {
+    /**
+     * Человекочитаемая подпись колонки даты на /admin/database.
+     */
+    function db_admin_date_column_label(?string $column): string
+    {
+        if ($column === null || $column === '') {
+            return '—';
+        }
+
+        $labels = config('cabinet-database-admin.date_column_labels', []);
+
+        return $labels[$column] ?? __('Database date column generic', ['column' => $column]);
+    }
+}
+
+if (! function_exists('db_admin_format_datetime')) {
+    /**
+     * Формат даты для админки БД: 27.05.2026 16:21.
+     */
+    function db_admin_format_datetime($value): string
+    {
+        if ($value === null || $value === '') {
+            return '—';
+        }
+
+        if (is_numeric($value)) {
+            try {
+                return \Carbon\Carbon::createFromTimestamp((int) $value)->format('d.m.Y H:i');
+            } catch (\Exception $e) {
+                return (string) $value;
+            }
+        }
+
+        try {
+            return \Carbon\Carbon::parse((string) $value)->format('d.m.Y H:i');
+        } catch (\Exception $e) {
+            return (string) $value;
+        }
     }
 }

@@ -1,11 +1,9 @@
 define([
     'jquery',
-    'keywordGenerator/functions',
-    'keywordGenerator/selector'
+    'keywordGenerator/functions'
 ], function (
     $,
-    Functions,
-    select2Init
+    Functions
 ) {
     return {
         keywordGeneratorStart: function ($container, basePath) {
@@ -66,10 +64,6 @@ define([
         var $fromWords = $('.from-words', $container);
         var $toWords = $('.to-words', $container);
 
-        select2Init($fromWords);
-        select2Init($toWords);
-        select2Init($('.left-right', $container));
-
         $fromWords.on('change', function () {
             var fromVal = $fromWords.val();
             var toVal = $toWords.val();
@@ -77,7 +71,7 @@ define([
             for (var i = fromVal; i <= 7; i++) {
                 $toWords.append('<option value=\'' + i + '\'>' + i + '</option>');
             }
-            $toWords.val(toVal).trigger('change.select2');
+            $toWords.val(toVal).trigger('change');
         });
 
         $toWords.on('change', function () {
@@ -87,7 +81,7 @@ define([
             for (var i = 1; i <= toVal; i++) {
                 $fromWords.append('<option value=\'' + i + '\'>' + i + '</option>');
             }
-            $fromWords.val(fromVal).trigger('change.select2');
+            $fromWords.val(fromVal).trigger('change');
         });
 
         $('.globalCheckboxOption', $container).click(function () {

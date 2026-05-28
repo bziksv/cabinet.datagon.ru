@@ -1,0 +1,225 @@
+/* Настройка меню — v2 (AdminLTE 4 / BS5) */
+
+.cabinet-menu-config-page {
+    --cabinet-menu-config-radius: 0.5rem;
+}
+
+.cabinet-menu-config-page #menuConfigStatus {
+    line-height: 1.45;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-actions .btn:disabled {
+    pointer-events: none;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-lead {
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    color: var(--bs-secondary-color);
+    max-width: 52rem;
+    margin-bottom: 1.25rem;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-layout {
+    align-items: flex-start;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-board {
+    min-height: 12rem;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-board__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-board__title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--bs-secondary-color);
+    margin: 0;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-board__hint {
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color);
+    margin: 0;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-tree {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-tree > li {
+    margin-bottom: 0.75rem;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-group-wrap > .cabinet-menu-config-group.card {
+    border-radius: var(--cabinet-menu-config-radius) var(--cabinet-menu-config-radius) 0 0;
+    overflow: hidden;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-group-wrap > .cabinet-menu-config-group .card-header {
+    background: var(--bs-tertiary-bg);
+    border-bottom: 1px solid var(--bs-border-color);
+    padding: 0.65rem 0.85rem;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-group-wrap > .cabinet-menu-config-group__list {
+    border: 1px solid var(--bs-border-color);
+    border-top: 0;
+    border-radius: 0 0 var(--cabinet-menu-config-radius) var(--cabinet-menu-config-radius);
+    background: var(--bs-body-bg);
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-group__title {
+    font-weight: 700;
+    font-size: 0.9375rem;
+    color: var(--bs-emphasis-color);
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-group__title[data-group-drag-handle] {
+    cursor: grab;
+}
+
+.cabinet-menu-config-page body.dragging .cabinet-menu-config-group__title[data-group-drag-handle] {
+    cursor: grabbing;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-group__tools .btn {
+    padding: 0.2rem 0.45rem;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-chevron {
+    transition: transform 0.2s ease;
+}
+
+.cabinet-menu-config-page [data-menu-panel-toggle][aria-expanded="false"] .cabinet-menu-config-chevron {
+    transform: rotate(-90deg);
+}
+
+.cabinet-menu-config-page .for-nest:not(.show) {
+    display: none;
+}
+
+.cabinet-menu-config-page .for-nest.show {
+    display: block;
+}
+
+.cabinet-menu-config-page .for-nest,
+.cabinet-menu-config-page .cabinet-menu-config-group__list {
+    list-style: none;
+    padding: 0.35rem;
+    margin: 0;
+    min-height: 2.5rem;
+}
+
+.cabinet-menu-config-page .for-nest:empty::before {
+    content: attr(data-empty-hint);
+    display: block;
+    padding: 0.75rem 1rem;
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color);
+    text-align: center;
+    border: 1px dashed var(--bs-border-color);
+    border-radius: calc(var(--cabinet-menu-config-radius) - 2px);
+}
+
+.cabinet-menu-config-page .moved-item,
+.cabinet-menu-config-page .cabinet-menu-config-item--solo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.75rem;
+    margin: 0.25rem 0;
+    border: 1px solid var(--bs-border-color-translucent);
+    border-radius: calc(var(--cabinet-menu-config-radius) - 2px);
+    background: var(--bs-body-bg);
+    cursor: grab;
+    transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.cabinet-menu-config-page .moved-item:hover,
+.cabinet-menu-config-page .cabinet-menu-config-item--solo:hover {
+    background: var(--bs-tertiary-bg);
+    border-color: var(--bs-border-color);
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.cabinet-menu-config-page .moved-item .handle,
+.cabinet-menu-config-page .cabinet-menu-config-item--solo .handle {
+    color: var(--bs-secondary-color);
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-item__label {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.9375rem;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-group__rename {
+    display: none;
+    gap: 0.35rem;
+    width: 100%;
+    margin-top: 0.35rem;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-group__rename.is-open {
+    display: flex;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-group__rename.is-open + .cabinet-menu-config-group__tools {
+    display: none !important;
+}
+
+.cabinet-menu-config-page .nested_with_switch.active > .cabinet-menu-config-group,
+.cabinet-menu-config-page .nested_with_switch.active > .cabinet-menu-config-item--solo {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: 1px;
+}
+
+.cabinet-menu-config-page .placeholder,
+.cabinet-menu-config-page .emptySpace {
+    height: 2.75rem;
+    margin: 0.25rem 0;
+    border-radius: calc(var(--cabinet-menu-config-radius) - 2px);
+    background: var(--bs-primary-bg-subtle);
+    border: 1px dashed var(--bs-primary);
+    opacity: 0.65;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-sidebar {
+    position: sticky;
+    top: 1rem;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-actions .btn {
+    justify-content: center;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-actions .btn i {
+    margin-right: 0.35rem;
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-tips {
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color);
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-tips li {
+    margin-bottom: 0.35rem;
+}
+
+.cabinet-menu-config-page .hide {
+    display: none !important;
+}

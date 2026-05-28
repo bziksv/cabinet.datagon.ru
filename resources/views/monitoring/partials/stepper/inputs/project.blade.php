@@ -1,33 +1,24 @@
+<p class="cabinet-mon-create-hint-step">{{ __('Monitoring v2 create step project hint') }}</p>
 <div class="row">
-    <div class="col-md-6">
-        <div class="card">
+    <div class="col-lg-7">
+        <div class="card card-outline card-secondary">
             <div class="card-header">
-                <h3 class="card-title">Название проекта</h3>
+                <h3 class="card-title mb-0">{{ __('Monitoring v2 create project card') }}</h3>
             </div>
-            <!-- /.card-header -->
             <div class="card-body">
-
-                <div class="callout callout-warning">
-                    <ul class="mb-0">
-                        <li class="text-success">Заполните название проекта</li>
-                        <li class="text-danger">URL в формате domain.com</li>
-                    </ul>
-                </div>
-
                 <div class="form-group">
-                    {!! Form::label('name', 'Имя проекта') !!}
-                    {!! Form::text('name', null, ['class' => 'form-control', 'placeholder' => 'Проект']) !!}
+                    {!! Form::label('name', __('Project name')) !!}
+                    {!! Form::text('name', null, ['class' => 'form-control', 'placeholder' => __('Monitoring v2 create name ph'), 'autocomplete' => 'organization']) !!}
                 </div>
-
-                <div class="form-group">
-                    {!! Form::label('url', 'URL домена') !!}
-                    {!! Form::text('url', null, ['class' => 'form-control', 'placeholder' => 'domain.com']) !!}
+                <div class="form-group mb-0">
+                    {!! Form::label('url', __('Monitoring v2 create domain label')) !!}
+                    {!! Form::text('url', null, ['class' => 'form-control', 'placeholder' => 'example.com', 'autocomplete' => 'off', 'inputmode' => 'url']) !!}
+                    <small class="form-text text-muted">{{ __('Monitoring v2 create url help') }}</small>
                 </div>
-
             </div>
-            <!-- /.card-body -->
-
+            <div class="card-footer text-muted small">
+                {{ __('Monitoring v2 create step project footer') }}
+            </div>
         </div>
-        <!-- /.card -->
     </div>
 </div>

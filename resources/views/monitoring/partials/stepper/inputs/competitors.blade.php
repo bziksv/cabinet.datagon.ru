@@ -1,25 +1,17 @@
+<p class="cabinet-mon-create-hint-step">{{ __('Monitoring v2 create step competitors hint') }}</p>
 <div class="row">
-    <div class="col-md-6">
-        <div class="card">
+    <div class="col-lg-7">
+        <div class="card card-outline card-secondary">
             <div class="card-header">
-                <h3 class="card-title">Добавить список конкурентов</h3>
+                <h3 class="card-title mb-0">{{ __('Monitoring v2 create competitors card') }}</h3>
             </div>
-            <!-- /.card-header -->
             <div class="card-body">
-                <div class="callout callout-warning">
-                    <ul class="mb-0">
-                        <li class="text-success">Заполните список конкурентов.</li>
-                        <li class="text-danger">Каждый URL с новой строки в формате domain.com.</li>
-                    </ul>
-                </div>
-
-                <div class="form-group">
-                    <label>Добавьте ваш список конкурентов</label>
-                    <textarea id="textarea-competitors" name="competitors" class="form-control" rows="10" placeholder="Введите ваш список конкурентов, каждый с новой строки"></textarea>
+                <div class="form-group mb-0">
+                    <label for="textarea-competitors">{{ __('Monitoring v2 create competitors textarea') }}</label>
+                    <textarea id="textarea-competitors" name="competitors" class="form-control" rows="12" placeholder="competitor1.com&#10;competitor2.ru"></textarea>
+                    <small class="text-muted d-block mt-1">{{ __('Monitoring v2 create competitors help') }}</small>
                 </div>
             </div>
-            <!-- /.card-body -->
         </div>
-        <!-- /.card -->
     </div>
 </div>

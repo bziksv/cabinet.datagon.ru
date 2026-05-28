@@ -1,97 +1,68 @@
+<p class="cabinet-mon-create-hint-step">{{ __('Monitoring v2 create step keywords hint') }}</p>
 <div class="row">
-    <div class="col-5">
-        <div class="row">
-            <div class="col-12 clearfix">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Добавить список запросов</h3>
-                    </div>
-                    <!-- /.card-header -->
-                    <div class="card-body">
-
-                        <div class="callout callout-warning">
-                            <ul class="mb-0">
-                                <li class="text-success">Заполните или загрузите список запросов.</li>
-                                <li class="text-danger">Нажмите кнопку "Добавить запросы".</li>
-                            </ul>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Добавьте ваш список запросов</label>
-                            <textarea id="textarea-keywords" class="form-control" rows="10" placeholder="Введите ваш список запросов, каждый с новой строки"></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <input type="file" id="csv-keywords">
-                            <p class="text-sm text-muted">Вы можете загрузить csv файл где в первой колонке будут запросы, второй группа запроса, третьей релевантная страница.</p>
-                        </div>
-
-                        <div class="form-group">
-                            <label>CSV разделитель</label>
-                            <select class="form-select" id="csv-delimiter">
-                                <option value=";">Точка с запятой ( ; )</option>
-                                <option value=",">Запятая ( , )</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Релевантный URL</label>
-                            <input type="text" class="form-control" id="relevant-url" placeholder="URL">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Цель</label>
-                            <select class="form-select" name="target">
-                                <option value="1">1</option>
-                                <option value="3">3</option>
-                                <option value="5">5</option>
-                                <option value="10" selected>10</option>
-                                <option value="20">20</option>
-                                <option value="50">50</option>
-                                <option value="100">100</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <div class="custom-control custom-checkbox">
-                                <input class="custom-control-input" type="checkbox" id="remove-duplicates" value="1" checked="">
-                                <label for="remove-duplicates" class="custom-control-label">Проверка на дубли</label>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Выбрать группу</label>
-                            <select class="form-control" id="keyword-groups" style="width: 100%;"></select>
-                        </div>
-
-                        <div class="input-group mb-3">
-                            <input type="text" class="form-control" placeholder="Название группы">
-                            <button type="button" class="btn btn-success" id="create-group">Добавить новую группу</button>
-                        </div>
-                    </div>
-                    <!-- /.card-body -->
-
-                    <div class="card-footer">
-                        <a href="javascript:void(0)" id="add-keywords" class="btn btn-success float-right">Добавить запросы</a>
+    <div class="col-lg-5">
+        <div class="card card-outline card-secondary h-100">
+            <div class="card-header">
+                <h3 class="card-title mb-0">{{ __('Monitoring v2 create keywords card') }}</h3>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label for="textarea-keywords">{{ __('Monitoring v2 create keywords textarea') }}</label>
+                    <textarea id="textarea-keywords" class="form-control" rows="10" placeholder="{{ __('Monitoring v2 create keywords ph') }}"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="csv-keywords">{{ __('Monitoring v2 create csv label') }}</label>
+                    <input type="file" id="csv-keywords" class="form-control form-control-sm" accept=".csv,text/csv">
+                    <small class="text-muted d-block mt-1">{{ __('Monitoring v2 create csv help') }}</small>
+                </div>
+                <div class="form-group">
+                    <label for="csv-delimiter">{{ __('Monitoring v2 create csv delimiter') }}</label>
+                    <select class="form-select form-select-sm" id="csv-delimiter">
+                        <option value=";">{{ __('Monitoring v2 create csv semi') }}</option>
+                        <option value=",">{{ __('Monitoring v2 create csv comma') }}</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="relevant-url">{{ __('Monitoring v2 create relevant label') }}</label>
+                    <input type="text" class="form-control form-control-sm" id="relevant-url" placeholder="https://example.com/page">
+                </div>
+                <div class="form-group">
+                    <label>{{ __('Target') }}</label>
+                    <select class="form-select form-select-sm" name="target">
+                        <option value="1">1</option>
+                        <option value="3">3</option>
+                        <option value="5">5</option>
+                        <option value="10" selected>10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="remove-duplicates" value="1" checked>
+                        <label class="form-check-label" for="remove-duplicates">{{ __('Monitoring v2 create dedupe') }}</label>
                     </div>
                 </div>
-                <!-- /.card -->
+                <div class="form-group">
+                    <label for="keyword-groups">{{ __('Group') }}</label>
+                    <select class="form-control" id="keyword-groups" style="width: 100%;"></select>
+                </div>
+                <div class="input-group input-group-sm mb-0">
+                    <input type="text" class="form-control" placeholder="{{ __('Monitoring v2 create new group ph') }}">
+                    <button type="button" class="btn btn-outline-secondary" id="create-group">{{ __('Add') }}</button>
+                </div>
             </div>
-
+            <div class="card-footer">
+                <button type="button" id="add-keywords" class="btn btn-primary w-100">
+                    {{ __('Monitoring v2 create add keywords btn') }}
+                </button>
+            </div>
         </div>
     </div>
-    <div class="col-7">
-        <div class="row">
-            <div class="col-12 clearfix">
-                <div class="card">
-                    <table id="myTable" class="table table-striped" style="width:100%"></table>
-                </div>
-                <!-- /.card -->
-            </div>
+    <div class="col-lg-7">
+        <div class="card card-outline card-secondary">
+            <table id="myTable" class="table table-striped table-sm w-100 mb-0"></table>
         </div>
     </div>
 </div>
-
-<div class="input-keywords"></div>
-
-

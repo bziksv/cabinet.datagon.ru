@@ -154,21 +154,40 @@ class MonitoringV2Controller extends Controller
             $projectIds = [];
         }
 
-        try {
-            set_time_limit(max(120, (int) ini_get('max_execution_time')));
-            $payload = $trend->seriesForUser($user, $projectIds, $days, $range);
+        $debugSession = $this->debugSession($request, $user);
+        $t0 = microtime(true);
 
-            return response()->json($payload);
+        try {
+            MonitoringV2DebugLog::info($debugSession, 'http.trend.start', [
+                'days' => $days,
+                'range' => $range,
+                'projects' => count($projectIds),
+            ]);
+            set_time_limit(max(300, (int) ini_get('max_execution_time')));
+            @ini_set('memory_limit', '512M');
+            $payload = $trend->seriesForUser($user, $projectIds, $days, $range);
+            $ms = (int) round((microtime(true) - $t0) * 1000);
+            MonitoringV2DebugLog::info($debugSession, 'http.trend.done', [
+                'ms' => $ms,
+                'points' => count($payload['labels'] ?? []),
+                'projects_used' => $payload['projects_used'] ?? null,
+            ]);
+
+            return response()->json($this->attachDebug($request, $user, $payload));
         } catch (\Throwable $e) {
             report($e);
+            MonitoringV2DebugLog::error($debugSession, 'http.trend.fail', [
+                'message' => $e->getMessage(),
+                'ms' => (int) round((microtime(true) - $t0) * 1000),
+            ]);
 
-            return response()->json([
+            return response()->json($this->attachDebug($request, $user, [
                 'labels' => [],
                 'values' => [],
                 'empty' => true,
                 'error' => true,
                 'message' => __('Monitoring v2 portfolio trend error'),
-            ]);
+            ]));
         }
     }
 
@@ -231,7 +250,7 @@ class MonitoringV2Controller extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        $limit = (int) $request->input('limit', 2);
+        $limit = (int) $request->input('limit', 3);
         $force = $request->boolean('force');
         $projectId = (int) $request->input('project_id');
 

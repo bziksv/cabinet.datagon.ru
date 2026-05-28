@@ -1,14 +1,9 @@
 <div class="row">
-    <div class="col-md-6">
+    <div class="col-lg-8">
         <div class="callout callout-success">
-            <h5 class="text-success">
-                Поздравляем! Вы настроили свой проект.
-            </h5>
-
-            <blockquote class="quote-secondary">
-                <p>Вы можете вернуться и что-то изменить.</p>
-                <small>После сохранения в настройках вы также можете добавить или изменить данные.</small>
-            </blockquote>
+            <h5 class="text-success mb-2">{{ __('Monitoring v2 create done title') }}</h5>
+            <p class="mb-2">{{ __('Monitoring v2 create done text') }}</p>
+            <p class="mb-0 small text-muted">{{ __('Monitoring v2 create done hint') }}</p>
         </div>
     </div>
 </div>

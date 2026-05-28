@@ -1,0 +1,60 @@
+.cabinet-mon-create__lead {
+    font-size: 0.9375rem;
+    color: #64748b;
+    max-width: 42rem;
+}
+
+.cabinet-mon-create__stepper .bs-stepper-header {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.cabinet-mon-create__stepper .bs-stepper-label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.cabinet-mon-create__stepper .bs-stepper-circle {
+    background: #e2e8f0;
+    color: #334155;
+}
+
+.cabinet-mon-create__stepper .step.active .bs-stepper-circle,
+.cabinet-mon-create__stepper .step.active .bs-stepper-label {
+    color: #1e293b;
+}
+
+.cabinet-mon-create__stepper .step.active .bs-stepper-circle {
+    background: #627d98;
+    color: #fff;
+}
+
+.cabinet-mon-create .content {
+    padding-top: 1rem;
+}
+
+.cabinet-mon-create .callout {
+    border-radius: 0.5rem;
+}
+
+.cabinet-mon-create .callout ul {
+    padding-left: 1.1rem;
+}
+
+.cabinet-mon-create .cabinet-mon-create-hint-step {
+    font-size: 0.8125rem;
+    color: #64748b;
+    margin-bottom: 1rem;
+}
+
+.cabinet-mon-create #myTable_wrapper .card-header {
+    background: #f8fafc;
+}
+
+.cabinet-mon-create .bs-stepper-content > form > .content > .float-end,
+.cabinet-mon-create .bs-stepper-content > form > .content > .float-right {
+    margin-top: 1.25rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}

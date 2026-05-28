@@ -501,6 +501,20 @@
         }
     }
 
+    function trendDebug(level, message, context) {
+        if (typeof window.cabinetMonV2DebugLine === 'function') {
+            window.cabinetMonV2DebugLine(level, message, context || {});
+        }
+    }
+
+    function trendPostData(extra) {
+        const data = Object.assign({ _token: cfg.csrf }, extra || {});
+        if (cfg.adminDebug && cfg.debugSessionId) {
+            data.debug_session = cfg.debugSessionId;
+        }
+        return data;
+    }
+
     function fetchPortfolioTop10Trend(rows) {
         const url = cfg.portfolioTrendUrl;
         if (!url || typeof $ === 'undefined') {
@@ -515,23 +529,33 @@
         showTrendLoader(ids.length);
 
         const s = chartSettings();
+        const started = performance.now();
+        trendDebug('info', 'ajax.trend.start', {
+            projects: ids.length,
+            days: s.periodDays,
+            range: s.range,
+        });
 
         return $.ajax({
             method: 'POST',
             url: url,
-            timeout: 180000,
+            timeout: 300000,
             traditional: true,
-            data: {
-                _token: cfg.csrf,
+            data: trendPostData({
                 days: s.periodDays,
                 range: s.range,
                 project_ids: ids,
-            },
+            }),
         })
             .done(function (data) {
                 if (loadSeq !== trendLoadSeq || chartMode !== 'trend') {
                     return;
                 }
+                trendDebug('info', 'ajax.trend.done', {
+                    ms: Math.round(performance.now() - started),
+                    points: data && data.labels ? data.labels.length : 0,
+                    empty: !!(data && data.empty),
+                });
                 hideTrendLoader();
                 if (data && data.error) {
                     renderTrendChart({ labels: [], values: [], empty: true });
@@ -546,6 +570,10 @@
                 if (loadSeq !== trendLoadSeq) {
                     return;
                 }
+                trendDebug('error', 'ajax.trend.fail', {
+                    ms: Math.round(performance.now() - started),
+                    status: xhr && xhr.status,
+                });
                 hideTrendLoader();
                 hideTrendBuildProgress();
                 destroyMain();

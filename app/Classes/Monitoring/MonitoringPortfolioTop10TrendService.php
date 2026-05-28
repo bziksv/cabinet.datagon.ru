@@ -43,7 +43,7 @@ class MonitoringPortfolioTop10TrendService
 
         sort($ids);
         $cacheKey = sprintf(
-            'mon_v2_portfolio_trend:%d:%d:%s:%s:v4',
+            'mon_v2_portfolio_trend:%d:%d:%s:%s:v5',
             (int) $user->id,
             $days,
             $range,
@@ -218,33 +218,50 @@ class MonitoringPortfolioTop10TrendService
      */
     private function seriesSliceForProject(int $projectId, int $days, string $range): array
     {
-        $keywordIds = DB::table('monitoring_keywords')
+        $hasKeywords = DB::table('monitoring_keywords')
             ->where('monitoring_project_id', $projectId)
-            ->pluck('id')
-            ->map(function ($id) {
-                return (int) $id;
-            })
-            ->all();
+            ->exists();
 
-        if ($keywordIds === []) {
+        if (!$hasKeywords) {
             return [];
         }
 
         $end = Carbon::today()->endOfDay();
         $start = Carbon::today()->subDays($days)->startOfDay();
 
-        $positions = MonitoringPosition::query()
-            ->whereIn('monitoring_keyword_id', $keywordIds)
-            ->where('created_at', '>=', $start)
-            ->where('created_at', '<=', $end)
-            ->orderByDesc('created_at')
-            ->get(['monitoring_keyword_id', 'monitoring_searchengine_id', 'position', 'created_at']);
+        $keywordSub = function ($query) use ($projectId) {
+            $query->select('id')
+                ->from('monitoring_keywords')
+                ->where('monitoring_project_id', $projectId);
+        };
 
-        if ($positions->isEmpty()) {
+        $latestSub = DB::table('monitoring_positions')
+            ->selectRaw('monitoring_keyword_id, monitoring_searchengine_id, DATE(created_at) as pos_day, MAX(created_at) as max_created')
+            ->whereIn('monitoring_keyword_id', $keywordSub)
+            ->whereBetween('created_at', [$start, $end])
+            ->groupBy('monitoring_keyword_id', 'monitoring_searchengine_id', DB::raw('DATE(created_at)'));
+
+        $rows = DB::table('monitoring_positions as p')
+            ->joinSub($latestSub, 'latest', function ($join) {
+                $join->on('p.monitoring_keyword_id', '=', 'latest.monitoring_keyword_id')
+                    ->on('p.monitoring_searchengine_id', '=', 'latest.monitoring_searchengine_id')
+                    ->on('p.created_at', '=', 'latest.max_created');
+            })
+            ->select('p.position', 'p.created_at')
+            ->get();
+
+        if ($rows->isEmpty()) {
             return [];
         }
 
-        $byDate = $this->lastPositionsByDay($positions);
+        $byDate = collect($rows)
+            ->groupBy(function ($row) {
+                return $this->positionCarbon($row)->format('d.m.Y');
+            })
+            ->map(function (Collection $items) {
+                return $items->pluck('position');
+            });
+
         $byDate = $this->applyRangeGrouping($byDate, $range);
 
         $out = [];

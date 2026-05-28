@@ -1,3 +1,4 @@
+<p class="cabinet-mon-create-hint-step">{{ __('Monitoring v2 create step regions hint') }}</p>
 <div class="row">
     <div class="col-md-6">
         <div class="card card-primary card-outline card-outline-tabs">

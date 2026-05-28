@@ -476,7 +476,7 @@ class ProjectFaviconService
 
     public function fillMissingBatch(iterable $projects, int $limit, bool $force = false): array
     {
-        $limit = max(1, min(3, $limit));
+        $limit = max(1, min(5, $limit));
         $projectIds = [];
         $all = [];
         foreach ($projects as $project) {
@@ -508,7 +508,7 @@ class ProjectFaviconService
         $rebuilt = 0;
         $timedOut = false;
         $wallStart = microtime(true);
-        $wallMs = 12000;
+        $wallMs = (int) env('MONITORING_FAVICON_FILL_WALL_MS', 20000);
         $donorsByHost = $this->buildHostDonorMap($all);
 
         foreach (array_slice($toRefresh, 0, $limit) as $project) {

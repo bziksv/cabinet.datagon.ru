@@ -139,8 +139,10 @@ class MonitoringProjectCreatorController extends Controller
                 'recordsTotal' => 0,
             ]);
 
-        $page = ($request->input('start') / $request->input('length')) + 1;
-        $keywords = $project->keywords()->paginate($request->input('length', 1), ['*'], 'page', $page);
+        $length = max(1, (int) $request->input('length', 10));
+        $start = max(0, (int) $request->input('start', 0));
+        $page = (int) floor($start / $length) + 1;
+        $keywords = $project->keywords()->paginate($length, ['*'], 'page', $page);
 
         foreach ($keywords as $q){
 

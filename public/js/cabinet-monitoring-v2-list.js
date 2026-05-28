@@ -119,7 +119,7 @@
     let monV2DebugReqCount = 0;
     let monV2DebugRenderTimer = null;
 
-    function monV2DebugLine(level, message, context) {
+    window.cabinetMonV2DebugLine = function monV2DebugLine(level, message, context) {
         if (!monV2AdminDebug) {
             return;
         }
@@ -1530,15 +1530,17 @@
             type: 'POST',
             url: cfg.fillFaviconsUrl,
             dataType: 'json',
-            timeout: 25000,
-            data: monV2PostData(),
+            timeout: 35000,
+            data: monV2PostData({ limit: 3 }),
         })
             .done(function (res) {
                 faviconFillRetries = 0;
                 applyMonV2DebugResponse(res);
                 const rebuilt = res && res.rebuilt ? res.rebuilt : 0;
+                const propagated = res && res.propagated ? res.propagated : 0;
                 monV2DebugLine('info', 'ajax.favicons.fill.done', {
                     rebuilt: rebuilt,
+                    propagated: propagated,
                     pending: res && res.pending,
                     wall_ms: res && res.wall_ms,
                 });
@@ -1546,8 +1548,6 @@
                 const pending = res && res.pending ? res.pending : 0;
                 if (faviconFillActive && pending > 0) {
                     updateFaviconProgress(pending, allRows.length);
-                }
-                if (pending > 0 && faviconFillActive && (rebuilt > 0 || (res && res.timed_out))) {
                     runFaviconFillStep();
                     return;
                 }

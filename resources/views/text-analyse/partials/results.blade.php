@@ -32,6 +32,7 @@
         @include('text-analyse.partials.results-compare', [
             'response' => $response,
             'request' => $request ?? [],
+            'isPublicView' => !empty($isPublicView),
         ])
     @else
 
@@ -96,6 +97,7 @@
             @include('text-analyse.partials.zipf-table', [
                 'graph' => $response['graph'] ?? [],
                 'hasCompare' => false,
+                'isPublicView' => !empty($isPublicView),
             ])
         </div>
     </div>
@@ -162,17 +164,23 @@
                         <tr class="cabinet-ta-word-row{{ $hasWordForms ? ' cabinet-ta-word-row--expandable' : '' }}"
                             data-cabinet-ta-word-id="{{ $wordRowId }}">
                             <td data-order="{{ $word['text'] }}" class="cabinet-ta-word-cell">
-                                @if($hasWordForms)
-                                    <button type="button"
-                                            class="cabinet-ta-word-toggle btn btn-link btn-sm p-0 text-start text-body text-decoration-none d-inline-flex align-items-center gap-1"
-                                            aria-expanded="false"
-                                            title="{{ __('Word forms') }}">
-                                        <span class="fw-medium">{{ $word['text'] }}</span>
-                                        <i class="bi bi-chevron-down small text-secondary cabinet-ta-word-toggle__icon" aria-hidden="true"></i>
-                                    </button>
-                                @else
-                                    <span class="fw-medium">{{ $word['text'] }}</span>
-                                @endif
+                                <span class="d-inline-flex flex-wrap align-items-baseline gap-1">
+                                    @if($hasWordForms)
+                                        <button type="button"
+                                                class="cabinet-ta-word-toggle btn btn-link btn-sm p-0 text-start text-body text-decoration-none d-inline-flex align-items-center gap-1"
+                                                aria-expanded="false"
+                                                title="{{ __('Word forms') }}">
+                                            <span class="fw-medium cabinet-ta-exclude-term">{{ $word['text'] }}</span>
+                                            <i class="bi bi-chevron-down small text-secondary cabinet-ta-word-toggle__icon" aria-hidden="true"></i>
+                                        </button>
+                                    @else
+                                        <span class="fw-medium cabinet-ta-exclude-term">{{ $word['text'] }}</span>
+                                    @endif
+                                    @include('text-analyse.partials.add-to-exclude-btn', [
+                                        'term' => $word['text'],
+                                        'isPublicView' => !empty($isPublicView),
+                                    ])
+                                </span>
                             </td>
                             <td data-order="{{ $word['density'] }}" class="text-end font-monospace">{{ $word['density'] }}</td>
                             <td data-order="{{ $word['total'] }}" class="text-end font-monospace">{{ $word['total'] }}</td>
@@ -223,7 +231,13 @@
                         <tr>
                             <td data-order="{{ $phrase['phrase'] }}"
                                 title="{{ __('Repetitions') }}: {{ $phrase['count'] }}">
-                                {{ trim($phrase['phrase']) }}
+                                <span class="d-inline-flex flex-wrap align-items-baseline gap-1">
+                                    <span class="cabinet-ta-exclude-term">{{ trim($phrase['phrase']) }}</span>
+                                    @include('text-analyse.partials.add-to-exclude-btn', [
+                                        'term' => trim($phrase['phrase']),
+                                        'isPublicView' => !empty($isPublicView),
+                                    ])
+                                </span>
                             </td>
                             <td data-order="{{ $phrase['count'] }}" class="text-end font-monospace">{{ $phrase['count'] }}</td>
                             <td data-order="{{ $phrase['density'] }}" class="text-end font-monospace">{{ $phrase['density'] }}</td>

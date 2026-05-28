@@ -326,7 +326,7 @@ class MonitoringV2Controller extends Controller
                     ->orderBy('monitoring_projects.name')
                     ->get();
 
-                $result = $service->fillMissingBatch($projects, $limit, $force);
+                $result = $service->fillMissingBatch($projects, $limit, $force, (int) $user->id);
 
                 if (($result['rebuilt'] ?? 0) > 0 || (int) ($result['propagated'] ?? 0) > 0) {
                     MonitoringProjectListSerializer::forgetCacheForUser((int) $user->id);
@@ -372,8 +372,8 @@ class MonitoringV2Controller extends Controller
                 return response('', 404);
             }
 
-            if ($force || $service->absolutePath($project) === null) {
-                $service->refresh($project, $force, true);
+            if ($force || $service->needsRefresh($project)) {
+                $service->refresh($project, $force, false);
             }
 
             $path = $service->absolutePath($project);

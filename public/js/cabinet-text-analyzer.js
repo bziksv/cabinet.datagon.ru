@@ -738,6 +738,59 @@
         });
     }
 
+    function parseExcludeLines(text) {
+        return String(text || '')
+            .replace(/\r\n/g, '\n')
+            .split('\n')
+            .map(function (line) {
+                return line.trim();
+            })
+            .filter(Boolean);
+    }
+
+    function addWordToExcludeList(word) {
+        word = String(word || '').trim();
+        if (!word) {
+            return false;
+        }
+        var $textarea = $('#listWords');
+        if (!$textarea.length) {
+            return false;
+        }
+        var lines = parseExcludeLines($textarea.val());
+        var lower = word.toLowerCase();
+        var exists = lines.some(function (line) {
+            return line.toLowerCase() === lower;
+        });
+        if (!exists) {
+            lines.push(word);
+            $textarea.val(lines.join('\n'));
+        }
+        var $switch = $('#removeWords');
+        if (!$switch.is(':checked')) {
+            $switch.prop('checked', true).trigger('change');
+        }
+        $('#cabinet-ta-list-words').removeClass('d-none');
+        $textarea.addClass('cabinet-ta-list-words--highlight');
+        window.setTimeout(function () {
+            $textarea.removeClass('cabinet-ta-list-words--highlight');
+        }, 1600);
+        var panel = document.getElementById('cabinet-ta-list-words');
+        if (panel && typeof panel.scrollIntoView === 'function') {
+            panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+        }
+        return !exists;
+    }
+
+    function initExcludeListButtons() {
+        $(document).on('click', '.cabinet-text-analyzer-page .cabinet-ta-add-exclude', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var word = $(this).attr('data-word') || $(this).closest('td').find('.cabinet-ta-exclude-term').first().text();
+            addWordToExcludeList(word);
+        });
+    }
+
     function initForm(cfg) {
         if (cfg.isPublicView) {
             return;
@@ -778,6 +831,7 @@
         releaseUiLock();
         startUiLockWatchdog();
         var cfg = window.cabinetTextAnalyzerConfig || {};
+        initExcludeListButtons();
         initForm(cfg);
         initPublicShare();
         if (cfg.hasResponse) {

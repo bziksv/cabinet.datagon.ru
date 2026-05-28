@@ -6,7 +6,7 @@ return [
      * Стабильная база PDF/UI: 6.9s. Дальнейшие правки — +0.1 или суффикс dev.
      * Журнал: datagon.ru/docs/cabinet-text-analyzer-changelog.md
      */
-    'version' => '6.9s',
+    'version' => '7.0',
 
     /** Демо на datagon.ru/analiz-teksta/ — POST /api/demo/analiz-teksta/run */
     'demo' => [

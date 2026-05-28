@@ -43,7 +43,15 @@
                 @endphp
                 <tr>
                     <td class="text-end font-monospace text-secondary">{{ $row['rank'] }}</td>
-                    <td><strong>{{ $row['word'] }}</strong></td>
+                    <td>
+                        <span class="d-inline-flex flex-wrap align-items-baseline gap-1">
+                            <strong class="cabinet-ta-exclude-term">{{ $row['word'] }}</strong>
+                            @include('text-analyse.partials.add-to-exclude-btn', [
+                                'term' => $row['word'],
+                                'isPublicView' => $isPublicView ?? false,
+                            ])
+                        </span>
+                    </td>
                     <td class="text-end font-monospace">{{ $row['actual'] }}</td>
                     <td class="text-end font-monospace text-secondary">{{ $row['ideal'] }}</td>
                     @if($hasCompare)

@@ -40,7 +40,7 @@
             <div class="bs-stepper-content">
                 <form class="needs-validation" method="post" action="{{ route('monitoring.store') }}" novalidate>
                     @csrf
-                    @include('monitoring.partials.stepper._content', ['target' => 'project', 'buttons' => ['next', 'back']])
+                    @include('monitoring.partials.stepper._content', ['target' => 'project', 'buttons' => ['back', 'next']])
                     @include('monitoring.partials.stepper._content', ['target' => 'keywords', 'buttons' => ['previous', 'next']])
                     @include('monitoring.partials.stepper._content', ['target' => 'competitors', 'buttons' => ['previous', 'next']])
                     @include('monitoring.partials.stepper._content', ['target' => 'regions', 'buttons' => ['previous', 'next']])

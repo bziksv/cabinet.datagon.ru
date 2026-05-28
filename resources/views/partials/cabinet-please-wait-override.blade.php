@@ -1,4 +1,14 @@
 {{-- Подключается после app.js: русский текст и снятие зависшего оверлея please-wait --}}
+<style>
+    /* .pg-loading-logo-header { width: 100% } — SVG без ограничения растягивался на весь экран */
+    .pg-loading-screen .pg-loading-logo-header img {
+        max-width: 12rem;
+        width: auto;
+        height: auto;
+        max-height: 3rem;
+        object-fit: contain;
+    }
+</style>
 <script>
 (function () {
     if (typeof window.loading !== 'function') {

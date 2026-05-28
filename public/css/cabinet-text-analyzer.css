@@ -874,3 +874,21 @@
 .cabinet-text-analyzer-page #phrasesTable tbody td {
     vertical-align: middle;
 }
+
+.cabinet-text-analyzer-page .cabinet-ta-add-exclude {
+    font-size: 0.75rem;
+    line-height: 1.2;
+    text-decoration: none;
+    opacity: 0.85;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-add-exclude:hover,
+.cabinet-text-analyzer-page .cabinet-ta-add-exclude:focus {
+    text-decoration: underline;
+    opacity: 1;
+}
+
+.cabinet-text-analyzer-page #listWords.cabinet-ta-list-words--highlight {
+    box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.28);
+    transition: box-shadow 0.2s ease;
+}

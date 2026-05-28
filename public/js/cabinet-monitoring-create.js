@@ -15,6 +15,14 @@
     let projectSaving = false;
     let projectSavedSnapshot = null;
 
+    function setWizardBusy(busy) {
+        const $next = $('.cabinet-mon-create__btn-next');
+        if ($next.length) {
+            $next.prop('disabled', !!busy);
+            $next.toggleClass('disabled', !!busy);
+        }
+    }
+
     function getProjectId() {
         if (projectId) {
             return projectId;
@@ -305,6 +313,7 @@
             }
 
             projectSaving = true;
+            setWizardBusy(true);
             const request = id ? cfg.urls.update : cfg.urls.create;
             const payload = id ? { id: id, name: form.name, url: form.url } : form;
 
@@ -318,12 +327,14 @@
                     $('input[name="url"]').val(form.url);
                     showSuccess(cfg.i18n.saved || 'Проект сохранён');
                     projectSaving = false;
+                    setWizardBusy(false);
                     if (stepper) {
                         stepper.next();
                     }
                 })
                 .catch(function (err) {
                     projectSaving = false;
+                    setWizardBusy(false);
                     const msg =
                         (err.response && err.response.data && err.response.data.message) ||
                         cfg.i18n.saveError ||
@@ -548,6 +559,7 @@
 
         dataTable = $(DATA_TABLE_ID).DataTable({
             rowId: 'id',
+            processing: true,
             autoWidth: false,
             ordering: false,
             searching: false,
@@ -584,16 +596,8 @@
                 },
             ],
             initComplete: function () {
-                const self = this.api();
                 const title = $('div.card-title');
                 title.text(cfg.i18n.queryList || 'Список запросов');
-                self.on('processing.dt', function (e, settings, processing) {
-                    if (processing && window.loading) {
-                        window.loading();
-                    } else if (window.pleaseWait) {
-                        window.pleaseWait.finish();
-                    }
-                });
             },
         });
     }
@@ -640,9 +644,6 @@
         dataTableEditor.create(data.length, false);
         dataTableEditor.multiSet(dataSet);
         dataTableEditor.submit();
-        if (window.loading) {
-            window.loading();
-        }
     }
 
     function bindRegionsSelect2() {

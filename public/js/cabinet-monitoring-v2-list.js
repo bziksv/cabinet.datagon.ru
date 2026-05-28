@@ -70,9 +70,11 @@
     let snapshotFillLastForce = false;
     let snapshotFillRetries = 0;
     const SNAPSHOT_FILL_MAX_STEPS = 40;
-    const FAVICON_FILL_MAX_STEPS = 40;
+    const FAVICON_FILL_MAX_STEPS = 28;
+    const FAVICON_FILL_MAX_ZERO_STEPS = 5;
     const FAVICON_FILL_MAX_RETRIES = 2;
     let faviconFillRetries = 0;
+    let faviconFillZeroSteps = 0;
     let faviconFillAfterRefresh = false;
     const faviconRefreshBusy = {};
     let childRowsPrefetchTimer = null;
@@ -1503,6 +1505,7 @@
     function stopFaviconFill() {
         faviconFillActive = false;
         faviconFillSteps = 0;
+        faviconFillZeroSteps = 0;
         if (!snapshotFillActive) {
             $progress.addClass('d-none');
         }
@@ -1540,14 +1543,38 @@
                 applyMonV2DebugResponse(res);
                 const rebuilt = res && res.rebuilt ? res.rebuilt : 0;
                 const propagated = res && res.propagated ? res.propagated : 0;
+                const stalled = !!(res && res.stalled);
                 monV2DebugLine('info', 'ajax.favicons.fill.done', {
                     rebuilt: rebuilt,
                     propagated: propagated,
                     pending: res && res.pending,
                     wall_ms: res && res.wall_ms,
+                    stalled: stalled,
+                    failed: res && res.failed,
                 });
                 mergeFaviconUpdates(res && res.updates ? res.updates : []);
                 const pending = res && res.pending ? res.pending : 0;
+                if (stalled) {
+                    monV2DebugLine('warn', 'favicons.fill.stalled', {
+                        pending: pending,
+                        failed: res && res.failed,
+                    });
+                    stopFaviconFill();
+                    return;
+                }
+                if (rebuilt === 0 && propagated === 0 && pending > 0) {
+                    faviconFillZeroSteps += 1;
+                    if (faviconFillZeroSteps >= FAVICON_FILL_MAX_ZERO_STEPS) {
+                        monV2DebugLine('warn', 'favicons.fill.no_progress', {
+                            steps: faviconFillZeroSteps,
+                            pending: pending,
+                        });
+                        stopFaviconFill();
+                        return;
+                    }
+                } else {
+                    faviconFillZeroSteps = 0;
+                }
                 if (faviconFillActive && pending > 0) {
                     updateFaviconProgress(pending, allRows.length);
                     runFaviconFillStep();
@@ -1584,6 +1611,7 @@
         faviconFillActive = true;
         faviconFillRetries = 0;
         faviconFillSteps = 0;
+        faviconFillZeroSteps = 0;
         runFaviconFillStep();
     }
 

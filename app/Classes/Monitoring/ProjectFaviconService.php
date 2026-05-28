@@ -5,6 +5,7 @@ namespace App\Classes\Monitoring;
 use App\MonitoringProject;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -13,6 +14,13 @@ use Illuminate\Support\Facades\Storage;
 class ProjectFaviconService
 {
     private const STORAGE_DIR = 'monitoring-favicons';
+
+    private const FILL_CURSOR_CACHE_PREFIX = 'mon_favicon_fill_cursor:';
+
+    private const FILL_FAIL_CACHE_PREFIX = 'mon_favicon_fill_fail:';
+
+    /** Не крутить одни и те же проекты в fill, если скачивание не удалось. */
+    private const FILL_FAIL_CACHE_MINUTES = 360;
 
     /** Слишком мелкий PNG — ошибка загрузки (16×16 .ico после resize ≈ 500+ B). */
     private const MIN_FAVICON_BYTES = 500;
@@ -387,33 +395,51 @@ class ProjectFaviconService
 
     public function refresh(MonitoringProject $project, bool $force = false, bool $fast = false): bool
     {
+        return $this->refreshWithReport($project, $force, $fast)['ok'];
+    }
+
+    /**
+     * @return array{ok: bool, reason: string}
+     */
+    public function refreshWithReport(MonitoringProject $project, bool $force = false, bool $fast = false): array
+    {
         $host = $this->fetcher->normalizeHost((string) $project->url);
         if ($host === null) {
-            return false;
+            return ['ok' => false, 'reason' => 'bad_host'];
         }
 
         if (!$force && !$this->needsRefresh($project)) {
-            return $this->absolutePath($project) !== null;
+            return $this->absolutePath($project) !== null
+                ? ['ok' => true, 'reason' => 'cached']
+                : ['ok' => false, 'reason' => 'missing_file'];
         }
 
         if ($this->copyFaviconFromSibling($project, $host)) {
-            return true;
+            return ['ok' => true, 'reason' => 'copied_sibling'];
         }
 
         $png = $this->fetchPngAvoidingPlaceholders($host, $fast);
         if ($png === null) {
-            return false;
+            return ['ok' => false, 'reason' => 'fetch_failed'];
         }
 
         $relative = self::STORAGE_DIR . '/' . $project->id . '.png';
-        Storage::disk('public')->put($relative, $png);
+        try {
+            Storage::disk('public')->put($relative, $png);
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'reason' => 'storage_write'];
+        }
+
+        if (!is_file(storage_path('app/public/' . $relative))) {
+            return ['ok' => false, 'reason' => 'storage_missing'];
+        }
 
         $project->favicon_path = $relative;
         $project->favicon_host = $host;
         $project->favicon_updated_at = Carbon::now();
         $project->save();
 
-        return true;
+        return ['ok' => true, 'reason' => 'downloaded'];
     }
 
     /**
@@ -474,7 +500,7 @@ class ProjectFaviconService
         return ['count' => $copied, 'updates' => $updates];
     }
 
-    public function fillMissingBatch(iterable $projects, int $limit, bool $force = false): array
+    public function fillMissingBatch(iterable $projects, int $limit, bool $force = false, ?int $userId = null): array
     {
         $limit = max(1, min(5, $limit));
         $projectIds = [];
@@ -491,35 +517,62 @@ class ProjectFaviconService
         $toRefresh = [];
         foreach ($all as $project) {
             $projectIds[] = (int) $project->id;
+            if (!$force && $this->wasFillFailedRecently((int) $project->id)) {
+                continue;
+            }
             if ($force || $this->needsRefresh($project)) {
                 $toRefresh[] = $project;
             }
         }
 
         if ($toRefresh === []) {
+            $pending = $this->countPendingInIds($projectIds);
+
             return [
                 'rebuilt' => 0,
-                'pending' => 0,
+                'pending' => $pending,
                 'updates' => [],
                 'propagated' => $propagated,
+                'attempted' => [],
+                'failed' => [],
+                'stalled' => $pending > 0,
             ];
         }
+
+        usort($toRefresh, static function (MonitoringProject $a, MonitoringProject $b): int {
+            return (int) $a->id <=> (int) $b->id;
+        });
+
+        $batch = $this->nextFillBatch($toRefresh, $limit, $userId);
 
         $rebuilt = 0;
         $timedOut = false;
         $wallStart = microtime(true);
         $wallMs = (int) env('MONITORING_FAVICON_FILL_WALL_MS', 20000);
         $donorsByHost = $this->buildHostDonorMap($all);
+        $attempted = [];
+        $failed = [];
 
-        foreach (array_slice($toRefresh, 0, $limit) as $project) {
+        foreach ($batch as $project) {
             if ((microtime(true) - $wallStart) * 1000 >= $wallMs) {
                 $timedOut = true;
                 break;
             }
-            $useFast = !$this->isWeakFavicon($project);
-            if ($this->refresh($project, true, $useFast)) {
+            $host = $this->fetcher->normalizeHost((string) $project->url);
+            $attempted[] = ['id' => (int) $project->id, 'host' => $host];
+
+            $report = $this->refreshWithReport($project, true, false);
+            if ($report['ok']) {
+                $this->forgetFillFailed((int) $project->id);
                 $updates[] = $this->faviconUpdatePayload($project, $donorsByHost);
                 $rebuilt++;
+            } else {
+                $this->markFillFailed((int) $project->id);
+                $failed[] = [
+                    'id' => (int) $project->id,
+                    'host' => $host,
+                    'reason' => $report['reason'],
+                ];
             }
         }
 
@@ -530,7 +583,63 @@ class ProjectFaviconService
             'propagated' => $propagated,
             'timed_out' => $timedOut,
             'wall_ms' => (int) round((microtime(true) - $wallStart) * 1000),
+            'attempted' => $attempted,
+            'failed' => $failed,
+            'fill_cursor' => $userId !== null ? (int) Cache::get(self::FILL_CURSOR_CACHE_PREFIX . $userId, 0) : null,
         ];
+    }
+
+    /**
+     * @param MonitoringProject[] $toRefresh
+     *
+     * @return MonitoringProject[]
+     */
+    private function nextFillBatch(array $toRefresh, int $limit, ?int $userId): array
+    {
+        $count = count($toRefresh);
+        if ($count === 0) {
+            return [];
+        }
+
+        $cursor = 0;
+        $key = null;
+        if ($userId !== null && $userId > 0) {
+            $key = self::FILL_CURSOR_CACHE_PREFIX . $userId;
+            $cursor = (int) Cache::get($key, 0);
+            if ($cursor >= $count) {
+                $cursor = 0;
+            }
+        }
+
+        $batch = [];
+        for ($i = 0; $i < $limit; $i++) {
+            $batch[] = $toRefresh[($cursor + $i) % $count];
+        }
+
+        if ($key !== null) {
+            Cache::put($key, ($cursor + $limit) % $count, now()->addHours(2));
+        }
+
+        return $batch;
+    }
+
+    private function wasFillFailedRecently(int $projectId): bool
+    {
+        return Cache::has(self::FILL_FAIL_CACHE_PREFIX . $projectId);
+    }
+
+    private function markFillFailed(int $projectId): void
+    {
+        Cache::put(
+            self::FILL_FAIL_CACHE_PREFIX . $projectId,
+            1,
+            now()->addMinutes(self::FILL_FAIL_CACHE_MINUTES)
+        );
+    }
+
+    private function forgetFillFailed(int $projectId): void
+    {
+        Cache::forget(self::FILL_FAIL_CACHE_PREFIX . $projectId);
     }
 
     /**

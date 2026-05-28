@@ -11,3 +11,11 @@
 @import '~please-wait/src/please-wait.scss';
 @import '~spinkit/spinkit.css';
 
+.pg-loading-screen .pg-loading-logo-header img {
+    max-width: 12rem;
+    width: auto;
+    height: auto;
+    max-height: 3rem;
+    object-fit: contain;
+}
+

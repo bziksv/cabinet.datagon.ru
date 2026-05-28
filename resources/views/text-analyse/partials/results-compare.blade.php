@@ -45,6 +45,7 @@
             'hasCompare' => true,
             'competitorUrl' => $competitorUrl,
             'competitorLabel' => $competitorLabel,
+            'isPublicView' => !empty($isPublicView),
         ])
     </div>
 </div>
@@ -122,7 +123,15 @@
                         $deltaClass = $delta > 0 ? 'text-success' : ($delta < 0 ? 'text-danger' : 'text-secondary');
                     @endphp
                     <tr class="cabinet-ta-word-row">
-                        <td class="fw-medium">{{ $row['text'] }}</td>
+                        <td>
+                            <span class="d-inline-flex flex-wrap align-items-baseline gap-1">
+                                <span class="fw-medium cabinet-ta-exclude-term">{{ $row['text'] }}</span>
+                                @include('text-analyse.partials.add-to-exclude-btn', [
+                                    'term' => $row['text'],
+                                    'isPublicView' => !empty($isPublicView),
+                                ])
+                            </span>
+                        </td>
                         <td class="text-end font-monospace border-start">{{ $main['total'] ?? '—' }}</td>
                         <td class="text-end font-monospace">{{ $main['inText'] ?? '—' }}</td>
                         <td class="text-end font-monospace">{{ $main['inLink'] ?? '—' }}</td>
@@ -173,7 +182,15 @@
                         $deltaClass = $delta > 0 ? 'text-success' : ($delta < 0 ? 'text-danger' : 'text-secondary');
                     @endphp
                     <tr>
-                        <td>{{ $row['phrase'] }}</td>
+                        <td>
+                            <span class="d-inline-flex flex-wrap align-items-baseline gap-1">
+                                <span class="cabinet-ta-exclude-term">{{ $row['phrase'] }}</span>
+                                @include('text-analyse.partials.add-to-exclude-btn', [
+                                    'term' => $row['phrase'],
+                                    'isPublicView' => !empty($isPublicView),
+                                ])
+                            </span>
+                        </td>
                         <td class="text-end font-monospace">{{ $row['main']['count'] ?? '—' }}</td>
                         <td class="text-end font-monospace">{{ $row['competitor']['count'] ?? '—' }}</td>
                         <td class="text-end font-monospace {{ $deltaClass }}">

@@ -29,7 +29,17 @@
     color: #fff;
 }
 
-.cabinet-mon-create .content {
+/* bs-stepper: только .content.active виден; без data-target на .step панели пустые */
+.cabinet-mon-create .bs-stepper-content > form > .content {
+    display: none;
+}
+
+.cabinet-mon-create .bs-stepper-content > form > .content.active,
+.cabinet-mon-create .bs-stepper-content > form > .content.dstepper-block {
+    display: block;
+}
+
+.cabinet-mon-create .bs-stepper-content > form > .content {
     padding-top: 1rem;
 }
 

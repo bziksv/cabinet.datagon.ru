@@ -872,6 +872,18 @@
         });
     }
 
+    function ensureFirstStepVisible(stepperEl) {
+        if (!stepperEl) {
+            return;
+        }
+        const panels = stepperEl.querySelectorAll('.bs-stepper-content .content');
+        const active = stepperEl.querySelector('.bs-stepper-content .content.active');
+        if (panels.length && !active) {
+            panels[0].classList.add('active');
+            panels[0].classList.add('dstepper-block');
+        }
+    }
+
     function init() {
         if (typeof toastr !== 'undefined' && cfg.toastr) {
             toastr.options = cfg.toastr;
@@ -881,8 +893,15 @@
         if (!el) {
             return;
         }
+        if (typeof Stepper === 'undefined') {
+            showError('Stepper не загрузился. Обновите страницу (Ctrl+F5).');
+            ensureFirstStepVisible(el);
+            return;
+        }
+
         stepper = new Stepper(el);
         window.stepper = stepper;
+        ensureFirstStepVisible(el);
 
         el.addEventListener('show.bs-stepper', function (event) {
             const nextStep = event.detail.indexStep;

@@ -119,7 +119,7 @@
     let monV2DebugReqCount = 0;
     let monV2DebugRenderTimer = null;
 
-    window.cabinetMonV2DebugLine = function monV2DebugLine(level, message, context) {
+    function monV2DebugLine(level, message, context) {
         if (!monV2AdminDebug) {
             return;
         }
@@ -139,6 +139,8 @@
             renderMonV2DebugLog(null, null);
         }, 200);
     }
+
+    window.cabinetMonV2DebugLine = monV2DebugLine;
 
     function monV2PostData(extra) {
         const data = Object.assign({ _token: cfg.csrf }, extra || {});

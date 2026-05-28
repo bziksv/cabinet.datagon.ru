@@ -19,7 +19,8 @@ class MonitoringPortfolioTop10TrendService
 
     private const MAX_PROJECTS = 100;
 
-    private const PROJECT_CHUNK = 5;
+    /** Сколько project_id в одном SQL (вместо 1 запроса на проект). */
+    private const PROJECT_CHUNK = 15;
 
     public function seriesForUser(User $user, array $projectIds, int $days, string $range = 'weeks'): array
     {
@@ -43,16 +44,20 @@ class MonitoringPortfolioTop10TrendService
 
         sort($ids);
         $cacheKey = sprintf(
-            'mon_v2_portfolio_trend:%d:%d:%s:%s:v5',
+            'mon_v2_portfolio_trend:%d:%d:%s:%s:v6',
             (int) $user->id,
             $days,
             $range,
             md5(implode(',', $ids))
         );
 
-        $payload = Cache::remember($cacheKey, 300, function () use ($ids, $days, $range) {
+        $fromCache = Cache::has($cacheKey);
+        $buildStarted = microtime(true);
+        $payload = Cache::remember($cacheKey, 600, function () use ($ids, $days, $range) {
             return $this->buildSeries($ids, $days, $range);
         });
+        $payload['build_ms'] = (int) round((microtime(true) - $buildStarted) * 1000);
+        $payload['from_cache'] = $fromCache;
 
         $payload['projects_used'] = count($ids);
         $payload['interpolation'] = 'nearest';
@@ -62,6 +67,84 @@ class MonitoringPortfolioTop10TrendService
         }
 
         return $payload;
+    }
+
+    /**
+     * Порция per-project для пошаговой загрузки с клиента (partial=1).
+     *
+     * @param int[] $projectIds
+     *
+     * @return array{per_project: array<int, array<string, float>>, chunk_ms: int, projects_in_chunk: int}
+     */
+    public function perProjectSliceChunk(User $user, array $projectIds, int $days, string $range = 'weeks'): array
+    {
+        if (!in_array($days, self::ALLOWED_DAYS, true)) {
+            $days = 90;
+        }
+        if (!in_array($range, ['days', 'weeks', 'month'], true)) {
+            $range = 'weeks';
+        }
+
+        $projects = $this->resolveProjects($user, $projectIds);
+        $ids = $projects->pluck('id')->map(function ($id) {
+            return (int) $id;
+        })->all();
+
+        $t0 = microtime(true);
+        $perProject = $this->seriesSliceForProjectChunk($ids, $days, $range);
+
+        return [
+            'per_project' => $perProject,
+            'chunk_ms' => (int) round((microtime(true) - $t0) * 1000),
+            'projects_in_chunk' => count($ids),
+            'partial' => true,
+            'days' => $days,
+            'range' => $range,
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, float>> $perProject
+     */
+    public function aggregateFromPerProject(array $perProject, int $days, string $range, int $projectsTotal): array
+    {
+        if (!in_array($days, self::ALLOWED_DAYS, true)) {
+            $days = 90;
+        }
+        if (!in_array($range, ['days', 'weeks', 'month'], true)) {
+            $range = 'weeks';
+        }
+
+        $projectsWithHistory = count($perProject);
+        if ($projectsWithHistory === 0) {
+            return $this->emptyPayload($days, $range, $projectsTotal, true);
+        }
+
+        $allLabels = $this->collectSortedLabels($perProject);
+        $labels = [];
+        $values = [];
+
+        foreach ($allLabels as $label) {
+            $sum = 0.0;
+            foreach ($perProject as $sparse) {
+                $value = $this->valueAtLabelWithNearest($sparse, $label);
+                if ($value !== null) {
+                    $sum += $value;
+                }
+            }
+            $labels[] = $label;
+            $values[] = round($sum / $projectsWithHistory, 2);
+        }
+
+        return [
+            'labels' => $labels,
+            'values' => $values,
+            'days' => $days,
+            'range' => $range,
+            'projects' => $projectsTotal,
+            'projects_with_history' => $projectsWithHistory,
+            'empty' => false,
+        ];
     }
 
     /**
@@ -93,14 +176,12 @@ class MonitoringPortfolioTop10TrendService
 
         /** @var array<int, array<string, float>> $perProject */
         $perProject = [];
+        $sqlChunks = 0;
 
-        foreach (array_chunk($projectIds, self::PROJECT_CHUNK) as $chunk) {
-            foreach ($chunk as $pid) {
-                $pid = (int) $pid;
-                $slice = $this->seriesSliceForProject($pid, $days, $range);
-                if ($slice !== []) {
-                    $perProject[$pid] = $slice;
-                }
+        foreach (array_chunk($projectIds, $this->sqlChunkSize()) as $chunk) {
+            $sqlChunks++;
+            foreach ($this->seriesSliceForProjectChunk($chunk, $days, $range) as $pid => $slice) {
+                $perProject[(int) $pid] = $slice;
             }
         }
 
@@ -133,7 +214,15 @@ class MonitoringPortfolioTop10TrendService
             'projects' => count($projectIds),
             'projects_with_history' => $projectsWithHistory,
             'empty' => false,
+            'sql_chunks' => $sqlChunks,
         ];
+    }
+
+    private function sqlChunkSize(): int
+    {
+        $size = (int) env('MONITORING_TREND_SQL_CHUNK', self::PROJECT_CHUNK);
+
+        return max(5, min(25, $size));
     }
 
     /**
@@ -214,30 +303,31 @@ class MonitoringPortfolioTop10TrendService
     }
 
     /**
-     * @return array<string, float>
+     * Один SQL на несколько проектов (вместо N отдельных запросов).
+     *
+     * @param int[] $projectIds
+     *
+     * @return array<int, array<string, float>>
      */
-    private function seriesSliceForProject(int $projectId, int $days, string $range): array
+    private function seriesSliceForProjectChunk(array $projectIds, int $days, string $range): array
     {
-        $hasKeywords = DB::table('monitoring_keywords')
-            ->where('monitoring_project_id', $projectId)
-            ->exists();
-
-        if (!$hasKeywords) {
+        $projectIds = array_values(array_unique(array_map('intval', array_filter($projectIds, function ($id) {
+            return (int) $id > 0;
+        }))));
+        if ($projectIds === []) {
             return [];
         }
 
         $end = Carbon::today()->endOfDay();
         $start = Carbon::today()->subDays($days)->startOfDay();
 
-        $keywordSub = function ($query) use ($projectId) {
-            $query->select('id')
-                ->from('monitoring_keywords')
-                ->where('monitoring_project_id', $projectId);
-        };
-
         $latestSub = DB::table('monitoring_positions')
             ->selectRaw('monitoring_keyword_id, monitoring_searchengine_id, DATE(created_at) as pos_day, MAX(created_at) as max_created')
-            ->whereIn('monitoring_keyword_id', $keywordSub)
+            ->whereIn('monitoring_keyword_id', function ($query) use ($projectIds) {
+                $query->select('id')
+                    ->from('monitoring_keywords')
+                    ->whereIn('monitoring_project_id', $projectIds);
+            })
             ->whereBetween('created_at', [$start, $end])
             ->groupBy('monitoring_keyword_id', 'monitoring_searchengine_id', DB::raw('DATE(created_at)'));
 
@@ -247,26 +337,34 @@ class MonitoringPortfolioTop10TrendService
                     ->on('p.monitoring_searchengine_id', '=', 'latest.monitoring_searchengine_id')
                     ->on('p.created_at', '=', 'latest.max_created');
             })
-            ->select('p.position', 'p.created_at')
+            ->join('monitoring_keywords as mk', 'mk.id', '=', 'p.monitoring_keyword_id')
+            ->whereIn('mk.monitoring_project_id', $projectIds)
+            ->select('mk.monitoring_project_id', 'p.position', 'p.created_at')
             ->get();
 
         if ($rows->isEmpty()) {
             return [];
         }
 
-        $byDate = collect($rows)
-            ->groupBy(function ($row) {
-                return $this->positionCarbon($row)->format('d.m.Y');
-            })
-            ->map(function (Collection $items) {
-                return $items->pluck('position');
-            });
-
-        $byDate = $this->applyRangeGrouping($byDate, $range);
-
         $out = [];
-        foreach ($byDate as $label => $tops) {
-            $out[(string) $label] = Helper::calculateTopPercentByPositions($tops, 10);
+        foreach ($rows->groupBy('monitoring_project_id') as $projectId => $projectRows) {
+            $byDate = collect($projectRows)
+                ->groupBy(function ($row) {
+                    return $this->positionCarbon($row)->format('d.m.Y');
+                })
+                ->map(function (Collection $items) {
+                    return $items->pluck('position');
+                });
+
+            $byDate = $this->applyRangeGrouping($byDate, $range);
+
+            $slice = [];
+            foreach ($byDate as $label => $tops) {
+                $slice[(string) $label] = Helper::calculateTopPercentByPositions($tops, 10);
+            }
+            if ($slice !== []) {
+                $out[(int) $projectId] = $slice;
+            }
         }
 
         return $out;

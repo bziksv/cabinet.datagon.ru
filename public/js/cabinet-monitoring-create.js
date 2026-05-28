@@ -655,22 +655,34 @@
                 inputTooShort: function () {
                     return cfg.i18n.regionType || 'Введите название региона';
                 },
+                searching: function () {
+                    return cfg.i18n.regionSearching || 'Поиск…';
+                },
+                noResults: function () {
+                    return cfg.i18n.regionNotFound || 'Ничего не найдено';
+                },
+                errorLoading: function () {
+                    return cfg.i18n.regionLoadError || 'Не удалось загрузить список';
+                },
             },
             ajax: {
-                delay: 500,
+                delay: 400,
                 url: cfg.urls.location,
                 dataType: 'json',
                 data: function (params) {
                     return { name: params.term, searchEngine: $(this).data('search') };
                 },
                 processResults: function (data) {
+                    const list = Array.isArray(data) ? data : [];
                     return {
-                        results: $.map(data, function (obj) {
+                        results: $.map(list, function (obj) {
+                            const lr = obj.lr != null ? String(obj.lr) : '';
+                            const name = obj.name != null ? String(obj.name) : '';
                             return {
-                                id: obj.lr,
+                                id: lr,
                                 source: obj.source,
-                                name: obj.name,
-                                text: obj.name + ' [' + obj.lr + ']',
+                                name: name,
+                                text: name + (lr ? ' [' + lr + ']' : ''),
                             };
                         }),
                     };

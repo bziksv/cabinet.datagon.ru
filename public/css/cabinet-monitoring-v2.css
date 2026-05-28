@@ -203,6 +203,21 @@
     line-height: 1.45;
 }
 
+.cabinet-mon-v2-trend-loader__stage {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--mon-v2-text, #334155);
+    text-align: center;
+    line-height: 1.4;
+}
+
+.cabinet-mon-v2-trend-loader__elapsed {
+    font-size: 0.8125rem;
+    color: var(--mon-v2-text-muted);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
 .cabinet-mon-v2-trend-loader__track {
     height: 0.35rem;
     border-radius: 999px;

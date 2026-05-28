@@ -61,7 +61,9 @@
                         <p class="cabinet-mon-v2-trend-loader__title mb-1">
                             {{ __('Monitoring v2 portfolio trend loading title') }}
                         </p>
-                        <p class="cabinet-mon-v2-trend-loader__detail mb-3" data-trend-loader-detail></p>
+                        <p class="cabinet-mon-v2-trend-loader__detail mb-2" data-trend-loader-detail></p>
+                        <p class="cabinet-mon-v2-trend-loader__stage mb-2" data-trend-loader-stage></p>
+                        <p class="cabinet-mon-v2-trend-loader__elapsed mb-3" data-trend-loader-elapsed aria-live="polite"></p>
                         <div class="cabinet-mon-v2-trend-loader__track" aria-hidden="true">
                             <div class="cabinet-mon-v2-trend-loader__bar" data-trend-loader-bar></div>
                         </div>

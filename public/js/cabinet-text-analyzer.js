@@ -576,6 +576,7 @@
         var wordForms = readJsonScript('cabinet-ta-word-forms', {});
 
         try {
+            initExcludeListButtons(cfg);
             if (!payload.compare) {
                 initResultTables({wordForms: wordForms});
             } else {
@@ -748,11 +749,28 @@
             .filter(Boolean);
     }
 
+    function setExcludeWordsEnabled(on) {
+        var input = document.getElementById('removeWords');
+        var $panel = $('#cabinet-ta-list-words');
+        var $textarea = $('#listWords');
+        if (!input || !$panel.length || !$textarea.length) {
+            return;
+        }
+        var wantOn = !!on;
+        if (wantOn !== input.checked) {
+            input.click();
+        }
+        $panel.toggleClass('d-none', !wantOn);
+        $textarea.prop('required', wantOn);
+    }
+
     function addWordToExcludeList(word) {
         word = String(word || '').trim();
         if (!word) {
             return false;
         }
+        setExcludeWordsEnabled(true);
+
         var $textarea = $('#listWords');
         if (!$textarea.length) {
             return false;
@@ -766,11 +784,6 @@
             lines.push(word);
             $textarea.val(lines.join('\n'));
         }
-        var $switch = $('#removeWords');
-        if (!$switch.is(':checked')) {
-            $switch.prop('checked', true).trigger('change');
-        }
-        $('#cabinet-ta-list-words').removeClass('d-none');
         $textarea.addClass('cabinet-ta-list-words--highlight');
         window.setTimeout(function () {
             $textarea.removeClass('cabinet-ta-list-words--highlight');
@@ -779,15 +792,31 @@
         if (panel && typeof panel.scrollIntoView === 'function') {
             panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
         }
+        if (typeof $textarea[0].focus === 'function') {
+            $textarea[0].focus();
+        }
         return !exists;
     }
 
-    function initExcludeListButtons() {
-        $(document).on('click', '.cabinet-text-analyzer-page .cabinet-ta-add-exclude', function (e) {
+    function initExcludeListButtons(cfg) {
+        if (cfg && cfg.isPublicView) {
+            return;
+        }
+        var $page = $('.cabinet-text-analyzer-page');
+        if (!$page.length) {
+            return;
+        }
+        $page.off('click.cabinetTaExclude', '.cabinet-ta-add-exclude');
+        $page.on('click.cabinetTaExclude', '.cabinet-ta-add-exclude', function (e) {
             e.preventDefault();
             e.stopPropagation();
-            var word = $(this).attr('data-word') || $(this).closest('td').find('.cabinet-ta-exclude-term').first().text();
-            addWordToExcludeList(word);
+            var $btn = $(this);
+            var word = $btn.attr('data-word') || $btn.closest('td').find('.cabinet-ta-exclude-term').first().text();
+            var added = addWordToExcludeList(word);
+            $btn.addClass(added ? 'cabinet-ta-add-exclude--added' : 'cabinet-ta-add-exclude--exists');
+            window.setTimeout(function () {
+                $btn.removeClass('cabinet-ta-add-exclude--added cabinet-ta-add-exclude--exists');
+            }, 1400);
         });
     }
 
@@ -808,9 +837,7 @@
         $('#cabinet-ta-mode-url').on('click', function () { setMode('url'); });
 
         $('#removeWords').on('change', function () {
-            var on = $(this).is(':checked');
-            $('#cabinet-ta-list-words').toggleClass('d-none', !on);
-            $('#listWords').prop('required', on);
+            setExcludeWordsEnabled($(this).is(':checked'));
         });
 
         $('#switchCompareCompetitor').on('change', function () {
@@ -831,8 +858,8 @@
         releaseUiLock();
         startUiLockWatchdog();
         var cfg = window.cabinetTextAnalyzerConfig || {};
-        initExcludeListButtons();
         initForm(cfg);
+        initExcludeListButtons(cfg);
         initPublicShare();
         if (cfg.hasResponse) {
             try {

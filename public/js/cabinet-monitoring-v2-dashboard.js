@@ -26,8 +26,11 @@
     let trendLoading = false;
     let lastChartSig = '';
     let trendLoaderProgressTimer = null;
+    let trendLoaderElapsedTimer = null;
     let trendRevealTimer = null;
     let trendLoadSeq = 0;
+    const TREND_BATCH_SIZE = 15;
+    const TREND_BATCH_MIN_PROJECTS = 18;
 
     function chartSettings() {
         if (window.cabinetMonV2ChartSettings) {
@@ -390,6 +393,71 @@
         }
     }
 
+    function clearTrendLoaderElapsedTimer() {
+        if (trendLoaderElapsedTimer) {
+            window.clearInterval(trendLoaderElapsedTimer);
+            trendLoaderElapsedTimer = null;
+        }
+    }
+
+    function trendLoaderStartedAt() {
+        if (!window._cabinetMonV2TrendLoadStarted) {
+            window._cabinetMonV2TrendLoadStarted = performance.now();
+        }
+        return window._cabinetMonV2TrendLoadStarted;
+    }
+
+    function trendLoaderElapsedSec() {
+        const started = trendLoaderStartedAt();
+        return Math.max(0, Math.round((performance.now() - started) / 1000));
+    }
+
+    function resetTrendLoaderClock() {
+        window._cabinetMonV2TrendLoadStarted = performance.now();
+    }
+
+    function setTrendLoaderStage(stageKey, context) {
+        const stageEl = document.querySelector('[data-trend-loader-stage]');
+        const elapsedEl = document.querySelector('[data-trend-loader-elapsed]');
+        const i18n = cfg.i18n || {};
+        let text = '';
+        const ctx = context || {};
+        const elapsed = trendLoaderElapsedSec();
+
+        if (stageKey === 'db' && i18n.portfolioTrendStageDb) {
+            text = i18n.portfolioTrendStageDb
+                .replace(':from', String(ctx.from || 1))
+                .replace(':to', String(ctx.to || ctx.total || 0))
+                .replace(':total', String(ctx.total || 0))
+                .replace(':elapsed', String(elapsed));
+        } else if (stageKey === 'agg' && i18n.portfolioTrendStageAgg) {
+            text = i18n.portfolioTrendStageAgg
+                .replace(':done', String(ctx.done || 0))
+                .replace(':total', String(ctx.total || 0))
+                .replace(':elapsed', String(elapsed));
+        } else if (stageKey === 'chart' && i18n.portfolioTrendStageChart) {
+            text = i18n.portfolioTrendStageChart.replace(':elapsed', String(elapsed));
+        } else if (stageKey === 'cache' && i18n.portfolioTrendStageCache) {
+            text = i18n.portfolioTrendStageCache.replace(':elapsed', String(elapsed));
+        } else if (i18n.portfolioTrendStageWait) {
+            text = i18n.portfolioTrendStageWait.replace(':elapsed', String(elapsed));
+        }
+
+        if (stageEl) {
+            stageEl.textContent = text;
+        }
+        if (elapsedEl) {
+            elapsedEl.textContent = elapsed + ' с';
+        }
+    }
+
+    function startTrendLoaderElapsedTicker() {
+        clearTrendLoaderElapsedTimer();
+        trendLoaderElapsedTimer = window.setInterval(function () {
+            setTrendLoaderStage(window._cabinetMonV2TrendStageKey || 'wait', window._cabinetMonV2TrendStageCtx || {});
+        }, 1000);
+    }
+
     function clearTrendRevealTimer() {
         if (trendRevealTimer) {
             window.clearTimeout(trendRevealTimer);
@@ -412,6 +480,9 @@
         if (!loader) {
             return;
         }
+        resetTrendLoaderClock();
+        window._cabinetMonV2TrendStageKey = 'wait';
+        window._cabinetMonV2TrendStageCtx = { total: projectCount || 0 };
         hideTrendBuildProgress();
         destroyMain();
         $panel.addClass('cabinet-mon-v2-portfolio__chart-panel--loading');
@@ -421,6 +492,8 @@
             build.setAttribute('hidden', '');
         }
         setTrendLoaderBar(4);
+        setTrendLoaderStage('wait', window._cabinetMonV2TrendStageCtx);
+        startTrendLoaderElapsedTicker();
         clearTrendLoaderProgressTimer();
         trendLoaderProgressTimer = window.setInterval(function () {
             const bar = document.querySelector('[data-trend-loader-bar]');
@@ -428,10 +501,11 @@
                 return;
             }
             const current = parseFloat(bar.style.width) || 4;
-            if (current >= 88) {
+            const cap = window._cabinetMonV2TrendProgressCap || 88;
+            if (current >= cap) {
                 return;
             }
-            setTrendLoaderBar(current + 3 + Math.random() * 5);
+            setTrendLoaderBar(current + 2 + Math.random() * 4);
         }, 450);
 
         const s = chartSettings();
@@ -460,6 +534,8 @@
         const loader = document.getElementById('cabinet-mon-v2-trend-loader');
         const $panel = $('.cabinet-mon-v2-portfolio__chart-panel');
         clearTrendLoaderProgressTimer();
+        clearTrendLoaderElapsedTimer();
+        window._cabinetMonV2TrendProgressCap = 88;
         setTrendLoaderBar(100);
         if (loader) {
             loader.setAttribute('aria-busy', 'false');
@@ -515,6 +591,218 @@
         return data;
     }
 
+    function trendLabelTimestamp(label) {
+        const parts = String(label).split('.');
+        if (parts.length !== 3) {
+            return 0;
+        }
+        const d = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+        const ts = d.getTime();
+
+        return isNaN(ts) ? 0 : ts;
+    }
+
+    function trendValueAtLabelWithNearest(sparse, label) {
+        if (sparse && Object.prototype.hasOwnProperty.call(sparse, label)) {
+            return sparse[label];
+        }
+        const targetTs = trendLabelTimestamp(label);
+        if (!targetTs) {
+            return null;
+        }
+        let prevVal = null;
+        let prevTs = null;
+        let nextVal = null;
+        let nextTs = null;
+        Object.keys(sparse || {}).forEach(function (l) {
+            const ts = trendLabelTimestamp(l);
+            if (!ts) {
+                return;
+            }
+            if (ts <= targetTs && (prevTs === null || ts > prevTs)) {
+                prevTs = ts;
+                prevVal = sparse[l];
+            }
+            if (ts >= targetTs && (nextTs === null || ts < nextTs)) {
+                nextTs = ts;
+                nextVal = sparse[l];
+            }
+        });
+        if (prevVal !== null && nextVal !== null) {
+            const dPrev = targetTs - prevTs;
+            const dNext = nextTs - targetTs;
+
+            return dPrev <= dNext ? prevVal : nextVal;
+        }
+        if (prevVal !== null) {
+            return prevVal;
+        }
+        if (nextVal !== null) {
+            return nextVal;
+        }
+
+        return null;
+    }
+
+    function aggregateTrendPerProject(perProject, projectsTotal) {
+        const pids = Object.keys(perProject || {});
+        const projectsWithHistory = pids.length;
+        if (!projectsWithHistory) {
+            return { labels: [], values: [], empty: true, projects_with_history: 0 };
+        }
+        const labelSet = {};
+        pids.forEach(function (pid) {
+            Object.keys(perProject[pid] || {}).forEach(function (label) {
+                labelSet[label] = true;
+            });
+        });
+        const labels = Object.keys(labelSet).sort(function (a, b) {
+            return trendLabelTimestamp(a) - trendLabelTimestamp(b);
+        });
+        const values = labels.map(function (label) {
+            let sum = 0;
+            pids.forEach(function (pid) {
+                const v = trendValueAtLabelWithNearest(perProject[pid], label);
+                if (v !== null) {
+                    sum += v;
+                }
+            });
+
+            return Math.round((sum / projectsWithHistory) * 100) / 100;
+        });
+
+        return {
+            labels: labels,
+            values: values,
+            empty: false,
+            projects: projectsTotal,
+            projects_with_history: projectsWithHistory,
+        };
+    }
+
+    function setTrendLoaderProgress(done, total) {
+        if (!total) {
+            return;
+        }
+        const pct = Math.max(8, Math.min(92, Math.round((done / total) * 92)));
+        window._cabinetMonV2TrendProgressCap = pct + 4;
+        setTrendLoaderBar(pct);
+    }
+
+    function fetchTrendAjax(postData) {
+        return $.ajax({
+            method: 'POST',
+            url: cfg.portfolioTrendUrl,
+            timeout: 300000,
+            traditional: true,
+            data: trendPostData(postData),
+        });
+    }
+
+    function fetchPortfolioTop10TrendBatched(ids, loadSeq, started) {
+        const s = chartSettings();
+        const total = ids.length;
+        const perProject = {};
+        let offset = 0;
+        let done = 0;
+
+        function runNextBatch() {
+            if (loadSeq !== trendLoadSeq || chartMode !== 'trend') {
+                return;
+            }
+            if (offset >= total) {
+                window._cabinetMonV2TrendStageKey = 'agg';
+                window._cabinetMonV2TrendStageCtx = { done: total, total: total };
+                setTrendLoaderStage('agg', window._cabinetMonV2TrendStageCtx);
+                setTrendLoaderProgress(total, total);
+                const data = aggregateTrendPerProject(perProject, total);
+                data.days = s.periodDays;
+                data.range = s.range;
+                trendDebug('info', 'ajax.trend.aggregated', {
+                    ms: Math.round(performance.now() - started),
+                    points: data.labels ? data.labels.length : 0,
+                    projects_with_history: data.projects_with_history,
+                });
+                window._cabinetMonV2TrendStageKey = 'chart';
+                setTrendLoaderStage('chart', {});
+                hideTrendLoader();
+                renderTrendChart(data);
+                if (loadSeq === trendLoadSeq) {
+                    trendLoading = false;
+                }
+                return;
+            }
+
+            const chunk = ids.slice(offset, offset + TREND_BATCH_SIZE);
+            const from = offset + 1;
+            const to = offset + chunk.length;
+            window._cabinetMonV2TrendStageKey = 'db';
+            window._cabinetMonV2TrendStageCtx = { from: from, to: to, total: total };
+            setTrendLoaderStage('db', window._cabinetMonV2TrendStageCtx);
+            setTrendLoaderProgress(done, total);
+
+            return fetchTrendAjax({
+                partial: 1,
+                days: s.periodDays,
+                range: s.range,
+                project_ids: chunk,
+                progress_total: total,
+                progress_done: done,
+            })
+                .done(function (data) {
+                    if (loadSeq !== trendLoadSeq || chartMode !== 'trend') {
+                        return;
+                    }
+                    const slice = (data && data.per_project) || {};
+                    Object.keys(slice).forEach(function (pid) {
+                        perProject[pid] = slice[pid];
+                    });
+                    done += chunk.length;
+                    offset += TREND_BATCH_SIZE;
+                    trendDebug('info', 'ajax.trend.chunk', {
+                        from: from,
+                        to: to,
+                        chunk_ms: data && data.chunk_ms,
+                        done: done,
+                        total: total,
+                    });
+                    runNextBatch();
+                })
+                .fail(function (xhr) {
+                    fetchPortfolioTop10TrendFail(xhr, loadSeq, started);
+                });
+        }
+
+        runNextBatch();
+    }
+
+    function fetchPortfolioTop10TrendFail(xhr, loadSeq, started) {
+        if (loadSeq !== trendLoadSeq) {
+            return;
+        }
+        trendDebug('error', 'ajax.trend.fail', {
+            ms: Math.round(performance.now() - started),
+            status: xhr && xhr.status,
+        });
+        hideTrendLoader();
+        hideTrendBuildProgress();
+        destroyMain();
+        if (typeof toastr !== 'undefined') {
+            const msg =
+                (xhr.responseJSON && xhr.responseJSON.message) ||
+                cfg.i18n.portfolioTrendError ||
+                cfg.i18n.loadError;
+            toastr.error(msg);
+        }
+        const $hint = $('#cabinet-mon-v2-dash-hint');
+        if ($hint.length && cfg.i18n && cfg.i18n.portfolioTrendError) {
+            $hint.text(cfg.i18n.portfolioTrendError);
+        }
+        if (loadSeq === trendLoadSeq) {
+            trendLoading = false;
+        }
+    }
+
     function fetchPortfolioTop10Trend(rows) {
         const url = cfg.portfolioTrendUrl;
         if (!url || typeof $ === 'undefined') {
@@ -530,22 +818,23 @@
 
         const s = chartSettings();
         const started = performance.now();
+        const useBatches = ids.length >= TREND_BATCH_MIN_PROJECTS;
         trendDebug('info', 'ajax.trend.start', {
             projects: ids.length,
             days: s.periodDays,
             range: s.range,
+            batched: useBatches,
         });
 
-        return $.ajax({
-            method: 'POST',
-            url: url,
-            timeout: 300000,
-            traditional: true,
-            data: trendPostData({
-                days: s.periodDays,
-                range: s.range,
-                project_ids: ids,
-            }),
+        if (useBatches) {
+            fetchPortfolioTop10TrendBatched(ids, loadSeq, started);
+            return;
+        }
+
+        return fetchTrendAjax({
+            days: s.periodDays,
+            range: s.range,
+            project_ids: ids,
         })
             .done(function (data) {
                 if (loadSeq !== trendLoadSeq || chartMode !== 'trend') {
@@ -555,7 +844,15 @@
                     ms: Math.round(performance.now() - started),
                     points: data && data.labels ? data.labels.length : 0,
                     empty: !!(data && data.empty),
+                    from_cache: data && data.from_cache,
+                    build_ms: data && data.build_ms,
                 });
+                if (data && data.from_cache) {
+                    window._cabinetMonV2TrendStageKey = 'cache';
+                    setTrendLoaderStage('cache', {});
+                }
+                window._cabinetMonV2TrendStageKey = 'chart';
+                setTrendLoaderStage('chart', {});
                 hideTrendLoader();
                 if (data && data.error) {
                     renderTrendChart({ labels: [], values: [], empty: true });
@@ -567,27 +864,7 @@
                 renderTrendChart(data);
             })
             .fail(function (xhr) {
-                if (loadSeq !== trendLoadSeq) {
-                    return;
-                }
-                trendDebug('error', 'ajax.trend.fail', {
-                    ms: Math.round(performance.now() - started),
-                    status: xhr && xhr.status,
-                });
-                hideTrendLoader();
-                hideTrendBuildProgress();
-                destroyMain();
-                if (typeof toastr !== 'undefined') {
-                    const msg =
-                        (xhr.responseJSON && xhr.responseJSON.message) ||
-                        cfg.i18n.portfolioTrendError ||
-                        cfg.i18n.loadError;
-                    toastr.error(msg);
-                }
-                const $hint = $('#cabinet-mon-v2-dash-hint');
-                if ($hint.length && cfg.i18n && cfg.i18n.portfolioTrendError) {
-                    $hint.text(cfg.i18n.portfolioTrendError);
-                }
+                fetchPortfolioTop10TrendFail(xhr, loadSeq, started);
             })
             .always(function () {
                 if (loadSeq === trendLoadSeq) {

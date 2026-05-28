@@ -3,6 +3,7 @@
 namespace App\Classes\Locations\Searches;
 
 use App\Classes\Locations\Region;
+use App\Support\YandexLrRegions;
 use Ixudra\Curl\Facades\Curl;
 
 class Yandex extends Region
@@ -25,9 +26,23 @@ class Yandex extends Region
 
     public function get(string $name)
     {
-        $location = $this->location->where('name', 'like', $name.'%')->where('source', $this->source);
-        if($location->count())
-            return $location->get();
+        $jsonHits = YandexLrRegions::search($name, 25);
+        if ($jsonHits !== []) {
+            return collect(array_map(function (array $item) {
+                return $this->store((string) $item['id'], (string) $item['name']);
+            }, $jsonHits));
+        }
+
+        $needle = mb_strtolower($name);
+        $location = $this->location->where('source', $this->source)
+            ->where(function ($query) use ($needle, $name) {
+                $query->where('name', 'like', $name . '%')
+                    ->orWhere('name', 'like', '%' . $name . '%')
+                    ->orWhereRaw('LOWER(name) LIKE ?', [$needle . '%']);
+            });
+        if ($location->count()) {
+            return $location->limit(25)->get();
+        }
 
         $response = $this->requestYandex($name);
 

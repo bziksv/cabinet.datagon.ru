@@ -876,10 +876,24 @@
 }
 
 .cabinet-text-analyzer-page .cabinet-ta-add-exclude {
+    position: relative;
+    z-index: 3;
     font-size: 0.75rem;
     line-height: 1.2;
     text-decoration: none;
     opacity: 0.85;
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-add-exclude--added {
+    color: var(--bs-success) !important;
+    opacity: 1;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-add-exclude--exists {
+    color: var(--bs-secondary) !important;
+    opacity: 1;
 }
 
 .cabinet-text-analyzer-page .cabinet-ta-add-exclude:hover,

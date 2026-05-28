@@ -165,12 +165,27 @@ class MonitoringV2Controller extends Controller
             ]);
             set_time_limit(max(300, (int) ini_get('max_execution_time')));
             @ini_set('memory_limit', '512M');
-            $payload = $trend->seriesForUser($user, $projectIds, $days, $range);
+
+            if ($request->boolean('partial')) {
+                $payload = $trend->perProjectSliceChunk($user, $projectIds, $days, $range);
+                $total = (int) $request->input('progress_total', 0);
+                $done = (int) $request->input('progress_done', 0) + (int) ($payload['projects_in_chunk'] ?? 0);
+                $payload['progress'] = [
+                    'done' => min($done, $total > 0 ? $total : $done),
+                    'total' => $total > 0 ? $total : $done,
+                ];
+            } else {
+                $payload = $trend->seriesForUser($user, $projectIds, $days, $range);
+            }
+
             $ms = (int) round((microtime(true) - $t0) * 1000);
             MonitoringV2DebugLog::info($debugSession, 'http.trend.done', [
                 'ms' => $ms,
+                'partial' => $request->boolean('partial'),
                 'points' => count($payload['labels'] ?? []),
                 'projects_used' => $payload['projects_used'] ?? null,
+                'chunk_ms' => $payload['chunk_ms'] ?? null,
+                'from_cache' => $payload['from_cache'] ?? null,
             ]);
 
             return response()->json($this->attachDebug($request, $user, $payload));

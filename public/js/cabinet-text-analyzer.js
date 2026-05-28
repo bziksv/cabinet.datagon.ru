@@ -562,42 +562,7 @@
         });
     }
 
-    function initResults(cfg) {
-        releaseUiLock();
-        startUiLockWatchdog();
-
-        var payload = readJsonScript('cabinet-ta-payload', {
-            compare: false,
-            clouds: {text: [], links: [], both: []},
-            cloudsCompetitor: {},
-            graph: [],
-            graphCompetitor: []
-        });
-        var wordForms = readJsonScript('cabinet-ta-word-forms', {});
-
-        try {
-            initExcludeListButtons(cfg);
-            if (!payload.compare) {
-                initResultTables({wordForms: wordForms});
-            } else {
-                initTableSearch();
-            }
-        } catch (e) {
-            console.error('cabinet-text-analyzer: tables', e);
-        }
-
-        try {
-            (new ZipfChart({
-                canvasId: 'cabinet-ta-zipf-chart',
-                graph: payload.graph || [],
-                graphCompetitor: payload.graphCompetitor || [],
-                compare: !!payload.compare,
-                labels: cfg.chartLabels || {}
-            })).render();
-        } catch (e) {
-            console.error('cabinet-text-analyzer: chart', e);
-        }
-
+    function buildCloudRenderers(cfg, payload) {
         var cloudDefs = [
             {suffix: 'text', key: 'text'},
             {suffix: 'links', key: 'links'},
@@ -616,7 +581,7 @@
                 });
             }
         });
-        clouds = clouds.map(function (item) {
+        return clouds.map(function (item) {
             item.renderer = new CloudRenderer({
                 hostSelector: item.hostSelector,
                 getData: item.getData,
@@ -626,13 +591,78 @@
             });
             return item;
         });
+    }
+
+    function initResultsHeavyVisuals(cfg, payload) {
+        var $chartWrap = $('.cabinet-ta-chart-wrap');
+        $chartWrap.removeClass('cabinet-ta-chart-wrap--loading');
 
         try {
-            initAllClouds(clouds);
+            (new ZipfChart({
+                canvasId: 'cabinet-ta-zipf-chart',
+                graph: payload.graph || [],
+                graphCompetitor: payload.graphCompetitor || [],
+                compare: !!payload.compare,
+                labels: cfg.chartLabels || {}
+            })).render();
+        } catch (e) {
+            console.error('cabinet-text-analyzer: chart', e);
+        }
+
+        try {
+            initAllClouds(buildCloudRenderers(cfg, payload));
             initCloudTooltips();
         } catch (e) {
             console.error('cabinet-text-analyzer: cloud', e);
         }
+
+        releaseUiLock();
+    }
+
+    function scheduleResultsHeavyInit(cfg, payload) {
+        var $chartWrap = $('.cabinet-ta-chart-wrap');
+        if ($chartWrap.length) {
+            $chartWrap.addClass('cabinet-ta-chart-wrap--loading');
+        }
+
+        var run = function () {
+            initResultsHeavyVisuals(cfg, payload);
+        };
+
+        if (typeof window.requestAnimationFrame === 'function') {
+            window.requestAnimationFrame(function () {
+                window.requestAnimationFrame(function () {
+                    window.setTimeout(run, 0);
+                });
+            });
+        } else {
+            window.setTimeout(run, 0);
+        }
+    }
+
+    function initResults(cfg) {
+        releaseUiLock();
+
+        var payload = readJsonScript('cabinet-ta-payload', {
+            compare: false,
+            clouds: {text: [], links: [], both: []},
+            cloudsCompetitor: {},
+            graph: [],
+            graphCompetitor: []
+        });
+        var wordForms = readJsonScript('cabinet-ta-word-forms', {});
+
+        try {
+            if (!payload.compare) {
+                initResultTables({wordForms: wordForms});
+            } else {
+                initTableSearch();
+            }
+        } catch (e) {
+            console.error('cabinet-text-analyzer: tables', e);
+        }
+
+        scheduleResultsHeavyInit(cfg, payload);
 
         if (cfg.scrollToResults) {
             var $results = $('.cabinet-ta-results');
@@ -643,8 +673,6 @@
                 });
             }
         }
-
-        releaseUiLock();
     }
 
     function initPublicShare() {
@@ -784,40 +812,51 @@
             lines.push(word);
             $textarea.val(lines.join('\n'));
         }
-        $textarea.addClass('cabinet-ta-list-words--highlight');
-        window.setTimeout(function () {
-            $textarea.removeClass('cabinet-ta-list-words--highlight');
-        }, 1600);
-        var panel = document.getElementById('cabinet-ta-list-words');
-        if (panel && typeof panel.scrollIntoView === 'function') {
-            panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
-        }
-        if (typeof $textarea[0].focus === 'function') {
-            $textarea[0].focus();
-        }
         return !exists;
     }
 
-    function initExcludeListButtons(cfg) {
-        if (cfg && cfg.isPublicView) {
+    function isTextAnalyzerPublicView() {
+        var cfg = window.cabinetTextAnalyzerConfig || {};
+        return !!cfg.isPublicView;
+    }
+
+    function handleExcludeListClick(btn) {
+        var word = btn.getAttribute('data-word') || '';
+        if (!word) {
+            var termEl = btn.closest('td');
+            if (termEl) {
+                var label = termEl.querySelector('.cabinet-ta-exclude-term');
+                word = label ? label.textContent : '';
+            }
+        }
+        var added = addWordToExcludeList(String(word || '').trim());
+        btn.classList.add(added ? 'cabinet-ta-add-exclude--added' : 'cabinet-ta-add-exclude--exists');
+        window.setTimeout(function () {
+            btn.classList.remove('cabinet-ta-add-exclude--added', 'cabinet-ta-add-exclude--exists');
+        }, 1400);
+    }
+
+    function bindExcludeListClickEarly() {
+        if (window._cabinetTaExcludeCaptureBound) {
             return;
         }
-        var $page = $('.cabinet-text-analyzer-page');
-        if (!$page.length) {
-            return;
-        }
-        $page.off('click.cabinetTaExclude', '.cabinet-ta-add-exclude');
-        $page.on('click.cabinetTaExclude', '.cabinet-ta-add-exclude', function (e) {
+        window._cabinetTaExcludeCaptureBound = true;
+        document.addEventListener('click', function (e) {
+            if (isTextAnalyzerPublicView()) {
+                return;
+            }
+            var target = e.target;
+            if (!target || !target.closest) {
+                return;
+            }
+            var btn = target.closest('.cabinet-ta-add-exclude');
+            if (!btn || !btn.closest('.cabinet-text-analyzer-page')) {
+                return;
+            }
             e.preventDefault();
             e.stopPropagation();
-            var $btn = $(this);
-            var word = $btn.attr('data-word') || $btn.closest('td').find('.cabinet-ta-exclude-term').first().text();
-            var added = addWordToExcludeList(word);
-            $btn.addClass(added ? 'cabinet-ta-add-exclude--added' : 'cabinet-ta-add-exclude--exists');
-            window.setTimeout(function () {
-                $btn.removeClass('cabinet-ta-add-exclude--added cabinet-ta-add-exclude--exists');
-            }, 1400);
-        });
+            handleExcludeListClick(btn);
+        }, true);
     }
 
     function initForm(cfg) {
@@ -854,12 +893,12 @@
         }
     }
 
+    bindExcludeListClickEarly();
+
     $(function () {
         releaseUiLock();
-        startUiLockWatchdog();
         var cfg = window.cabinetTextAnalyzerConfig || {};
         initForm(cfg);
-        initExcludeListButtons(cfg);
         initPublicShare();
         if (cfg.hasResponse) {
             try {

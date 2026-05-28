@@ -29,8 +29,7 @@
     let trendLoaderElapsedTimer = null;
     let trendRevealTimer = null;
     let trendLoadSeq = 0;
-    const TREND_BATCH_SIZE = 15;
-    const TREND_BATCH_MIN_PROJECTS = 18;
+    const TREND_LOCAL_PREFIX = 'cabinetMonV2Trend:';
 
     function chartSettings() {
         if (window.cabinetMonV2ChartSettings) {
@@ -424,10 +423,8 @@
         const ctx = context || {};
         const elapsed = trendLoaderElapsedSec();
 
-        if (stageKey === 'db' && i18n.portfolioTrendStageDb) {
-            text = i18n.portfolioTrendStageDb
-                .replace(':from', String(ctx.from || 1))
-                .replace(':to', String(ctx.to || ctx.total || 0))
+        if (stageKey === 'db' && i18n.portfolioTrendStageDbSingle) {
+            text = i18n.portfolioTrendStageDbSingle
                 .replace(':total', String(ctx.total || 0))
                 .replace(':elapsed', String(elapsed));
         } else if (stageKey === 'agg' && i18n.portfolioTrendStageAgg) {
@@ -689,6 +686,116 @@
         setTrendLoaderBar(pct);
     }
 
+    function trendStorageSignature(ids, settings) {
+        const sorted = ids
+            .slice()
+            .map(function (id) {
+                return String(id);
+            })
+            .sort();
+        return settings.periodDays + '|' + settings.range + '|' + sorted.join(',');
+    }
+
+    function readLocalTrend(signature) {
+        try {
+            const raw = localStorage.getItem(TREND_LOCAL_PREFIX + signature);
+            if (!raw) {
+                return null;
+            }
+            const parsed = JSON.parse(raw);
+            if (!parsed || !parsed.labels || !parsed.labels.length) {
+                return null;
+            }
+            return parsed;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function writeLocalTrend(signature, data) {
+        if (!data || !data.labels || !data.labels.length) {
+            return;
+        }
+        try {
+            localStorage.setItem(
+                TREND_LOCAL_PREFIX + signature,
+                JSON.stringify({
+                    labels: data.labels,
+                    values: data.values,
+                    days: data.days,
+                    range: data.range,
+                    projects: data.projects,
+                    projects_used: data.projects_used,
+                    projects_with_history: data.projects_with_history,
+                    built_at: data.built_at,
+                    cached_until: data.cached_until,
+                    interpolation: data.interpolation,
+                })
+            );
+        } catch (e) {
+            /* quota */
+        }
+    }
+
+    function formatTrendBuiltAt(iso) {
+        if (!iso) {
+            return '—';
+        }
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) {
+            return String(iso);
+        }
+        const pad = function (n) {
+            return n < 10 ? '0' + n : String(n);
+        };
+        return (
+            pad(d.getDate()) +
+            '.' +
+            pad(d.getMonth() + 1) +
+            '.' +
+            d.getFullYear() +
+            ' ' +
+            pad(d.getHours()) +
+            ':' +
+            pad(d.getMinutes())
+        );
+    }
+
+    function isTrendDataStale(data) {
+        if (!data) {
+            return true;
+        }
+        const now = Date.now();
+        if (data.cached_until) {
+            const until = Date.parse(data.cached_until);
+            if (!isNaN(until) && now > until) {
+                return true;
+            }
+        }
+        const staleHours = cfg.trendStaleHours > 0 ? cfg.trendStaleHours : 24;
+        if (data.built_at) {
+            const built = Date.parse(data.built_at);
+            if (!isNaN(built) && now - built > staleHours * 3600 * 1000) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function updateTrendRefreshButton(stale, hasChart) {
+        const $btn = $('#cabinet-mon-v2-trend-refresh');
+        if (!$btn.length) {
+            return;
+        }
+        if (chartMode !== 'trend' || !hasChart) {
+            $btn.addClass('d-none');
+            return;
+        }
+        $btn.removeClass('d-none');
+        $btn.toggleClass('btn-warning', !!stale);
+        $btn.toggleClass('btn-outline-secondary', !stale);
+    }
+
     function fetchTrendAjax(postData) {
         return $.ajax({
             method: 'POST',
@@ -697,83 +804,6 @@
             traditional: true,
             data: trendPostData(postData),
         });
-    }
-
-    function fetchPortfolioTop10TrendBatched(ids, loadSeq, started) {
-        const s = chartSettings();
-        const total = ids.length;
-        const perProject = {};
-        let offset = 0;
-        let done = 0;
-
-        function runNextBatch() {
-            if (loadSeq !== trendLoadSeq || chartMode !== 'trend') {
-                return;
-            }
-            if (offset >= total) {
-                window._cabinetMonV2TrendStageKey = 'agg';
-                window._cabinetMonV2TrendStageCtx = { done: total, total: total };
-                setTrendLoaderStage('agg', window._cabinetMonV2TrendStageCtx);
-                setTrendLoaderProgress(total, total);
-                const data = aggregateTrendPerProject(perProject, total);
-                data.days = s.periodDays;
-                data.range = s.range;
-                trendDebug('info', 'ajax.trend.aggregated', {
-                    ms: Math.round(performance.now() - started),
-                    points: data.labels ? data.labels.length : 0,
-                    projects_with_history: data.projects_with_history,
-                });
-                window._cabinetMonV2TrendStageKey = 'chart';
-                setTrendLoaderStage('chart', {});
-                hideTrendLoader();
-                renderTrendChart(data);
-                if (loadSeq === trendLoadSeq) {
-                    trendLoading = false;
-                }
-                return;
-            }
-
-            const chunk = ids.slice(offset, offset + TREND_BATCH_SIZE);
-            const from = offset + 1;
-            const to = offset + chunk.length;
-            window._cabinetMonV2TrendStageKey = 'db';
-            window._cabinetMonV2TrendStageCtx = { from: from, to: to, total: total };
-            setTrendLoaderStage('db', window._cabinetMonV2TrendStageCtx);
-            setTrendLoaderProgress(done, total);
-
-            return fetchTrendAjax({
-                partial: 1,
-                days: s.periodDays,
-                range: s.range,
-                project_ids: chunk,
-                progress_total: total,
-                progress_done: done,
-            })
-                .done(function (data) {
-                    if (loadSeq !== trendLoadSeq || chartMode !== 'trend') {
-                        return;
-                    }
-                    const slice = (data && data.per_project) || {};
-                    Object.keys(slice).forEach(function (pid) {
-                        perProject[pid] = slice[pid];
-                    });
-                    done += chunk.length;
-                    offset += TREND_BATCH_SIZE;
-                    trendDebug('info', 'ajax.trend.chunk', {
-                        from: from,
-                        to: to,
-                        chunk_ms: data && data.chunk_ms,
-                        done: done,
-                        total: total,
-                    });
-                    runNextBatch();
-                })
-                .fail(function (xhr) {
-                    fetchPortfolioTop10TrendFail(xhr, loadSeq, started);
-                });
-        }
-
-        runNextBatch();
     }
 
     function fetchPortfolioTop10TrendFail(xhr, loadSeq, started) {
@@ -803,38 +833,58 @@
         }
     }
 
-    function fetchPortfolioTop10Trend(rows) {
+    function fetchPortfolioTop10Trend(rows, options) {
         const url = cfg.portfolioTrendUrl;
         if (!url || typeof $ === 'undefined') {
             return;
         }
+        options = options || {};
+        const forceRefresh = !!options.forceRefresh;
         const ids = (rows || lastRows || []).map(function (row) {
             return row.id;
         });
+        const s = chartSettings();
+        const signature = trendStorageSignature(ids, s);
+
+        if (!forceRefresh) {
+            const local = readLocalTrend(signature);
+            if (local) {
+                const stale = isTrendDataStale(local);
+                trendDebug('info', 'trend.local', { stale: stale, built_at: local.built_at });
+                renderTrendChart(
+                    Object.assign({}, local, {
+                        from_cache: true,
+                        stale: stale,
+                    })
+                );
+                if (!stale) {
+                    return;
+                }
+            }
+        }
+
         const loadSeq = ++trendLoadSeq;
         trendLoading = true;
         clearTrendRevealTimer();
         showTrendLoader(ids.length);
 
-        const s = chartSettings();
         const started = performance.now();
-        const useBatches = ids.length >= TREND_BATCH_MIN_PROJECTS;
+        window._cabinetMonV2TrendStageKey = 'db';
+        window._cabinetMonV2TrendStageCtx = { total: ids.length };
+        setTrendLoaderStage('db', window._cabinetMonV2TrendStageCtx);
+
         trendDebug('info', 'ajax.trend.start', {
             projects: ids.length,
             days: s.periodDays,
             range: s.range,
-            batched: useBatches,
+            refresh: forceRefresh,
         });
-
-        if (useBatches) {
-            fetchPortfolioTop10TrendBatched(ids, loadSeq, started);
-            return;
-        }
 
         return fetchTrendAjax({
             days: s.periodDays,
             range: s.range,
             project_ids: ids,
+            refresh: forceRefresh ? 1 : 0,
         })
             .done(function (data) {
                 if (loadSeq !== trendLoadSeq || chartMode !== 'trend') {
@@ -856,11 +906,13 @@
                 hideTrendLoader();
                 if (data && data.error) {
                     renderTrendChart({ labels: [], values: [], empty: true });
+                    updateTrendRefreshButton(false, false);
                     if (typeof toastr !== 'undefined' && data.message) {
                         toastr.warning(data.message);
                     }
                     return;
                 }
+                writeLocalTrend(signature, data);
                 renderTrendChart(data);
             })
             .fail(function (xhr) {
@@ -922,6 +974,8 @@
             if ($hint.length && cfg.i18n && cfg.i18n.portfolioTrendEmpty) {
                 $hint.text(cfg.i18n.portfolioTrendEmpty);
             }
+            updateTrendRefreshButton(false, false);
+            hideTrendBuildProgress();
             return;
         }
 
@@ -980,6 +1034,9 @@
             revealTrendPointsStepwise(mainChart, allLabels, allValues, 55);
         }
 
+        const stale = !!(data && data.stale) || isTrendDataStale(data);
+        updateTrendRefreshButton(stale, true);
+
         if ($hint.length && cfg.i18n && cfg.i18n.portfolioTrendHint) {
             const projectsUsed = (data && data.projects_used) || (data && data.projects) || 0;
             const withHistory =
@@ -991,7 +1048,20 @@
                 .replace(':days', String(s.periodDays))
                 .replace(':projects', String(projectsUsed))
                 .replace(':with_history', String(withHistory));
-            if (data && data.interpolation === 'nearest' && cfg.i18n.portfolioTrendInterpolated) {
+            if (stale && cfg.i18n.portfolioTrendStale) {
+                hint = cfg.i18n.portfolioTrendStale.replace(
+                    ':built_at',
+                    formatTrendBuiltAt(data && data.built_at)
+                );
+            } else if (data && data.from_cache && cfg.i18n.portfolioTrendCached) {
+                hint +=
+                    ' ' +
+                    cfg.i18n.portfolioTrendCached.replace(
+                        ':built_at',
+                        formatTrendBuiltAt(data && data.built_at)
+                    );
+            }
+            if (!stale && data && data.interpolation === 'nearest' && cfg.i18n.portfolioTrendInterpolated) {
                 hint += ' ' + cfg.i18n.portfolioTrendInterpolated;
             }
             if (data && data.projects_capped && cfg.i18n.portfolioTrendCapped) {
@@ -1023,6 +1093,7 @@
                 clearTrendRevealTimer();
                 hideTrendLoader();
                 hideTrendBuildProgress();
+                updateTrendRefreshButton(false, false);
             }
             if (chartMode === 'trend') {
                 fetchPortfolioTop10Trend(lastRows);
@@ -1054,6 +1125,13 @@
         });
 
         syncMetricTabsVisibility();
+
+        $('#cabinet-mon-v2-trend-refresh').on('click', function () {
+            if (chartMode !== 'trend' || trendLoading) {
+                return;
+            }
+            fetchPortfolioTop10Trend(lastRows, { forceRefresh: true });
+        });
     }
 
     function render(rows, filtered) {

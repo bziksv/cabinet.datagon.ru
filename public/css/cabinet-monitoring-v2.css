@@ -1329,10 +1329,51 @@ button.cabinet-mon-v2-favicon-btn {
 .cabinet-mon-v2-engines {
     display: inline-flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    gap: 0.2rem;
-    max-width: 2.75rem;
+    gap: 0.35rem 0.5rem;
+    max-width: 8.5rem;
+}
+
+.cabinet-mon-v2-engine-wrap {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 4.25rem;
+}
+
+.cabinet-mon-v2-engine-schedule {
+    position: absolute;
+    top: calc(100% + 0.15rem);
+    left: 50%;
+    z-index: 6;
+    transform: translateX(-50%);
+    font-size: 0.625rem;
+    line-height: 1.2;
+    color: #475569;
+    text-align: center;
+    max-width: 7.5rem;
+    padding: 0.15rem 0.35rem;
+    border-radius: 0.25rem;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.12s ease, visibility 0.12s ease;
+}
+
+.cabinet-mon-v2-engine-wrap:hover .cabinet-mon-v2-engine-schedule,
+.cabinet-mon-v2-engine-wrap:focus-within .cabinet-mon-v2-engine-schedule {
+    opacity: 1;
+    visibility: visible;
+}
+
+.cabinet-mon-v2-engine-schedule--manual {
+    color: #94a3b8;
 }
 
 .cabinet-mon-v2-engine {
@@ -1382,16 +1423,23 @@ button.cabinet-mon-v2-favicon-btn {
     padding: 0.45rem 0.75rem;
     text-align: left;
     line-height: 1.45;
-    white-space: nowrap;
+    white-space: pre-line;
 }
 
 .cabinet-mon-v2-table tbody td.cabinet-mon-v2-table__col-engines {
     text-align: center;
     white-space: nowrap;
-    width: 3rem;
-    max-width: 3rem;
+    width: auto;
+    min-width: 3.25rem;
+    max-width: none;
     padding-left: 0.35rem;
     padding-right: 0.35rem;
+    overflow: visible;
+}
+
+.cabinet-mon-v2-table tbody tr:hover td.cabinet-mon-v2-table__col-engines {
+    position: relative;
+    z-index: 3;
 }
 
 .cabinet-mon-v2-card__metrics {

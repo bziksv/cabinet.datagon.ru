@@ -6,7 +6,10 @@
  * @see App\Http\Controllers\MonitoringV2Controller
  */
 return [
-    'version' => '3.4.68-dev',
+    'version' => '3.4.75-dev',
+
+    /** После скольких часов считать локальный/серверный снимок тренда устаревшим (кнопка «Пересчитать»). */
+    'trend_stale_hours' => (int) env('MONITORING_TREND_STALE_HOURS', 24),
 
     'debug_log' => env('MONITORING_V2_DEBUG_LOG', true),
     'debug_log_ttl_minutes' => (int) env('MONITORING_V2_DEBUG_LOG_TTL', 120),

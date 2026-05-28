@@ -87,7 +87,14 @@
                 </div>
                 <canvas id="cabinet-mon-v2-chart-main" height="320" aria-hidden="true"></canvas>
             </div>
-            <p class="cabinet-mon-v2-portfolio__hint mb-0" id="cabinet-mon-v2-dash-hint">{{ __('Monitoring v2 dash hint all') }}</p>
+            <p class="cabinet-mon-v2-portfolio__hint mb-0">
+                <span id="cabinet-mon-v2-dash-hint">{{ __('Monitoring v2 dash hint all') }}</span>
+                <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary ms-2 d-none"
+                    id="cabinet-mon-v2-trend-refresh"
+                >{{ __('Monitoring v2 portfolio trend refresh') }}</button>
+            </p>
         </div>
     </section>
 @endif

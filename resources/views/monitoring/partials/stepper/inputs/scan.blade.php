@@ -8,9 +8,17 @@
             <!-- /.card-header -->
             <div class="card-body">
                 <div class="callout callout-warning">
-                    <p class="mb-0">
-                        Здесь Вы можете установить когда снимать позиции. Если Вы установите режим и не укажите время/дни, то проект будет обновляться только в ручном режиме. Обновить можно будет на главной странице с проектами или внутри самого проекта. Обновлять можно как все фразы сразу, так и выборочно.
+                    <p class="mb-2">{{ __('Monitoring v2 create scan schedule lead') }}</p>
+                    <p class="mb-2">
+                        {!! __('Monitoring v2 create scan schedule any mode') !!}
                     </p>
+                    <ul class="mb-2 ps-3 small">
+                        <li>{{ __('Monitoring v2 create scan mode times') }}</li>
+                        <li>{{ __('Monitoring v2 create scan mode weeks') }}</li>
+                        <li>{{ __('Monitoring v2 create scan mode months') }}</li>
+                        <li>{{ __('Monitoring v2 create scan mode ranges') }}</li>
+                    </ul>
+                    <p class="mb-0 small text-secondary">{{ __('Monitoring v2 create scan schedule manual') }}</p>
                 </div>
 
                 <div class="form-group">

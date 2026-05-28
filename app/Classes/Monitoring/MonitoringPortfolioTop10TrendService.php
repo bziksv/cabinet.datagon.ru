@@ -22,7 +22,7 @@ class MonitoringPortfolioTop10TrendService
     /** Сколько project_id в одном SQL (вместо 1 запроса на проект). */
     private const PROJECT_CHUNK = 15;
 
-    public function seriesForUser(User $user, array $projectIds, int $days, string $range = 'weeks'): array
+    public function seriesForUser(User $user, array $projectIds, int $days, string $range = 'weeks', bool $refresh = false): array
     {
         if (!in_array($days, self::ALLOWED_DAYS, true)) {
             $days = 90;
@@ -44,17 +44,26 @@ class MonitoringPortfolioTop10TrendService
 
         sort($ids);
         $cacheKey = sprintf(
-            'mon_v2_portfolio_trend:%d:%d:%s:%s:v6',
+            'mon_v2_portfolio_trend:%d:%d:%s:%s:v9',
             (int) $user->id,
             $days,
             $range,
             md5(implode(',', $ids))
         );
 
-        $fromCache = Cache::has($cacheKey);
+        if ($refresh) {
+            Cache::forget($cacheKey);
+        }
+
+        $fromCache = !$refresh && Cache::has($cacheKey);
+        $cacheTtl = $this->cacheTtlSeconds();
         $buildStarted = microtime(true);
-        $payload = Cache::remember($cacheKey, 600, function () use ($ids, $days, $range) {
-            return $this->buildSeries($ids, $days, $range);
+        $payload = Cache::remember($cacheKey, $cacheTtl, function () use ($ids, $days, $range, $cacheTtl) {
+            $built = $this->buildSeries($ids, $days, $range);
+            $built['built_at'] = Carbon::now()->toIso8601String();
+            $built['cached_until'] = Carbon::now()->addSeconds($cacheTtl)->toIso8601String();
+
+            return $built;
         });
         $payload['build_ms'] = (int) round((microtime(true) - $buildStarted) * 1000);
         $payload['from_cache'] = $fromCache;
@@ -225,6 +234,19 @@ class MonitoringPortfolioTop10TrendService
         return max(5, min(25, $size));
     }
 
+    /** Кэш тренда до конца календарного дня (первый расчёт — долго, повтор — из кэша). */
+    private function cacheTtlSeconds(): int
+    {
+        $configured = (int) env('MONITORING_TREND_CACHE_SECONDS', 0);
+        if ($configured > 0) {
+            return $configured;
+        }
+
+        $seconds = Carbon::now()->diffInSeconds(Carbon::now()->endOfDay());
+
+        return max(300, $seconds);
+    }
+
     /**
      * @param array<int, array<string, float>> $perProject
      * @return list<string>
@@ -311,6 +333,8 @@ class MonitoringPortfolioTop10TrendService
      */
     private function seriesSliceForProjectChunk(array $projectIds, int $days, string $range): array
     {
+        @ini_set('memory_limit', '512M');
+
         $projectIds = array_values(array_unique(array_map('intval', array_filter($projectIds, function ($id) {
             return (int) $id > 0;
         }))));
@@ -339,35 +363,106 @@ class MonitoringPortfolioTop10TrendService
             })
             ->join('monitoring_keywords as mk', 'mk.id', '=', 'p.monitoring_keyword_id')
             ->whereIn('mk.monitoring_project_id', $projectIds)
-            ->select('mk.monitoring_project_id', 'p.position', 'p.created_at')
+            ->selectRaw('mk.monitoring_project_id as project_id')
+            ->selectRaw('DATE(p.created_at) as pos_day')
+            ->selectRaw('COUNT(*) as pos_count')
+            ->selectRaw('SUM(CASE WHEN p.position IS NULL OR p.position = 0 THEN 1 ELSE 0 END) as zero_count')
+            ->selectRaw('SUM(CASE WHEN p.position > 0 AND p.position <= 10 THEN 1 ELSE 0 END) as top10_count')
+            ->groupBy('mk.monitoring_project_id', DB::raw('DATE(p.created_at)'))
             ->get();
 
         if ($rows->isEmpty()) {
             return [];
         }
 
-        $out = [];
-        foreach ($rows->groupBy('monitoring_project_id') as $projectId => $projectRows) {
-            $byDate = collect($projectRows)
-                ->groupBy(function ($row) {
-                    return $this->positionCarbon($row)->format('d.m.Y');
-                })
-                ->map(function (Collection $items) {
-                    return $items->pluck('position');
-                });
-
-            $byDate = $this->applyRangeGrouping($byDate, $range);
-
-            $slice = [];
-            foreach ($byDate as $label => $tops) {
-                $slice[(string) $label] = Helper::calculateTopPercentByPositions($tops, 10);
+        /** @var array<int, array<string, float>> $daily */
+        $daily = [];
+        foreach ($rows as $row) {
+            $projectId = (int) $row->project_id;
+            $day = $row->pos_day;
+            if (!$projectId || !$day) {
+                continue;
             }
+            $label = Carbon::parse($day)->format('d.m.Y');
+            $daily[$projectId][$label] = $this->topPercentFromCounts(
+                (int) $row->pos_count,
+                (int) $row->top10_count,
+                (int) $row->zero_count
+            );
+        }
+
+        $out = [];
+        foreach ($daily as $projectId => $sparse) {
+            $slice = $this->applyRangeGroupingSparse($sparse, $range);
             if ($slice !== []) {
                 $out[(int) $projectId] = $slice;
             }
         }
 
         return $out;
+    }
+
+    /**
+     * ТОП-N % как Helper::calculateTopPercentByPositions (0 при нулевой/пустой позиции в срезе).
+     */
+    private function topPercentFromCounts(int $total, int $inTop, int $zeroCount): float
+    {
+        if ($total <= 0 || $zeroCount > 0) {
+            return 0.0;
+        }
+
+        return round(($inTop / $total) * 100, 2);
+    }
+
+    /**
+     * @param array<string, float> $sparse
+     *
+     * @return array<string, float>
+     */
+    private function applyRangeGroupingSparse(array $sparse, string $range): array
+    {
+        if ($range === 'days' || $sparse === []) {
+            return $sparse;
+        }
+
+        uksort($sparse, function ($a, $b) {
+            return $this->labelTimestamp($a) <=> $this->labelTimestamp($b);
+        });
+
+        if ($range === 'weeks') {
+            $filtered = [];
+            $currentWeek = null;
+            foreach ($sparse as $label => $value) {
+                $carbon = Carbon::createFromFormat('d.m.Y', (string) $label);
+                if ($carbon === false) {
+                    continue;
+                }
+                $week = (int) $carbon->format('W');
+                if ($currentWeek === null || $currentWeek !== $week) {
+                    $filtered[$label] = $value;
+                }
+                $currentWeek = $week;
+            }
+
+            return $filtered;
+        }
+
+        if ($range === 'month') {
+            $filtered = [];
+            $seen = [];
+            foreach ($sparse as $label => $value) {
+                $carbon = Carbon::createFromFormat('d.m.Y', (string) $label);
+                $key = $carbon === false ? (string) $label : $carbon->format('m.Y');
+                if (!isset($seen[$key])) {
+                    $filtered[$label] = $value;
+                    $seen[$key] = true;
+                }
+            }
+
+            return $filtered;
+        }
+
+        return $sparse;
     }
 
     private function emptyPayload(int $days, string $range, int $projects, bool $noPositions = false): array

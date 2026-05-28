@@ -14,7 +14,8 @@ return [
      |
      */
 
-    'enabled' => env('DEBUGBAR_ENABLED', null),
+    // По умолчанию выключен (даже при APP_DEBUG=true). Включить: DEBUGBAR_ENABLED=true в .env
+    'enabled' => env('DEBUGBAR_ENABLED', false),
     'except' => [
         'telescope*',
         'horizon*',

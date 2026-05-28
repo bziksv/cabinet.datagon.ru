@@ -166,17 +166,13 @@ class MonitoringV2Controller extends Controller
             set_time_limit(max(300, (int) ini_get('max_execution_time')));
             @ini_set('memory_limit', '512M');
 
+            $refresh = $request->boolean('refresh');
             if ($request->boolean('partial')) {
-                $payload = $trend->perProjectSliceChunk($user, $projectIds, $days, $range);
-                $total = (int) $request->input('progress_total', 0);
-                $done = (int) $request->input('progress_done', 0) + (int) ($payload['projects_in_chunk'] ?? 0);
-                $payload['progress'] = [
-                    'done' => min($done, $total > 0 ? $total : $done),
-                    'total' => $total > 0 ? $total : $done,
-                ];
-            } else {
-                $payload = $trend->seriesForUser($user, $projectIds, $days, $range);
+                MonitoringV2DebugLog::info($debugSession, 'http.trend.legacy_partial', [
+                    'projects' => count($projectIds),
+                ]);
             }
+            $payload = $trend->seriesForUser($user, $projectIds, $days, $range, $refresh);
 
             $ms = (int) round((microtime(true) - $t0) * 1000);
             MonitoringV2DebugLog::info($debugSession, 'http.trend.done', [
@@ -202,7 +198,7 @@ class MonitoringV2Controller extends Controller
                 'empty' => true,
                 'error' => true,
                 'message' => __('Monitoring v2 portfolio trend error'),
-            ]));
+            ]), 500);
         }
     }
 

@@ -17,7 +17,7 @@ class MonitoringProjectListSerializer
     private const CACHE_TTL_SECONDS = 120;
 
     /** Смена схемы ответа — сброс старого кэша с пустыми снимками. */
-    private const CACHE_KEY_SUFFIX = 's16';
+    private const CACHE_KEY_SUFFIX = 's17';
 
     /** Фоновая догрузка метрик — отдельный endpoint, не в list. */
     /** Один проект за HTTP — иначе таймаут 90 с на тяжёлых ProjectData. */
@@ -178,8 +178,17 @@ class MonitoringProjectListSerializer
                 },
                 'users.roles:id,name,title',
                 'searchengines' => static function ($query) {
-                    $query->select('id', 'monitoring_project_id', 'engine', 'lr')
-                        ->with('location:id,lr,name');
+                    $query->select(
+                        'id',
+                        'monitoring_project_id',
+                        'engine',
+                        'lr',
+                        'auto_update',
+                        'time',
+                        'weekdays',
+                        'monthday',
+                        'day'
+                    )->with('location:id,lr,name');
                 },
             ])
             ->orderBy('monitoring_projects.name')
@@ -431,13 +440,15 @@ class MonitoringProjectListSerializer
     }
 
     /**
-     * Города/регионы по ПС для тултипов в списке v2.
+     * Регионы и расписание съёма по ПС (тултип и подпись в списке v2).
      *
      * @param \Illuminate\Support\Collection<int, \App\MonitoringSearchengine> $searchengines
-     * @return array<string, list<string>>
+     *
+     * @return array<string, list<array{name: string, schedule: string, schedule_short: string, manual: bool, mode: string}>>
      */
     private function buildEngineRegions($searchengines): array
     {
+        $formatter = app(MonitoringSearchengineScheduleFormatter::class);
         $out = [];
 
         foreach ($searchengines as $se) {
@@ -449,21 +460,32 @@ class MonitoringProjectListSerializer
                 $out[$key] = [];
             }
 
-            $label = null;
+            $name = null;
             if ($se->location !== null && trim((string) $se->location->name) !== '') {
-                $label = trim((string) $se->location->name);
+                $name = trim((string) $se->location->name);
             } elseif ($se->lr !== null && trim((string) $se->lr) !== '') {
-                $label = '[' . trim((string) $se->lr) . ']';
+                $name = '[' . trim((string) $se->lr) . ']';
             }
 
-            if ($label !== null && !in_array($label, $out[$key], true)) {
-                $out[$key][] = $label;
+            if ($name === null) {
+                continue;
             }
+
+            $schedule = $formatter->describe($se);
+            $out[$key][] = [
+                'name' => $name,
+                'schedule' => $schedule['label'],
+                'schedule_short' => $schedule['short'],
+                'manual' => $schedule['manual'],
+                'mode' => $schedule['mode'],
+            ];
         }
 
-        foreach ($out as $engine => $cities) {
-            sort($cities, SORT_NATURAL | SORT_FLAG_CASE);
-            $out[$engine] = $cities;
+        foreach ($out as $engine => $regions) {
+            usort($regions, static function (array $a, array $b): int {
+                return strnatcasecmp($a['name'], $b['name']);
+            });
+            $out[$engine] = $regions;
         }
 
         ksort($out);

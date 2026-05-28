@@ -859,23 +859,62 @@
         };
     }
 
-    function engineRegionsTooltip(meta, engineKey, engineRegions) {
-        const cities =
+    function normalizeEngineRegions(engineRegions, engineKey) {
+        const raw =
             engineRegions && engineRegions[engineKey] ? engineRegions[engineKey] : [];
-        const label = meta.label;
-        if (!cities.length) {
-            return { html: escHtml(label), plain: label };
+        return raw.map(function (item) {
+            if (typeof item === 'string') {
+                return {
+                    name: item,
+                    schedule: '',
+                    schedule_short: '',
+                    manual: true,
+                    mode: 'manual',
+                };
+            }
+            return item;
+        });
+    }
+
+    function engineScheduleSummary(regions) {
+        if (!regions.length) {
+            return '';
         }
-        return {
-            html:
-                escHtml(label) +
-                cities
-                    .map(function (city) {
-                        return '<br>' + escHtml(city);
-                    })
-                    .join(''),
-            plain: label + ': ' + cities.join(', '),
-        };
+        const lines = regions.map(function (r) {
+            return r.schedule_short || r.schedule || '';
+        });
+        const unique = [];
+        lines.forEach(function (line) {
+            if (line && unique.indexOf(line) === -1) {
+                unique.push(line);
+            }
+        });
+        if (unique.length === 1) {
+            return unique[0];
+        }
+        if (regions.length > 1) {
+            const tpl = cfg.i18n.scheduleRegionsCount || ':n регионов';
+            return tpl.replace(':n', String(regions.length));
+        }
+
+        return unique[0] || '';
+    }
+
+    function engineRegionsTooltip(meta, engineKey, engineRegions) {
+        const regions = normalizeEngineRegions(engineRegions, engineKey);
+        const label = meta.label;
+        const manualLabel = cfg.i18n.scheduleManual || 'Ручной съём';
+        if (!regions.length) {
+            return label;
+        }
+        return [label]
+            .concat(
+                regions.map(function (region) {
+                    const sched = region.schedule || manualLabel;
+                    return region.name + ': ' + sched;
+                })
+            )
+            .join('\n');
     }
 
     function renderEngines(engines, engineRegions) {
@@ -888,17 +927,31 @@
                 .map(function (engine) {
                     const meta = engineChipMeta(engine);
                     const engineKey = String(engine || '').toLowerCase();
-                    const tip = engineRegionsTooltip(meta, engineKey, engineRegions);
+                    const regions = normalizeEngineRegions(engineRegions, engineKey);
+                    const tipPlain = engineRegionsTooltip(meta, engineKey, engineRegions);
+                    const scheduleLine = engineScheduleSummary(regions);
+                    const scheduleClass = scheduleLine && regions[0] && regions[0].manual
+                        ? 'cabinet-mon-v2-engine-schedule--manual'
+                        : '';
                     return (
+                        '<span class="cabinet-mon-v2-engine-wrap">' +
                         '<span class="cabinet-mon-v2-engine cabinet-mon-v2-engine--' +
                         meta.mod +
-                        '" data-bs-toggle="tooltip" data-bs-html="true" data-bs-custom-class="cabinet-mon-v2-engine-tooltip" data-bs-placement="top" title="' +
-                        tip.html +
+                        '" data-bs-toggle="tooltip" data-bs-custom-class="cabinet-mon-v2-engine-tooltip" data-bs-placement="top" title="' +
+                        escHtml(tipPlain) +
                         '"><i class="' +
                         escHtml(meta.icon) +
                         '" aria-hidden="true"></i><span class="visually-hidden">' +
-                        escHtml(tip.plain) +
-                        '</span></span>'
+                        escHtml(tipPlain) +
+                        '</span></span>' +
+                        (scheduleLine
+                            ? '<span class="cabinet-mon-v2-engine-schedule ' +
+                              scheduleClass +
+                              '" aria-hidden="true">' +
+                              escHtml(scheduleLine) +
+                              '</span>'
+                            : '') +
+                        '</span>'
                     );
                 })
                 .join('') +

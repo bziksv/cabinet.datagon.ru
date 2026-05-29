@@ -1,2 +1,1 @@
-<span class="badge badge-info target">{{ $key->target }}</span>
-
+<span class="cabinet-mon-target-badge">{{ $key->target }}</span>

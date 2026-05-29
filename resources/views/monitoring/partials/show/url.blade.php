@@ -1,6 +1,12 @@
-<a href="#" @if($urls->count()) data-bs-toggle="popover" @endif title="URL" data-content='{{ view('monitoring.partials.show.popover.urls', ['urls' => $urls]) }}'>
-    <span class="badge badge-light">
-        <i class="fas fa-link"></i>
-        <span class="{{ $textClass }} text-sm text-bold">{{ $urls->count() }}</span>
-    </span>
+<a href="#"
+   class="cabinet-mon-url-badge"
+   @if($urls->count())
+       data-bs-toggle="popover"
+       data-bs-title="URL"
+       data-bs-html="true"
+       data-bs-content="{{ view('monitoring.partials.show.popover.urls', ['urls' => $urls, 'page' => $page ?? null])->render() }}"
+       onclick="return false;"
+   @endif>
+    <i class="fas fa-link" aria-hidden="true"></i>
+    <span class="{{ $textClass }}">{{ $urls->count() }}</span>
 </a>

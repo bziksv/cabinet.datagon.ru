@@ -57,14 +57,32 @@
 }
 
 /* Шапка (разметка из public/html/index.html) */
+#header-nav-bar.cabinet-header {
+    overflow-x: clip;
+    max-width: 100%;
+}
+
 #header-nav-bar.cabinet-header > .container-fluid {
     align-items: center;
     min-height: 3.5rem;
+    max-width: 100%;
+    overflow-x: clip;
+    flex-wrap: wrap;
+    row-gap: 0.15rem;
 }
 
 #header-nav-bar.cabinet-header .navbar-nav {
     align-items: center;
-    flex-wrap: nowrap;
+    flex-wrap: wrap !important;
+    max-width: 100%;
+}
+
+#header-nav-bar.cabinet-header .navbar-nav.ms-auto {
+    justify-content: flex-end;
+    flex: 1 1 16rem;
+    min-width: 0 !important;
+    max-width: 100%;
+    margin-left: auto !important;
 }
 
 #header-nav-bar.cabinet-header .navbar-nav > .nav-item > .nav-link,
@@ -84,6 +102,10 @@
 
 #header-nav-bar.cabinet-header .cabinet-header-module-limit .nav-link {
     cursor: default;
+    max-width: 15rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 #header-nav-bar.cabinet-header .navbar-badge {

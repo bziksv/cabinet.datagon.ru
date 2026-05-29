@@ -4,6 +4,7 @@ namespace App\Classes\Monitoring;
 
 use App\MonitoringDataTableColumnsProject;
 use App\MonitoringProject;
+use App\MonitoringPublicShare;
 use App\MonitoringUserStatus;
 use App\User;
 use Illuminate\Support\Collection;
@@ -17,7 +18,7 @@ class MonitoringProjectListSerializer
     private const CACHE_TTL_SECONDS = 120;
 
     /** Смена схемы ответа — сброс старого кэша с пустыми снимками. */
-    private const CACHE_KEY_SUFFIX = 's17';
+    private const CACHE_KEY_SUFFIX = 's18';
 
     /** Фоновая догрузка метрик — отдельный endpoint, не в list. */
     /** Один проект за HTTP — иначе таймаут 90 с на тяжёлых ProjectData. */
@@ -223,12 +224,14 @@ class MonitoringProjectListSerializer
         }
 
         $items = [];
+        $activeShares = $this->loadActivePublicShares((int) $user->id, $projects->pluck('id')->all());
         foreach ($projects as $project) {
             $items[] = $this->serializeProject(
                 $project,
                 $snapshots->get($project->id),
                 $user,
-                $faviconDonorsByHost
+                $faviconDonorsByHost,
+                $activeShares
             );
         }
 
@@ -374,12 +377,14 @@ class MonitoringProjectListSerializer
 
     /**
      * @param array<string, MonitoringProject> $faviconDonorsByHost
+     * @param array<int, array{active: bool, url: string, expires_label: string}> $activeShares
      */
     private function serializeProject(
         MonitoringProject $project,
         ?MonitoringDataTableColumnsProject $snap,
         User $auth,
-        array $faviconDonorsByHost = []
+        array $faviconDonorsByHost = [],
+        array $activeShares = []
     ): array {
         $engineRegions = $this->buildEngineRegions($project->searchengines);
         $engines = array_keys($engineRegions);
@@ -436,7 +441,48 @@ class MonitoringProjectListSerializer
             'engine_regions' => $engineRegions,
             'users' => $users,
             'actions' => $this->buildActions($project, $auth, $perms),
+            'public_share' => $activeShares[(int) $project->id] ?? [
+                'active' => false,
+                'url' => null,
+                'expires_label' => null,
+            ],
         ];
+    }
+
+    /**
+     * Активные публичные ссылки текущего пользователя по проектам списка.
+     *
+     * @param int[] $projectIds
+     *
+     * @return array<int, array{active: bool, url: string, expires_label: string}>
+     */
+    private function loadActivePublicShares(int $userId, array $projectIds): array
+    {
+        if (!MonitoringPublicShare::tableAvailable() || $projectIds === []) {
+            return [];
+        }
+
+        $out = [];
+        $shares = MonitoringPublicShare::query()
+            ->where('user_id', $userId)
+            ->whereIn('monitoring_project_id', $projectIds)
+            ->active()
+            ->orderByDesc('id')
+            ->get();
+
+        foreach ($shares as $share) {
+            $pid = (int) $share->monitoring_project_id;
+            if (isset($out[$pid])) {
+                continue;
+            }
+            $out[$pid] = [
+                'active' => true,
+                'url' => $share->publicUrl(),
+                'expires_label' => $share->expiresLabel(),
+            ];
+        }
+
+        return $out;
     }
 
     /**
@@ -460,19 +506,21 @@ class MonitoringProjectListSerializer
                 $out[$key] = [];
             }
 
-            $name = null;
-            if ($se->location !== null && trim((string) $se->location->name) !== '') {
-                $name = trim((string) $se->location->name);
-            } elseif ($se->lr !== null && trim((string) $se->lr) !== '') {
-                $name = '[' . trim((string) $se->lr) . ']';
-            }
-
-            if ($name === null) {
+            $lr = trim((string) ($se->lr ?? ''));
+            if ($lr === '' && ($se->location === null || trim((string) $se->location->name) === '')) {
                 continue;
             }
 
+            $name = MonitoringLocationLabel::displayName(
+                (string) $se->engine,
+                $lr,
+                $se->location ? (string) $se->location->name : null
+            );
+
             $schedule = $formatter->describe($se);
             $out[$key][] = [
+                'engine' => $key,
+                'lr' => $lr,
                 'name' => $name,
                 'schedule' => $schedule['label'],
                 'schedule_short' => $schedule['short'],
@@ -536,6 +584,13 @@ class MonitoringProjectListSerializer
             'href' => route('monitoring.copy', $id),
             'label' => 'Копировать проект',
             'icon' => 'far fa-copy',
+        ];
+
+        $actions[] = [
+            'kind' => 'public_share',
+            'id' => $id,
+            'label' => (string) __('Monitoring v2 public share menu'),
+            'icon' => 'bi bi-share',
         ];
 
         if ($perms['export']) {

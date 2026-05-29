@@ -153,6 +153,7 @@
     @slot('js')
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
+        @include('monitoring.partials.smart-search-script')
         <script>
             let historyTable
 
@@ -262,6 +263,11 @@
                                 "previous": "«"
                             },
                             emptyTable: "{{ __('There are no positions for the selected date ranges') }}"
+                        },
+                        initComplete: function () {
+                            if (window.cabinetMonitoringSearch) {
+                                window.cabinetMonitoringSearch.dataTableInitComplete.call(this);
+                            }
                         },
                     })
 

@@ -6,7 +6,10 @@
  * @see App\Http\Controllers\MonitoringV2Controller
  */
 return [
-    'version' => '3.4.76-dev',
+    'version' => '3.5.48-dev',
+
+    /** Сроки публичной ссылки (дни; 0 — бессрочно). */
+    'public_share_ttl_days' => [30, 90, 180, 365, 0],
 
     /** После скольких часов считать локальный/серверный снимок тренда устаревшим (кнопка «Пересчитать»). */
     'trend_stale_hours' => (int) env('MONITORING_TREND_STALE_HOURS', 24),

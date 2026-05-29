@@ -41,6 +41,7 @@ Route::get('public/share/text-analyzer/{token}', 'TextAnalyzerPublicShareControl
 Route::get('public/share/html-editor/{token}', 'HtmlEditorPublicShareController@show')->name('html.editor.public.share.view');
 Route::get('public/share/site-monitoring/{token}', 'SiteMonitoringPublicShareController@show')->name('site.monitoring.public.share.view');
 Route::get('public/share/domain-information/{token}', 'DomainInformationPublicShareController@show')->name('domain.information.public.share.view');
+Route::get('public/share/monitoring-v2/{token}', 'MonitoringPublicShareController@show')->name('monitoring.public.share.view');
 Route::post('/balance-add/result', 'BalanceAddController@result')->name('balance.add.result');
 Route::get('/personal-data/ru', 'AccessController@getRuPersonalData');
 Route::get('/personal-data/en', 'AccessController@getEnPersonalData');
@@ -422,6 +423,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('monitoring-v2/preferences/list-columns', 'MonitoringV2Controller@saveListColumns')->name('monitoring.v2.preferences.list-columns');
     Route::post('monitoring-v2/snapshots/fill', 'MonitoringV2Controller@fillSnapshots')->name('monitoring.v2.snapshots.fill');
     Route::post('monitoring-v2/favicons/fill', 'MonitoringV2Controller@fillFavicons')->name('monitoring.v2.favicons.fill');
+    Route::get('monitoring-v2/project-stats', 'MonitoringV2Controller@projectStats')->name('monitoring.v2.project.stats');
+    Route::post('monitoring-v2/public-share', 'MonitoringV2Controller@createPublicShare')->name('monitoring.public.share.create');
+    Route::post('monitoring-v2/public-share/revoke', 'MonitoringV2Controller@revokePublicShare')->name('monitoring.public.share.revoke');
 
     Route::resource('monitoring', 'MonitoringController');
 

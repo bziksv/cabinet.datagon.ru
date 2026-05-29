@@ -476,7 +476,11 @@ class MonitoringController extends Controller
         /** @var MonitoringProject $project */
         $project = $user->monitoringProjects()
             ->withCount('competitors')
-            ->with(['backlinks:id,monitoring_project_id,total_link,total_broken_link'])
+            ->with([
+                'backlinks:id,monitoring_project_id,total_link,total_broken_link',
+                'searchengines.location',
+                'groups',
+            ])
             ->findOrFail($id);
         $navigations = $this->navigations($project);
 

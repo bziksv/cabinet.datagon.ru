@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
  */
 class MonitoringPortfolioTop10TrendService
 {
-    public const ALLOWED_DAYS = [30, 60, 90, 180, 366];
+    public const ALLOWED_DAYS = [30, 60, 90, 180, 365];
 
     private const MAX_PROJECTS = 100;
 

@@ -38,7 +38,8 @@
         @endif
     </div>
 
-    @include('monitoring.keywords.modal.main')
+        @include('monitoring.keywords.modal.main')
+        @include('monitoring-v2.partials.public-share-modal')
 
     @slot('js')
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
@@ -68,6 +69,7 @@
                 saveColumnsUrl: @json(route('monitoring.v2.preferences.list-columns')),
                 fillSnapshotsUrl: @json(route('monitoring.v2.snapshots.fill')),
                 fillFaviconsUrl: @json(route('monitoring.v2.favicons.fill')),
+                projectStatsUrl: @json(route('monitoring.v2.project.stats')),
                 listColumns: @json($listColumns ?? []),
                 showUrlTemplate: @json(url('/monitoring/__ID__')),
                 faviconProjectUrlTemplate: @json(url('/monitoring-v2/favicon?project=__ID__')),
@@ -152,6 +154,17 @@
                     portfolioTrendStale: @json(__('Monitoring v2 portfolio trend stale')),
                     portfolioTrendRefresh: @json(__('Monitoring v2 portfolio trend refresh')),
                     portfolioTrendStageDbSingle: @json(__('Monitoring v2 portfolio trend stage db single')),
+                    publicShareCreate: @json(__('Create public link')),
+                    publicShareRefresh: @json(__('Refresh public link')),
+                    publicShareRevoked: @json(__('Public link revoked')),
+                    publicShareCreated: @json(__('Public link created')),
+                    publicShareSnapshotAt: @json(__('Monitoring public share snapshot at')),
+                    publicShareNoRegions: @json(__('Monitoring public share no regions')),
+                    publicShareNoData: @json(__('No data')),
+                    publicShareColDate: @json(__('Update date')),
+                    validUntil: @json(__('Valid until')),
+                    publicShareBadge: @json(__('Monitoring v2 public share badge')),
+                    publicShareActive: @json(__('Monitoring v2 public share active')),
                 },
                 trendStaleHours: {{ (int) config('cabinet-monitoring.trend_stale_hours', 24) }},
                 defaultView: @json('table'),
@@ -159,9 +172,12 @@
                 debugSessionId: @json($debugSessionId ?? ''),
             };
         </script>
+        <script src="{{ asset('js/cabinet-monitoring-chart-scales.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-chart-scales.js')) ?: time() }}"></script>
+        @include('monitoring.partials.smart-search-script')
         <script src="{{ asset('js/cabinet-monitoring-v2-chart-settings.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-v2-chart-settings.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-monitoring-v2-dashboard.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-v2-dashboard.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-monitoring-v2-list.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-v2-list.js')) ?: time() }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-v2-public-share.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-v2-public-share.js')) ?: time() }}"></script>
         @include('monitoring-v2.partials.project-interactions')
     @endslot
 @endcomponent

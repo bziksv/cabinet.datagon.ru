@@ -271,6 +271,7 @@
         <!-- DataTables  & Plugins -->
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
+        @include('monitoring.partials.smart-search-script')
 
         <script src="{{ asset('plugins/datatables-buttons/js/buttons.excel.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables-buttons/js/buttons.html5.js') }}"></script>
@@ -598,6 +599,11 @@
                             orderable: false, targets: [0, 2]
                         },
                     ],
+                    initComplete: function () {
+                        if (window.cabinetMonitoringSearch) {
+                            window.cabinetMonitoringSearch.dataTableInitComplete.call(this);
+                        }
+                    },
                 })
 
                 $('#table').on('draw.dt', function () {
@@ -726,6 +732,11 @@
                                                 "next": "»",
                                                 "previous": "«"
                                             },
+                                        },
+                                        initComplete: function () {
+                                            if (window.cabinetMonitoringSearch) {
+                                                window.cabinetMonitoringSearch.dataTableInitComplete.call(this);
+                                            }
                                         },
                                     })
                                 }

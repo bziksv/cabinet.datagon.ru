@@ -68,6 +68,7 @@
         <!-- DataTables  & Plugins -->
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min-editor'])
+        @include('monitoring.partials.smart-search-script')
         <!-- Select2 -->
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <!-- InputMask -->
@@ -283,6 +284,10 @@
                 },
                 initComplete: function () {
                     let api = this.api();
+
+                    if (window.cabinetMonitoringSearch) {
+                        window.cabinetMonitoringSearch.wireGlobalDataTableSearch(api);
+                    }
 
                     this.find('tbody').on('click', 'td .dt-control', function () {
                         let icon = $(this).find('i');

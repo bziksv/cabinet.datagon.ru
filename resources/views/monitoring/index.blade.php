@@ -120,6 +120,7 @@
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'monitoring-index'])
         <script src="{{ asset('plugins/datatables/search.js') }}"></script>
+        @include('monitoring.partials.smart-search-script')
         <!-- Moment js -->
         <script src="{{ asset('plugins/moment/moment-with-locales.min.js') }}"></script>
         <!-- Papa parse -->
@@ -280,6 +281,10 @@
                 },
                 initComplete: function () {
                     let api = this.api();
+
+                    if (window.cabinetMonitoringSearch) {
+                        window.cabinetMonitoringSearch.wireGlobalDataTableSearch(api);
+                    }
 
                     $('#filter-user-status').change(function(){
                         api.column('users:name').search($(this).val()).draw();

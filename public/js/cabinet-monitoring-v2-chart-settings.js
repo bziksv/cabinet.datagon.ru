@@ -8,9 +8,11 @@
     const cfg = window.cabinetMonV2Config || {};
 
     const SERIES_PRESET_TOPS = {
+        '1': [1],
+        '3': [3],
         '10': [10],
         '351020100': [3, 5, 10, 20, 100],
-        '35102050100': [3, 5, 10, 20, 50, 100],
+        '35102030100': [3, 5, 10, 20, 30, 100],
         all: null,
     };
 
@@ -26,8 +28,11 @@
         if (!raw || typeof raw !== 'object') {
             return out;
         }
-        const days = parseInt(raw.periodDays, 10);
-        if ([30, 60, 90, 180, 366].indexOf(days) >= 0) {
+        let days = parseInt(raw.periodDays, 10);
+        if (days === 366) {
+            days = 365;
+        }
+        if ([30, 60, 90, 180, 365].indexOf(days) >= 0) {
             out.periodDays = days;
         }
         if (['days', 'weeks', 'month'].indexOf(raw.range) >= 0) {
@@ -39,6 +44,9 @@
         let preset = raw.seriesPreset;
         if (preset === '51020') {
             preset = '351020100';
+        }
+        if (preset === '35102050100') {
+            preset = 'all';
         }
         if (Object.prototype.hasOwnProperty.call(SERIES_PRESET_TOPS, preset)) {
             out.seriesPreset = preset;

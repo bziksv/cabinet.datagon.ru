@@ -117,6 +117,11 @@ class MonitoringKeywordsController extends Controller
             $this->regions = $this->regions->where('id', $regionID);
         }
 
+        $search = $collection->get('search', []);
+        if (!empty($search['value'])) {
+            $this->applyQuerySmartSearch($this->queries, $search['value']);
+        }
+
         $this->filter($filteredColumns)->order($order, $filteredColumns);
 
         $page = ($length) ? ($start / $length) + 1 : false;
@@ -305,7 +310,11 @@ class MonitoringKeywordsController extends Controller
                                 $textClass = 'text-success';
                         }
 
-                        $row->put('url', view('monitoring.partials.show.url', ['textClass' => $textClass, 'urls' => $urls])->render());
+                        $row->put('url', view('monitoring.partials.show.url', [
+                            'textClass' => $textClass,
+                            'urls' => $urls,
+                            'page' => $keyword->page,
+                        ])->render());
                     } else
                         $row->put($i, '-');
                     break;
@@ -706,16 +715,23 @@ class MonitoringKeywordsController extends Controller
 
             switch ($column['data']) {
                 case 'query':
-                    if ($column['search']['value'])
-                        $model->where('query', 'like', '%' . $column['search']['value'] . '%');
+                    if (!empty($column['search']['value'])) {
+                        $this->applyQuerySmartSearch($model, $column['search']['value']);
+                    }
                     break;
                 case 'group':
                     if ($column['search']['value'])
                         $model->whereIn('monitoring_group_id', explode(',', $column['search']['value']));
                     break;
                 case 'url':
-                    if ($column['search']['value'])
-                        $model->whereIn('id', $this->getKeywordIdsWithNotValidateUrl($project->id, $region->id));
+                    if ($column['search']['value']) {
+                        $ids = $this->getKeywordIdsWithNotValidateUrl($project->id, $region->id);
+                        if ($ids->isEmpty()) {
+                            $model->whereRaw('0 = 1');
+                        } else {
+                            $model->whereIn('monitoring_keywords.id', $ids);
+                        }
+                    }
                     break;
                 case 'dynamics':
                     if ($column['search']['value']) {
@@ -729,6 +745,48 @@ class MonitoringKeywordsController extends Controller
         }
 
         return $this;
+    }
+
+    /**
+     * Умный поиск запроса: клиент шлёт regex-альтернативы раскладки (pote|зщеу).
+     */
+    private function applyQuerySmartSearch($builder, string $value): void
+    {
+        $terms = $this->parseSmartSearchTerms($value);
+        if ($terms === []) {
+            return;
+        }
+
+        $builder->where(function ($query) use ($terms) {
+            foreach ($terms as $term) {
+                $query->orWhere('monitoring_keywords.query', 'like', '%' . $this->escapeLike($term) . '%');
+            }
+        });
+    }
+
+    private function parseSmartSearchTerms(string $value): array
+    {
+        if ($value === '') {
+            return [];
+        }
+
+        $unescaped = preg_replace('/\\\\(.)/u', '$1', $value);
+        $parts = preg_split('/\|/', $unescaped);
+        $terms = [];
+
+        foreach ($parts as $part) {
+            $part = trim($part);
+            if ($part !== '') {
+                $terms[] = $part;
+            }
+        }
+
+        return array_values(array_unique($terms));
+    }
+
+    private function escapeLike(string $value): string
+    {
+        return addcslashes($value, '%_\\');
     }
 
     private function updateDynamics()
@@ -765,8 +823,8 @@ class MonitoringKeywordsController extends Controller
             })
             ->where('monitoring_keywords.monitoring_project_id', $projectId)
             ->where('monitoring_positions.monitoring_searchengine_id', $regionId)
-            ->get()
-            ->pluck('id');
+            ->distinct()
+            ->pluck('monitoring_positions.monitoring_keyword_id');
 
         return $lastUrlPosition;
     }

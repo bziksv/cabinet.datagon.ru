@@ -66,6 +66,7 @@
         <!-- DataTables  & Plugins -->
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min-editor'])
+        @include('monitoring.partials.smart-search-script')
 
         <!-- Select2 -->
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
@@ -248,6 +249,11 @@
                 ],
                 initComplete: function(){
                     let api = this.api();
+
+                    if (window.cabinetMonitoringSearch) {
+                        window.cabinetMonitoringSearch.wireGlobalDataTableSearch(api);
+                    }
+
                     let json = api.ajax.json();
                     let card = this.closest('.card');
 

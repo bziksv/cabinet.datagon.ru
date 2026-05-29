@@ -1,121 +1,88 @@
-@component('component.card', ['title' => __('Monitoring position')])
-
+@component('component.card', [
+    'title' => $project->name,
+    'titleHtml' => '<span class="visually-hidden">' . e($project->name) . '</span>',
+])
     @slot('css')
-        <!-- Toastr -->
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
-        <!-- DataTables -->
         @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-css'])
-        <!-- Select2 -->
         <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
-        <!-- daterange picker -->
         <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
-
-        <style>
-            .dTable {
-                display: none;
-            }
-
-            .dataTables_processing {
-                margin: 10px auto;
-                z-index: 4;
-            }
-
-            .exist-position {
-                color: #28a745 !important;
-                font-weight: bold;
-            }
-
-            .popover {
-                max-width: none;
-            }
-
-            .progress-spinner {
-                position: absolute;
-                top: 10%;
-                width: 100%;
-                text-align: center;
-                z-index: 1;
-            }
-
-            .reset-zoom {
-                position: absolute;
-                top: 50px;
-                right: 30px;
-            }
-
-            .dataTables_scrollHead {
-                position: sticky !important;
-                top: 0px;
-                z-index: 1;
-                background-color: white;
-            }
-        </style>
+        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ @filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time() }}">
     @endslot
 
-    <div class="row">
-        @foreach($navigations as $navigation)
-            <div class="col-lg-2 col-6">
-                <a href="{{ $navigation['href'] }}" class="small-box {{ $navigation['bg'] }}" style="min-height: 137px">
-                    <div class="inner">
-                        @if($navigation['h3'])
-                            <h3 class="mb-0">{{ $navigation['h3'] }}</h3>
-                        @endif
+    <div class="cabinet-mon-project-page" id="cabinet-mon-project-root" data-view="keywords">
+        @include('monitoring.partials.show.project-chrome', ['project' => $project])
 
-                        {!! $navigation['content'] !!}
+        <div class="cabinet-mon-project-page__body">
+            @include('monitoring.partials.show.project-kpi')
 
-                        @isset($navigation['small'])
-                            <small>{!! $navigation['small'] !!}</small>
-                        @endisset
+            @include('monitoring.partials.show.project-toolbar')
 
-                        @isset($navigation['actions'])
-                            <small>{!! $navigation['actions'] !!}</small>
-                        @endisset
-                    </div>
-                    <div class="icon">
-                        <i class="{{ $navigation['icon'] }}"></i>
-                    </div>
-                </a>
+            <div data-mon-view-panel="overview">
+                @include('monitoring.partials.show.charts')
             </div>
-        @endforeach
-    </div>
 
-    @include('monitoring.partials.show.filter')
-
-    <div class="row">
-        <div class="col-12">
-            @include('monitoring.partials.show.charts')
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-12 mb-3">
-            <a href="{{ route('groups.index', $project->id) }}" class="btn btn-default">Управление группами проекта</a>
-
-            @can('update_occurrence_monitoring')
-                <a href="javascript:void(0)" id="occurrence-update" class="btn btn-default">Обновить частотность проекта</a>
-            @endcan
-
-            <a href="{{ route('prices.index', $project->id) }}" id="" class="btn btn-default">Цена запросов</a>
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-12 card-table">
-            <div class="card processing">
-                <div class="dataTables_processing"><img src="/img/1485.gif" style="width: 50px; height: 50px;"></div>
+            <div class="cabinet-mon-project-table-panel card-table" id="cabinet-mon-show-table-host" data-mon-view-panel="keywords">
+                <div class="cabinet-mon-project-table-panel__loader" id="cabinetMonShowTableLoader">
+                    @include('monitoring.partials.show.loader', ['label' => __('Monitoring show table loading')])
+                </div>
+                <table class="table table-hover table-bordered text-center w-100 mb-0" id="monitoringTable"></table>
             </div>
-            <div class="card dTable">
-                <table class="table table-hover table-responsive table-bordered text-center" id="monitoringTable"></table>
-            </div>
-            <!-- /.card -->
         </div>
     </div>
 
     @include('monitoring.keywords.modal.main')
 
     @slot('js')
-        <!-- Toastr -->
+        @php
+            $monChartRegion = null;
+            if (request('region')) {
+                $monChartRegion = $project->searchengines->firstWhere('id', (int) request('region'));
+            } elseif ($project->searchengines->count() === 1) {
+                $monChartRegion = $project->searchengines->first();
+            }
+            $monBaseRegion = null;
+            if ($monChartRegion) {
+                $monBaseRegion = [
+                    'id' => (int) $monChartRegion->id,
+                    'engine' => (string) $monChartRegion->engine,
+                    'lr' => (string) $monChartRegion->lr,
+                    'label' => \App\Classes\Monitoring\MonitoringLocationLabel::filterOption($monChartRegion),
+                ];
+            }
+        @endphp
+        <script>
+            window.cabinetMonProjectConfig = {
+                projectId: {{ (int) $project->id }},
+                baseGroupId: @json(request('group') ? (int) request('group') : null),
+                baseRegion: @json($monBaseRegion),
+                statsUrl: @json(route('monitoring.v2.project.stats')),
+                projectsListUrl: @json(route('monitoring.v2.projects.list')),
+                groupsUrl: @json(url('/monitoring/creator/groups')),
+                csrf: @json(csrf_token()),
+                i18n: {
+                    kpiSnapshotRegion: @json(__('Monitoring show kpi snapshot region hint')),
+                    kpiSnapshotProject: @json(__('Monitoring show kpi snapshot project hint')),
+                    kpiLoadError: @json(__('Monitoring show kpi load error')),
+                    compareNone: @json(__('Monitoring show compare none')),
+                    compareAllGroups: @json(__('Monitoring show compare all groups')),
+                    compareSearchPlaceholder: @json(__('Monitoring show compare search placeholder')),
+                    compareNoResults: @json(__('Monitoring show compare no results')),
+                    compareSearching: @json(__('Monitoring show compare searching')),
+                    compareNeedBaseRegion: @json(__('Monitoring show compare need base region')),
+                    compareMissingRegionLead: @json(__('Monitoring show compare missing region lead')),
+                    compareMissingRegionAvailable: @json(__('Monitoring show compare missing region available')),
+                    compareIntersectHint: @json(__('Monitoring show compare intersect hint')),
+                    compareIntersectEmpty: @json(__('Monitoring show compare intersect empty')),
+                },
+            };
+        </script>
+        <script src="{{ asset('js/cabinet-monitoring-chart-scales.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-chart-scales.js')) ?: time() }}"></script>
+        @include('monitoring.partials.smart-search-script')
+        <script src="{{ asset('js/cabinet-monitoring-show-charts.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-show-charts.js')) ?: time() }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-show-compare.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-show-compare.js')) ?: time() }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
         <!-- Bootstrap 4 -->
         <script src="{{ asset('plugins/bootstrap-modal-form-templates/bootstrap-modal-form-templates.js') }}"></script>
@@ -124,6 +91,7 @@
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <!-- Select2 -->
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
+        <script src="{{ asset('js/cabinet-select2-defaults.js') }}?v={{ @filemtime(public_path('js/cabinet-select2-defaults.js')) ?: time() }}"></script>
         <!-- InputMask -->
         <script src="{{ asset('plugins/moment/moment.min.js') }}"></script>
         <script src="{{ asset('plugins/inputmask/jquery.inputmask.min.js') }}"></script>
@@ -154,8 +122,10 @@
 
         <script>
             const PROJECT_ID = '{{ $project->id }}';
-            const PROJECT_NAME = '{{ $project->name }}';
-            const REGION_ID = '{{ request('region', null) }}';
+            const PROJECT_NAME = @json($project->name);
+            const REGION_ID = '{{ $monChartRegion ? $monChartRegion->id : '' }}';
+            const REGION_ENGINE = @json($monChartRegion ? $monChartRegion->engine : null);
+            const REGION_LR = @json($monChartRegion ? $monChartRegion->lr : null);
             const GROUP_ID = '{{ request('group', null) }}';
             const DATES = '{{ request('dates', null) }}';
             const MODE = '{{ request('mode', null) }}';
@@ -163,7 +133,76 @@
             const LENGTH_MENU = JSON.parse('{{ $lengthMenu }}');
             const MAIN_COLUMNS_COUNT = 7;
 
+            function chartDateRange() {
+                if (DATES && String(DATES).trim()) {
+                    return DATES;
+                }
+                return moment().subtract(29, 'days').format('YYYY-MM-DD') + ' - ' + moment().format('YYYY-MM-DD');
+            }
+
+            function cabinetMonWirePopovers(root) {
+                if (typeof bootstrap === 'undefined' || !bootstrap.Popover) {
+                    return;
+                }
+                var scope = root || document;
+                scope.querySelectorAll('[data-bs-toggle="popover"]').forEach(function (el) {
+                    if (el.dataset.cabinetMonPopoverWired === '1') {
+                        return;
+                    }
+                    el.dataset.cabinetMonPopoverWired = '1';
+                    var pop = new bootstrap.Popover(el, {
+                        trigger: 'manual',
+                        placement: 'auto',
+                        html: true,
+                        sanitize: false,
+                        container: 'body',
+                        customClass: 'cabinet-mon-url-popover',
+                        popperConfig: function (defaultConfig) {
+                            defaultConfig.modifiers = defaultConfig.modifiers || [];
+                            defaultConfig.modifiers.push({
+                                name: 'preventOverflow',
+                                options: {
+                                    boundary: 'viewport',
+                                    padding: 8,
+                                },
+                            });
+                            defaultConfig.modifiers.push({
+                                name: 'flip',
+                                options: {
+                                    fallbackPlacements: ['left', 'top', 'bottom'],
+                                },
+                            });
+                            return defaultConfig;
+                        },
+                    });
+                    el.addEventListener('mouseenter', function () {
+                        pop.show();
+                    });
+                    el.addEventListener('mouseleave', function () {
+                        var anchor = el;
+                        var timeout = setTimeout(function () {
+                            pop.hide();
+                        }, 300);
+                        document.querySelectorAll('.popover').forEach(function (popEl) {
+                            popEl.addEventListener('mouseenter', function () {
+                                clearTimeout(timeout);
+                            });
+                            popEl.addEventListener('mouseleave', function () {
+                                var instance = bootstrap.Popover.getInstance(anchor);
+                                if (instance) {
+                                    instance.hide();
+                                }
+                            });
+                        });
+                    });
+                });
+            }
+
             let table = $('#monitoringTable');
+
+            function cabinetMonShowHideTableLoader() {
+                $('#cabinetMonShowTableLoader').remove();
+            }
 
             toastr.options = {
                 "preventDuplicates": true,
@@ -214,14 +253,16 @@
                     language: {
                         lengthMenu: "_MENU_",
                         search: "_INPUT_",
-                        searchPlaceholder: "Search...",
+                        searchPlaceholder: @json(__('Monitoring show table search')),
+                        emptyTable: @json(__('Monitoring show table empty')),
+                        zeroRecords: @json(__('Monitoring show table empty')),
+                        processing: @json(__('Monitoring show table loading')),
                         paginate: {
-                            "first": "«",
-                            "last": "»",
-                            "next": "»",
-                            "previous": "«"
+                            first: "«",
+                            last: "»",
+                            next: "»",
+                            previous: "«"
                         },
-                        processing: '<img src="/img/1485.gif" style="width: 50px; height: 50px;">',
                     },
                     processing: true,
                     serverSide: true,
@@ -243,14 +284,19 @@
                         {orderable: false, targets: '_all'},
                     ],
                     initComplete: function () {
+                        cabinetMonShowHideTableLoader();
                         let api = this.api();
+
+                        if (window.cabinetMonitoringSearch) {
+                            window.cabinetMonitoringSearch.wireGlobalDataTableSearch(api);
+                        }
 
                         let url = new URL(window.location.href);
                         let params = new URLSearchParams(url.search);
 
                         axios.get(`/monitoring/keywords/show/controls/${PROJECT_ID}`).then(function (response) {
 
-                            let container = $('.mailbox-controls');
+                            let container = $('.mailbox-controls').first();
                             let content = response.data;
 
                             container.html(content);
@@ -279,7 +325,7 @@
                                 let checkboxes = $('.table tbody tr').find('input[type="checkbox"]:checked');
                                 if (checkboxes.length) {
 
-                                    if (window.confirm("Do you really want to delete?")) {
+                                    if (window.confirm(@json(__('Do you really want to delete?')))) {
 
                                         $.each(checkboxes, function (i, checkbox) {
                                             let id = $(checkbox).val();
@@ -381,6 +427,14 @@
                                 trigger: 'hover',
                             });
 
+                            function setColumnToggleState(name, visible) {
+                                container
+                                    .find('.column-visible[data-column="' + name + '"]')
+                                    .toggleClass('is-on', visible)
+                                    .toggleClass('is-off', !visible)
+                                    .attr('aria-pressed', visible ? 'true' : 'false');
+                            }
+
                             container.find('.column-visible').click(function () {
 
                                 let name = $(this).data('column');
@@ -388,8 +442,7 @@
                                 let visible = column.visible();
 
                                 column.visible(!visible);
-
-                                $(`.column-visible[data-column="${name}"]`).toggleClass('hover', visible);
+                                setColumnToggleState(name, !visible);
 
                                 axios.post('/monitoring/project/set/column/settings', {
                                     monitoring_project_id: PROJECT_ID,
@@ -403,14 +456,13 @@
 
                                     $.each(response.data, function (i, item) {
                                         let column = api.column(item.name + ':name');
+                                        let visible = !!item.state;
 
-                                        if (item.state === 0)
-                                            column.visible(item.state);
+                                        if (!visible) {
+                                            column.visible(false);
+                                        }
 
-                                        if (item.state)
-                                            container.find(`.column-visible[data-column="${item.name}"]`).removeClass('hover');
-                                        else
-                                            container.find(`.column-visible[data-column="${item.name}"]`).addClass('hover');
+                                        setColumnToggleState(item.name, visible);
                                     });
                                 });
                         });
@@ -438,10 +490,17 @@
                         api.columns().every(function () {
                             let that = this;
 
-                            $('input', this.header()).on('keyup change', function () {
-                                if (that.search() !== this.value) {
-                                    that.search(this.value).draw();
+                            $('input', this.header()).each(function () {
+                                let $input = $(this);
+                                if (window.cabinetMonitoringSearch) {
+                                    window.cabinetMonitoringSearch.wireColumnDataTableSearch(that, $input);
+                                    return;
                                 }
+                                $input.on('keyup change', function () {
+                                    if (that.search() !== this.value) {
+                                        that.search(this.value).draw();
+                                    }
+                                });
                             });
                         });
 
@@ -466,32 +525,37 @@
                         }
 
                         let notValidateUrl = $('<div />', {
-                            class: 'custom-control custom-switch'
-                        }).css({
-                            "margin-right": "2.25rem",
+                            class: 'cabinet-mon-filter-switch custom-control custom-switch custom-switch-off-danger custom-switch-on-success',
                         });
 
-                        notValidateUrl.append($('<input />', {
-                            type: "checkbox",
-                            id: "notValidateUrl",
-                            name: "url",
-                            value: "1",
-                            class: "custom-control-input",
-                        }).click(function () {
-                            let val = $(this).val();
+                        notValidateUrl.append(
+                            $('<input />', {
+                                type: 'checkbox',
+                                id: 'notValidateUrl',
+                                class: 'custom-control-input',
+                            }).on('change', function () {
+                                var active = $(this).is(':checked');
+                                var prevTotal = api.page.info().recordsTotal;
+                                $(this).closest('.cabinet-mon-filter-switch').toggleClass('is-active', active);
+                                api.column('url:name').search(active ? '1' : '').draw();
+                                if (active) {
+                                    api.one('draw', function () {
+                                        var info = api.page.info();
+                                        if (prevTotal > 0 && info.recordsTotal === 0) {
+                                            toastr.info(@json(__('Monitoring show filter non target urls empty')));
+                                        }
+                                    });
+                                }
+                            })
+                        );
 
-                            if (val == "1")
-                                $(this).val(0);
-                            else
-                                $(this).val(1);
-
-                            api.column($(this).attr('name') + ':name').search(val).draw();
-                        }));
-
-                        notValidateUrl.append($('<label />', {
-                            for: "notValidateUrl",
-                            class: "custom-control-label",
-                        }).text("Показать нецелевые URL"));
+                        notValidateUrl.append(
+                            $('<label />', {
+                                for: 'notValidateUrl',
+                                class: 'custom-control-label',
+                                title: @json(__('Monitoring show filter non target urls hint')),
+                            }).text(@json(__('Monitoring show filter non target urls')))
+                        );
 
                         let dynamic = $('<div />', {
                             class: 'form-group'
@@ -501,9 +565,9 @@
                         });
 
                         let dynamicOptions = [
-                            {val: '', text: 'Динамика'},
-                            {val: 'positive', text: 'Положительная'},
-                            {val: 'negative', text: 'Отрицательная'},
+                            {val: '', text: @json(__('Monitoring show filter dynamics all'))},
+                            {val: 'positive', text: @json(__('Monitoring show filter dynamics positive'))},
+                            {val: 'negative', text: @json(__('Monitoring show filter dynamics negative'))},
                         ];
 
                         let dynamicSelect = $('<select />', {
@@ -521,21 +585,33 @@
 
                         dynamic.append(dynamicSelect);
 
+                        var $dtHeader = $(api.table().container()).closest('.dataTables_wrapper').children('.card-header').first();
+                        if (!$dtHeader.length) {
+                            $dtHeader = $('#cabinet-mon-show-table-host').find('.card-header').first();
+                        }
+                        var $tableTitle = $dtHeader.find('.card-title').first();
+
                         if (response.data.region.length === 1) {
-                            this.closest('.card').find('.card-header .card-title').after(dynamic);
-                            this.closest('.card').find('.card-header .card-title').after(notValidateUrl);
+                            var $headerFilters = $('<div />', {
+                                class: 'cabinet-mon-table-header-filters ms-auto d-flex align-items-center flex-wrap',
+                            });
+                            $headerFilters.append(notValidateUrl);
+                            $headerFilters.append(dynamic);
+                            $tableTitle.after($headerFilters);
                         }
 
-                        this.closest('.card').find('.card-header label').css('margin-bottom', 0);
+                        $dtHeader.find('label').css('margin-bottom', 0);
                         $('.dataTables_length').find('select').removeClass('form-select form-select-sm');
-                        this.closest('.card').find('.card-header .card-title').addClass('flex-grow-1').text(PROJECT_NAME);
+                        $tableTitle.addClass('flex-grow-1').text(PROJECT_NAME);
+
+                        if (window.cabinetMonitoringShowChrome) {
+                            window.cabinetMonitoringShowChrome.onTableReady(api);
+                        }
                     },
                     drawCallback: function () {
+                        cabinetMonShowHideTableLoader();
                         let api = this.api();
                         let data = api.data();
-                        let card = table.closest('.card-table');
-                        card.find('.processing').remove();
-                        card.find('.dTable').css('display', 'block');
 
                         $('tbody > tr', table).each(function (i, item) {
                             let target = 0;
@@ -559,25 +635,7 @@
 
                         $('.pagination').addClass('pagination-sm');
 
-                        $('[data-bs-toggle="popover"]').popover({
-                            trigger: 'manual',
-                            placement: 'right',
-                            html: true,
-                        }).on("mouseenter", function () {
-                            $(this).popover("show");
-                        }).on("mouseleave", function () {
-                            let self = this;
-
-                            let timeout = setTimeout(function () {
-                                $(self).popover("hide");
-                            }, 300);
-
-                            $('.popover').hover(function () {
-                                clearTimeout(timeout);
-                            }, function () {
-                                $(self).popover("hide");
-                            });
-                        });
+                        cabinetMonWirePopovers(table[0]);
                     },
                 });
 
@@ -700,7 +758,7 @@
                                             input.val(null);
                                         }).catch(function (error) {
 
-                                            toastr.error('Something is going wrong');
+                                            toastr.error(@json(__('Something is going wrong')));
                                         });
                                     }
                                 });
@@ -749,6 +807,12 @@
                         });
                     }
                 });
+            }).catch(function () {
+                let loader = $('#cabinetMonShowTableLoader');
+                loader.addClass('is-error');
+                loader.find('.cabinet-mon-loader__icon').remove();
+                loader.find('.cabinet-mon-loader__label').text(@json(__('Monitoring show table load error')));
+                toastr.error(@json(__('Monitoring show table load error')));
             });
 
             $('#reservation').daterangepicker({
@@ -772,14 +836,23 @@
                 startDate: startDate ?? moment().subtract(30, 'days'),
                 endDate: endDate ?? moment(),
                 ranges: {
-                    'Последние 7 дней': [moment().subtract(6, 'days'), moment()],
-                    'Последние 30 дней': [moment().subtract(29, 'days'), moment()],
-                    'Прошлый месяц': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')],
+                    [@json(__('Monitoring show date last 7 days'))]: [moment().subtract(6, 'days'), moment()],
+                    [@json(__('Monitoring show date last 30 days'))]: [moment().subtract(29, 'days'), moment()],
+                    [@json(__('Monitoring show date last 60 days'))]: [moment().subtract(59, 'days'), moment()],
+                    [@json(__('Monitoring show date last 90 days'))]: [moment().subtract(89, 'days'), moment()],
+                    [@json(__('Monitoring show date last 180 days'))]: [moment().subtract(179, 'days'), moment()],
+                    [@json(__('Monitoring show date last 365 days'))]: [moment().subtract(364, 'days'), moment()],
+                    [@json(__('Monitoring show date last month'))]: [
+                        moment().subtract(1, 'month').startOf('month'),
+                        moment().subtract(1, 'month').endOf('month'),
+                    ],
                 },
                 alwaysShowCalendars: true,
                 showCustomRangeLabel: false,
                 locale: {
                     format: 'DD-MM-YYYY',
+                    applyLabel: @json(__('Apply')),
+                    cancelLabel: @json(__('Cancel')),
                     daysOfWeek: [
                         "Вс",
                         "Пн",
@@ -928,7 +1001,7 @@
                     });
                 }).catch(function (error) {
 
-                    toastr.error('Something is going wrong');
+                    toastr.error(@json(__('Something is going wrong')));
                 });
             });
 
@@ -943,6 +1016,10 @@
             });
 
             let charts = {};
+            var monPositionYScale = window.cabinetMonitoringChartScales
+                ? window.cabinetMonitoringChartScales.lineY()
+                : { reverse: true, ticks: { stepSize: 5 } };
+
             if ($('#topPercent').length) {
                 $.extend(charts, {
                     'top': {
@@ -981,7 +1058,7 @@
                                     },
                                     zoom: {
                                         enabled: true,
-                                        zoomButtonText: 'Reset',
+                                        zoomButtonText: @json(__('Reset')),
                                         zoomButtonClass: 'reset-zoom btn btn-default btn-sm',
                                     },
                                     callbacks: {
@@ -1023,11 +1100,7 @@
                                         display: false,
                                     }
                                 },
-                                y: {
-                                    ticks: {
-                                        stepSize: 5
-                                    }
-                                }
+                                y: monPositionYScale,
                             },
                             plugins: {
                                 crosshair: {
@@ -1039,7 +1112,7 @@
                                     },
                                     zoom: {
                                         enabled: true,
-                                        zoomButtonText: 'Reset',
+                                        zoomButtonText: @json(__('Reset')),
                                         zoomButtonClass: 'reset-zoom btn btn-default btn-sm',
                                     },
                                     callbacks: {
@@ -1081,11 +1154,7 @@
                                         display: false,
                                     }
                                 },
-                                y: {
-                                    ticks: {
-                                        stepSize: 5
-                                    }
-                                }
+                                y: monPositionYScale,
                             },
                             plugins: {
                                 crosshair: {
@@ -1097,12 +1166,12 @@
                                     },
                                     zoom: {
                                         enabled: true,
-                                        zoomButtonText: 'Reset',
+                                        zoomButtonText: @json(__('Reset')),
                                         zoomButtonClass: 'reset-zoom btn btn-default btn-sm',
                                     },
                                     callbacks: {
                                         afterZoom: function () {
-                                            charts.middle.options.plugins.crosshair.zoom.enabled = false;
+                                            charts.regions_middle.options.plugins.crosshair.zoom.enabled = false;
                                         }
                                     }
                                 },
@@ -1118,6 +1187,383 @@
             }
 
             let chartFilterPeriod = $('#chartFilterPeriod');
+            var topChartRawPayload = null;
+            var topChartRawBase = null;
+            var topChartRawCompare = null;
+            var topChartRef = null;
+            var chartLoadsPending = 0;
+            var chartLoadFailed = false;
+            var chartLoadingLabel = @json(__('Monitoring show chart loading'));
+            var chartRenderingLabel = @json(__('Monitoring show chart rendering'));
+            var chartLoadErrorLabel = @json(__('Monitoring show chart load error'));
+
+            function chartLoaderLabelEl() {
+                return $('.cabinet-mon-project-charts .progress-spinner .cabinet-mon-loader__label');
+            }
+
+            function chartLoadingStart() {
+                if (chartLoadsPending === 0) {
+                    chartLoadFailed = false;
+                }
+                chartLoadsPending += 1;
+                var $sp = $('.cabinet-mon-project-charts .progress-spinner');
+                $sp.removeClass('d-none is-error');
+                chartLoaderLabelEl().text(chartLoadingLabel);
+                if (!$sp.find('.cabinet-mon-loader__icon').length) {
+                    $sp.html(
+                        '<div class="cabinet-mon-loader" role="status" aria-live="polite">' +
+                        '<i class="fas fa-circle-notch cabinet-mon-loader__icon" aria-hidden="true"></i>' +
+                        '<span class="cabinet-mon-loader__label"></span></div>'
+                    );
+                    chartLoaderLabelEl().text(chartLoadingLabel);
+                }
+            }
+
+            function chartLoadingEnd(failed) {
+                chartLoadsPending = Math.max(0, chartLoadsPending - 1);
+                if (failed) {
+                    chartLoadFailed = true;
+                }
+                if (chartLoadsPending > 0) {
+                    return;
+                }
+                var $sp = $('.cabinet-mon-project-charts .progress-spinner');
+                if (chartLoadFailed) {
+                    $sp.removeClass('d-none').addClass('is-error');
+                    chartLoaderLabelEl().text(chartLoadErrorLabel);
+                    return;
+                }
+                $sp.addClass('d-none');
+            }
+
+            function applyChartDataDeferred(chart, payload, obj) {
+                return new Promise(function (resolve) {
+                    chartLoaderLabelEl().text(chartRenderingLabel);
+                    window.requestAnimationFrame(function () {
+                        window.requestAnimationFrame(function () {
+                            setTimeout(function () {
+                                chart.data = normalizeChartPayload(payload, obj);
+                                chart.update('none');
+                                window.requestAnimationFrame(resolve);
+                            }, 0);
+                        });
+                    });
+                });
+            }
+
+            function chartParamsForProject(projectId, groupId, range, chartType) {
+                var params = {
+                    projectId: projectId,
+                    regionId: REGION_ID,
+                    dateRange: chartDateRange(),
+                    chart: chartType,
+                };
+                if (range) {
+                    params.range = range;
+                }
+                if (groupId) {
+                    params.group = groupId;
+                }
+                if (REGION_ENGINE) {
+                    params.matchEngine = REGION_ENGINE;
+                }
+                if (REGION_LR) {
+                    params.matchLr = REGION_LR;
+                }
+                return params;
+            }
+
+            function fetchChartPayload(params) {
+                return axios.get('/monitoring/charts', { params: params }).then(function (response) {
+                    return response.data;
+                });
+            }
+
+            function buildChartPayload(basePayload, comparePayload, chartType) {
+                var compareApi = window.cabinetMonitoringShowCompare;
+                if (
+                    comparePayload &&
+                    compareApi &&
+                    compareApi.canFetchCompareCharts &&
+                    compareApi.canFetchCompareCharts() &&
+                    chartType !== 'distribution'
+                ) {
+                    return compareApi.mergeChartPayloads(
+                        basePayload,
+                        comparePayload,
+                        PROJECT_NAME,
+                        compareApi.getState().projectName
+                    );
+                }
+                return basePayload;
+            }
+
+            function applyTopChartFromRaw() {
+                if (!topChartRef || !topChartRawBase || !window.cabinetMonitoringShowCharts) {
+                    return;
+                }
+                var preset = window.cabinetMonitoringShowCharts.getPreset();
+                var base = window.cabinetMonitoringShowCharts.applyTopPreset(topChartRawBase, preset);
+                var cmp = topChartRawCompare
+                    ? window.cabinetMonitoringShowCharts.applyTopPreset(topChartRawCompare, preset)
+                    : null;
+                var payload = buildChartPayload(base, cmp, 'top');
+                if (window.cabinetMonitoringChartScales) {
+                    payload = window.cabinetMonitoringChartScales.applySpanGaps(payload);
+                    payload = window.cabinetMonitoringChartScales.applyDistinctLineColors(payload);
+                }
+                topChartRawPayload = payload;
+                topChartRef.data = payload;
+                topChartRef.update('none');
+            }
+
+            function reloadAllCharts() {
+                var range = chartFilterPeriod.val();
+                $.each(chartInstances, function (key, chart) {
+                    loadChartData(chart, charts[key], range);
+                });
+                loadDistributionChart();
+            }
+
+            var distributionChartBase = null;
+            var distributionChartCompare = null;
+
+            function distributionChartParams() {
+                var params = chartParamsForProject(PROJECT_ID, GROUP_ID, null, 'distribution');
+                var compareApi = window.cabinetMonitoringShowCompare;
+                if (compareApi && compareApi.appendIntersectParams) {
+                    params = compareApi.appendIntersectParams(params, true);
+                }
+                return params;
+            }
+
+            function distributionCompareParams() {
+                var compareApi = window.cabinetMonitoringShowCompare;
+                if (!compareApi || !compareApi.canFetchCompareCharts || !compareApi.canFetchCompareCharts()) {
+                    return null;
+                }
+                return compareApi.getChartParams(
+                    chartParamsForProject(PROJECT_ID, GROUP_ID, null, 'distribution')
+                );
+            }
+
+            function distributionChartOptions() {
+                return {
+                    maintainAspectRatio: false,
+                    cutout: '62%',
+                    plugins: {
+                        crosshair: false,
+                        datalabels: {
+                            anchor: 'center',
+                            color: function (context) {
+                                var bg = context.dataset.backgroundColor[context.dataIndex];
+                                if (window.cabinetMonitoringChartScales) {
+                                    return window.cabinetMonitoringChartScales.distributionLabelColor(bg);
+                                }
+                                return bg === '#ffc107' || bg === '#adb5bd' ? '#212529' : '#ffffff';
+                            },
+                            font: {
+                                size: 12,
+                                weight: '600',
+                            },
+                            formatter: function (value) {
+                                if (!value) {
+                                    return null;
+                                }
+                                return value + '%';
+                            },
+                        },
+                        legend: {
+                            position: 'left',
+                            labels: {
+                                boxWidth: 14,
+                                padding: 10,
+                                usePointStyle: true,
+                                pointStyle: 'rectRounded',
+                                font: {
+                                    size: 13,
+                                },
+                                generateLabels: function (chart) {
+                                    var data = chart.data;
+                                    return data.labels.map(function (label, i) {
+                                        var ds = data.datasets[0];
+                                        var value = ds.data[i];
+                                        return {
+                                            text: label + ': ' + value + '%',
+                                            fillStyle: ds.backgroundColor[i],
+                                            strokeStyle: ds.backgroundColor[i],
+                                            hidden: ds.hidden,
+                                            index: i,
+                                        };
+                                    });
+                                },
+                            },
+                        },
+                    },
+                };
+            }
+
+            function prepareDistributionPayload(payload) {
+                if (!payload) {
+                    return payload;
+                }
+                if (window.cabinetMonitoringChartScales) {
+                    return window.cabinetMonitoringChartScales.applyDistributionStyle(payload);
+                }
+                return payload;
+            }
+
+            function renderDistributionDoughnut(canvasEl, payload) {
+                if (!canvasEl || !payload) {
+                    return null;
+                }
+                return new Chart(canvasEl.getContext('2d'), {
+                    type: 'doughnut',
+                    data: payload,
+                    plugins: [ChartDataLabels],
+                    options: distributionChartOptions(),
+                });
+            }
+
+            function loadDistributionChart() {
+                if (!$('#distributionByTop').length) {
+                    return;
+                }
+                chartLoadingStart();
+
+                var compareApi = window.cabinetMonitoringShowCompare;
+                var requests = [fetchChartPayload(distributionChartParams())];
+                var compareParams = distributionCompareParams();
+                if (compareParams) {
+                    requests.push(fetchChartPayload(compareParams));
+                }
+
+                Promise.all(requests)
+                    .then(function (results) {
+                        return new Promise(function (resolve) {
+                            window.requestAnimationFrame(function () {
+                                if (distributionChartBase) {
+                                    distributionChartBase.destroy();
+                                    distributionChartBase = null;
+                                }
+                                if (distributionChartCompare) {
+                                    distributionChartCompare.destroy();
+                                    distributionChartCompare = null;
+                                }
+
+                                var basePayload = results[0];
+                                var comparePayload = results[1] || null;
+                                var $colBase = $('#distributionColBase');
+                                var $colCompare = $('#distributionColCompare');
+                                var $titleBase = $('#distributionBaseTitle');
+                                var $titleCompare = $('#distributionCompareTitle');
+
+                                if (comparePayload && compareApi && compareApi.canFetchCompareCharts()) {
+                                    $colBase.removeClass('col-12').addClass('col-12 col-lg-6');
+                                    $colCompare.removeClass('d-none');
+                                    $titleBase.text(PROJECT_NAME).removeClass('d-none');
+                                    $titleCompare
+                                        .text((compareApi.getState() && compareApi.getState().projectName) || '')
+                                        .removeClass('d-none');
+                                    distributionChartCompare = renderDistributionDoughnut(
+                                        $('#distributionByTopCompare').get(0),
+                                        prepareDistributionPayload(comparePayload)
+                                    );
+                                } else {
+                                    $colBase.removeClass('col-lg-6').addClass('col-12');
+                                    $colCompare.addClass('d-none');
+                                    $titleBase.addClass('d-none').text('');
+                                    $titleCompare.addClass('d-none').text('');
+                                }
+
+                                distributionChartBase = renderDistributionDoughnut(
+                                    $('#distributionByTop').get(0),
+                                    prepareDistributionPayload(basePayload)
+                                );
+
+                                if (compareApi && compareApi.setIntersectMeta && basePayload && basePayload._meta) {
+                                    compareApi.setIntersectMeta(basePayload._meta);
+                                }
+
+                                window.requestAnimationFrame(resolve);
+                            });
+                        });
+                    })
+                    .then(function () {
+                        chartLoadingEnd(false);
+                    })
+                    .catch(function () {
+                        chartLoadingEnd(true);
+                    });
+            }
+
+            function normalizeChartPayload(payload, obj) {
+                if (!payload) {
+                    return payload;
+                }
+                if (obj.chart === 'top' && window.cabinetMonitoringShowCharts) {
+                    payload = window.cabinetMonitoringShowCharts.applyTopPreset(
+                        payload,
+                        window.cabinetMonitoringShowCharts.getPreset()
+                    );
+                }
+                if (window.cabinetMonitoringChartScales) {
+                    payload = window.cabinetMonitoringChartScales.applySpanGaps(payload);
+                    if (
+                        obj.chart === 'top' ||
+                        obj.chart === 'middle' ||
+                        obj.chart === 'regions_middle'
+                    ) {
+                        payload = window.cabinetMonitoringChartScales.applyDistinctLineColors(payload);
+                    }
+                }
+                return payload;
+            }
+
+            function loadChartData(chart, obj, range) {
+                chartLoadingStart();
+
+                var baseParams = chartParamsForProject(PROJECT_ID, GROUP_ID, range, obj.chart);
+                var compareApi = window.cabinetMonitoringShowCompare;
+                if (compareApi && compareApi.appendIntersectParams) {
+                    baseParams = compareApi.appendIntersectParams(baseParams, true);
+                }
+                var compareParams =
+                    compareApi && compareApi.canFetchCompareCharts && compareApi.canFetchCompareCharts() && obj.chart !== 'distribution'
+                        ? compareApi.getChartParams(baseParams)
+                        : null;
+
+                var requests = [fetchChartPayload(baseParams)];
+                if (compareParams) {
+                    requests.push(fetchChartPayload(compareParams));
+                }
+
+                return Promise.all(requests)
+                    .then(function (results) {
+                        var basePayload = results[0];
+                        var comparePayload = results[1] || null;
+                        if (compareApi && compareApi.setIntersectMeta && basePayload && basePayload._meta) {
+                            compareApi.setIntersectMeta(basePayload._meta);
+                        }
+                        if (obj.chart === 'top' && topChartRef && window.cabinetMonitoringShowCharts) {
+                            topChartRawBase = basePayload;
+                            topChartRawCompare = comparePayload;
+                            applyTopChartFromRaw();
+                            return Promise.resolve();
+                        }
+                        var payload = buildChartPayload(basePayload, comparePayload, obj.chart);
+                        return applyChartDataDeferred(chart, payload, obj);
+                    })
+                    .then(function () {
+                        chartLoadingEnd(false);
+                    })
+                    .catch(function () {
+                        chartLoadingEnd(true);
+                        toastr.error(chartLoadErrorLabel);
+                    });
+            }
+
+            var chartInstances = {};
 
             $.each(charts, function (key, obj) {
 
@@ -1127,115 +1573,45 @@
                     options: obj.options
                 });
 
+                if (obj.chart === 'top') {
+                    topChartRef = chart;
+                }
+                chartInstances[key] = chart;
+
                 chartFilterPeriod.change(function () {
-                    let range = $(this).val();
-                    $('.progress-spinner').removeClass('d-none');
-
-                    axios.get('/monitoring/charts', {
-                        params: {
-                            projectId: PROJECT_ID,
-                            group: GROUP_ID,
-                            regionId: REGION_ID,
-                            dateRange: DATES,
-                            range: range,
-                            chart: obj.chart,
-                        }
-                    }).then(function (response) {
-                        chart.data = response.data;
-                        chart.update();
-
-                        $('.progress-spinner').addClass('d-none');
-                    });
+                    loadChartData(chart, obj, $(this).val());
                 });
             });
 
-            chartFilterPeriod.trigger('change');
+            if (window.cabinetMonitoringShowCharts && $('.cabinet-mon-top-presets').length) {
+                window.cabinetMonitoringShowCharts.wirePresets($('.cabinet-mon-top-presets'), function () {
+                    if (topChartRawBase) {
+                        applyTopChartFromRaw();
+                    } else if (topChartRef && chartFilterPeriod.length) {
+                        loadChartData(topChartRef, { chart: 'top' }, chartFilterPeriod.val());
+                    }
+                });
+            }
 
-            axios.get('/monitoring/charts', {
-                params: {
-                    projectId: PROJECT_ID,
-                    group: GROUP_ID,
-                    regionId: REGION_ID,
-                    dateRange: DATES,
-                    chart: 'distribution',
-                }
-            }).then(function (response) {
 
-                if ($('#distributionByTop').length) {
-                    new Chart($('#distributionByTop').get(0).getContext('2d'), {
-                        type: 'doughnut',
-                        data: response.data,
-                        plugins: [ChartDataLabels],
-                        options: {
-                            maintainAspectRatio: false,
-                            title: {
-                                display: true,
-                                text: 'Распределение по ТОП-100',
-                                position: 'left',
-                            },
-                            plugins: {
-                                crosshair: false,
-                                datalabels: {
-                                    anchor: 'center',
-                                    color: '#fff',
-                                    font: {
-                                        size: 12,
-                                        weight: 'bold',
-                                    },
-                                    formatter: (value, ctx) => {
-                                        if (! value) {
-                                            return null
-                                        }
+            $('.cabinet-mon-project-charts .nav-pills a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+                var target = $(e.target).attr('href') || '';
+                var showPeriod = target === '#tab_1' || target === '#tab_2';
+                chartFilterPeriod.toggleClass('d-none', !showPeriod);
+            });
 
-                                        return `${value}%`;
-                                    },
-                                },
-                                legend: {
-                                    position: 'left',
-                                    labels: {
-                                        font: {
-                                            size: 24,
-                                            style: "normal",
-                                        },
-                                        generateLabels: function (chart) {
-                                            let data = chart.data;
-
-                                            return data.labels.map(function (label, i) {
-                                                let dsIndex = 0;
-                                                let ds = data.datasets[0];
-
-                                                let value = chart.config.data.datasets[dsIndex].data[i];
-
-                                                return {
-                                                    text: label + ": " + value + "%",
-                                                    fillStyle: ds.backgroundColor[i],
-                                                    strokeStyle: ds.backgroundColor[i],
-                                                    hidden: ds.hidden,
-                                                    index: i
-                                                };
-                                            });
-                                        },
-                                    },
-                                },
-                            }
-                        }
+            if (window.cabinetMonitoringShowCompare) {
+                window.cabinetMonitoringShowCompare.init().then(function () {
+                    window.cabinetMonitoringShowCompare.onChange(function () {
+                        reloadAllCharts();
                     });
-                }
-            });
-
-            $('#showChartsBlock').click(function () {
-                let btn = $(this);
-                let charts = $('.card-charts');
-
-                if (charts.hasClass('d-none')) {
-                    charts.removeClass('d-none');
-                    btn.text('Скрыть графики');
-                } else {
-                    charts.addClass('d-none');
-                    btn.text('Показать графики');
-                }
-
-            });
+                    chartFilterPeriod.trigger('change');
+                    loadDistributionChart();
+                });
+            } else {
+                chartFilterPeriod.trigger('change');
+                loadDistributionChart();
+            }
 
             $('#occurrence-update').click(function () {
                 let action = 'all';

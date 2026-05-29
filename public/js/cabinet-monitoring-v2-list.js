@@ -668,12 +668,37 @@
             '" target="_blank" rel="noopener">' +
             escHtml(row.url) +
             '</a>' +
+            '<div class="cabinet-mon-v2-project-cell__name-row">' +
             '<a class="cabinet-mon-v2-project-cell__name" href="' +
             escHtml(showUrl) +
             '">' +
             escHtml(row.name || '—') +
             '</a>' +
+            renderPublicShareBadge(row) +
+            '</div>' +
             '</div></div>'
+        );
+    }
+
+    function renderPublicShareBadge(row) {
+        const ps = row.public_share;
+        if (!ps || !ps.active) {
+            return '';
+        }
+        const title = ps.expires_label
+            ? escHtml(ps.expires_label)
+            : escHtml(cfg.i18n.publicShareActive || 'Public link active');
+        const url = ps.url ? escHtml(ps.url) : '#';
+        return (
+            '<a href="' +
+            url +
+            '" target="_blank" rel="noopener" class="cabinet-mon-v2-public-share-badge badge rounded-pill text-bg-success text-decoration-none" title="' +
+            title +
+            '" data-bs-toggle="tooltip">' +
+            '<i class="bi bi-share-fill" aria-hidden="true"></i>' +
+            '<span class="cabinet-mon-v2-public-share-badge__text">' +
+            escHtml(cfg.i18n.publicShareBadge || 'Guest link') +
+            '</span></a>'
         );
     }
 
@@ -807,8 +832,13 @@
         const q = ($search.val() || '').trim().toLowerCase();
         const status = $statusFilter.val() || '';
         const blob = row._searchBlob || searchBlob(row);
-        if (q && String(blob).indexOf(q) < 0) {
-            return false;
+        if (q) {
+            const matched = window.cabinetMonitoringSearch
+                ? window.cabinetMonitoringSearch.matches(q, blob)
+                : String(blob).indexOf(q) >= 0;
+            if (!matched) {
+                return false;
+            }
         }
         if (status && String(row._statusCodes || '').indexOf(status) < 0) {
             return false;
@@ -1086,16 +1116,26 @@
                         escHtml(a.label) +
                         '</a>';
                     break;
+                case 'public_share':
+                    menuHtml +=
+                        '<a class="dropdown-item cabinet-mon-v2-public-share-open" href="#" data-id="' +
+                        a.id +
+                        '"><i class="' +
+                        escHtml(a.icon) +
+                        ' me-2"></i>' +
+                        escHtml(a.label) +
+                        '</a>';
+                    break;
                 default:
                     break;
             }
         });
 
         return (
-            '<div class="btn-group">' +
-            '<button type="button" data-bs-toggle="dropdown" class="btn btn-outline-secondary btn-sm dropdown-toggle cabinet-mon-v2-card__menu-btn" aria-expanded="false">' +
+            '<div class="btn-group cabinet-mon-v2-row-menu">' +
+            '<button type="button" data-bs-toggle="dropdown" aria-expanded="false" class="btn btn-outline-secondary btn-sm cabinet-mon-v2-card__menu-btn">' +
             '<i class="fas fa-bars" aria-hidden="true"></i></button>' +
-            '<div class="dropdown-menu dropdown-menu-end">' +
+            '<div class="dropdown-menu dropdown-menu-end shadow-sm">' +
             menuHtml +
             '</div></div>'
         );
@@ -1130,11 +1170,14 @@
             '" target="_blank" rel="noopener">' +
             escHtml(row.url) +
             '</a>' +
-            '<h3 class="cabinet-mon-v2-card__name"><a class="cabinet-mon-v2-card__name-link text-decoration-none" href="' +
+            '<div class="cabinet-mon-v2-card__name-row">' +
+            '<h3 class="cabinet-mon-v2-card__name mb-0"><a class="cabinet-mon-v2-card__name-link text-decoration-none" href="' +
             escHtml(showUrl) +
             '">' +
             escHtml(row.name || '—') +
             '</a></h3>' +
+            renderPublicShareBadge(row) +
+            '</div>' +
             '</div>' +
             '<div class="cabinet-mon-v2-card__menu">' +
             renderMenu(row.actions) +
@@ -1411,6 +1454,17 @@
             wireAvatarImages($tablePanel[0]);
             wireFaviconImages($tablePanel[0]);
         }
+    }
+
+    function mergePublicShareUpdate(projectId, share) {
+        const patch = {
+            public_share: {
+                active: !!(share && share.active),
+                url: share && share.url ? share.url : null,
+                expires_label: share && share.expires_label ? share.expires_label : null,
+            },
+        };
+        mergeSnapshotUpdates([{ id: projectId, public_share: patch.public_share }], true);
     }
 
     function mergeSnapshotUpdates(updates, fullRedraw) {
@@ -1917,7 +1971,11 @@
             } else {
                 const q = ($search.val() || '').trim().toLowerCase();
                 const status = $statusFilter.val() || '';
-                const matchSearch = !q || String($card.data('search') || '').indexOf(q) >= 0;
+                const matchSearch =
+                    !q ||
+                    (window.cabinetMonitoringSearch
+                        ? window.cabinetMonitoringSearch.matches(q, String($card.data('search') || ''))
+                        : String($card.data('search') || '').indexOf(q) >= 0);
                 const codes = String($card.data('status-codes') || '');
                 const matchStatus = !status || codes.indexOf(status) >= 0;
                 show = matchSearch && matchStatus;
@@ -2242,6 +2300,12 @@
         if (window.cabinetMonV2ChartSettings && window.cabinetMonV2ChartSettings.presetTopNumbers) {
             return window.cabinetMonV2ChartSettings.presetTopNumbers(preset);
         }
+        if (preset === '1') {
+            return [1];
+        }
+        if (preset === '3') {
+            return [3];
+        }
         if (preset === '10') {
             return [10];
         }
@@ -2249,7 +2313,10 @@
             return [3, 5, 10, 20, 100];
         }
         if (preset === '35102050100') {
-            return [3, 5, 10, 20, 50, 100];
+            return null;
+        }
+        if (preset === '35102030100') {
+            return [3, 5, 10, 20, 30, 100];
         }
         return null;
     }
@@ -2267,22 +2334,27 @@
         return allowed.indexOf(n) >= 0;
     }
 
-    function styleChildChartDataset(ds, metric) {
+    function styleChildChartDataset(ds, metric, seriesIndex) {
         const color =
-            metric === 'position' ? '#d9480f' : childChartColorForLabel(ds.label);
+            metric === 'position'
+                ? window.cabinetMonitoringChartScales
+                    ? window.cabinetMonitoringChartScales.lineColor(seriesIndex || 0)
+                    : '#1971c2'
+                : childChartColorForLabel(ds.label);
         return {
             label: ds.label,
             data: ds.data,
             borderColor: color,
-            backgroundColor: color + '22',
+            backgroundColor: color,
             borderWidth: 3,
             borderDash: [],
             pointRadius: 4,
             pointHoverRadius: 6,
-            pointBackgroundColor: '#fff',
-            pointBorderColor: color,
+            pointBackgroundColor: color,
+            pointBorderColor: '#ffffff',
             pointBorderWidth: 2,
             tension: 0.15,
+            spanGaps: true,
             fill: metric === 'position',
             hidden: false,
         };
@@ -2299,8 +2371,8 @@
         }
         return {
             labels: (apiData && apiData.labels) || [],
-            datasets: datasets.map(function (ds) {
-                return styleChildChartDataset(ds, metric);
+            datasets: datasets.map(function (ds, idx) {
+                return styleChildChartDataset(ds, metric, idx);
             }),
         };
     }
@@ -2322,18 +2394,22 @@
 
     function childChartYScaleOptions(datasets, metric) {
         if (metric !== 'position') {
-            return { min: 0, max: 100 };
+            return { min: 0, max: 100, reverse: false };
+        }
+        if (window.cabinetMonitoringChartScales && window.cabinetMonitoringChartScales.positionYBounds) {
+            return window.cabinetMonitoringChartScales.positionYBounds(datasets);
         }
         const vals = childChartNumericValues(datasets);
         if (!vals.length) {
-            return { min: 0, suggestedMax: 50 };
+            return { reverse: true, min: 1, suggestedMax: 50 };
         }
         let minV = Math.min.apply(null, vals);
         let maxV = Math.max.apply(null, vals);
         const span = maxV - minV || 8;
         const pad = Math.max(span * 0.15, 1);
         return {
-            min: Math.max(0, Math.floor(minV - pad)),
+            reverse: true,
+            min: Math.max(1, Math.floor(minV - pad)),
             max: Math.ceil(maxV + pad),
         };
     }
@@ -2435,6 +2511,7 @@
     function ensureChildRegionChart(canvas, metric, preset) {
         let chart = childChartStoreGet(canvas);
         const isPercent = metric === 'top';
+        const isPosition = metric === 'position';
         if (chart) {
             return chart;
         }
@@ -2466,16 +2543,21 @@
                     },
                 },
                 scales: {
-                    y: {
-                        min: 0,
-                        max: 100,
-                        ticks: {
-                            callback: function (v) {
-                                return isPercent ? v + '%' : v;
+                    y: isPosition
+                        ? (window.cabinetMonitoringChartScales
+                            ? window.cabinetMonitoringChartScales.lineY({ grid: { color: 'rgba(0, 0, 0, 0.07)' } })
+                            : { reverse: true, grid: { color: 'rgba(0, 0, 0, 0.07)' } })
+                        : {
+                            min: 0,
+                            max: 100,
+                            reverse: false,
+                            ticks: {
+                                callback: function (v) {
+                                    return v + '%';
+                                },
                             },
+                            grid: { color: 'rgba(0, 0, 0, 0.07)' },
                         },
-                        grid: { color: 'rgba(0, 0, 0, 0.07)' },
-                    },
                     x: {
                         ticks: { maxRotation: 45, minRotation: 0 },
                         grid: { display: false },
@@ -2498,6 +2580,7 @@
             metric === 'top' && (chart.data.datasets || []).length > 1;
         chart.options.scales.y.min = yBounds.min;
         chart.options.scales.y.max = yBounds.max;
+        chart.options.scales.y.reverse = !!yBounds.reverse;
         chart.options.scales.y.ticks.callback = function (v) {
             return isPercent ? v + '%' : v;
         };
@@ -2935,6 +3018,9 @@
     window.cabinetMonV2List = {
         reload: function () {
             window.location.reload();
+        },
+        patchPublicShare: function (projectId, share) {
+            mergePublicShareUpdate(projectId, share);
         },
     };
 

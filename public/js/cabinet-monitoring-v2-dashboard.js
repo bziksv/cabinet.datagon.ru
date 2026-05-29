@@ -218,8 +218,10 @@
         if (mainChart.options.scales && mainChart.options.scales.x) {
             if (isMiddle) {
                 delete mainChart.options.scales.x.max;
+                mainChart.options.scales.x.reverse = true;
             } else {
                 mainChart.options.scales.x.max = 100;
+                mainChart.options.scales.x.reverse = false;
             }
         }
         mainChart.update('none');
@@ -338,8 +340,8 @@
                 plugins: { legend: { display: false } },
                 scales: {
                     x: isMiddle
-                        ? { ticks: {} }
-                        : { max: 100, ticks: { callback: function (v) { return v + '%'; } } },
+                        ? { reverse: true, ticks: {} }
+                        : { max: 100, reverse: false, ticks: { callback: function (v) { return v + '%'; } } },
                 },
             },
         });

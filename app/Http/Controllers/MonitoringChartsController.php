@@ -3,6 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Classes\Monitoring\AreaChartData;
+use App\Classes\Monitoring\MonitoringChartPalette;
+use App\Classes\Monitoring\MonitoringChartPositionSeries;
+use App\Classes\Monitoring\MonitoringCompareKeywordIntersect;
+use App\Classes\Monitoring\MonitoringLocationLabel;
 use App\MonitoringPosition;
 use App\MonitoringProject;
 use Carbon\Carbon;
@@ -17,7 +21,7 @@ class MonitoringChartsController extends Controller
     protected $positions;
     protected $region;
 
-    private function initModelClasses(Request $request)
+    private function initModelClasses(Request $request): bool
     {
         $this->project = MonitoringProject::findOrFail($request->input('projectId', null));
 
@@ -27,14 +31,48 @@ class MonitoringChartsController extends Controller
             $this->keywords = $this->keywords->where('monitoring_group_id', $request->input('group'));
         }
 
-        $region = $this->project->searchengines();
+        $this->region = $this->resolveSearchengine($request);
 
-        if($request->input('regionId'))
-            $region->where('id', $request->input('regionId'));
+        if ($this->region === null) {
+            $this->positions = collect([]);
 
-        $this->region = $region->orderBy('id', 'asc')->first();
+            return false;
+        }
 
         $this->positions = $this->getPositionsForRange($request->input('dateRange', null));
+
+        return true;
+    }
+
+    /**
+     * Регион графика: id текущего проекта или сопоставление engine+lr (сравнение проектов).
+     */
+    private function resolveSearchengine(Request $request): ?\App\MonitoringSearchengine
+    {
+        $query = $this->project->searchengines();
+
+        if ($request->filled('regionId')) {
+            $byId = (clone $query)->where('id', $request->input('regionId'))->first();
+            if ($byId) {
+                return $byId;
+            }
+        }
+
+        if ($request->filled('matchEngine') && $request->filled('matchLr')) {
+            $byLr = (clone $query)
+                ->where('engine', $request->input('matchEngine'))
+                ->where('lr', $request->input('matchLr'))
+                ->orderBy('id')
+                ->first();
+            if ($byLr) {
+                return $byLr;
+            }
+            if ($request->boolean('strictMatch')) {
+                return null;
+            }
+        }
+
+        return $query->orderBy('id', 'asc')->first();
     }
 
     public function getPositionsForRange($dateRange = null)
@@ -65,26 +103,79 @@ class MonitoringChartsController extends Controller
 
     public function getChartData(Request $request)
     {
-        $this->initModelClasses($request);
+        @set_time_limit(120);
 
-        switch ($request->input('chart')){
+        $this->resolveKeywords($request);
 
-            case "regions_middle":
-                return $this->getMiddlePositionAllRegions($request);
-                break;
+        if ($request->input('chart') === 'regions_middle') {
+            return $this->wrapChartMeta($request, $this->getMiddlePositionAllRegions($request));
+        }
 
-            case "middle":
-                return $this->getMiddlePosition($request);
-                break;
+        $this->region = $this->resolveSearchengine($request);
+        if ($this->region === null || $this->keywords->isEmpty()) {
+            return (new AreaChartData([]))->setData([])->get();
+        }
 
-            case "distribution":
-                return $this->getDistributionByTop($request);
-                break;
+        switch ($request->input('chart')) {
+            case 'middle':
+                return $this->wrapChartMeta($request, $this->getMiddlePosition($request));
+
+            case 'distribution':
+                return $this->wrapChartMeta($request, $this->getDistributionByTop($request));
 
             default:
-                return $this->getTopPercent($request);
-
+                return $this->wrapChartMeta($request, $this->getTopPercent($request));
         }
+    }
+
+    private function resolveKeywords(Request $request): void
+    {
+        $this->project = MonitoringProject::findOrFail($request->input('projectId', null));
+        $this->keywords = $this->project->keywords;
+
+        if ($request->filled('group')) {
+            $this->keywords = $this->keywords->where('monitoring_group_id', (int) $request->input('group'));
+        }
+
+        if (!$request->boolean('intersect') || !$request->filled('intersectProjectId')) {
+            return;
+        }
+
+        $ids = MonitoringCompareKeywordIntersect::keywordIdsForIntersection(
+            (int) $this->project->id,
+            $request->filled('group') ? (int) $request->input('group') : null,
+            (int) $request->input('intersectProjectId'),
+            $request->filled('intersectGroup') ? (int) $request->input('intersectGroup') : null
+        );
+
+        $this->keywords = $this->keywords->whereIn('id', $ids)->values();
+    }
+
+    /**
+     * @return int[]
+     */
+    private function keywordIds(): array
+    {
+        return $this->keywords->pluck('id')->map(function ($id) {
+            return (int) $id;
+        })->all();
+    }
+
+    /**
+     * @param array<string, mixed> $chart
+     *
+     * @return array<string, mixed>
+     */
+    private function wrapChartMeta(Request $request, array $chart): array
+    {
+        if ($request->boolean('intersect')) {
+            $chart['_meta'] = [
+                'intersected' => true,
+                'keywords' => $this->keywords->count(),
+            ];
+        }
+
+        return $chart;
     }
 
     protected function getDistributionByTop(Request $request)
@@ -93,24 +184,37 @@ class MonitoringChartsController extends Controller
             'labels' => ['ТОП 3', 'ТОП 10', 'ТОП 30', 'ТОП 50', 'ТОП 100', 'ТОП 101+'],
             'data' => [0, 0, 0, 0, 0, 0],
         ];
-        $positionsGroupByDate = $this->getLastPositionsByDays();
 
-        if($positionsGroupByDate->isEmpty())
+        [$start, $end] = MonitoringChartPositionSeries::parseDateRange($request->input('dateRange', null));
+        $bucket = MonitoringChartPositionSeries::resolveBucket(null, $start, $end);
+        $groupId = $request->filled('group') ? (int) $request->input('group') : null;
+        $keywordIds = $this->keywordIds();
+        $positionsByDay = MonitoringChartPositionSeries::latestPositionsSeries(
+            (int) $this->project->id,
+            $groupId,
+            (int) $this->region->id,
+            $start,
+            $end,
+            $bucket,
+            $keywordIds
+        );
+
+        if ($positionsByDay->isEmpty()) {
             return (new AreaChartData([]))->setData([])->get();
+        }
 
-        $positions = $positionsGroupByDate->last();
+        $positions = $positionsByDay->last();
 
-        $response["data"][0] = $this->calculatePercentPositionsInTop($positions, 3);
-        $response["data"][1] = $this->calculatePercentPositionsInTop($positions, 10);
-        $response["data"][2] = $this->calculatePercentPositionsInTop($positions, 30);
-        $response["data"][3] = $this->calculatePercentPositionsInTop($positions, 50);
-        $response["data"][4] = $this->calculatePercentPositionsInTop($positions, 100);
-
+        $response['data'][0] = $this->calculatePercentPositionsInTop($positions, 3);
+        $response['data'][1] = $this->calculatePercentPositionsInTop($positions, 10);
+        $response['data'][2] = $this->calculatePercentPositionsInTop($positions, 30);
+        $response['data'][3] = $this->calculatePercentPositionsInTop($positions, 50);
+        $response['data'][4] = $this->calculatePercentPositionsInTop($positions, 100);
         $response['data'][5] += ($this->keywords->count() - $positions->count());
 
         $chart = new AreaChartData($response['labels']);
-        $chart->setBackgroundColor(['rgb(46, 150, 221)', 'rgb(33, 147, 108)', 'rgb(26, 188, 156)', 'rgb(162, 223, 159)', 'rgb(176, 199, 199)', 'rgb(251, 192, 45)'])
-            ->setBorderColor('#FFFFFF')
+        $chart->setBackgroundColor(MonitoringChartPalette::distributionColors())
+            ->setBorderColor('#ffffff')
             ->setHidden(false)
             ->setLabel('Распределение по ТОП-100')
             ->setData($response['data']);
@@ -120,78 +224,90 @@ class MonitoringChartsController extends Controller
 
     protected function getMiddlePosition(Request $request)
     {
-        $response = [];
-        $positions = $this->getLastPositions($request->input('range'));
+        [$start, $end] = MonitoringChartPositionSeries::parseDateRange($request->input('dateRange', null));
+        $bucket = MonitoringChartPositionSeries::resolveBucket($request->input('range'), $start, $end);
+        $groupId = $request->filled('group') ? (int) $request->input('group') : null;
+        $series = MonitoringChartPositionSeries::middleSeries(
+            (int) $this->project->id,
+            $groupId,
+            (int) $this->region->id,
+            $start,
+            $end,
+            $bucket,
+            $this->keywordIds()
+        );
 
-        if($positions->isEmpty())
+        if ($series->isEmpty()) {
             return (new AreaChartData([]))->setData([])->get();
-
-        foreach ($positions as $date => $position){
-
-            $response['labels'][] = $date;
-            $response['data'][] = round($position->sum() / $position->count());
         }
 
-        $chart = new AreaChartData($response['labels']);
-
+        $chart = new AreaChartData($series->keys()->values()->all());
         $chart->setBackgroundColor('#28a745')
             ->setHidden(false)
             ->setBorderColor('#28a745')
             ->setLabel('Средняя позиция')
-            ->setData($response['data']);
+            ->setData($series->values()->all());
 
         return $chart->get();
     }
 
     protected function getMiddlePositionAllRegions(Request $request)
     {
-        if($this->project->searchengines->count() <= 1)
-            return false;
-
-        $response = [];
-
-        foreach($this->project->searchengines as $engine){
-
-            $this->region = $engine;
-            $this->positions = $this->getPositionsForRange($request->input('dateRange', null));
-            $positions = $this->getLastPositions($request->input('range'));
-
-            if($positions->isEmpty())
-                return (new AreaChartData([]))->setData([])->get();
-
-            foreach ($positions as $label => $position){
-
-                $response['labels'][] = $label;
-                $response['data'][$engine->lr][$label] = round($position->sum() / $position->count());
-            }
-        }
-        $response['labels'] = array_unique($response['labels']);
-
-        foreach($response['labels'] as $label){
-
-            foreach ($response['data'] as &$data){
-                if(!array_key_exists($label, $data))
-                    $data[$label] = null;
-            }
+        if ($this->project->searchengines->count() <= 1) {
+            return (new AreaChartData([]))->setData([])->get();
         }
 
-        $chart = new AreaChartData($response['labels']);
+        [$start, $end] = MonitoringChartPositionSeries::parseDateRange($request->input('dateRange', null));
+        $bucket = MonitoringChartPositionSeries::resolveBucket($request->input('range'), $start, $end);
+        $groupId = $request->filled('group') ? (int) $request->input('group') : null;
+        $engineIds = $this->project->searchengines->pluck('id')->map(function ($id) {
+            return (int) $id;
+        })->all();
 
-        foreach ($response['data'] as $lr => &$data){
+        $seriesByEngine = MonitoringChartPositionSeries::middleSeriesByEngines(
+            (int) $this->project->id,
+            $groupId,
+            $engineIds,
+            $start,
+            $end,
+            $bucket,
+            $this->keywordIds()
+        );
 
-            $order = $response['labels'];
-            uksort($data, function($key1, $key2) use ($order) {
-                return ((array_search($key1, $order) > array_search($key2, $order)) ? 1 : -1);
-            });
+        if ($seriesByEngine === []) {
+            return (new AreaChartData([]))->setData([])->get();
+        }
 
-            $region = $this->project->searchengines->where('lr', $lr)->first();
-            $color = sprintf('#%06X', mt_rand(0, 0xFFFFFF));
+        $labels = [];
+        foreach ($seriesByEngine as $series) {
+            foreach ($series->keys() as $label) {
+                $labels[] = $label;
+            }
+        }
+        $labels = array_values(array_unique($labels));
+        usort($labels, function ($a, $b) {
+            return strtotime(str_replace('.', '-', $a)) <=> strtotime(str_replace('.', '-', $b));
+        });
 
+        $chart = new AreaChartData($labels);
+        $seriesIndex = 0;
+        foreach ($this->project->searchengines as $engine) {
+            $series = $seriesByEngine[(int) $engine->id] ?? null;
+            if ($series === null || $series->isEmpty()) {
+                continue;
+            }
+
+            $dataByLabel = [];
+            foreach ($labels as $label) {
+                $dataByLabel[$label] = $series->has($label) ? $series->get($label) : null;
+            }
+
+            $color = MonitoringChartPalette::lineColor($seriesIndex++);
             $chart->setBackgroundColor($color)
                 ->setHidden(false)
                 ->setBorderColor($color)
-                ->setLabel($region->location->name . ' [' . $lr . ']')
-                ->setData($data);
+                ->setLabel(MonitoringLocationLabel::chartLegend($engine))
+                ->setDataForLabels($labels, $dataByLabel);
         }
 
         return $chart->get();
@@ -199,36 +315,47 @@ class MonitoringChartsController extends Controller
 
     protected function getTopPercent(Request $request)
     {
-        $topSettings = [
-            1 => ['top' => 1, 'color' => '#228B22', 'hidden' => true],
-            3 => ['top' => 3, 'color' => '#1E90FF', 'hidden' => true],
-            5 => ['top' => 5, 'color' => '#008080', 'hidden' => true],
-            10 => ['top' => 10, 'color' => '#9370DB', 'hidden' => false],
-            20 => ['top' => 20, 'color' => '#D2691E', 'hidden' => true],
-            30 => ['top' => 30, 'color' => '#CD5C5C', 'hidden' => true],
-            40 => ['top' => 40, 'color' => '#B22222', 'hidden' => true],
-            50 => ['top' => 50, 'color' => '#A9A9A9', 'hidden' => true],
-        ];
-        $response = [];
-        $positions = $this->getLastPositions($request->input('range'));
+        $topTops = [1, 3, 5, 10, 20, 30, 50, 100];
+        $topSettings = [];
+        foreach ($topTops as $i => $top) {
+            $color = MonitoringChartPalette::lineColor($i);
+            $topSettings[$top] = ['top' => $top, 'color' => $color, 'hidden' => false];
+        }
 
-        if($positions->isEmpty())
+        [$start, $end] = MonitoringChartPositionSeries::parseDateRange($request->input('dateRange', null));
+        $bucket = MonitoringChartPositionSeries::resolveBucket($request->input('range'), $start, $end);
+        $groupId = $request->filled('group') ? (int) $request->input('group') : null;
+        $keywordIds = $this->keywordIds();
+        $positionsByDay = MonitoringChartPositionSeries::latestPositionsSeries(
+            (int) $this->project->id,
+            $groupId,
+            (int) $this->region->id,
+            $start,
+            $end,
+            $bucket,
+            $keywordIds
+        );
+
+        if ($positionsByDay->isEmpty()) {
             return (new AreaChartData([]))->setData([])->get();
+        }
 
-        foreach ($positions as $date => $position){
-
+        $response = ['labels' => [], 'data' => []];
+        foreach ($positionsByDay as $date => $position) {
             $response['labels'][] = $date;
-            foreach ($topSettings as $setting)
+            foreach ($topSettings as $setting) {
                 $response['data'][$setting['top']][] = $this->calculatePercentPositionsInTop($position, $setting['top']);
+            }
         }
 
         $chart = new AreaChartData($response['labels']);
-        foreach ($response['data'] as $top => $data)
-        $chart->setBackgroundColor($topSettings[$top]['color'])
-            ->setHidden($topSettings[$top]['hidden'])
-            ->setBorderColor($topSettings[$top]['color'])
-            ->setLabel('% ключей в ТОП-' . $top)
-            ->setData($data);
+        foreach ($response['data'] as $top => $data) {
+            $chart->setBackgroundColor($topSettings[$top]['color'])
+                ->setHidden($topSettings[$top]['hidden'])
+                ->setBorderColor($topSettings[$top]['color'])
+                ->setLabel('% ключей в ТОП-' . $top)
+                ->setData($data);
+        }
 
         return $chart->get();
     }

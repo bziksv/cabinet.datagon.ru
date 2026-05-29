@@ -15,6 +15,11 @@ class PositionsPercentCalculate
         $this->positions = $positions;
     }
 
+    public function top1()
+    {
+        return $this->calculate(1);
+    }
+
     public function top3()
     {
         return $this->calculate(3);

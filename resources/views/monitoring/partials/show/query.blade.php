@@ -3,7 +3,11 @@
 </span>
 
 @if($key->page)
-    <a href="{{ $key->page }}" data-bs-toggle="popover" title="Целевой URL" data-content="{{ view('monitoring.partials.show.popover.url', ['url' => $key->page])->render() }}">
+    <a href="{{ $key->page }}"
+       data-bs-toggle="popover"
+       data-bs-title="Целевой URL"
+       data-bs-html="true"
+       data-bs-content="{{ view('monitoring.partials.show.popover.url', ['url' => $key->page])->render() }}">
         <span class="badge badge-light"><i class="fas fa-link"></i></span>
     </a>
 @endif

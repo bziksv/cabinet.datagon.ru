@@ -394,6 +394,7 @@
         <!-- DataTables  & Plugins -->
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
+        @include('monitoring.partials.smart-search-script')
         <!-- Charts -->
         <script src="{{ asset('plugins/chart.js/2.7.3/chart.min.js') }}"></script>
         <!-- InputMask -->
@@ -533,6 +534,11 @@
                             "next": "»",
                             "previous": "«"
                         },
+                    },
+                    initComplete: function () {
+                        if (window.cabinetMonitoringSearch) {
+                            window.cabinetMonitoringSearch.dataTableInitComplete.call(this);
+                        }
                     },
                 })
             }
@@ -760,7 +766,12 @@
                         },
                         drawCallback: function (settings) {
                             colorCells()
-                        }
+                        },
+                        initComplete: function () {
+                            if (window.cabinetMonitoringSearch) {
+                                window.cabinetMonitoringSearch.dataTableInitComplete.call(this);
+                            }
+                        },
                     })
                 }
 

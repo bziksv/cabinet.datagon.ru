@@ -44,9 +44,29 @@ class AreaChartData
             'backgroundColor' => $this->backgroundColor,
             'borderColor' => $this->borderColor,
             'hidden' => $this->hidden,
+            'spanGaps' => true,
+            'pointRadius' => 3,
+            'pointHoverRadius' => 5,
+            'tension' => 0.15,
         ];
 
         return $this;
+    }
+
+    /**
+     * Точки в порядке labels (для пропусков — null, линия через spanGaps).
+     *
+     * @param array<int, string> $labels
+     * @param array<string, mixed> $valuesByLabel
+     */
+    public function setDataForLabels(array $labels, array $valuesByLabel): AreaChartData
+    {
+        $series = [];
+        foreach ($labels as $label) {
+            $series[] = array_key_exists($label, $valuesByLabel) ? $valuesByLabel[$label] : null;
+        }
+
+        return $this->setData($series);
     }
 
     /**

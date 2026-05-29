@@ -428,12 +428,17 @@
     background: var(--mon-v2-panel);
     border: 1px solid #cbd5e1;
     border-radius: 0.75rem;
-    overflow: hidden;
+    overflow: visible;
     box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
 }
 
 .cabinet-mon-v2-table-scroll {
     overflow-x: auto;
+    overflow-y: visible;
+}
+
+.cabinet-mon-v2-table-scroll .dataTables_wrapper {
+    overflow: visible;
 }
 
 /* DataTables FixedHeader на длинной странице v2 даёт «полосу» и перекрывает строки — не используем */
@@ -1150,11 +1155,71 @@ button.cabinet-mon-v2-favicon-btn {
 }
 
 .cabinet-mon-v2-quick-actions {
-    display: flex;
-    flex-wrap: wrap;
+    display: inline-flex;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: flex-end;
     gap: 0.35rem;
+}
+
+.cabinet-mon-v2-quick-actions .btn-sm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 31px;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.cabinet-mon-v2-quick-actions .btn-group,
+.cabinet-mon-v2-row-menu {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.cabinet-mon-v2-table tbody td.project-actions {
+    overflow: visible;
+    position: relative;
+    white-space: nowrap;
+    min-width: 11rem;
+}
+
+.cabinet-mon-v2-quick-actions .dropdown-menu {
+    z-index: 1060;
+    min-width: 13rem;
+    padding: 0.35rem 0;
+    border-color: #dee2e6;
+}
+
+.cabinet-mon-v2-quick-actions .dropdown-item,
+.cabinet-mon-v2-card__menu .dropdown-item {
+    color: #212529 !important;
+    font-size: 0.875rem;
+    padding: 0.45rem 0.85rem;
+}
+
+.cabinet-mon-v2-quick-actions .dropdown-item:hover,
+.cabinet-mon-v2-quick-actions .dropdown-item:focus,
+.cabinet-mon-v2-card__menu .dropdown-item:hover,
+.cabinet-mon-v2-card__menu .dropdown-item:focus {
+    color: #1e2125 !important;
+    background-color: #f1f5f9;
+}
+
+.cabinet-mon-v2-quick-actions .dropdown-item i,
+.cabinet-mon-v2-card__menu .dropdown-item i {
+    color: #64748b;
+    width: 1.1rem;
+    text-align: center;
+}
+
+.cabinet-mon-v2-quick-actions .dropdown-divider,
+.cabinet-mon-v2-card__menu .dropdown-divider {
+    margin: 0.35rem 0;
 }
 
 .cabinet-mon-v2-quick-actions .btn-primary {
@@ -1686,5 +1751,76 @@ button.cabinet-mon-v2-favicon-btn {
 @media (min-width: 992px) {
     .cabinet-mon-v2-skeleton {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Публичный отчёт / модалка «Статистика для клиента» */
+.cabinet-mon-v2-public-banner {
+    border-left: 4px solid var(--bs-info);
+}
+
+.cabinet-mon-v2-public-kpi {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    background: #fff;
+    height: 100%;
+}
+
+.cabinet-mon-v2-public-kpi__value {
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+.cabinet-mon-v2-public-kpi__label {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+    margin-top: 0.25rem;
+}
+
+.cabinet-mon-v2-public-table th,
+.cabinet-mon-v2-public-table td {
+    font-size: 0.8125rem;
+    vertical-align: middle;
+}
+
+.cabinet-mon-v2-public-share-modal__footer {
+    background: #f8f9fa;
+}
+
+.cabinet-mon-v2-public-share__ttl {
+    max-width: 9rem;
+}
+
+.cabinet-mon-v2-project-cell__name-row,
+.cabinet-mon-v2-card__name-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.cabinet-mon-v2-public-share-badge {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.2;
+    padding: 0.2rem 0.45rem;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.cabinet-mon-v2-public-share-badge:hover {
+    filter: brightness(0.95);
+    color: #fff;
+}
+
+.cabinet-mon-v2-public-share-badge__text {
+    margin-left: 0.2rem;
+}
+
+@media (max-width: 575.98px) {
+    .cabinet-mon-v2-public-share-badge__text {
+        display: none;
     }
 }

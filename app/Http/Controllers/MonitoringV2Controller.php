@@ -7,6 +7,10 @@ use App\Classes\Monitoring\MonitoringProjectListSerializer;
 use App\Classes\Monitoring\ProjectFaviconFetcher;
 use App\Classes\Monitoring\ProjectFaviconService;
 use App\MonitoringProject;
+use App\MonitoringPublicShare;
+use App\Classes\Monitoring\MonitoringProjectPageSummary;
+use App\Support\MonitoringProjectPublicStats;
+use App\Support\MonitoringPublicShareTtl;
 use App\MonitoringV2UserPreference;
 use App\Support\MonitoringV2DebugLog;
 use App\User;
@@ -138,7 +142,7 @@ class MonitoringV2Controller extends Controller
     }
 
     /**
-     * Тренд среднего ТОП-10 по портфелю (30/60/90/180/366 дней).
+     * Тренд среднего ТОП-10 по портфелю (30/60/90/180/365 дней).
      */
     public function portfolioTop10Trend(Request $request, MonitoringPortfolioTop10TrendService $trend): JsonResponse
     {
@@ -397,6 +401,141 @@ class MonitoringV2Controller extends Controller
 
         // ?host= — не качаем в HTTP (список v2 догружает через favicons/fill).
         return response('', 404);
+    }
+
+    /**
+     * KPI и регионы проекта для модалки «Статистика для клиента».
+     */
+    public function projectStats(Request $request): JsonResponse
+    {
+        App::setLocale('ru');
+
+        $project = $this->findAccessibleProject((int) $request->input('projectId'));
+
+        $regionId = $request->filled('regionId') ? (int) $request->input('regionId') : null;
+
+        $payload = MonitoringProjectPublicStats::buildForExport($project);
+        $payload['summary'] = MonitoringProjectPageSummary::build($project, $regionId);
+        $payload['share'] = $this->shareStateForProject($project);
+
+        return response()->json($payload);
+    }
+
+    public function createPublicShare(Request $request): JsonResponse
+    {
+        App::setLocale('ru');
+
+        $project = $this->findAccessibleProject((int) $request->input('projectId'));
+
+        if (!MonitoringPublicShare::tableAvailable()) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Monitoring public share unavailable'),
+                'code' => 503,
+            ], 503);
+        }
+
+        $ttlDays = MonitoringPublicShareTtl::normalize($request->input('ttl_days', 30));
+        $report = MonitoringProjectPublicStats::buildForExport($project);
+        $meta = $this->buildReportMeta($project);
+        $share = MonitoringPublicShare::issueForProject(
+            (int) Auth::id(),
+            $project->id,
+            $report,
+            $meta,
+            $ttlDays
+        );
+
+        if ($share === null) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Public link could not be created.'),
+                'code' => 500,
+            ], 500);
+        }
+
+        MonitoringProjectListSerializer::forgetCacheForUser((int) Auth::id());
+
+        return response()->json([
+            'success' => true,
+            'message' => __('Public link created'),
+            'url' => $share->publicUrl(),
+            'ttl_days' => $ttlDays,
+            'expires_at' => $share->expires_at ? $share->expires_at->format('d.m.Y H:i') : null,
+            'expires_label' => $share->expiresLabel(),
+        ]);
+    }
+
+    public function revokePublicShare(Request $request): JsonResponse
+    {
+        App::setLocale('ru');
+
+        $project = $this->findAccessibleProject((int) $request->input('projectId'));
+
+        if (!MonitoringPublicShare::tableAvailable()) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Public sharing is temporarily unavailable.'),
+                'code' => 503,
+            ], 503);
+        }
+
+        MonitoringPublicShare::revokeForProject((int) Auth::id(), $project->id);
+
+        MonitoringProjectListSerializer::forgetCacheForUser((int) Auth::id());
+
+        return response()->json([
+            'success' => true,
+            'message' => __('Public link revoked'),
+        ]);
+    }
+
+    protected function findAccessibleProject(int $id): MonitoringProject
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        return $user->monitoringProjects()->findOrFail($id);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function buildReportMeta(MonitoringProject $project): array
+    {
+        return [
+            'generated_at' => now()->format('d.m.Y H:i'),
+            'source_label' => trim($project->name . ' · ' . $project->url),
+            'version' => config('cabinet-monitoring.version'),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function shareStateForProject(MonitoringProject $project): array
+    {
+        if (!MonitoringPublicShare::tableAvailable()) {
+            return [
+                'available' => false,
+                'url' => null,
+                'expires_at' => null,
+                'expires_label' => null,
+                'ttl_days' => 30,
+                'ttl_options' => [],
+            ];
+        }
+
+        $share = MonitoringPublicShare::activeForProject($project->id, (int) Auth::id());
+
+        return [
+            'available' => true,
+            'url' => $share ? $share->publicUrl() : null,
+            'expires_at' => $share && $share->expires_at ? $share->expires_at->format('d.m.Y H:i') : null,
+            'expires_label' => $share ? $share->expiresLabel() : null,
+            'ttl_days' => $share ? $share->ttlDaysFromPayload() : 30,
+            'ttl_options' => MonitoringPublicShareTtl::labelsForUi(),
+        ];
     }
 
     private function isMonitoringDebugUser(User $user): bool

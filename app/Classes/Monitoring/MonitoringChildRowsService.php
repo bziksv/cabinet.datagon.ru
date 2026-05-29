@@ -45,6 +45,52 @@ class MonitoringChildRowsService
         });
     }
 
+    /**
+     * Регионы и срезы для публичного отчёта (JSON, без HTML).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function exportGroupsForProject(MonitoringProject $project): array
+    {
+        $formatter = app(MonitoringSearchengineScheduleFormatter::class);
+        $groups = $this->buildGroups($project, null);
+
+        return $groups->map(function ($engine) use ($formatter) {
+            $schedule = $formatter->describe($engine);
+
+            return [
+                'engine' => (string) $engine->engine,
+                'location' => MonitoringLocationLabel::displayName(
+                    (string) $engine->engine,
+                    (string) $engine->lr,
+                    $engine->location ? (string) $engine->location->name : null
+                ),
+                'lr' => (string) $engine->lr,
+                'schedule' => $schedule['label'],
+                'rows' => $engine->data->map(function ($row) {
+                    return [
+                        'date' => !empty($row->latest_created)
+                            ? $row->latest_created->format('d.m.Y')
+                            : null,
+                        'period_label' => (string) ($row->snapshot_period_label ?? ''),
+                        'delta_vs_label' => (string) ($row->delta_vs_label ?? ''),
+                        'middle' => $row->middle_position,
+                        'top_1' => (string) ($row->top_1 ?? ''),
+                        'top_3' => (string) ($row->top_3 ?? ''),
+                        'top_5' => (string) ($row->top_5 ?? ''),
+                        'top_10' => (string) ($row->top_10 ?? ''),
+                        'top_20' => (string) ($row->top_20 ?? ''),
+                        'top_50' => (string) ($row->top_50 ?? ''),
+                        'top_100' => (string) ($row->top_100 ?? ''),
+                        'mastered' => $row->mastered ?? null,
+                        'mastered_percent' => $row->mastered_percent ?? null,
+                        'mastered_percent_day' => $row->mastered_percent_day ?? null,
+                    ];
+                })->values()->all(),
+            ];
+        })->values()->all();
+    }
+
     public static function forgetProjectCache(int $projectId): void
     {
         Cache::put('monitoring_child_rows_ver:' . $projectId, (int) Cache::get('monitoring_child_rows_ver:' . $projectId, 0) + 1, 86400);

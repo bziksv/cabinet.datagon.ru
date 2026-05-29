@@ -77,6 +77,7 @@ class ProjectData
     {
         $percentOfTop = new PositionsPercentCalculate($this->positions->pluck('position'));
 
+        $this->result['top1'] = $percentOfTop->top1();
         $this->result['top3'] = $percentOfTop->top3();
         $this->result['top5'] = $percentOfTop->top5();
         $this->result['top10'] = $percentOfTop->top10();

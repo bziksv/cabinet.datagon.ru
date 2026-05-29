@@ -62,7 +62,7 @@
 @include('layouts.partials.lte4-scripts')
 <script src="{{ asset('js/cabinet-jquery-modal-bridge.js') }}"></script>
 <script src="{{ asset('js/cabinet-bs5-shim.js') }}"></script>
-<script src="{{ asset('js/cabinet-select2-defaults.js') }}"></script>
+<script src="{{ asset('js/cabinet-select2-defaults.js') }}?v={{ @filemtime(public_path('js/cabinet-select2-defaults.js')) ?: time() }}"></script>
 <script src="{{ asset('js/cabinet-lte3-widgets.js') }}"></script>
 
 @if(request()->route()->parameter('statistic_project_id') !== null)

@@ -126,14 +126,16 @@ class PositionsExport implements FromView, WithDefaultStyles, WithEvents, WithSt
                 if (preg_match('/data-position/', $field)) {
                     $col = $this->formatPosition($field);
                     $col['color'] = null;
+                    $position = (int) ($col[0] ?? 101);
 
-                    if ($target >= (int)$col[0]) {
+                    if ($target >= $position) {
                         $col['color'] = $this->green;
                     } else {
                         $ck = 'col_' . (filter_var($fk, FILTER_SANITIZE_NUMBER_INT) + 1);
                         if (isset($el[$ck]) && is_string($el[$ck])) {
                             $p = $this->formatPosition($el[$ck]);
-                            if ($target >= (int)$p[0]) {
+                            $prevPosition = (int) ($p[0] ?? 101);
+                            if ($target >= $prevPosition) {
                                 $col['color'] = $this->yellow;
                             }
                         }
@@ -148,6 +150,10 @@ class PositionsExport implements FromView, WithDefaultStyles, WithEvents, WithSt
 
     private function formatPosition(string $field): array
     {
-        return array_values(array_filter(explode(' ', trim(strip_tags($field)))));
+        $parts = explode(' ', trim(strip_tags($field)));
+
+        return array_values(array_filter($parts, static function ($part) {
+            return $part !== '';
+        }));
     }
 }

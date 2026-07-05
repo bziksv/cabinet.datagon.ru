@@ -12,6 +12,7 @@ use App\Classes\Monitoring\MonitoringProjectPageSummary;
 use App\Support\MonitoringProjectPublicStats;
 use App\Support\MonitoringPublicShareTtl;
 use App\MonitoringV2UserPreference;
+use App\Support\MonitoringPositionsSchedule;
 use App\Support\MonitoringV2DebugLog;
 use App\User;
 use Illuminate\Contracts\View\View;
@@ -37,6 +38,8 @@ class MonitoringV2Controller extends Controller
 
         /** @var User $user */
         $user = Auth::user();
+
+        MonitoringPositionsSchedule::enforceForFreeUser($user);
 
         $count = $user->monitoringProjects()->count();
         $isMonitoringAdmin = $user->hasAnyRole(['Super Admin', 'admin']);

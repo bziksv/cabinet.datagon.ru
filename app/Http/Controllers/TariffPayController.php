@@ -108,11 +108,20 @@ class TariffPayController extends Controller
 
         return collect([
             'name' => ['title' => __('Tariff'), 'value' => $tariff->name()],
-            'days' => ['title' => __('Days'), 'value' => $tariff->getPeriod()->days()],
-            'price' => ['title' => __('Price'), 'value' => $tariff->price('price')],
-            'discount' => ['title' => __('Discount'), 'value' => $tariff->price('discount')],
-            'total' => ['title' => __('Total'), 'value' => $tariff->price('priceWithDiscount')]
+            'days' => ['title' => __('Days'), 'value' => $this->formatTariffDisplayValue($tariff->getPeriod()->days())],
+            'price' => ['title' => __('Price'), 'value' => $this->formatTariffDisplayValue($tariff->price('price'))],
+            'discount' => ['title' => __('Discount'), 'value' => $this->formatTariffDisplayValue($tariff->price('discount'))],
+            'total' => ['title' => __('Total'), 'value' => $this->formatTariffDisplayValue($tariff->price('priceWithDiscount'))],
         ]);
+    }
+
+    private function formatTariffDisplayValue($value): string
+    {
+        if (is_numeric($value)) {
+            return number_format((int) $value, 0, '.', ' ');
+        }
+
+        return (string) $value;
     }
 
     /**

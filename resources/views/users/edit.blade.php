@@ -49,6 +49,7 @@
                     'telegramConnected' => $telegramConnected,
                     'canManageStatistic' => $canManageStatistic,
                 ])
+                @include('users.partials.storage-footprint', ['user' => $user, 'storageFootprint' => $storageFootprint ?? null])
             </div>
 
             <div class="col-lg-8 col-xl-9">
@@ -234,4 +235,11 @@
         });
         })(jQuery);
     </script>
+    <script>
+        window.cabinetUsersAdminConfig = {
+            footprintRefreshUrl: @json(route('users.storage-footprint.refresh')),
+            i18n: {},
+        };
+    </script>
+    <script src="{{ asset('js/cabinet-users-admin.js') }}?v={{ @filemtime(public_path('js/cabinet-users-admin.js')) ?: time() }}"></script>
 @endsection

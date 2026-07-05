@@ -73,7 +73,7 @@
                 <i class="bi bi-graph-up" aria-hidden="true"></i>{{ __('Monitoring position') }}
             </a>
         @endif
-        @if($activeModule === 'competitors')
+        @if($activeModule === 'competitors' || $activeModule === 'competitors-positions' || $activeModule === 'competitors-dynamics')
             <span class="cabinet-mon-project-module-nav__item is-active">
                 <i class="bi bi-people" aria-hidden="true"></i>{{ __('My competitors') }}
             </span>

@@ -421,6 +421,9 @@
             return true;
         },
         scan: function () {
+            if (cfg.onFreeTariff) {
+                return true;
+            }
             const id = getProjectId();
             if (!id) {
                 return false;

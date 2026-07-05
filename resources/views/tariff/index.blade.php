@@ -185,7 +185,7 @@
                                                 <span>{{ $fname }}: <i class="bi bi-infinity" title="{{ __('Unlimited') }}"></i></span>
                                             @else
                                                 <i class="bi bi-check-circle-fill text-success flex-shrink-0" aria-hidden="true"></i>
-                                                <span>{{ $fname }}: <strong>{{ $setting['value'] }}</strong></span>
+                                                <span>{{ $fname }}: <strong>{{ number_format((int) $setting['value'], 0, '.', ' ') }}</strong></span>
                                             @endif
                                         </li>
                                     @endif
@@ -280,7 +280,7 @@
                                             @elseif((int) $cell['value'] === 1000000)
                                                 <i class="bi bi-infinity text-success" title="{{ __('Unlimited') }}"></i>
                                             @else
-                                                <strong>{{ $cell['value'] }}</strong>
+                                                <strong>{{ number_format((int) $cell['value'], 0, '.', ' ') }}</strong>
                                             @endif
                                         </td>
                                     @endforeach

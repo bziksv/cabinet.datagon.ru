@@ -63,6 +63,7 @@
         <script src="{{ asset('plugins/moment/moment.min.js') }}"></script>
         <script>
             window.cabinetMonCreateConfig = {
+                onFreeTariff: @json($onFreeTariff ?? false),
                 urls: {
                     create: @json(url('/monitoring/creator/create')),
                     update: @json(url('/monitoring/creator/update')),

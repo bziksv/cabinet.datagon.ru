@@ -8,6 +8,8 @@ use App\Classes\Cron\DeleteUnverifiedUsers;
 use App\Classes\Cron\HttpHeadersDelete;
 use App\Classes\Cron\MetaTags;
 use App\Classes\Cron\MetaTagsHistoriesDelete;
+use App\Classes\Cron\MonitoringCompetitorsDynamicsCleanup;
+use App\Classes\Cron\MonitoringFreeTariffPositionsCleanup;
 use App\Classes\Cron\MonitoringPublicSharesDelete;
 use App\Classes\Cron\HtmlEditorPublicSharesDelete;
 use App\Classes\Cron\RelevancePublicSharesDelete;
@@ -21,6 +23,7 @@ use App\Console\Commands\SearchIndicesRemoveAll;
 use App\MonitoringProject;
 use App\MonitoringSearchengine;
 use App\MonitoringSettings;
+use App\User;
 use Carbon\Carbon;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
@@ -78,6 +81,8 @@ class Kernel extends ConsoleKernel
 
         $schedule->command(SearchIndicesDelete::class)->daily();
         $schedule->command(SearchIndicesRemoveAll::class)->daily();
+        $schedule->call(new MonitoringFreeTariffPositionsCleanup())->dailyAt('04:20');
+        $schedule->call(new MonitoringCompetitorsDynamicsCleanup())->dailyAt('04:25');
 
         // $schedule->command('inspire')
         //          ->hourly();
@@ -99,6 +104,11 @@ class Kernel extends ConsoleKernel
 
                 if (empty($engine->project)) {
                     $engine->delete();
+                    continue;
+                }
+
+                $creator = User::query()->find((int) $engine->project->creator);
+                if ($creator instanceof User && $creator->onFreeTariff()) {
                     continue;
                 }
 

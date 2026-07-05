@@ -139,6 +139,7 @@
             alwaysShowCalendars: true,
             showCustomRangeLabel: false,
             locale: buildLocale(i18n),
+            autoUpdateInput: options.autoUpdateInput !== false,
         });
 
         if (options.includeModeRadios !== false) {

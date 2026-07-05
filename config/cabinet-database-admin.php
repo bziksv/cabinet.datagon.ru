@@ -6,7 +6,30 @@
  * @see App\Services\Database\DatabaseInventoryService
  */
 return [
-    'version' => '1.1.1s',
+    'version' => '1.1.3s',
+
+    /** Таймаут AJAX-превью строк, секунды */
+    'row_preview_timeout_seconds' => 15,
+
+    /**
+     * Превью: ORDER BY id DESC (PK), не created_at — иначе на search_indices (17M+) минуты.
+     * Совпадает с date_probe_light_tables + типичные гигантские таблицы.
+     */
+    'row_preview_order_by_id_tables' => [
+        'search_indices',
+        'monitoring_positions',
+        'monitoring_stats',
+        'relevance_history',
+        'relevance_history_result',
+    ],
+
+    /**
+     * Таблицы, для которых на /admin/database показывается «Очистить» (TRUNCATE + OPTIMIZE).
+     * Только явный whitelist — случайно не снести продуктовые данные.
+     */
+    'clearable_tables' => [
+        'failed_jobs',
+    ],
 
     /**
      * Подписи колонок в колонке «Диапазон данных» (вместо сырого created_at и т.п.).
@@ -50,6 +73,7 @@ return [
         'sessions' => ['payload'],
         'jobs' => ['payload'],
         'failed_jobs' => [],
+        'search_indices' => ['url', 'title', 'snippet', 'source'],
     ],
 
     /** Кэш снимка (information_schema + маппинг), секунды */

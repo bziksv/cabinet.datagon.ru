@@ -31,8 +31,8 @@
         ])
 
         @if($isMonitoringAdmin)
-            <div class="cabinet-mon-v2-admin-strip text-secondary small">
-                <i class="bi bi-shield-check me-1" aria-hidden="true"></i>{{ __('Monitoring v2 admin strip') }}
+            <div class="cabinet-mon-v2-admin-panel mt-3">
+                @include('monitoring.admin._btn')
             </div>
             @include('monitoring-v2.partials.admin-debug-log', ['isMonitoringAdmin' => $isMonitoringAdmin])
         @endif
@@ -129,6 +129,7 @@
                     scheduleManual: @json(__('Monitoring v2 schedule manual')),
                     scheduleRegionsCount: @json(__('Monitoring v2 schedule regions count')),
                     colBudget: @json(__('Budget')),
+                    colMastered: @json(__('Mastered')),
                     childChartShow: @json(__('Monitoring child chart show')),
                     childChartHide: @json(__('Monitoring child chart hide')),
                     childChartMetricPosition: @json(__('Monitoring child chart metric position')),

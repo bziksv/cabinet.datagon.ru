@@ -29,8 +29,6 @@
             </div>
         </div>
 
-        @include('users.partials.activity-dashboard', ['activity' => $activity])
-
         <div class="row g-2 g-md-3 mb-3 cabinet-users-stat">
             <div class="col-6 col-lg-3 d-flex">
                 <div class="info-box mb-0 flex-fill">
@@ -75,41 +73,52 @@
 
         @include('users.partials.filters')
 
-        @include('users.partials.legend')
+        @include('partials.monitoring-stale-schedules', [
+            'staleMonitoring' => $staleMonitoring,
+            'staleIdPrefix' => 'cabinet-users-stale',
+            'staleExpanded' => false,
+            'staleShowLogic' => false,
+            'staleTitle' => __('Users stale monitoring title'),
+            'staleFilterOnUsersPage' => true,
+        ])
+
+        @include('users.partials.storage-footprint', ['footprintRefreshedAt' => $footprintRefreshedAt ?? null])
 
         <div class="card cabinet-users-card shadow-sm">
-            <div class="card-header d-flex flex-wrap align-items-center justify-content-between">
-                <h3 class="card-title mb-0">{{ __('User list') }}</h3>
-                <div class="dropdown">
-                    <button type="button"
-                            class="btn btn-sm btn-outline-secondary dropdown-toggle"
-                            data-bs-toggle="dropdown"
-                            aria-expanded="false">
-                        <i class="bi bi-download me-1"></i>{{ __('Export and actions') }}
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li>
-                            <a class="dropdown-item" href="{{ route('get.verified.users', 'xls') }}">
-                                <i class="bi bi-file-earmark-excel me-2 text-success"></i>Excel
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="{{ route('get.verified.users', 'csv') }}">
-                                <i class="bi bi-filetype-csv me-2 text-primary"></i>CSV
-                            </a>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#exportModal">
-                                <i class="bi bi-funnel me-2"></i>{{ __('User Upload Filter') }}
-                            </button>
-                        </li>
-                        <li>
-                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#assignTariffModal">
-                                <i class="bi bi-tag me-2"></i>{{ __('Assign tariff') }}
-                            </button>
-                        </li>
-                    </ul>
+            <div class="card-header">
+                <h3 class="card-title">{{ __('User list') }}</h3>
+                <div class="card-tools">
+                    <div class="dropdown">
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false">
+                            <i class="bi bi-download me-1"></i>{{ __('Export and actions') }}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item" href="{{ route('get.verified.users', 'xls') }}">
+                                    <i class="bi bi-file-earmark-excel me-2 text-success"></i>Excel
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ route('get.verified.users', 'csv') }}">
+                                    <i class="bi bi-filetype-csv me-2 text-primary"></i>CSV
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#exportModal">
+                                    <i class="bi bi-funnel me-2"></i>{{ __('User Upload Filter') }}
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#assignTariffModal">
+                                    <i class="bi bi-tag me-2"></i>{{ __('Assign tariff') }}
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
             <div class="card-body border-bottom py-3 cabinet-users-search-bar">
@@ -141,6 +150,8 @@
                 <table class="table table-striped table-hover align-middle mb-0 w-100" id="service-users" width="100%"></table>
             </div>
         </div>
+
+        @include('users.partials.activity-dashboard', ['activity' => $activity])
     </div>
 
     @include('users.modal.index', ['id' => 'exportModal', 'action' => route('filter.exports.users'), 'title' => __('User Upload Filter')])
@@ -222,6 +233,7 @@
                 d.filter_telegram = $('#filter-telegram').val() || '';
                 d.filter_id_from = $('#filter-id-from').val() || '';
                 d.filter_id_to = $('#filter-id-to').val() || '';
+                d.filter_stale_monitoring = $('#filter-stale-monitoring').val() || '';
                 if (d.search) {
                     d.search.value = d.filter_q;
                 }
@@ -266,7 +278,7 @@
             }
 
             var usersTable = $('#service-users').DataTable({
-                dom: '<"row align-items-center g-2 cabinet-users-dt-top"<"col-sm-auto"l>>rt<"row align-items-center g-2"<"col-sm-auto"i><"col-sm"p>>',
+                dom: '<"row align-items-center justify-content-end g-2 cabinet-users-dt-top"<"col-sm-auto"l>>rt<"row align-items-center g-2"<"col-sm-auto"i><"col-sm"p>>',
                 autoWidth: false,
                 lengthMenu: [10, 25, 50, 100],
                 pageLength: 50,
@@ -311,11 +323,14 @@
                 order: [[0, 'desc']],
                 createdRow: function (row, data) {
                     $(row).find('td').eq(6).attr('data-order', data.last_online_strtotime || 0);
+                    var storageOrder = data.storage ? (data.storage.rows != null ? data.storage.rows : -1) : -1;
+                    $(row).find('td').eq(7).attr('data-order', storageOrder);
                 },
                 columnDefs: [
-                    {orderable: true, targets: [0, 1, 2, 4, 6]},
-                    {orderable: false, targets: '_all'},
-                    {className: 'text-end', targets: [7]},
+                    {orderable: true, targets: [0, 1, 2, 3, 4, 5, 6, 7]},
+                    {orderable: false, targets: [8]},
+                    {className: 'cabinet-users-storage-col text-nowrap', targets: [7]},
+                    {className: 'cabinet-users-actions-col text-nowrap', targets: [8]},
                 ],
                 columns: [
                     {
@@ -347,16 +362,23 @@
                         },
                     },
                     {
+                        name: 'tariff',
                         title: @json(__('Tariff')),
                         data: function (row) {
                             var tariff = row.tariff || {};
                             if (!tariff.name) {
                                 return '<span class="text-secondary">—</span>';
                             }
-                            return '<span class="badge text-bg-warning">' + $('<div>').text(tariff.name).html() + '</span><br>' +
-                                '<small class="text-secondary">' + @json(__('Active until')) + ':</small><br>' +
-                                '<small>' + tariff.active_to + '</small><br>' +
-                                '<small class="text-secondary">' + tariff.active_to_diffForHumans + '</small>';
+                            var badgeClass = tariff.is_free ? 'text-bg-secondary' : 'text-bg-warning';
+                            var html = '<span class="badge ' + badgeClass + '">' + $('<div>').text(tariff.name).html() + '</span>';
+                            if (tariff.active_to) {
+                                html += '<br><small class="text-secondary">' + @json(__('Active until')) + ':</small><br>' +
+                                    '<small>' + $('<div>').text(tariff.active_to).html() + '</small><br>' +
+                                    '<small class="text-secondary">' + $('<div>').text(tariff.active_to_diffForHumans || '').html() + '</small>';
+                            } else if (tariff.role_only) {
+                                html += '<br><small class="text-secondary">' + @json(__('Users tariff role only')) + '</small>';
+                            }
+                            return html;
                         },
                     },
                     {
@@ -368,6 +390,7 @@
                         className: 'text-nowrap',
                     },
                     {
+                        name: 'roles',
                         title: @json(__('Roles')),
                         data: function (row) {
                             var roles = row.roles || [];
@@ -393,8 +416,18 @@
                         className: 'text-nowrap',
                     },
                     {
+                        name: 'storage_footprint',
+                        title: @json(__('Users storage footprint column')),
+                        data: function (row) {
+                            if (!row.storage) {
+                                return '<span class="text-secondary small">' + @json(__('Users storage footprint not computed')) + '</span>';
+                            }
+                            return '<span class="small">' + $('<div>').text(row.storage.label).html() + '</span>';
+                        },
+                        className: 'text-nowrap',
+                    },
+                    {
                         title: @json(__('Actions')),
-                        className: 'cabinet-users-actions',
                         data: function (row) {
                             var html = '<div class="cabinet-users-actions">';
                             html += '<a class="btn btn-outline-secondary btn-sm" href="' + userUrl(routes.login, row.id) + '" title="' + @json(__('Login')) + '"><i class="bi bi-box-arrow-in-right"></i></a>';
@@ -425,7 +458,24 @@
                         });
                     }
                 },
+                drawCallback: function () {
+                    if (typeof window.cabinetUsersEnsureVisibleFootprints === 'function') {
+                        window.cabinetUsersEnsureVisibleFootprints(this.api());
+                    }
+                },
             });
+
+            (function applyStaleFilterFromQuery() {
+                try {
+                    var params = new URLSearchParams(window.location.search);
+                    if (params.get('filter_stale_monitoring') === '1') {
+                        $('#filter-stale-monitoring').val('1');
+                        cabinetUsersUpdateFilterBadge();
+                        usersTable.ajax.reload();
+                    }
+                } catch (e) {
+                }
+            })();
 
             $('#cabinet-users-filters-apply').on('click', function () {
                 usersTable.ajax.reload();
@@ -537,4 +587,46 @@
             return $('<div />').append(collapse)[0].outerHTML;
         }
     </script>
+    <script>
+        window.cabinetUsersAdminConfig = {
+            usersTotal: {{ (int) ($stats['total'] ?? 0) }},
+            footprintRefreshUrl: @json(route('users.storage-footprint.refresh')),
+            usersEditUrlTemplate: @json(url('/users/__ID__/edit')),
+            i18n: {
+                confirmRefreshAll: @json(__('Users storage footprint confirm refresh all')),
+                refreshedAll: @json(__('Users storage footprint refreshed all')),
+                refreshProgress: @json(__('Users storage footprint refresh progress')),
+                progressTitle: @json(__('Users storage footprint progress title')),
+                progressStatus: @json(__('Users storage footprint progress status')),
+                progressPhaseVisible: @json(__('Users storage footprint progress phase visible')),
+                progressErrors: @json(__('Users storage footprint progress errors')),
+                progressDone: @json(__('Users storage footprint progress done')),
+                progressAlreadyRunning: @json(__('Users storage footprint progress already running')),
+                error: @json(__('Users admin action error')),
+            },
+        };
+    </script>
+    <script src="{{ asset('js/cabinet-button-busy.js') }}?v={{ @filemtime(public_path('js/cabinet-button-busy.js')) ?: time() }}"></script>
+    <script>
+        window.cabinetMonitoringStaleSchedulesConfig = {
+            idPrefix: 'cabinet-users-stale',
+            staleInactiveDays: {{ (int) ($staleMonitoring['inactive_days'] ?? 90) }},
+            staleListUrl: @json(route('monitoring.admin.stale-schedules.list')),
+            staleDisableUrl: @json(route('monitoring.admin.stale-schedules.disable')),
+            usersEditUrlTemplate: @json(url('/users/__ID__/edit')),
+            reloadUsersTable: true,
+            i18n: {
+                staleEmpty: @json(__('Users stale monitoring empty')),
+                never: @json(__('Never')),
+                disableProject: @json(__('Users stale monitoring disable project')),
+                disableUser: @json(__('Users stale monitoring disable user')),
+                confirmDisable: @json(__('Users stale monitoring confirm disable')),
+                disabled: @json(__('Users stale monitoring disabled toast')),
+                disabling: @json(__('Monitoring admin stale schedules disabling')),
+                error: @json(__('An error has occurred')),
+            },
+        };
+    </script>
+    <script src="{{ asset('js/cabinet-monitoring-stale-schedules.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-stale-schedules.js')) ?: time() }}"></script>
+    <script src="{{ asset('js/cabinet-users-admin.js') }}?v={{ @filemtime(public_path('js/cabinet-users-admin.js')) ?: time() }}"></script>
 @endsection

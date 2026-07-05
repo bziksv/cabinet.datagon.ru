@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Cache;
 
 class StatisticsAdmin
 {
-    private const DASHBOARD_CACHE_KEY = 'monitoring_admin_dashboard_stats_v1';
+    private const DASHBOARD_CACHE_KEY = 'monitoring_admin_dashboard_stats_v2';
 
     private const DASHBOARD_CACHE_SECONDS = 300;
     protected $projects;

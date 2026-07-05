@@ -3,9 +3,18 @@
 return [
   /**
    * Видимая версия модуля /cluster (badge в шапке карточки).
-   * Журнал: datagon.ru/docs/cabinet-cluster-changelog.md
+   * Журнал: titlo.ru/docs/cabinet-cluster-changelog.md
    */
-  'version' => '2.36',
+  'version' => '2.37',
+
+  /** Без новых строк в cluster_queue_array — abort wait (минуты). */
+  'wait_stale_minutes' => (int) env('CLUSTER_WAIT_STALE_MINUTES', 30),
+
+  /** Абсолютный предел ожидания кластера (часы от первой строки / wait job). */
+  'wait_max_hours' => (int) env('CLUSTER_WAIT_MAX_HOURS', 6),
+
+  /** Сообщение об ошибке в poll UI после abort (часы в cache). */
+  'wait_failed_cache_hours' => (int) env('CLUSTER_WAIT_FAILED_CACHE_HOURS', 48),
 
   /** Локально: параллельные воркеры child_cluster (scripts/dev-cluster-queue.sh). */
   'queue_workers' => (int) env('CLUSTER_QUEUE_WORKERS', env('APP_ENV', 'production') === 'local' ? 4 : 1),
@@ -39,7 +48,7 @@ return [
   ],
 
   /**
-   * Демо на datagon.ru/klasterizator-klyuchevykh-slov/
+   * Демо на titlo.ru/klasterizator-klyuchevykh-slov/
    * POST /api/demo/klasterizator-klyuchevykh-slov/run|poll
    */
   'demo' => [

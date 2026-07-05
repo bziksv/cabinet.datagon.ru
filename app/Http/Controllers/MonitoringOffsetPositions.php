@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Monitoring\Positions\Offset;
 use App\MonitoringProject;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class MonitoringOffsetPositions extends Controller
 {
@@ -21,11 +20,12 @@ class MonitoringOffsetPositions extends Controller
      */
     public function index()
     {
-        $user = Auth::user();
+        $projects = (new MonitoringProject())->all();
 
-        $projects = $user->monitoringProjects()->get();
-
-        return view('monitoring.admin.offset_positions.index', compact('projects'));
+        return view('monitoring.admin.offset_positions.index', [
+            'projects' => $projects,
+            'projectCount' => $projects->count(),
+        ]);
     }
 
     public function offset(Request $request)

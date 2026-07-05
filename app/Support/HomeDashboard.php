@@ -172,7 +172,7 @@ class HomeDashboard
             return $hosts;
         }
 
-        $list = ['lk.redbox.su', 'cabinet.datagon.ru', 'localhost', '127.0.0.1'];
+        $list = ['lk.redbox.su', 'cabinet.titlo.ru', 'cabinet.datagon.ru', 'localhost', '127.0.0.1'];
         $appHost = parse_url(rtrim((string) config('app.url'), '/'), PHP_URL_HOST);
         if (is_string($appHost) && $appHost !== '') {
             $list[] = $appHost;

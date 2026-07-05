@@ -80,6 +80,8 @@ if (! function_exists('localize_cabinet_url')) {
         $prefixes = [
             'https://lk.redbox.su',
             'http://lk.redbox.su',
+            'https://cabinet.titlo.ru',
+            'http://cabinet.titlo.ru',
             'https://cabinet.datagon.ru',
             'http://cabinet.datagon.ru',
         ];
@@ -133,7 +135,7 @@ if (! function_exists('cabinet_brand_name')) {
 
 if (! function_exists('cabinet_page_title')) {
     /**
-     * Заголовок вкладки: «Раздел — Датагон» (как бренд в сайдбаре).
+     * Заголовок вкладки: «Раздел — Титло» (как бренд в сайдбаре).
      */
     function cabinet_page_title(?string $pageTitle = null): string
     {

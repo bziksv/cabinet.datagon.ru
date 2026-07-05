@@ -13,20 +13,27 @@
             'project' => $project,
             'activeModule' => 'competitors',
             'showViewTabs' => false,
+            'pageHint' => __('Monitoring competitors page hint'),
         ])
+
+        @include('monitoring.competitors.partials.sub-nav', ['project' => $project, 'activeTab' => 'list'])
 
         <div class="cabinet-mon-project-page__body">
             <section class="cabinet-mon-competitors-workspace card" aria-labelledby="competitors-workspace-title">
-                <div class="cabinet-mon-competitors-workspace__intro">
-                    <h2 class="cabinet-mon-competitors-workspace__title h6 mb-0" id="competitors-workspace-title">
-                        {{ __('Domains ranked in the top 10') }}
-                    </h2>
-                    <p class="cabinet-mon-competitors-workspace__hint text-secondary small mb-0">
-                        {{ __('Monitoring competitors page hint') }}
-                    </p>
-                    <p class="cabinet-mon-competitors-workspace__date text-secondary small mb-0 d-none" id="competitors-date-line">
-                        {{ __('The date of withdrawal of positions used') }}: <span id="dateOnly"></span>
-                    </p>
+                <div class="cabinet-mon-competitors-workspace__head">
+                    <div class="cabinet-mon-competitors-workspace__intro">
+                        <h2 class="cabinet-mon-competitors-workspace__title h6 mb-0" id="competitors-workspace-title">
+                            {{ __('Monitoring competitors workspace title') }}
+                        </h2>
+                        <p class="cabinet-mon-competitors-workspace__meta text-secondary small mb-0">
+                            {{ __('Monitoring competitors workspace meta', ['count' => number_format($countQuery, 0, ',', ' ')]) }}
+                            <span class="cabinet-mon-competitors-workspace__date d-none" id="competitors-date-line">
+                                <span class="text-secondary mx-1">·</span>
+                                {{ __('The date of withdrawal of positions used') }}:
+                                <span class="fw-semibold text-body" id="dateOnly"></span>
+                            </span>
+                        </p>
+                    </div>
                 </div>
 
                 <ol class="cabinet-mon-competitors-steps" id="competitors-steps" aria-label="{{ __('Monitoring competitors steps label') }}">
@@ -54,8 +61,8 @@
                 </ol>
 
                 <div class="cabinet-mon-competitors-workspace__form">
-                    <div class="cabinet-mon-competitors-field cabinet-mon-competitors-field--region">
-                        <label class="cabinet-mon-competitors-field__label" for="searchEngines">{{ __('Region') }}</label>
+                    <div class="cabinet-mon-competitors-workspace__field cabinet-mon-competitors-workspace__field--region">
+                        <label class="cabinet-mon-competitors-workspace__label" for="searchEngines">{{ __('Region') }}</label>
                         <select name="region" class="form-select form-select-sm" id="searchEngines">
                             @if($project->searchengines->count() > 1)
                                 <option value="">{{ __('All search engine and regions') }}</option>
@@ -67,44 +74,38 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="cabinet-mon-competitors-field cabinet-mon-competitors-field--action">
+                    <div class="cabinet-mon-competitors-workspace__field cabinet-mon-competitors-workspace__field--action">
+                        <label class="cabinet-mon-competitors-workspace__label visually-hidden" for="start-analyse-region">{{ __('Analyse') }}</label>
                         <button type="button" class="btn btn-primary btn-sm w-100" id="start-analyse-region">
                             <i class="bi bi-play-fill me-1" aria-hidden="true"></i>{{ __('Analyse') }}
                         </button>
                     </div>
                 </div>
 
-                <div class="cabinet-mon-competitors-panel">
-                    <div class="cabinet-mon-competitors-panel__head">
-                        <div class="cabinet-mon-competitors-panel__title">
+                <div class="cabinet-mon-competitors-workspace__toolbar">
+                    <div class="cabinet-mon-competitors-workspace__toolbar-row">
+                        <div class="cabinet-mon-competitors-workspace__toolbar-title">
                             <i class="bi bi-people me-1" aria-hidden="true"></i>
                             {{ __('My competitors') }}
                             <span class="badge text-bg-secondary ms-1" id="counter-competitors" data-mon-competitors-count>{{ count($competitors) }}</span>
                         </div>
-                        <div class="cabinet-mon-competitors-panel__actions">
-                            @if(count($competitors) > 0)
-                            <a class="btn btn-success btn-sm" id="compare-competitors-positions"
+                        <div class="cabinet-mon-competitors-workspace__toolbar-actions">
+                            <a class="btn btn-outline-secondary btn-sm{{ count($competitors) > 0 ? ' btn-success' : '' }}"
+                               id="compare-competitors-positions"
                                href="{{ route('monitoring.competitors.positions', $project->id) }}">
                                 <i class="bi bi-bar-chart-line me-1" aria-hidden="true"></i>{{ __('Comparison with competitors') }}
                             </a>
-                            @endif
                             <button type="button" class="btn btn-outline-primary btn-sm" id="add-competitor-manual"
                                     data-bs-toggle="modal" data-bs-target="#addCompetitorManualModal">
                                 <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>{{ __('Monitoring competitors add manual') }}
                             </button>
                             <button type="button" class="btn btn-outline-secondary btn-sm" id="searchCompetitors"
-                                    title="{{ __('Monitoring competitors suggest disabled hint') }}">
+                                    title="{{ __('Monitoring competitors suggest hint') }}">
                                 <i class="bi bi-magic me-1" aria-hidden="true"></i>{{ __('Monitoring competitors suggest from top') }}
                             </button>
-                            @if(count($competitors) === 0)
-                            <a class="btn btn-outline-secondary btn-sm" id="compare-competitors-positions"
-                               href="{{ route('monitoring.competitors.positions', $project->id) }}">
-                                <i class="bi bi-bar-chart-line me-1" aria-hidden="true"></i>{{ __('Comparison with competitors') }}
-                            </a>
-                            @endif
                         </div>
                     </div>
-                    <div class="cabinet-mon-competitors-panel__chips" id="competitors-chips">
+                    <div class="cabinet-mon-competitors-workspace__chips" id="competitors-chips">
                         @forelse($competitors as $competitor)
                             <span class="cabinet-mon-competitors-chip">
                                 <span class="cabinet-mon-competitors-chip__domain">{{ $competitor['url'] }}</span>
@@ -118,11 +119,12 @@
                                 </button>
                             </span>
                         @empty
-                            <span class="cabinet-mon-competitors-panel__empty text-secondary small" id="competitors-chips-empty">
+                            <span class="cabinet-mon-competitors-workspace__chips-empty text-secondary small" id="competitors-chips-empty">
                                 {{ __('Monitoring competitors chips empty') }}
                             </span>
                         @endforelse
                     </div>
+                    <p class="cabinet-mon-competitors-workspace__hint mb-0">{{ __('Monitoring competitors toolbar hint') }}</p>
                 </div>
 
                 <div class="cabinet-mon-competitors-dt-bar d-none" id="competitors-dt-bar">
@@ -130,7 +132,7 @@
                     <div id="competitors-dt-length"></div>
                 </div>
 
-                <div class="cabinet-mon-competitors-workspace__body" id="competitors-workspace-body">
+                <div class="cabinet-mon-competitors-result" id="competitors-result">
                     <div class="cabinet-mon-competitors-empty" id="competitors-empty-state">
                         <div class="cabinet-mon-competitors-empty__icon" aria-hidden="true">
                             <i class="bi bi-1-circle"></i>
@@ -160,14 +162,26 @@
                     </div>
 
                     <div class="cabinet-mon-competitors-loading d-none" id="competitors-loading" role="status" aria-live="polite">
-                        @include('monitoring.partials.show.loader', ['label' => __('loading results')])
-                        <span id="render-state" class="cabinet-mon-competitors-loading__text">{{ __('loading results') }}</span>
+                        @include('monitoring.partials.show.loader', ['label' => __('Monitoring competitors result loading')])
+                        <span id="render-state" class="cabinet-mon-competitors-loading__text">{{ __('Monitoring competitors result loading') }}</span>
                     </div>
 
                     <div class="cabinet-mon-competitors-table-host d-none" id="tableBlock">
+                        <div class="cabinet-mon-competitors-table-host__loader d-none" id="competitors-table-loader" role="status" aria-live="polite">
+                            @include('monitoring.partials.show.loader', [
+                                'size' => 'sm',
+                                'label' => __('Monitoring competitors stats loading'),
+                            ])
+                        </div>
                         <div class="cabinet-mon-competitors-table-hint" id="competitors-table-hint" role="note">
                             <i class="bi bi-check2-square me-1" aria-hidden="true"></i>
                             {{ __('Monitoring competitors table hint') }}
+                        </div>
+                        <div class="cabinet-mon-competitors-stats-notice d-none" id="competitors-stats-notice" role="status" aria-live="polite">
+                            @include('monitoring.partials.show.loader', [
+                                'size' => 'sm',
+                                'label' => __('Monitoring competitors stats loading'),
+                            ])
                         </div>
                         <div class="table-responsive">
                             <table id="table" class="table table-hover table-sm mb-0 w-100 cabinet-mon-competitors-table">
@@ -228,82 +242,9 @@
         </div>
     </div>
 
-    <div class="modal fade" id="removeCompetitor" tabindex="-1" aria-labelledby="removeCompetitorLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="removeCompetitorLabel">{{ __('Monitoring competitors remove confirm title') }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
-                </div>
-                <div class="modal-body">
-                    {{ __('Monitoring competitors remove confirm body') }} <strong id="competitor-name"></strong>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
-                    <button type="button" class="btn btn-danger" id="remove-competitor" data-bs-dismiss="modal">{{ __('Remove') }}</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal fade" id="addCompetitorManualModal" tabindex="-1" aria-labelledby="addCompetitorManualModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="addCompetitorManualModalLabel">{{ __('Monitoring competitors add manual title') }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="text-secondary small">{{ __('Monitoring competitors add manual help') }}</p>
-                    <label class="form-label fw-semibold" for="competitor-manual-input">{{ __('Domain') }}</label>
-                    <textarea id="competitor-manual-input" class="form-control" rows="5"
-                              placeholder="{{ __('Monitoring competitors add manual placeholder') }}"></textarea>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
-                    <button type="button" class="btn btn-primary" id="save-competitor-manual">
-                        <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>{{ __('Add') }}
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal fade" id="competitorsModal" tabindex="-1" aria-labelledby="competitorsModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="competitorsModalLabel">{{ __('Monitoring competitors suggest modal title') }}</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="text-secondary small">{{ __('Monitoring competitors suggest modal help') }}</p>
-                    <div class="mb-3">
-                        <label for="competitors-textarea" class="form-label fw-semibold">{{ __('Your closest competitors') }}</label>
-                        <textarea name="competitors-textarea" id="competitors-textarea" class="form-control" rows="8"></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <button class="btn btn-outline-secondary btn-sm mb-2" type="button" data-bs-toggle="collapse"
-                                data-bs-target="#collapseIgnoredDomains" aria-expanded="false"
-                                aria-controls="collapseIgnoredDomains">
-                            {{ __('Ignored domains') }}
-                        </button>
-                        <div class="collapse" id="collapseIgnoredDomains">
-                            <textarea id="ignored-domains" name="ignored-domains" class="form-control" rows="6" readonly>{{ $ignoredDomains }}</textarea>
-                        </div>
-                    </div>
-                    <div>
-                        <p class="fw-semibold small mb-1">{{ __('Domain') }}: {{ __('How many times have I met') }}</p>
-                        <div id="competitors-list" class="small text-secondary"></div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
-                    <button type="button" id="add-competitors" class="btn btn-primary" data-bs-dismiss="modal">{{ __('Add') }}</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    @include('monitoring.competitors.partials.modals', [
+        'ignoredDomains' => $ignoredDomains,
+    ])
 
     @slot('js')
         <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
@@ -327,6 +268,7 @@
                     addCompetitors: @json(route('monitoring.add.competitors')),
                     getCompetitors: @json(route('monitoring.get.competitors')),
                     getCompetitorsDomain: @json(route('monitoring.get.competitors.domain')),
+                    competitorsPageStats: @json(route('monitoring.get.competitors.page.stats')),
                     competitorsInfo: @json(url('/monitoring-competitors/' . $project->id)),
                     competitorsArray: @json(url('/monitoring/get-competitors-array/' . $project->id)),
                     waitResult: @json(url('/monitoring/wait-result')),
@@ -362,6 +304,10 @@
                     tableInfo: @json(__('Monitoring dt table info')),
                     tableInfoEmpty: @json(__('Monitoring dt table info empty')),
                     tableInfoFiltered: @json(__('Monitoring dt table info filtered')),
+                    statsLoading: @json(__('Monitoring competitors stats loading')),
+                    statsLoadingCell: @json(__('Monitoring competitors stats loading cell')),
+                    statsLoadError: @json(__('Monitoring competitors stats load error')),
+                    resultLoading: @json(__('Monitoring competitors result loading')),
                 },
             };
         </script>

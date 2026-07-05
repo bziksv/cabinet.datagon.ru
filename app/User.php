@@ -36,7 +36,7 @@ class User extends Authenticatable implements MustVerifyEmail
      * @var array
      */
     protected $fillable = [
-        'balance', 'name', 'last_name', 'email', 'lang', 'password', 'last_authorization', 'telegram_token', 'telegram_prompt_snoozed_until', 'metrics', 'statistic'
+        'balance', 'name', 'last_name', 'email', 'lang', 'password', 'last_authorization', 'telegram_token', 'telegram_prompt_snoozed_until', 'monitoring_schedule_prompt_snoozed_until', 'metrics', 'statistic'
     ];
 
     /**
@@ -52,6 +52,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'email_verified_at' => 'datetime',
         'last_online_at' => 'datetime',
         'telegram_prompt_snoozed_until' => 'datetime',
+        'monitoring_schedule_prompt_snoozed_until' => 'datetime',
         'news_comments_blocked_at' => 'datetime',
         'metrics' => 'json',
     ];
@@ -155,10 +156,32 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Активен тариф Free (роль Spatie).
+     * Есть роль платного тарифа (Optimal / Ultimate / Maximum).
+     */
+    public function hasPaidTariffRole(): bool
+    {
+        app(PermissionRegistrar::class)->setPermissionsTeamId(1);
+        $this->loadMissing('roles');
+        $roles = $this->getRoleNames();
+
+        foreach (array_filter((array) config('cabinet-users.paid_tariff_role_codes', [])) as $code) {
+            if ($roles->contains($code)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Эффективный тариф Free: роль Free и нет платной тарифной роли.
      */
     public function onFreeTariff(): bool
     {
+        if ($this->hasPaidTariffRole()) {
+            return false;
+        }
+
         app(PermissionRegistrar::class)->setPermissionsTeamId(1);
         $this->loadMissing('roles');
 
@@ -452,6 +475,23 @@ class User extends Authenticatable implements MustVerifyEmail
         }
 
         return true;
+    }
+
+    /**
+     * Free + сохранённое расписание съёма — модалка на страницах мониторинга позиций.
+     */
+    public function shouldShowMonitoringSchedulePaidPrompt(): bool
+    {
+        if (!$this->onFreeTariff()) {
+            return false;
+        }
+
+        if ($this->monitoring_schedule_prompt_snoozed_until
+            && $this->monitoring_schedule_prompt_snoozed_until->isFuture()) {
+            return false;
+        }
+
+        return \App\Support\MonitoringPositionsSchedule::hasConfiguredScheduleForUser($this);
     }
 
     public function telegramBotSubscribeUrl(): string

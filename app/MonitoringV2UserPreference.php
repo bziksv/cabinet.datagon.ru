@@ -25,7 +25,7 @@ class MonitoringV2UserPreference extends Model
     {
         return [
             'top3' => true,
-            'top5' => false,
+            'top5' => true,
             'top10' => true,
             'top30' => true,
             'top100' => true,
@@ -34,6 +34,7 @@ class MonitoringV2UserPreference extends Model
             'users' => true,
             'engines' => true,
             'budget' => true,
+            'mastered' => true,
         ];
     }
 

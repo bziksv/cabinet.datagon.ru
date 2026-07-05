@@ -82,7 +82,7 @@
 
         <div class="cabinet-partners-suggest px-4 py-3 small text-secondary">
             {{ __('If you know a good service and are ready to share it, then write to ') }}
-            <a href="mailto:info@datagon.ru" class="fw-medium">info@datagon.ru</a>
+            <a href="mailto:info@titlo.ru" class="fw-medium">info@titlo.ru</a>
         </div>
     </div>
 @endcomponent

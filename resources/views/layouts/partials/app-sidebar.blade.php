@@ -4,8 +4,8 @@
        data-sidebar-breakpoint="992">
     <div class="sidebar-brand">
         <a href="{{ route('home') }}" class="brand-link cabinet-brand">
-            <img src="{{ asset('img/logo-icon.svg') }}" alt="Датагон" class="brand-image opacity-75 shadow cabinet-brand__icon">
-            <span class="brand-text fw-light">Датагон</span>
+            <img src="{{ asset('img/logo-icon.svg') }}" alt="Титло" class="brand-image opacity-75 shadow cabinet-brand__icon">
+            <span class="brand-text fw-light">Титло</span>
         </a>
     </div>
     <div class="sidebar-wrapper">

@@ -4,11 +4,11 @@ return [
     /**
      * Видимая версия страницы /text-analyzer (badge в шапке карточки).
      * Стабильная база PDF/UI: 6.9s. Дальнейшие правки — +0.1 или суффикс dev.
-     * Журнал: datagon.ru/docs/cabinet-text-analyzer-changelog.md
+     * Журнал: titlo.ru/docs/cabinet-text-analyzer-changelog.md
      */
     'version' => '7.3',
 
-    /** Демо на datagon.ru/analiz-teksta/ — POST /api/demo/analiz-teksta/run */
+    /** Демо на titlo.ru/analiz-teksta/ — POST /api/demo/analiz-teksta/run */
     'demo' => [
         'module_slug' => 'analiz-teksta',
         'max_chars' => 3000,

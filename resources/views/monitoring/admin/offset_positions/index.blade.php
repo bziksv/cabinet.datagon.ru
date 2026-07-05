@@ -1,187 +1,128 @@
-@component('component.card', ['title' => __('Monitoring position')])
+@extends('layouts.app')
 
-    @slot('css')
-        <!-- Toastr -->
-        <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
-        <!-- Select2 -->
-        <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
-        <!-- daterange picker -->
-        <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
-        <!-- CodeMirror -->
-        <link rel="stylesheet" href="{{ asset('plugins/codemirror/codemirror.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/codemirror/theme/monokai.css') }}">
-        <!-- Tempusdominus Bootstrap 4 -->
-        <link rel="stylesheet" href="{{ asset('plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css') }}">
-    @endslot
+@section('title', __('Monitoring offset page title'))
 
-    <div class="row">
-        <div class="col-6">
-            @include('monitoring.admin._btn')
+@section('css')
+    <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.css') }}">
+    <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-admin.css') }}?v={{ @filemtime(public_path('css/cabinet-monitoring-admin.css')) ?: time() }}">
+@endsection
 
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Форма</h3>
-                </div>
-
-                <div class="card-body">
-
-                    <div class="form-group">
-                        <label>Проект</label>
-                        <select class="form-control select2" id="project">
-                            <option value="">Выберите проект</option>
-                            @foreach($projects as $project)
-                                <option value="{{ $project->id }}">{{ $project->name }} - {{ $project->url }} [{{ $project->id }}]</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                </div>
-                <div class="card-footer">
-                    <button type="submit" class="btn btn-default" data-bs-toggle="modal" data-target=".modal">Экспортировать</button>
-                </div>
+@section('content')
+    <div class="cabinet-mon-admin-page cabinet-mon-offset-page">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+            <div>
+                <h2 class="h4 mb-2 d-flex flex-wrap align-items-center gap-1">
+                    <i class="bi bi-pencil-square text-primary" aria-hidden="true"></i>
+                    <span>{{ __('Monitoring offset page title') }}</span>
+                    @include('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-monitoring'])
+                </h2>
+                <p class="text-secondary small mb-0" style="max-width: 46rem;">
+                    {{ __('Monitoring offset page lead') }}
+                </p>
             </div>
-
         </div>
 
+        @include('monitoring.admin.partials.nav', ['active' => 'offset_positions'])
+
+        <div class="row g-2 g-md-3 mb-3">
+            <div class="col-6 col-md-4">
+                <div class="info-box mb-0">
+                    <span class="info-box-icon text-bg-primary shadow-sm"><i class="bi bi-folder2"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">{{ __('Monitoring offset kpi projects') }}</span>
+                        <span class="info-box-number">{{ $projectCount }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4">
+                <div class="info-box mb-0">
+                    <span class="info-box-icon text-bg-warning shadow-sm"><i class="bi bi-file-earmark-arrow-down"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">{{ __('Monitoring offset kpi scope') }}</span>
+                        <span class="info-box-number small">{{ __('Monitoring offset kpi scope value') }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="info-box mb-0">
+                    <span class="info-box-icon text-bg-info shadow-sm"><i class="bi bi-sliders"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">{{ __('Monitoring offset kpi rules') }}</span>
+                        <span class="info-box-number">3</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @include('monitoring.admin.offset_positions.partials.guide')
+
+        <div class="row g-3">
+            <div class="col-lg-5">
+                <section class="card shadow-sm border-0">
+                    <div class="card-header bg-white py-3">
+                        <h3 class="h6 mb-0">{{ __('Monitoring offset form title') }}</h3>
+                        <p class="small text-secondary mb-0">{{ __('Monitoring offset form lead') }}</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label" for="mon-offset-project">{{ __('Monitoring offset field project') }}</label>
+                            <select class="form-select select2" id="mon-offset-project" data-placeholder="{{ __('Monitoring offset project placeholder') }}">
+                                <option value="">{{ __('Monitoring offset project placeholder') }}</option>
+                                @foreach($projects as $project)
+                                    <option value="{{ $project->id }}">{{ $project->name }} — {{ $project->url }} [{{ $project->id }}]</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <button type="button" class="btn btn-primary w-100" id="mon-offset-open-export" disabled>
+                            <i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>{{ __('Monitoring offset open export') }}
+                        </button>
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-lg-7">
+                <section class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white py-3">
+                        <h3 class="h6 mb-0">{{ __('Monitoring offset rules title') }}</h3>
+                        <p class="small text-secondary mb-0">{{ __('Monitoring offset rules lead') }}</p>
+                    </div>
+                    <div class="card-body">
+                        @include('monitoring.admin.offset_positions.partials.offset-rules')
+
+                        <div class="alert alert-light border small mb-0 mt-2">
+                            <i class="bi bi-lightbulb me-1 text-warning"></i>
+                            {{ __('Monitoring offset rules example') }}
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
     </div>
 
     @include('monitoring.keywords.modal.main')
+@endsection
 
-    @slot('js')
-        <!-- Toastr -->
-        <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
-        <!-- Select2 -->
-        <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
-        <!-- moment -->
-        <script src="{{ asset('plugins/moment/moment.min.js') }}"></script>
-        <!-- date-range-picker -->
-        <script src="{{ asset('plugins/daterangepicker/daterangepicker.js') }}"></script>
-        <!-- CodeMirror -->
-        <script src="{{ asset('plugins/codemirror/codemirror.js') }}"></script>
-        <script src="{{ asset('plugins/codemirror/mode/css/css.js') }}"></script>
-        <script src="{{ asset('plugins/codemirror/mode/xml/xml.js') }}"></script>
-        <script src="{{ asset('plugins/codemirror/mode/htmlmixed/htmlmixed.js') }}"></script>
-        <!-- Moment js -->
-        <script src="{{ asset('plugins/moment/moment-with-locales.min.js') }}"></script>
-        <!-- Tempusdominus Bootstrap 4 -->
-        <script src="{{ asset('plugins/tempusdominus-bootstrap-4/js/tempusdominus-bootstrap-4.min.js') }}"></script>
-
-        <script>
-            toastr.options = {
-                "preventDuplicates": true,
-                "timeOut": "5000"
-            };
-
-            let $project = $('#project');
-
-            $('.select2').select2({});
-
-            $('.modal').on('show.bs.modal', function (event) {
-
-                let modal = $(this);
-
-                let ID = $project.val();
-
-                axios.get(`/monitoring/${ID}/export/edit`).then(function (response) {
-                    let content = response.data;
-                    modal.find('.modal-content').html(content);
-
-                    modal.find('select[name="mode"] option[value="finance"]').prop('selected', true);
-
-                    modal.find('#finance').removeClass('d-none');
-
-                    modal.find('select[name="mode"]').change(function(){
-                        if($(this).val() === 'finance')
-                            modal.find('#finance').removeClass('d-none');
-                        else
-                            modal.find('#finance').addClass('d-none');
-                    });
-
-                    //Date picker
-                    modal.find('#startDatePicker, #endDatePicker').datetimepicker({
-                        format: 'L',
-                        locale: 'ru',
-                    });
-
-                    let $label = $("<label />").text("Корректировать позиции");
-
-                    let $rule1 = createGroupRule({
-                        label: "Правило 1",
-                        inputFrom: { value: "11" },
-                        inputTo: { value: "16" },
-                        inputCount: { value: "6" }
-                    }, 0);
-
-                    let $rule2 = createGroupRule({
-                        label: "Правило 2",
-                        inputFrom: { value: "17" },
-                        inputTo: { value: "22" },
-                        inputCount: { value: "12" }
-                    }, 1);
-
-                    let $rule3 = createGroupRule({
-                        label: "Правило 3"
-                    }, 2);
-
-                    modal.find('.form-group').eq(1).after([$label, $rule1, $rule2, $rule3]);
-
-                }).catch(function (error) {
-                    modal.find('.modal-content').html(error);
-                });
-            });
-
-            function createGroupRule(params, index = 0) {
-
-                let def = {
-                    label: "Корректировать позиции",
-                    inputAttr: {
-                        type : "number",
-                        min : "1",
-                        class : "form-control mb-2",
-                        name : "",
-                        placeholder : "",
-                        value : "",
-                    },
-                    inputFrom: {
-                        name: "offset["+ index +"][from]",
-                        placeholder: "С"
-                    },
-                    inputTo: {
-                        name: "offset["+ index +"][to]",
-                        placeholder: "До"
-                    },
-                    inputCount: {
-                        name: "offset["+ index +"][count]",
-                        placeholder: "Кол-во позиций"
-                    },
-                };
-
-                let options = $.extend(true, def, params);
-
-                let $group = $("<div />", { "class" : "form-group" });
-
-                let $label = $("<label />").text(options.label);
-
-                let $operator = $("<select />", { "name" : "offset["+ index +"][operator]", "class" : "form-select mb-2" })
-                    .append([
-                        $("<option />").val("-").text("-"),
-                        $("<option />").val("+").text("+")
-                    ]);
-
-                $group.append([
-                    $label,
-                    $("<input />", $.extend(true, options.inputAttr, options.inputFrom)),
-                    $("<input />", $.extend(true, options.inputAttr, options.inputTo)),
-                    $operator,
-                    $("<input />", $.extend(true, options.inputAttr, options.inputCount))
-                ]);
-
-                return $group;
-            }
-
-        </script>
-    @endslot
-
-
-@endcomponent
+@section('js')
+    <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
+    <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
+    <script src="{{ asset('plugins/moment/moment-with-locales.min.js') }}"></script>
+    <script src="{{ asset('plugins/tempusdominus-bootstrap-4/js/tempusdominus-bootstrap-4.min.js') }}"></script>
+    <script src="{{ asset('js/cabinet-button-busy.js') }}?v={{ @filemtime(public_path('js/cabinet-button-busy.js')) ?: time() }}"></script>
+    <script src="{{ asset('js/cabinet-monitoring-offset-positions.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-offset-positions.js')) ?: time() }}"></script>
+    <script>
+        window.cabinetMonitoringOffsetConfig = {
+            exportEditUrlTemplate: @json(url('/monitoring/__ID__/export/edit')),
+            i18n: {
+                projectRequired: @json(__('Monitoring offset project required')),
+                exportLoading: @json(__('Monitoring offset export loading')),
+                exportLoadError: @json(__('Monitoring offset export load error')),
+                exportSubmit: @json(__('Monitoring offset open export')),
+                exportSubmitBusy: @json(__('Monitoring offset export busy')),
+            },
+        };
+    </script>
+@endsection

@@ -89,6 +89,7 @@ class MonitoringWaitResultsQueue implements ShouldQueue
 
             MonitoringHelper::where('hash', $this->hash)->delete();
         } else {
+            MonitoringCompetitor::updateChangesDateProgress($this->record, count($results), $this->target);
             MonitoringWaitResultsQueue::dispatch($this->hash, $this->target, $this->project, $this->record)->delay(now()->addSeconds(10));
         }
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\MonitoringProjectCreated;
 use App\Classes\Monitoring\ProjectFaviconService;
+use App\Support\MonitoringPositionsSchedule;
 use App\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
@@ -250,6 +251,9 @@ class MonitoringProjectCreatorController extends Controller
 
     private function updateRegion(Request $request)
     {
+        /** @var User $user */
+        $user = $this->user;
+
         $this->project->searchengines()->update([
             'auto_update' => false,
             'time' => null,
@@ -259,12 +263,32 @@ class MonitoringProjectCreatorController extends Controller
         ]);
 
         $data = $request->input('data');
-        foreach ($data as $item){
-            $this->project->searchengines()->find($item['id'])->update([
-                'auto_update' => true,
-                $item['name'] => $item['val'],
-            ]);
+        if (!is_array($data)) {
+            return response()->json(['ok' => true]);
         }
+
+        foreach ($data as $item) {
+            $engine = $this->project->searchengines()->find($item['id'] ?? null);
+            if (!$engine) {
+                continue;
+            }
+
+            $update = [
+                $item['name'] => $item['val'],
+            ];
+
+            if (!$user->onFreeTariff()) {
+                $update['auto_update'] = true;
+            }
+
+            $engine->update($update);
+        }
+
+        if ($user->onFreeTariff()) {
+            MonitoringPositionsSchedule::enforceForFreeUser($user);
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     private function removeRegion(Request $request)

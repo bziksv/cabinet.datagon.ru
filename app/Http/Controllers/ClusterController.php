@@ -258,6 +258,21 @@ class ClusterController extends Controller
 
     public function getProgress(string $id): JsonResponse
     {
+        $failed = ClusterProgress::getFailed($id);
+        if ($failed !== null) {
+            $progress = ClusterProgress::snapshot($id);
+
+            return $this->withClusterDebug($id, [
+                'failed' => true,
+                'error' => $failed['message'] ?? __('Cluster analysis failed.'),
+                'failed_at' => $failed['at'] ?? null,
+                'count' => $progress['queue_count'],
+                'phrases_done' => $progress['phrases_done'],
+                'phrases_pending' => $progress['phrases_pending'],
+                'phrases_total' => $progress['phrases_total'],
+            ], 422);
+        }
+
         $cluster = ClusterResults::where('progress_id', '=', $id)->first();
         if (isset($cluster)) {
             ClusterQueue::where('progress_id', '=', $id)->delete();

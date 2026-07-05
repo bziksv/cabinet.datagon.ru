@@ -58,7 +58,7 @@ class MonitoringProject extends Model
 
     public function dates()
     {
-        return $this->hasMany(MonitoringChangesDate::class);
+        return $this->hasMany(MonitoringChangesDate::class)->orderByDesc('id');
     }
 
     public static function getLastDates(MonitoringProject $project): array

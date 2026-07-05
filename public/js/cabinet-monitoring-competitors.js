@@ -10,6 +10,8 @@
     var activeCoach = null;
     var justAddedCompetitor = false;
     var pendingSuggestOpen = false;
+    var statsCache = {};
+    var statsRequest = null;
 
     function competitorsCount() {
         return Number($('#counter-competitors').text()) || 0;
@@ -348,7 +350,7 @@
     function renderCompetitorsChips(list) {
         var $chips = $('#competitors-chips');
         if (!list || !list.length) {
-            $chips.html('<span class="cabinet-mon-competitors-panel__empty text-secondary small" id="competitors-chips-empty">' + cfg.i18n.chipsEmpty + '</span>');
+            $chips.html('<span class="cabinet-mon-competitors-workspace__chips-empty text-secondary small" id="competitors-chips-empty">' + cfg.i18n.chipsEmpty + '</span>');
             setCompetitorsCount(0);
             return;
         }
@@ -498,6 +500,138 @@
             '<span class="cabinet-mon-competitors-metric__count">' + count + '</span>' +
             pctHtml +
             '</span>';
+    }
+
+    function dataTableLanguage(overrides) {
+        var lang = {
+            lengthMenu: '_MENU_',
+            search: '_INPUT_',
+            searchPlaceholder: cfg.i18n.search,
+            info: cfg.i18n.tableInfo,
+            infoEmpty: cfg.i18n.tableInfoEmpty,
+            infoFiltered: cfg.i18n.tableInfoFiltered,
+            paginate: {
+                first: '«',
+                last: '»',
+                next: '»',
+                previous: '«',
+            },
+            emptyTable: cfg.i18n.empty,
+        };
+
+        if (overrides) {
+            $.extend(lang, overrides);
+        }
+
+        return lang;
+    }
+
+    function resetStatsCache() {
+        statsCache = {};
+        if (statsRequest) {
+            statsRequest.abort();
+            statsRequest = null;
+        }
+        $('#competitors-stats-notice').addClass('d-none');
+        $('#competitors-table-loader').addClass('d-none');
+    }
+
+    function metricLoadingCell() {
+        var label = (cfg.i18n && cfg.i18n.statsLoadingCell) ? cfg.i18n.statsLoadingCell : '';
+        return '<span class="cabinet-mon-competitors-metric-loader" title="' + label + '" aria-label="' + label + '">' +
+            '<span class="cabinet-mon-loader cabinet-mon-loader--sm" role="presentation">' +
+            '<i class="fas fa-circle-notch cabinet-mon-loader__icon" aria-hidden="true"></i>' +
+            '</span></span>';
+    }
+
+    function updateStatsNotice(api) {
+        if (!api) {
+            $('#competitors-stats-notice').addClass('d-none');
+            $('#competitors-table-loader').addClass('d-none');
+            return;
+        }
+
+        var pending = !!statsRequest;
+        if (!pending) {
+            api.rows({ page: 'current' }).every(function () {
+                var domain = $(this.node()).find('.cabinet-mon-competitors-vis-col').attr('data-action');
+                if (domain && !statsCache[domain]) {
+                    pending = true;
+                    return false;
+                }
+            });
+        }
+
+        $('#competitors-stats-notice').toggleClass('d-none', !pending);
+        $('#competitors-table-loader').toggleClass('d-none', !statsRequest);
+    }
+
+    function applyRowStats(domain, stats) {
+        var $row = $('#table tbody tr').filter(function () {
+            return $(this).find('.cabinet-mon-competitors-vis-col').attr('data-action') === domain;
+        });
+
+        if (!$row.length || !stats) {
+            return;
+        }
+
+        $row.find('td').eq(3).html(formatIntersection(stats)).attr('data-order', Number(stats.intersectionCount || 0));
+        $row.find('td').eq(4).html(formatPct(stats.top_3)).attr('data-order', Number(stats.top_3 || 0));
+        $row.find('td').eq(5).html(formatPct(stats.top_10)).attr('data-order', Number(stats.top_10 || 0));
+        $row.find('td').eq(6).html(formatPct(stats.top_100)).attr('data-order', Number(stats.top_100 || 0));
+        $row.find('td').eq(7).html(formatAvg(stats.avgPosition)).attr('data-order', Number(stats.avgPosition || 101));
+    }
+
+    function loadVisiblePageStats(api) {
+        if (!api || !cfg.routes.competitorsPageStats) {
+            return;
+        }
+
+        var domains = [];
+        api.rows({ page: 'current' }).every(function () {
+            var domain = $(this.node()).find('.cabinet-mon-competitors-vis-col').attr('data-action');
+            if (domain && !statsCache[domain]) {
+                domains.push(domain);
+            }
+        });
+
+        if (!domains.length) {
+            updateStatsNotice(api);
+            return;
+        }
+
+        updateStatsNotice(api);
+
+        if (statsRequest) {
+            statsRequest.abort();
+        }
+
+        statsRequest = $.ajax({
+            type: 'POST',
+            dataType: 'json',
+            url: cfg.routes.competitorsPageStats,
+            data: {
+                _token: cfg.csrf,
+                projectId: cfg.projectId,
+                region: $('#searchEngines').val(),
+                domains: domains,
+            },
+            success: function (response) {
+                $.each(response.stats || {}, function (domain, stats) {
+                    statsCache[domain] = stats;
+                    applyRowStats(domain, stats);
+                });
+            },
+            error: function () {
+                if (typeof toastr !== 'undefined' && cfg.i18n.statsLoadError) {
+                    toastr.error(cfg.i18n.statsLoadError);
+                }
+            },
+            complete: function () {
+                statsRequest = null;
+                updateStatsNotice(api);
+            },
+        });
     }
 
     function refreshMethods() {
@@ -697,6 +831,8 @@
     }
 
     function renderTableRows(response) {
+        resetStatsCache();
+
         var competitors = JSON.parse(sessionStorage.getItem('competitorsArray') || '[]');
         var data = JSON.parse(response.result);
         var $dateLine = $('#competitors-date-line');
@@ -764,10 +900,10 @@
                 visibilityCell += '</div>';
 
                 var intersectionCell = formatIntersection(val);
-                var top3Cell = formatPct(val.top_3);
-                var top10Cell = formatPct(val.top_10);
-                var top100Cell = formatPct(val.top_100);
-                var avgCell = formatAvg(val.avgPosition);
+                var top3Cell = val.top_3 != null ? formatPct(val.top_3) : metricLoadingCell();
+                var top10Cell = val.top_10 != null ? formatPct(val.top_10) : metricLoadingCell();
+                var top100Cell = val.top_100 != null ? formatPct(val.top_100) : metricLoadingCell();
+                var avgCell = val.avgPosition != null ? formatAvg(val.avgPosition) : metricLoadingCell();
 
                 tableRows.push(
                     '<tr class="' + rowClass + '">' +
@@ -803,15 +939,18 @@
                 { className: 'text-end', targets: [3, 4, 5, 6, 7] },
             ],
             initComplete: function () {
-                wireCompetitorsDataTableBar(this.api());
+                var api = this.api();
+                wireCompetitorsDataTableBar(api);
                 if (window.cabinetMonitoringSearch) {
                     window.cabinetMonitoringSearch.dataTableInitComplete.call(this);
                 }
+                loadVisiblePageStats(api);
             },
         });
 
         $('#table').on('draw.dt', function () {
             refreshMethods();
+            loadVisiblePageStats($('#table').DataTable());
         });
 
         setTimeout(function () {
@@ -867,6 +1006,8 @@
                 region: $('#searchEngines').val(),
             },
             beforeSend: function () {
+                resetStatsCache();
+
                 if ($.fn.DataTable.isDataTable($('#table'))) {
                     $('#table').DataTable().destroy();
                 }
@@ -970,7 +1111,7 @@
             removedRow = $(this).closest('.cabinet-mon-competitors-chip');
         });
 
-        $('#remove-competitor').on('click', function () {
+        $('#remove-competitor-confirm').on('click', function () {
             $.ajax({
                 type: 'POST',
                 dataType: 'json',
@@ -988,12 +1129,16 @@
                     setCompetitorsCount(count);
                     if (count === 0) {
                         $('#competitors-chips').html(
-                            '<span class="cabinet-mon-competitors-panel__empty text-secondary small" id="competitors-chips-empty">' +
+                            '<span class="cabinet-mon-competitors-workspace__chips-empty text-secondary small" id="competitors-chips-empty">' +
                             cfg.i18n.chipsEmpty + '</span>'
                         );
                         setWorkspaceView('empty');
                     } else {
                         updateSteps();
+                    }
+                    var modalEl = document.getElementById('removeCompetitor');
+                    if (modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
                     }
                 },
             });

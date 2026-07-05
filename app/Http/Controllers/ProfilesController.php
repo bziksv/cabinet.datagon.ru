@@ -253,4 +253,25 @@ class ProfilesController extends Controller
 
         return redirect()->back();
     }
+
+    /**
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
+     */
+    public function snoozeMonitoringSchedulePaidPrompt(Request $request)
+    {
+        $weeks = max(1, (int) config('cabinet-monitoring.schedule_prompt_snooze_weeks', 2));
+        $until = Carbon::now()->addWeeks($weeks);
+
+        $this->user->monitoring_schedule_prompt_snoozed_until = $until;
+        $this->user->save();
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'ok' => true,
+                'snoozed_until' => $until->toIso8601String(),
+            ]);
+        }
+
+        return redirect()->back();
+    }
 }

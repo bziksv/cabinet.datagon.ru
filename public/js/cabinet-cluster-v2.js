@@ -626,6 +626,14 @@
           renderClusterDebugLog(response.debug_log || [], response.debug_state || null, progressId);
         }
 
+        if (response.failed) {
+          clearInterval(pollInterval);
+          $('#clv2-start').prop('disabled', false);
+          $('#clv2-progress-wrap').addClass('d-none');
+          showToast('error', response.error || cfg.i18n.progressError);
+          return;
+        }
+
         if ('result' in response) {
           clearInterval(pollInterval);
           setProgress(100, cfg.i18n.rendering);

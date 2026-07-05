@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Classes\Monitoring\MonitoringLocationLabel;
 use App\Classes\Monitoring\MonitoringProjectPageSummary;
 use App\Classes\Monitoring\Helper;
 use App\Classes\Monitoring\Mastered;
@@ -12,7 +13,6 @@ use App\Common;
 use App\Events\MonitoringProjectBeforeDelete;
 use App\Events\MonitoringProjectCopyProgress;
 use App\Events\MonitoringProjectCreated;
-use App\Jobs\Monitoring\MonitoringChangesDateQueue;
 use App\Jobs\Monitoring\MonitoringCompetitorsQueue;
 use App\Jobs\MonitoringProjectCopyJob;
 use App\Mail\MonitoringApproveProjectMail;
@@ -32,6 +32,7 @@ use App\MonitoringProjectSettings;
 use App\MonitoringSearchengine;
 use App\MonitoringSettings;
 use App\Project;
+use App\Support\MonitoringPositionsSchedule;
 use App\User;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -72,9 +73,11 @@ class MonitoringController extends Controller
         /** @var User $user */
         $user = $this->user;
 
+        MonitoringPositionsSchedule::enforceForFreeUser($user);
+
         $count = $user->monitoringProjects()->count();
 
-        return view('monitoring.index', compact( 'count'));
+        return view('monitoring.index', compact('count'));
     }
 
     public function copy($id)
@@ -457,7 +460,12 @@ class MonitoringController extends Controller
      */
     public function create()
     {
-        return view('monitoring.create');
+        /** @var User $user */
+        $user = $this->user;
+        MonitoringPositionsSchedule::enforceForFreeUser($user);
+        $onFreeTariff = $user->onFreeTariff();
+
+        return view('monitoring.create', compact('onFreeTariff'));
     }
 
     /**
@@ -817,7 +825,19 @@ class MonitoringController extends Controller
 
         $allWords = MonitoringKeyword::where('monitoring_project_id', $project->id)->get(['id', 'query'])->toArray();
         $totalWords = count($allWords);
-        $keywords = array_chunk($allWords, 100);
+        $batchSize = max(50, (int) config('cabinet-monitoring.competitors_positions_batch_size', 250));
+        $keywords = array_chunk($allWords, $batchSize);
+        $defaultRegion = request('region') ?: optional($project->searchengines->first())->id;
+        $snapshot = null;
+        if ($defaultRegion) {
+            $snapshotPosition = MonitoringCompetitor::resolveSnapshot($project->id, $defaultRegion);
+            if ($snapshotPosition && $snapshotPosition->engine) {
+                $snapshot = [
+                    'dateOnly' => $snapshotPosition->dateOnly,
+                    'lr' => $snapshotPosition->engine->lr,
+                ];
+            }
+        }
 
         return view('monitoring.competitors.statistics', [
             'project' => $project,
@@ -827,77 +847,322 @@ class MonitoringController extends Controller
             'navigations' => $navigations,
             'keywords' => json_encode($keywords),
             'totalWords' => $totalWords,
+            'positionsParallel' => max(1, (int) config('cabinet-monitoring.competitors_positions_parallel', 5)),
+            'positionsBatchSize' => $batchSize,
+            'useBulkLoad' => (bool) config('cabinet-monitoring.competitors_positions_use_bulk', true),
+            'allKeywords' => json_encode($allWords),
+            'snapshot' => $snapshot,
+        ]);
+    }
+
+    public function competitorsDynamics(MonitoringProject $project)
+    {
+        $competitorDomains = MonitoringCompetitor::where('monitoring_project_id', $project->id)
+            ->orderBy('url')
+            ->pluck('url')
+            ->all();
+
+        return view('monitoring.competitors.dynamics', [
+            'project' => $project,
+            'searchEngines' => $project->searchengines,
+            'competitorDomains' => $competitorDomains,
         ]);
     }
 
     public function getStatistics(Request $request): JsonResponse
     {
-        $statistics = MonitoringCompetitor::calculateStatistics($request->all());
+        $payload = $request->all();
+
+        if ($request->boolean('bulk')) {
+            @set_time_limit(300);
+            @ini_set('memory_limit', '512M');
+            $payload['keywords'] = MonitoringKeyword::where('monitoring_project_id', (int) $request->projectId)
+                ->get(['id', 'query'])
+                ->toArray();
+            $statistics = MonitoringCompetitor::calculateStatisticsBulk($payload);
+        } else {
+            $statistics = MonitoringCompetitor::calculateStatistics($payload);
+        }
+
+        $lastDate = MonitoringCompetitor::resolveLastDateForStatistics($payload);
 
         return response()->json([
             'visibility' => $statistics['visibility'],
             'statistics' => $statistics['statistics'],
+            'snapshot' => $lastDate ? [
+                'dateOnly' => $lastDate['dateOnly'],
+                'lr' => $lastDate['engine']['lr'],
+            ] : null,
+        ]);
+    }
+
+    public function getCompetitorsSnapshot(Request $request): JsonResponse
+    {
+        $position = MonitoringCompetitor::resolveSnapshot((int) $request->projectId, $request->region);
+
+        if (!$position || !$position->engine) {
+            return response()->json(['snapshot' => null]);
+        }
+
+        return response()->json([
+            'snapshot' => [
+                'dateOnly' => $position->dateOnly,
+                'lr' => $position->engine->lr,
+            ],
         ]);
     }
 
     public function competitorsHistoryPositions(Request $request): JsonResponse
     {
+        $projectId = (int) $request->projectId;
+        $regionId = (int) $request->region;
+        $dateRange = (string) $request->dateRange;
+        $selectedCompetitors = MonitoringCompetitor::normalizeChangesDateCompetitorInput($request->input('competitors'));
+        $competitorsKey = MonitoringCompetitor::changesDateCompetitorsSelectionKey($selectedCompetitors);
+
+        $existing = MonitoringChangesDate::query()
+            ->where('monitoring_project_id', $projectId)
+            ->where('range', $dateRange)
+            ->whereIn('state', ['pending', 'in queue', 'in process'])
+            ->orderByDesc('id')
+            ->get()
+            ->first(function (MonitoringChangesDate $record) use ($regionId, $competitorsKey) {
+                $payload = json_decode($record->request, true) ?: [];
+
+                return (int) ($payload['region'] ?? 0) === $regionId
+                    && MonitoringCompetitor::changesDateCompetitorsSelectionKey($payload['competitors'] ?? null) === $competitorsKey;
+            });
+
+        if ($existing) {
+            return response()->json([
+                'analyseId' => $existing->id,
+                'duplicate' => true,
+                'redirect' => false,
+            ]);
+        }
+
+        $estimate = MonitoringCompetitor::estimateChangesByDateRange(
+            $projectId,
+            $regionId,
+            $dateRange
+        );
+
+        $payload = array_merge($request->all(), [
+            'progress_done' => 0,
+            'progress_total' => $estimate['progressTotal'],
+            'competitors' => $selectedCompetitors,
+        ]);
+
+        $hasActive = MonitoringCompetitor::projectHasActiveChangesDateReport($projectId);
+
         $newRecord = new MonitoringChangesDate([
             'monitoring_project_id' => $request->projectId,
             'range' => $request->dateRange,
-            'request' => json_encode($request->all(), true)
+            'request' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            'state' => $hasActive ? 'pending' : 'in queue',
         ]);
         $newRecord->save();
 
-        MonitoringChangesDateQueue::dispatch(
-            $newRecord,
-            $request->all()
-        )->onQueue('monitoring_change_dates');
+        if (!$hasActive) {
+            MonitoringCompetitor::dispatchChangesDateReport($newRecord, $payload);
+        }
 
         return response()->json([
             'analyseId' => $newRecord->id,
+            'queued' => $hasActive,
+            'queuePosition' => $hasActive ? MonitoringCompetitor::pendingQueuePosition($newRecord) : null,
+            'queueTotal' => MonitoringCompetitor::pendingQueueTotal($projectId),
             'redirect' => false,
+            'estimate' => $estimate,
         ]);
+    }
+
+    public function estimateChangesDates(Request $request): JsonResponse
+    {
+        try {
+            $estimate = MonitoringCompetitor::estimateChangesByDateRange(
+                (int) $request->projectId,
+                (int) $request->region,
+                (string) $request->dateRange
+            );
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json($estimate);
     }
 
     public function checkChangesDatesState(Request $request): JsonResponse
     {
+        $this->releaseSessionLockForPolling();
+
         $record = MonitoringChangesDate::where('id', $request['id'])->first();
 
-        if (isset($record) && $record->state === 'ready' || $record->state === 'in process') {
-            return response()->json([
+        return response()->json($this->buildChangesDateStatePayload($record));
+    }
+
+    public function checkChangesDatesStateBatch(Request $request): JsonResponse
+    {
+        $this->releaseSessionLockForPolling();
+
+        $ids = array_values(array_unique(array_filter(array_map('intval', (array) $request->input('ids', [])))));
+        if ($ids === []) {
+            return response()->json(['records' => []]);
+        }
+
+        $records = MonitoringChangesDate::whereIn('id', $ids)->get()->keyBy('id');
+        $projectIds = [];
+
+        foreach ($ids as $id) {
+            $record = $records->get($id);
+            if ($record) {
+                $projectIds[(int) $record->monitoring_project_id] = true;
+            }
+        }
+
+        foreach (array_keys($projectIds) as $projectId) {
+            MonitoringCompetitor::tryDispatchNextChangesDateReport($projectId);
+        }
+
+        $records = MonitoringChangesDate::whereIn('id', $ids)->get()->keyBy('id');
+        $payload = [];
+
+        foreach ($ids as $id) {
+            $payload[(string) $id] = $this->buildChangesDateStatePayload($records->get($id));
+        }
+
+        return response()->json(['records' => $payload]);
+    }
+
+    protected function releaseSessionLockForPolling(): void
+    {
+        if (session()->isStarted()) {
+            session()->save();
+        }
+    }
+
+    protected function buildChangesDateStatePayload(?MonitoringChangesDate $record): array
+    {
+        if (!$record) {
+            return ['state' => 'in queue'];
+        }
+
+        $requestData = json_decode($record->request, true) ?: [];
+        $progressDone = (int) ($requestData['progress_done'] ?? 0);
+        $progressTotal = (int) ($requestData['progress_total'] ?? 0);
+        $progressPercent = $progressTotal > 0
+            ? min(100, (int) round($progressDone / $progressTotal * 100))
+            : null;
+
+        $staleMinutes = max(5, (int) config('cabinet-monitoring.competitors_changes_dates_stale_minutes', 20));
+        $stale = $record->state === 'in process'
+            && $record->updated_at
+            && $record->updated_at->diffInMinutes(now()) >= $staleMinutes
+            && ($progressTotal === 0 || $progressDone < $progressTotal);
+
+        if ($stale && $record->state === 'in process') {
+            $record->update([
+                'state' => 'fail',
+                'result' => '',
+            ]);
+            MonitoringCompetitor::tryDispatchNextChangesDateReport((int) $record->monitoring_project_id);
+
+            return [
+                'state' => 'fail',
+                'id' => $record->id,
+                'progress_done' => $progressDone,
+                'progress_total' => $progressTotal,
+                'progress_percent' => $progressPercent,
+                'stale' => true,
+            ];
+        }
+
+        if ($record->state === 'pending') {
+            return [
+                'state' => 'pending',
+                'id' => $record->id,
+                'queue_position' => MonitoringCompetitor::pendingQueuePosition($record),
+                'queue_total' => MonitoringCompetitor::pendingQueueTotal((int) $record->monitoring_project_id),
+                'progress_done' => $progressDone,
+                'progress_total' => $progressTotal,
+                'progress_percent' => $progressPercent,
+                'stale' => false,
+            ];
+        }
+
+        if (in_array($record->state, ['ready', 'in process'], true)) {
+            return [
                 'state' => $record->state,
                 'range' => $record->range,
                 'result' => json_decode($record->result, true),
-                'id' => $record->id
-            ]);
+                'id' => $record->id,
+                'progress_done' => $progressDone,
+                'progress_total' => $progressTotal,
+                'progress_percent' => $progressPercent,
+                'stale' => $stale,
+            ];
         }
 
-        return response()->json([
+        if ($record->state === 'fail') {
+            return [
+                'state' => 'fail',
+                'id' => $record->id,
+                'progress_done' => $progressDone,
+                'progress_total' => $progressTotal,
+                'progress_percent' => $progressPercent,
+                'stale' => false,
+            ];
+        }
+
+        return [
             'state' => 'in queue',
-        ]);
+            'progress_done' => $progressDone,
+            'progress_total' => $progressTotal,
+            'progress_percent' => $progressPercent,
+            'stale' => false,
+        ];
     }
 
     public function removeChangesDatesState(Request $request): JsonResponse
     {
-        $count = MonitoringChangesDate::where('id', $request['id'])->delete();
+        $record = MonitoringChangesDate::where('id', $request['id'])->first();
 
-        if ($count === 1) {
-            return response()->json([], 200);
+        if (!$record) {
+            return response()->json([], 415);
         }
 
-        return response()->json([], 415);
+        $projectId = (int) $record->monitoring_project_id;
+        $wasActive = in_array($record->state, ['in queue', 'in process'], true);
+
+        MonitoringCompetitor::cancelQueuedChangesDateReport((int) $record->id);
+        $record->delete();
+
+        if ($wasActive) {
+            MonitoringCompetitor::tryDispatchNextChangesDateReport($projectId);
+        }
+
+        return response()->json([], 200);
     }
 
     public function resultChangesDatesState(MonitoringChangesDate $project)
     {
-        $request = json_decode($project->request, true);
+        $request = json_decode($project->request, true) ?: [];
+        $monitoringProject = MonitoringProject::find($project->monitoring_project_id);
         $engine = MonitoringSearchengine::with('location:id,lr,name')
-            ->where('id', $request['region'])
+            ->where('id', $request['region'] ?? null)
             ->first();
-        $request['region'] = $engine && $engine->location ? $engine->location->name : '';
+        $regionLabel = $engine
+            ? MonitoringLocationLabel::filterOption($engine)
+            : ($request['region'] ?? '');
 
-        return view('monitoring.competitors.dates-results', compact('project', 'request'));
+        return view('monitoring.competitors.dates-results', [
+            'changeRecord' => $project,
+            'monitoringProject' => $monitoringProject,
+            'request' => $request,
+            'regionLabel' => $regionLabel,
+            'ownDomain' => $monitoringProject ? $monitoringProject->url : null,
+            'resultData' => json_decode($project->result, true) ?: [],
+        ]);
     }
 
     public function getCompetitorsDomain(Request $request): array
@@ -924,6 +1189,27 @@ class MonitoringController extends Controller
         }
 
         return $response;
+    }
+
+    public function getCompetitorsPageStats(Request $request): JsonResponse
+    {
+        $domains = $request->input('domains', []);
+        if (!is_array($domains)) {
+            $domains = [];
+        }
+
+        $domains = array_values(array_unique(array_filter(array_map(static function ($domain) {
+            return trim((string) $domain);
+        }, $domains))));
+
+        $limit = (int) config('cabinet-monitoring.competitors_stats_batch_size', 50);
+        if ($limit > 0) {
+            $domains = array_slice($domains, 0, $limit);
+        }
+
+        return response()->json([
+            'stats' => MonitoringCompetitor::computePageStats($request->all(), $domains),
+        ]);
     }
 
     public function getProjectCompetitors(MonitoringProject $project): array

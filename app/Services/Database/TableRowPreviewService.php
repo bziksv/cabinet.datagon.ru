@@ -26,6 +26,10 @@ class TableRowPreviewService
             return $this->previewFailedJobs($limit);
         }
 
+        if ($table === 'search_indices') {
+            return $this->previewSearchIndices($limit);
+        }
+
         return $this->previewGeneric($table, $limit);
     }
 
@@ -87,6 +91,37 @@ class TableRowPreviewService
     /**
      * @return array{table: string, limit: int, order_column: string, columns: list<string>, rows: list<array<string, mixed>>, note: ?string}
      */
+    private function previewSearchIndices(int $limit): array
+    {
+        $rows = DB::table('search_indices')
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get(['id', 'lr', 'query', 'position', 'created_at']);
+
+        $out = [];
+        foreach ($rows as $row) {
+            $out[] = [
+                'id' => $row->id,
+                'lr' => $row->lr,
+                'query' => $this->truncate((string) ($row->query ?? ''), 120),
+                'position' => $row->position,
+                'created_at' => (string) ($row->created_at ?? ''),
+            ];
+        }
+
+        return [
+            'table' => 'search_indices',
+            'limit' => $limit,
+            'order_column' => 'id DESC',
+            'columns' => ['id', 'lr', 'query', 'position', 'created_at'],
+            'rows' => $out,
+            'note' => __('Database preview search indices note'),
+        ];
+    }
+
+    /**
+     * @return array{table: string, limit: int, order_column: string, columns: list<string>, rows: list<array<string, mixed>>, note: ?string}
+     */
     private function previewGeneric(string $table, int $limit): array
     {
         $schema = (string) config('database.connections.mysql.database');
@@ -105,7 +140,7 @@ class TableRowPreviewService
             'password', 'remember_token', 'payload', 'exception',
         ]));
 
-        $orderCol = $this->resolveOrderColumn($meta->pluck('column_name')->all());
+        $orderCol = $this->resolveOrderColumn($meta->pluck('column_name')->all(), $table);
         $maxChars = (int) config('cabinet-database-admin.row_preview_max_cell_chars', 400);
 
         $selectParts = [];
@@ -165,8 +200,13 @@ class TableRowPreviewService
     /**
      * @param list<string> $columnNames
      */
-    private function resolveOrderColumn(array $columnNames): string
+    private function resolveOrderColumn(array $columnNames, string $table): string
     {
+        $byId = array_flip(config('cabinet-database-admin.row_preview_order_by_id_tables', []));
+        if (isset($byId[$table]) && in_array('id', $columnNames, true)) {
+            return 'id';
+        }
+
         foreach (['failed_at', 'updated_at', 'created_at', 'last_check', 'id'] as $candidate) {
             if (in_array($candidate, $columnNames, true)) {
                 return $candidate;

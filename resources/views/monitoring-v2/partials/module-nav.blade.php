@@ -27,10 +27,13 @@
                     <a class="nav-link" href="{{ route('monitoring.stat') }}">{{ __('Statistics') }}</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="{{ route('monitoring-permissions.index') }}">{{ __('Права') }}</a>
+                    <a class="nav-link" href="{{ route('monitoring-permissions.index') }}">{{ __('Monitoring admin nav permissions') }}</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="{{ route('set.positions') }}">{{ __('Set positions') }}</a>
+                    <a class="nav-link" href="{{ route('set.positions') }}">{{ __('Monitoring admin nav set positions') }}</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ route('offset.positions') }}">{{ __('Monitoring admin nav offset positions') }}</a>
                 </li>
             @endif
         </ul>

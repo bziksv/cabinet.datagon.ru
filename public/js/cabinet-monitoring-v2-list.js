@@ -28,7 +28,7 @@
 
     const LIST_COLUMN_DEFAULTS = {
         top3: true,
-        top5: false,
+        top5: true,
         top10: true,
         top30: true,
         top100: true,
@@ -37,6 +37,7 @@
         users: true,
         engines: true,
         budget: true,
+        mastered: true,
     };
 
     const LIST_COLUMN_META = [
@@ -50,6 +51,7 @@
         { key: 'users', label: function () { return cfg.i18n.colUsers; } },
         { key: 'engines', label: function () { return cfg.i18n.colEngines; } },
         { key: 'budget', label: function () { return cfg.i18n.colBudget; } },
+        { key: 'mastered', label: function () { return cfg.i18n.colMastered; } },
     ];
 
     let listColumnPrefs = Object.assign({}, LIST_COLUMN_DEFAULTS, cfg.listColumns || {});
@@ -751,6 +753,29 @@
         return Number.isNaN(pct) ? 0 : pct;
     }
 
+    function renderBudgetCell(row) {
+        let html = escHtml(formatMoney(row.budget));
+        const pct = row.mastered_percent != null && row.mastered_percent !== ''
+            ? parseFloat(String(row.mastered_percent).replace(',', '.'))
+            : 0;
+        if (pct > 0) {
+            html += '<sup class="text-success ms-1">' + escHtml(String(Math.floor(pct)) + '%') + '</sup>';
+        }
+        return html;
+    }
+
+    function renderMasteredCell(row) {
+        const mastered = parseFloat(row.mastered) || 0;
+        let html = escHtml(formatMoney(mastered));
+        if (mastered > 0) {
+            const pct = masteredDayPercent(row);
+            if (pct > 0) {
+                html += '<br><small class="text-success">' + escHtml(String(pct) + '%') + '</small>';
+            }
+        }
+        return html;
+    }
+
     function prepareRows(rows) {
         return (rows || []).map(function (row) {
             const next = Object.assign({}, row);
@@ -1219,7 +1244,13 @@
             '<div class="cabinet-mon-v2-card__budget small text-secondary">' +
             escHtml(cfg.i18n.budget) +
             ': ' +
-            escHtml(formatMoney(row.budget)) +
+            renderBudgetCell(row) +
+            (isListColumnVisible('mastered')
+                ? '<br>' +
+                  escHtml(cfg.i18n.mastered) +
+                  ': ' +
+                  renderMasteredCell(row)
+                : '') +
             '</div>' +
             '</div>' +
             '<footer class="cabinet-mon-v2-card__foot">' +
@@ -2127,7 +2158,18 @@
                         if (type === 'sort' || type === 'type') {
                             return parseFloat(row.budget) || 0;
                         }
-                        return escHtml(formatMoney(row.budget));
+                        return renderBudgetCell(row);
+                    },
+                },
+                {
+                    name: 'mastered',
+                    className: 'align-middle text-nowrap',
+                    visible: isListColumnVisible('mastered'),
+                    data: function (row, type) {
+                        if (type === 'sort' || type === 'type') {
+                            return parseFloat(row.mastered) || 0;
+                        }
+                        return renderMasteredCell(row);
                     },
                 },
                 {

@@ -4,7 +4,9 @@
             <h3 class="card-title">{{ __('Administration panel') }}</h3>
         </div>
         <div class="card-body">
-            {{ $description }}
+            @isset($description)
+                {{ $description }}
+            @endisset
 
             {{ $slot }}
         </div>

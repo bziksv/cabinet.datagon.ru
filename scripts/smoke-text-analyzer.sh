@@ -198,7 +198,7 @@ if ($pdfResp->getStatusCode() === 200) {
         } else {
             $pdfText = (string) $pdfResp->getContent();
         }
-        $hasBrandText = (strpos($pdfText, 'Датагон') !== false || strpos($pdfText, 'Datagon') !== false);
+        $hasBrandText = (strpos($pdfText, 'Титло') !== false || strpos($pdfText, 'Titlo') !== false);
         $hasBrandAssets = is_file(public_path('img/logo-pdf.png')) && is_file(public_path('img/logo-icon-pdf.png'));
         $pdfSize = strlen($pdfText);
         $hasBrand = $hasBrandText || ($hasBrandAssets && $pdfSize > 28000);

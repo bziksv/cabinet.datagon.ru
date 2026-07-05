@@ -1,0 +1,46 @@
+.cabinet-queue-admin-page .q-summary-card {
+    border-left: 4px solid var(--bs-primary);
+}
+
+.cabinet-queue-admin-page .q-summary-card--warn {
+    border-left-color: var(--bs-warning);
+}
+
+.cabinet-queue-admin-page .q-summary-card--danger {
+    border-left-color: var(--bs-danger);
+}
+
+.cabinet-queue-admin-page .q-queue-name,
+.cabinet-queue-admin-page .q-progress-id {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.875rem;
+}
+
+.cabinet-queue-admin-page .q-row-warn {
+    --bs-table-bg: rgba(var(--bs-warning-rgb), 0.08);
+}
+
+.cabinet-queue-admin-page .q-row-danger {
+    --bs-table-bg: rgba(var(--bs-danger-rgb), 0.08);
+}
+
+.cabinet-queue-admin-page .q-row-danger td:first-child,
+.cabinet-queue-admin-page .q-row-warn td:first-child {
+    border-left: 3px solid var(--bs-danger);
+}
+
+.cabinet-queue-admin-page .q-row-warn td:first-child {
+    border-left-color: var(--bs-warning);
+}
+
+.cabinet-queue-admin-page .q-filter-pills .btn {
+    font-size: 0.8125rem;
+}
+
+.cabinet-queue-admin-page .q-sticky-toolbar {
+    position: sticky;
+    top: 0.5rem;
+    z-index: 10;
+    background: var(--bs-body-bg);
+    padding-bottom: 0.5rem;
+}

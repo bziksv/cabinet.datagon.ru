@@ -13,6 +13,8 @@
         $filter = $filter ?? 'all';
         $largeMb = (int) config('cabinet-database-admin.large_table_mb', 100);
 
+        $clearableTables = array_flip(config('cabinet-database-admin.clearable_tables', []));
+
         $filtered = array_filter($allTables, static function (array $t) use ($filter, $largeMb) {
             if ($filter === 'orphan') {
                 return ($t['status'] ?? '') === 'orphan';
@@ -237,14 +239,30 @@
                                 @endif
                             </td>
                             <td class="text-end text-nowrap">
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-secondary db-preview-btn"
-                                        data-table="{{ $t['name'] }}"
-                                        data-preview-target="{{ $previewId }}"
-                                        title="{{ __('Database preview last rows', ['n' => config('cabinet-database-admin.row_preview_limit', 10)]) }}">
-                                    <i class="bi bi-list-ul" aria-hidden="true"></i>
-                                    <span class="d-none d-md-inline ms-1">{{ __('Preview') }}</span>
-                                </button>
+                                <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-secondary db-preview-btn"
+                                            data-table="{{ $t['name'] }}"
+                                            data-preview-target="{{ $previewId }}"
+                                            title="{{ __('Database preview last rows', ['n' => config('cabinet-database-admin.row_preview_limit', 10)]) }}">
+                                        <i class="bi bi-list-ul" aria-hidden="true"></i>
+                                        <span class="d-none d-md-inline ms-1">{{ __('Preview') }}</span>
+                                    </button>
+                                    @if(isset($clearableTables[$t['name']]))
+                                        @php
+                                            $clearConfirm = __('Database clear table confirm', ['table' => $t['name']]);
+                                        @endphp
+                                        <form action="{{ route('admin.database.clear', ['table' => $t['name']]) }}" method="post" class="d-inline"
+                                              onsubmit='return confirm(@json($clearConfirm));'>
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                    title="{{ __('Database clear table', ['table' => $t['name']]) }}">
+                                                <i class="bi bi-trash3" aria-hidden="true"></i>
+                                                <span class="d-none d-md-inline ms-1">{{ __('Database clear table action') }}</span>
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                         <tr class="db-preview-row d-none" id="{{ $previewId }}" data-preview-for="{{ $t['name'] }}">
@@ -271,7 +289,8 @@
                 empty: @json(__('Database preview empty')),
                 error: @json(__('Database preview error')),
                 order: @json(__('Database preview order')),
-                excerpt: @json(__('Exception excerpt'))
+                excerpt: @json(__('Exception excerpt')),
+                loading: @json(__('Database preview loading'))
             };
 
             function escapeHtml(s) {
@@ -327,14 +346,18 @@
                     if (panel.getAttribute('data-loaded') === '1') {
                         return;
                     }
+                    btn.disabled = true;
+                    btn.setAttribute('aria-busy', 'true');
                     spinner.classList.remove('d-none');
-                    panel.querySelector('.db-preview-placeholder').textContent = '';
+                    panel.querySelector('.db-preview-placeholder').textContent = labels.loading;
                     fetch(previewUrlTemplate.replace('__TABLE__', encodeURIComponent(table)), {
                         headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
                     })
                         .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, json: j }; }); })
                         .then(function (res) {
                             spinner.classList.add('d-none');
+                            btn.disabled = false;
+                            btn.removeAttribute('aria-busy');
                             if (!res.ok) {
                                 panel.innerHTML = '<p class="text-danger mb-0">' + escapeHtml(res.json.error || labels.error) + '</p>';
                                 return;
@@ -344,6 +367,8 @@
                         })
                         .catch(function () {
                             spinner.classList.add('d-none');
+                            btn.disabled = false;
+                            btn.removeAttribute('aria-busy');
                             panel.innerHTML = '<p class="text-danger mb-0">' + escapeHtml(labels.error) + '</p>';
                         });
                 });

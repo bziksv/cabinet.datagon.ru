@@ -63,7 +63,7 @@ sleep 1
 for pid in $(lsof -ti :3002 -sTCP:LISTEN 2>/dev/null); do
   cmd=$(ps -p "$pid" -o command= 2>/dev/null || true)
   if [[ "$cmd" == *"next dev"* ]] || [[ "$cmd" == *"next-server"* ]]; then
-    echo "На :3002 висит Next (маркетинг). Остановите: cd datagon.ru && npm run dev:stop" >&2
+    echo "На :3002 висит Next (маркетинг). Остановите: cd titlo.ru && npm run dev:stop" >&2
     exit 1
   fi
   if [[ -n "$cmd" ]] && [[ "$cmd" != *"cabinet-proxy.mjs"* ]]; then

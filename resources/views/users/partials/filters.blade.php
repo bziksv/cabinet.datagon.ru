@@ -37,6 +37,8 @@
                         @foreach($tariffSelect['tariff'] as $code => $name)
                             <option value="{{ $code }}">{{ $name }}</option>
                         @endforeach
+                        <option value="Free">{{ __('Free') }}</option>
+                        <option value="no_role">{{ __('Users tariff filter no role') }}</option>
                     </select>
                 </div>
                 <div class="col-12 col-md-6 col-lg-4">
@@ -82,6 +84,13 @@
                                placeholder="{{ __('To') }}"
                                min="1">
                     </div>
+                </div>
+                <div class="col-12 col-md-6 col-lg-4">
+                    <label class="form-label small mb-1" for="filter-stale-monitoring">{{ __('Users stale monitoring filter label') }}</label>
+                    <select class="form-select form-select-sm" id="filter-stale-monitoring" data-filter>
+                        <option value="">{{ __('Any') }}</option>
+                        <option value="1">{{ __('Users stale monitoring filter yes') }}</option>
+                    </select>
                 </div>
                 <div class="col-12 col-md-6 col-lg-4 cabinet-users-filters__actions-col">
                     <div class="cabinet-users-filters__actions d-flex flex-wrap gap-2">

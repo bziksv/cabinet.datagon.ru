@@ -5,7 +5,7 @@ namespace App\Support;
 use Illuminate\Http\Request;
 
 /**
- * Guest-лимиты демо (те же cookie, что datagon.ru/lib/demo/guest-session.ts).
+ * Guest-лимиты демо (те же cookie, что titlo.ru/lib/demo/guest-session.ts).
  */
 final class DemoGuestSession
 {

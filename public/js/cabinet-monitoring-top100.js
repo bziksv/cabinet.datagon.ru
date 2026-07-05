@@ -7,11 +7,77 @@
 
     var colorArray = getColors();
     var activeFilter = 'URL';
+    var analysedProgress = 0;
+    var guideStepsDone = {
+        1: false,
+        2: false,
+        3: false,
+        4: false,
+        5: false,
+    };
+
+    function setGuideStepDone(step, done) {
+        if (!step || step < 1 || step > 5) {
+            return;
+        }
+        guideStepsDone[step] = !!done;
+        $('#top100-guide-steps [data-top100-guide-step="' + step + '"]').toggleClass('is-done', guideStepsDone[step]);
+    }
+
+    function syncGuideStepsFromForm() {
+        setGuideStepDone(1, !!$('#words-select').val());
+        setGuideStepDone(2, getDates().length > 0);
+        setGuideStepDone(3, !!$('#searchEngines').val());
+    }
+
+    function markGuideToolStep() {
+        if (!$('#top100-tools-panel').hasClass('is-locked')) {
+            setGuideStepDone(5, true);
+        }
+    }
+
+    function bindGuideStepHandlers() {
+        $('#words-select').on('change select2:select', function () {
+            setGuideStepDone(1, !!$(this).val());
+        });
+
+        $('#searchEngines').on('change', function () {
+            setGuideStepDone(3, !!$(this).val());
+        });
+
+        $('#filter').on('input change', markGuideToolStep);
+    }
 
     function setWorkspaceView(mode) {
         $('#top100-empty-state').toggleClass('d-none', mode !== 'empty');
+        $('#top100-no-data').toggleClass('d-none', mode !== 'no-data');
         $('#progress').toggleClass('d-none', mode !== 'loading');
         $('#top100-result-wrap').toggleClass('d-none', mode !== 'result');
+        $('#top100-results-head').toggleClass('d-none', mode !== 'result');
+    }
+
+    function escapeHtml(text) {
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function menuLabel(icon, text) {
+        return '<i class="bi bi-' + icon + ' me-2" aria-hidden="true"></i>' + text;
+    }
+
+    function getSelectedRegions() {
+        var val = $('#searchEngines').val();
+        if (!val) {
+            return [];
+        }
+
+        return [{
+            lr: val,
+            label: $('#searchEngines option:selected').text().trim(),
+        }];
     }
 
     function getColors() {
@@ -84,16 +150,39 @@
     }
 
     function disableElements() {
-        $('#select-my-competitors, #select-my-project, #top, #filter, #analyse, #top100-empty-analyse').prop('disabled', true);
+        $('#select-my-competitors, #select-my-project, #top, #filter, #analyse, #top100-empty-analyse, #searchEngines, #words-select').prop('disabled', true);
         $('.change-filter-name').prop('disabled', true);
+        $('#top100-tools-panel').addClass('is-locked');
         $('#select-my-project').attr('data-action', 'color').text(cfg.i18n.selectProject);
         $('#select-my-competitors').attr('data-action', 'color').text(cfg.i18n.selectCompetitors);
     }
 
     function enableElements() {
-        $('#select-my-project, #select-my-competitors, #top, #filter, #analyse, #top100-empty-analyse').prop('disabled', false);
+        $('#select-my-project, #select-my-competitors, #top, #filter, #analyse, #top100-empty-analyse, #searchEngines, #words-select').prop('disabled', false);
         $('.change-filter-name').prop('disabled', false);
+        $('#top100-tools-panel').removeClass('is-locked');
         selectProject();
+    }
+
+    function generateEmptyColumn(date) {
+        return '<div class="kanban-card cabinet-mon-top100-column cabinet-mon-top100-column--empty card border">' +
+            '    <div class="card-header py-2 cabinet-mon-top100-column__head">' +
+            '        <span class="cabinet-mon-top100-column__pos">#</span>' +
+            '        <span class="cabinet-mon-top100-column__date">' + escapeHtml(date) + '</span>' +
+            '    </div>' +
+            '    <div class="card-body p-2">' +
+            '        <p class="small text-secondary mb-0">' + escapeHtml(cfg.i18n.noSnapshot) + '</p>' +
+            '    </div>' +
+            '</div>';
+    }
+
+    function generateEngineBoard(region) {
+        return $('<div class="cabinet-mon-top100-engine-block">' +
+            '    <div class="cabinet-mon-top100-engine-block__head">' +
+            '        <h4 class="h6 mb-0">' + escapeHtml(region.label) + '</h4>' +
+            '    </div>' +
+            '    <div class="cabinet-mon-top100-columns"></div>' +
+            '</div>');
     }
 
     function generateKanbanCard(items, date) {
@@ -125,11 +214,11 @@
                 '            <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>' +
                 '        </button>' +
                 '        <div class="dropdown-menu dropdown-menu-end">' +
-                '            <a class="dropdown-item" href="' + v.url + '" target="_blank" rel="noopener noreferrer">' + cfg.i18n.openSite + '</a>' +
-                '            <a class="dropdown-item" href="' + cfg.routes.textAnalyzerRedirect + '/' + v.url.replaceAll('/', 'abc') + '" target="_blank" rel="noopener noreferrer">' + cfg.i18n.analyse + '</a>' +
-                '            <button type="button" class="dropdown-item copy" data-target="' + v.url + '">' + cfg.i18n.copyUrl + '</button>' +
-                '            <button type="button" class="dropdown-item copy" data-target="' + origin + '">' + cfg.i18n.copyDomain + '</button>' +
-                '            <button type="button" class="dropdown-item set-relationships" data-target="' + v.url + '">' + cfg.i18n.viewPositions + '</button>' +
+                '            <a class="dropdown-item" href="' + v.url + '" target="_blank" rel="noopener noreferrer">' + menuLabel('box-arrow-up-right', cfg.i18n.openSite) + '</a>' +
+                '            <a class="dropdown-item" href="' + cfg.routes.textAnalyzerRedirect + '/' + v.url.replaceAll('/', 'abc') + '" target="_blank" rel="noopener noreferrer">' + menuLabel('pie-chart', cfg.i18n.analyse) + '</a>' +
+                '            <button type="button" class="dropdown-item copy" data-target="' + v.url + '">' + menuLabel('clipboard', cfg.i18n.copyUrl) + '</button>' +
+                '            <button type="button" class="dropdown-item copy" data-target="' + origin + '">' + menuLabel('globe2', cfg.i18n.copyDomain) + '</button>' +
+                '            <button type="button" class="dropdown-item set-relationships" data-target="' + v.url + '">' + menuLabel('diagram-3', cfg.i18n.viewPositions) + '</button>' +
                 '        </div>' +
                 '    </div>' +
                 '</div>';
@@ -144,7 +233,7 @@
             '</div>';
     }
 
-    function sendAjaxRequest(word, date) {
+    function sendAjaxRequest(word, date, regionLr) {
         var currentDate = moment(date, 'DD-MM-YYYY').format('YYYY-MM-DD');
 
         return new Promise(function (resolve) {
@@ -155,35 +244,44 @@
                     _token: cfg.csrf,
                     word: word,
                     date: currentDate,
-                    region: $('#searchEngines').val(),
+                    region: regionLr,
                 },
                 success: function (response) {
-                    if (response.length === 100) {
-                        $('#result').append(generateKanbanCard(response, date));
-                    }
-                    resolve();
+                    resolve(Array.isArray(response) ? response : []);
                 },
                 error: function (error) {
                     console.error('top100 request error:', error);
-                    resolve();
+                    resolve([]);
                 },
             });
         });
     }
 
-    async function processWordAndDates(word, dates) {
-        var counter = 1;
+    async function processWordAndDates(word, dates, region) {
+        var $board = generateEngineBoard(region);
+        var $columns = $board.find('.cabinet-mon-top100-columns');
+        $('#top100-result-wrap').append($board);
+
+        var hasData = false;
         var date;
+
         for (date of dates) {
-            await sendAjaxRequest(word, date);
-            $('#analysed-days').text(counter);
-            counter++;
+            var response = await sendAjaxRequest(word, date, region.lr);
+            if (response.length > 0) {
+                $columns.append(generateKanbanCard(response, date));
+                hasData = true;
+            } else {
+                $columns.append(generateEmptyColumn(date));
+            }
+            analysedProgress++;
+            $('#analysed-days').text(analysedProgress);
         }
 
-        maxTop();
-        changeVisual();
-        filter();
-        $('.cabinet-mon-top100-item__menu .dropdown').show();
+        if (!hasData) {
+            $board.addClass('cabinet-mon-top100-engine-block--empty');
+        }
+
+        return hasData;
     }
 
     function randomInteger(min, max) {
@@ -197,7 +295,7 @@
 
         var $from = $(from);
         var $to = $(to);
-        var $main = $('#result');
+        var $main = $from.closest('.cabinet-mon-top100-columns');
         var mainTop = $main.offset().top;
         var mainLeft = $main.offset().left;
         var mainHeight = $main.outerHeight();
@@ -246,9 +344,9 @@
             .appendTo($main);
     }
 
-    function getElements(domain) {
+    function getElements(domain, $scope) {
         var elements = [];
-        $.each($('.cabinet-mon-top100-column'), function (key, value) {
+        $.each($scope.find('.cabinet-mon-top100-column'), function (key, value) {
             elements.push($($(value).find(".fixed-lines[data-domain='" + domain + "']")).parent());
         });
         return elements;
@@ -260,7 +358,7 @@
 
         if ($menu.find('.dropdown-item.remove-relationships').length === 0) {
             $menu.append(
-                '<button type="button" class="dropdown-item remove-relationships" data-id="' + id + '">' + cfg.i18n.deleteLink + '</button>'
+                '<button type="button" class="dropdown-item remove-relationships" data-id="' + id + '">' + menuLabel('x-circle', cfg.i18n.deleteLink) + '</button>'
             );
         }
         $menu.find('.dropdown-item.set-relationships').remove();
@@ -274,7 +372,7 @@
             var $parent = $(this).parent();
             $(this).remove();
             $parent.append(
-                '<button type="button" class="dropdown-item set-relationships">' + cfg.i18n.viewPositions + '</button>'
+                '<button type="button" class="dropdown-item set-relationships">' + menuLabel('diagram-3', cfg.i18n.viewPositions) + '</button>'
             );
 
             if ($parent.closest('.kanban-item').hasClass('competitor-domain')) {
@@ -295,7 +393,8 @@
             var color = colorArray.shift();
             var targetUrl = $(this).closest('.kanban-item').find('.fixed-lines').attr('data-domain');
             var id = randomInteger(0, 90000000);
-            var elements = getElements(targetUrl);
+            var $columns = $(this).closest('.cabinet-mon-top100-columns');
+            var elements = getElements(targetUrl, $columns);
             var will = [];
             var i;
             var j;
@@ -341,7 +440,8 @@
             var targetUrl = $(this).attr('data-domain');
             var id = randomInteger(0, 90000000);
             var find = false;
-            var elements = getElements(targetUrl);
+            var $columns = $(this).closest('.cabinet-mon-top100-columns');
+            var elements = getElements(targetUrl, $columns);
             var will = [];
             var i;
             var j;
@@ -409,6 +509,7 @@
 
     function maxTop() {
         $('#top').off('change').on('change', function () {
+            markGuideToolStep();
             var top = $('#top').val();
             $('[data-index].kanban-item').each(function () {
                 $(this).toggle(parseInt($(this).attr('data-index'), 10) <= top);
@@ -419,6 +520,7 @@
 
     function changeVisual() {
         $('.change-filter-name').off('click').on('click', function () {
+            markGuideToolStep();
             $('.change-filter-name').removeClass('active');
             $(this).addClass('active');
 
@@ -433,6 +535,7 @@
 
     function selectProject() {
         $('#select-my-project').off('click').on('click', function () {
+            markGuideToolStep();
             if ($(this).attr('data-action') === 'color') {
                 var find = false;
                 var target = $(this).attr('data-target');
@@ -462,6 +565,7 @@
         });
 
         $('#select-my-competitors').off('click').on('click', function () {
+            markGuideToolStep();
             var array = cfg.competitors || [];
             var notFound = [];
 
@@ -506,15 +610,34 @@
     }
 
     async function startAnalyse(words, dates) {
+        var regions = getSelectedRegions();
+        var anyData = false;
         var word;
+        var region;
+
         for (word of words) {
-            await processWordAndDates(word, dates);
+            for (region of regions) {
+                if (await processWordAndDates(word, dates, region)) {
+                    anyData = true;
+                }
+            }
         }
 
-        setTimeout(function () {
-            setWorkspaceView('result');
-            enableElements();
-        }, 2000);
+        maxTop();
+        changeVisual();
+        filter();
+        $('.cabinet-mon-top100-item__menu .dropdown').show();
+        enableElements();
+
+        setGuideStepDone(4, true);
+
+        if (!anyData) {
+            $('#top100-result-wrap').empty();
+            setWorkspaceView('no-data');
+            return;
+        }
+
+        setWorkspaceView('result');
 
         $('[data-bs-toggle="tooltip"]').tooltip();
 
@@ -534,12 +657,19 @@
 
     $(document).ready(function () {
         $('#words-select').select2({
+            theme: 'bootstrap4',
             width: '100%',
-            minimumResultsForSearch: 8,
+            minimumResultsForSearch: Infinity,
+            placeholder: cfg.i18n.selectPhrase,
+            allowClear: false,
             dropdownCssClass: 'cabinet-mon-top100-select2',
         });
 
         setWorkspaceView('empty');
+
+        $('#date-range').on('focus', function () {
+            this.removeAttribute('readonly');
+        });
 
         if (window.cabinetMonitoringDateRange) {
             window.cabinetMonitoringDateRange.init({
@@ -551,12 +681,19 @@
                 },
                 startDate: moment().subtract(3, 'days'),
                 endDate: moment(),
+                autoUpdateInput: false,
                 i18n: cfg.dateRangeI18n,
                 onCalendarError: function () {
                     errorMessage(cfg.i18n.calendarError);
                 },
+                onApply: function () {
+                    setGuideStepDone(2, getDates().length > 0);
+                },
             });
         }
+
+        bindGuideStepHandlers();
+        syncGuideStepsFromForm();
 
         $('#analyse, #top100-empty-analyse').on('click', function () {
             var words = [$('#words-select').val()];
@@ -567,12 +704,30 @@
             }
 
             disableElements();
-            $('#result').html('');
+            setGuideStepDone(5, false);
+            $('#top100-result-wrap').empty();
             $('#filter').val('');
             setWorkspaceView('loading');
 
+            analysedProgress = 0;
             var days = getDates();
-            $('#total-days').text(days.length);
+            if (!days.length) {
+                errorMessage(cfg.i18n.selectDates);
+                enableElements();
+                setWorkspaceView('empty');
+                return;
+            }
+
+            var regions = getSelectedRegions();
+            if (!regions.length) {
+                errorMessage(cfg.i18n.selectRegion);
+                enableElements();
+                setWorkspaceView('empty');
+                return;
+            }
+
+            var totalRequests = days.length * regions.length;
+            $('#total-days').text(totalRequests);
             $('#analysed-days').text('0');
             startAnalyse(words, days);
         });

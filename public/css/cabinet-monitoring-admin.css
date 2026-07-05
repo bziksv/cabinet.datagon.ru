@@ -1,0 +1,116 @@
+.cabinet-mon-admin-page {
+    max-width: 960px;
+}
+
+.cabinet-mon-perm-page {
+    max-width: 1100px;
+}
+
+.cabinet-mon-admin-nav .nav-link {
+    font-size: 0.875rem;
+    padding: 0.35rem 0.75rem;
+}
+
+.cabinet-mon-admin-nav .nav-link.active {
+    font-weight: 600;
+}
+
+.cabinet-mon-admin-section .card-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.cabinet-mon-admin-form .input-group-text {
+    cursor: pointer;
+}
+
+.cabinet-mon-admin-form code {
+    font-size: 0.8em;
+}
+
+.cabinet-mon-admin-field-detail {
+    margin-top: 0.35rem;
+    padding: 0.65rem 0.75rem;
+    background: rgba(13, 110, 253, 0.06);
+    border-radius: 0.375rem;
+    line-height: 1.45;
+    white-space: pre-line;
+}
+
+.cabinet-mon-perm-accordion .accordion-button {
+    font-size: 0.95rem;
+}
+
+.cabinet-mon-perm-accordion .accordion-button:not(.collapsed) {
+    background: rgba(13, 110, 253, 0.04);
+}
+
+.cabinet-mon-perm-group {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.5rem;
+    padding: 0.75rem 0.85rem;
+    background: #fff;
+}
+
+.cabinet-mon-perm-switch-item + .cabinet-mon-perm-switch-item {
+    margin-top: 0.65rem;
+    padding-top: 0.65rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.cabinet-mon-perm-switch-list .form-check-label {
+    cursor: pointer;
+    width: 100%;
+}
+
+.cabinet-mon-perm-overview code {
+    font-size: 0.75rem;
+}
+
+.cabinet-mon-perm-form .form-check-input:disabled {
+    opacity: 0.55;
+}
+
+.cabinet-mon-set-pos-page {
+    max-width: 1100px;
+}
+
+.cabinet-mon-set-pos-log-card .card-body {
+    min-height: 22rem;
+}
+
+.cabinet-mon-set-pos-log-editor {
+    min-height: 22rem;
+}
+
+.cabinet-mon-set-pos-log-editor .CodeMirror {
+    min-height: 22rem;
+    height: auto;
+    font-size: 0.8125rem;
+}
+
+.cabinet-mon-set-pos-form .select2-container {
+    width: 100% !important;
+}
+
+.cabinet-mon-set-pos-logic td:first-child {
+    width: 38%;
+}
+
+.cabinet-mon-offset-page {
+    max-width: 1100px;
+}
+
+.cabinet-mon-offset-rule {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.5rem;
+    padding: 0.75rem 0.85rem;
+    background: rgba(13, 110, 253, 0.02);
+}
+
+.cabinet-mon-offset-logic td:first-child {
+    width: 38%;
+}
+
+.cabinet-mon-offset-page .select2-container {
+    width: 100% !important;
+}

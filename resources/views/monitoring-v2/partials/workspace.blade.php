@@ -97,6 +97,7 @@
                             <th scope="col">{{ __('Users') }}</th>
                             <th scope="col" class="text-center cabinet-mon-v2-table__col-engines" title="{{ __('Monitoring v2 engines column hint') }}">ПС</th>
                             <th scope="col">{{ __('Budget') }}</th>
+                            <th scope="col">{{ __('Mastered') }}</th>
                             <th scope="col" class="text-end">{{ __('Monitoring v2 col actions') }}</th>
                         </tr>
                     </thead>

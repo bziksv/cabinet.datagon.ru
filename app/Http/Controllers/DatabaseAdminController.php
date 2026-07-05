@@ -72,8 +72,28 @@ class DatabaseAdminController extends Controller
             ->with('success', $message);
     }
 
+    public function clearTable(string $table, DatabaseInventoryService $inventory): RedirectResponse
+    {
+        try {
+            $result = $inventory->clearTable($table);
+        } catch (\InvalidArgumentException $e) {
+            return redirect()
+                ->route('admin.database.index')
+                ->with('error', $e->getMessage());
+        }
+
+        return redirect()
+            ->route('admin.database.index')
+            ->with('success', __('Database table cleared', [
+                'table' => $result['table'],
+                'count' => $result['deleted'],
+            ]));
+    }
+
     public function previewRows(string $table, TableRowPreviewService $preview): JsonResponse
     {
+        set_time_limit(max(15, (int) config('cabinet-database-admin.row_preview_timeout_seconds', 15)));
+
         try {
             $data = $preview->preview($table);
         } catch (\InvalidArgumentException $e) {

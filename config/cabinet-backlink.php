@@ -3,7 +3,7 @@
 return [
     'version' => '1.0.5s',
 
-    /** Демо на datagon.ru/otslezhivanie-ssylok/ — POST api/demo/otslezhivanie-ssylok/run */
+    /** Демо на titlo.ru/otslezhivanie-ssylok/ — POST api/demo/otslezhivanie-ssylok/run */
     'demo' => [
         'module' => 'otslezhivanie-ssylok',
         'max_runs_per_day' => 5,

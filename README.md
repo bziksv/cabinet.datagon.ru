@@ -1,42 +1,34 @@
-# cabinet.datagon.ru (Laravel / кабинет)
+# cabinet.titlo.ru (Laravel / кабинет)
 
-Локальная папка для workspace рядом с **datagon.ru**.
+Локальная папка workspace: **`cabinet.datagon.ru`** (рядом с маркетингом **`datagon.ru`** / **titlo**).
 
-**Git:** [github.com/bziksv/cabinet.datagon.ru](https://github.com/bziksv/cabinet.datagon.ru). Инструкция: [datagon.ru/docs/cabinet-git.md](../datagon.ru/docs/cabinet-git.md).
+**Git (целевой):** [github.com/bziksv/cabinet.titlo](https://github.com/bziksv/cabinet.titlo)  
+**Legacy:** [cabinet.datagon.ru](https://github.com/bziksv/cabinet.datagon.ru)
 
-## Деплой и серверы (актуально)
+Деплой и серверы — в маркетинг-репо:
 
-**Не дублировать здесь** — каноническая заметка в маркетинг-репозитории:
+- **[cabinet-titlo-deploy.md](../datagon.ru/docs/cabinet-titlo-deploy.md)** — `cabinet.titlo.ru`, порт **3004**
+- [cabinet-servers.md](../datagon.ru/docs/cabinet-servers.md) · [cabinet-deploy.md](../datagon.ru/docs/cabinet-deploy.md) (legacy)
 
-**[datagon.ru/docs/cabinet-servers.md](../datagon.ru/docs/cabinet-servers.md)** · деплой VPS: **[cabinet-deploy.md](../datagon.ru/docs/cabinet-deploy.md)**
-
-Кратко (май 2026):
-
-| | Старый | Новый |
-|---|--------|--------|
-| IP | `178.250.157.140` | `155.212.171.103` |
-| Домен | lk.redbox.su | cabinet.datagon.ru |
-| Порт | (старый VPS) | **3002** (nginx → `127.0.0.1:3002`; datagon.ru — **3001**) |
-| Путь | `/var/www/redbox.su/data/www/lk.redbox.su` | `/var/www/cabinet_data_usr/data/www/cabinet.datagon.ru` |
-| БД | **здесь** | подключение к старому серверу, пока БД не перенесли |
-
-Прод для пользователей пока **lk.redbox.su**; файлы на новом VPS уже скопированы.
+| | Legacy | Titlo (целевой) |
+|---|--------|-----------------|
+| Домен | cabinet.datagon.ru / lk.redbox.su | **cabinet.titlo.ru** |
+| VPS | `155.212.171.103` | тот же |
+| Путь | `/var/www/cabinet_data_usr/.../cabinet.datagon.ru` | `/var/www/cabinet_titl_usr/.../cabinet.titlo.ru` |
+| Порт | **3002** | **3004** |
+| БД | `178.250.157.140` (пока общая) | та же |
 
 ## Локальный запуск (Mac)
 
-1. `.env` с VPS (имя файла именно **`.env`**, не `env`).
-2. PHP **7.4**: `brew install shivammathur/php/php@7.4`, в PATH: `/opt/homebrew/opt/php@7.4/bin`.
+1. `.env` с VPS (имя файла **`.env`**, не `env`).
+2. PHP **7.4**: `/opt/homebrew/opt/php@7.4/bin` в PATH.
 3. `composer install --no-dev`
-4. `./scripts/dev-serve.sh` → http://localhost:3002 (3 PHP-воркера + прокси; остановка: `./scripts/dev-parallel.sh stop`)
+4. `./scripts/dev-serve.sh` → http://localhost:3002
 
-В `.env` для Mac: **`DB_HOST=178.250.157.140`** (не `127.0.0.1`). Подробнее: [datagon.ru/docs/cabinet-git.md](../datagon.ru/docs/cabinet-git.md).
+В `.env`: **`DB_HOST=178.250.157.140`**, **`APP_URL=http://localhost:3002`**.
 
-## Эталон UI (обязательно для вёрстки)
+Маркетинг titlo: `npm run dev:titlo` → :3003, ссылки на кабинет `:3002`.
 
-**cabinet.datagon.ru** (local **:3002**, прод **cabinet.datagon.ru**) — все UI-элементы для Blade-страниц **берём из шаблона AdminLTE** в `public/html/`:
+## Эталон UI
 
-- **URL:** http://localhost:3002/html/ (AdminLTE 4.0.0, см. `public/html/VERSION.txt`)
-- **Как:** открыть подходящую демо-страницу (`forms/`, `tables/`, `widgets/`, `layout/`, …) → подобрать блок → перенести разметку в `resources/views/`
-- **Обновление шаблона:** `./scripts/sync-lte-html.sh --force`
-
-Полная инструкция: **[datagon.ru/docs/cabinet-reference.md](../datagon.ru/docs/cabinet-reference.md)** (раздел «Эталон UI кабинета»). Рабочий `layouts/app.blade.php` пока AdminLTE 3 — при переносе из v4 см. [migration guide](https://adminlte.io/themes/v4/docs/migration.html).
+http://localhost:3002/html/ (AdminLTE 4) — см. [cabinet-reference.md](../datagon.ru/docs/cabinet-reference.md).

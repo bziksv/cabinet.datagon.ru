@@ -73,6 +73,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/visits-statistics/', 'UsersController@userVisitStatistics')->name('users.statistics');
     Route::post('users/tariff', 'UsersController@storeTariff')->name('users.tariff');
     Route::get('users/search-emails', 'UsersController@searchEmails')->name('users.search-emails');
+
+    Route::get('monitoring/admin/stale-schedules/list', 'MonitoringAdminController@staleSchedulesList')->name('monitoring.admin.stale-schedules.list');
+    Route::post('monitoring/admin/stale-schedules/disable', 'MonitoringAdminController@disableStaleSchedules')->name('monitoring.admin.stale-schedules.disable');
+    Route::post('users/storage-footprint/refresh', 'UsersController@refreshStorageFootprint')->name('users.storage-footprint.refresh');
+    Route::get('users/{user}/storage-footprint', 'UsersController@userStorageFootprint')->name('users.storage-footprint.show');
     Route::resource('users', 'UsersController');
 
     Route::post('/manage-access/assignPermission', 'ManageAccessController@assignPermission');
@@ -81,10 +86,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
         'index', 'store', 'update'
     ]);
 
+    Route::get('/admin/notifications', 'NotificationsAdminController@index')->name('admin.notifications.index');
+    Route::post('/admin/notifications/test/telegram', 'NotificationsAdminController@testTelegram')->name('admin.notifications.test.telegram');
+    Route::post('/admin/notifications/test/email', 'NotificationsAdminController@testEmail')->name('admin.notifications.test.email');
+    Route::get('/admin/notifications/preview/modal/{eventId}', 'NotificationsAdminController@previewModal')->name('admin.notifications.preview.modal');
+    Route::get('/admin/notifications/preview/email/{eventId}', 'NotificationsAdminController@previewEmail')->name('admin.notifications.preview.email');
+
     Route::get('/admin/database', 'DatabaseAdminController@index')->name('admin.database.index');
     Route::get('/admin/database/preview/{table}', 'DatabaseAdminController@previewRows')->name('admin.database.preview');
     Route::post('/admin/database/refresh', 'DatabaseAdminController@refresh')->name('admin.database.refresh');
     Route::post('/admin/database/probe-dates', 'DatabaseAdminController@probeDates')->name('admin.database.probe-dates');
+    Route::post('/admin/database/clear/{table}', 'DatabaseAdminController@clearTable')->name('admin.database.clear');
+
+    Route::get('/admin/queues', 'QueueAdminController@index')->name('admin.queue.index');
+    Route::post('/admin/queues/refresh', 'QueueAdminController@refresh')->name('admin.queue.refresh');
+    Route::post('/admin/queues/cancel-cluster', 'QueueAdminController@cancelCluster')->name('admin.queue.cancel-cluster');
+    Route::post('/admin/queues/purge', 'QueueAdminController@purgeQueue')->name('admin.queue.purge');
+    Route::post('/admin/queues/delete-job', 'QueueAdminController@deleteJob')->name('admin.queue.delete-job');
+    Route::post('/admin/queues/cancel-monitoring-report', 'QueueAdminController@cancelMonitoringReport')->name('admin.queue.cancel-monitoring-report');
+    Route::post('/admin/queues/purge-orphan-clusters', 'QueueAdminController@purgeOrphanClusters')->name('admin.queue.purge-orphan-clusters');
 
     Route::get('/admin/xml-providers', 'XmlProvidersAdminController@index')->name('admin.xml-providers.index');
     Route::post('/admin/xml-providers/refresh', 'XmlProvidersAdminController@refresh')->name('admin.xml-providers.refresh');
@@ -129,6 +149,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('test-telegram-notify', 'ProfilesController@testTelegramNotify')->name('profile.test-telegram-notify');
     Route::post('profile/telegram-connect-prompt/snooze', 'ProfilesController@snoozeTelegramConnectPrompt')
         ->name('profile.telegram-connect-prompt.snooze');
+    Route::post('profile/monitoring-schedule-paid-prompt/snooze', 'ProfilesController@snoozeMonitoringSchedulePaidPrompt')
+        ->name('profile.monitoring-schedule-paid-prompt.snooze');
 
     Route::get('support', 'SupportTicketController@index')->name('support.index');
     Route::get('support/create', 'SupportTicketController@create')->name('support.create');
@@ -438,7 +460,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::match(['get', 'post'], '/monitoring/projects/get', 'MonitoringController@getProjects')->name('monitoring.projects.get');
     Route::get('/monitoring/{project_id}/child-rows/get/{group_id?}', 'MonitoringController@getChildRowsPageByProject')->name('monitoring.child.rows.get');
     Route::post('/monitoring/competitors/history/positions/', 'MonitoringController@competitorsHistoryPositions')->name('monitoring.competitors.history.positions');
+    Route::post('/monitoring/competitors/history/estimate', 'MonitoringController@estimateChangesDates')->name('monitoring.changes.dates.estimate');
     Route::post('/monitoring/competitors/check-analyse-state', 'MonitoringController@checkChangesDatesState')->name('monitoring.changes.dates.check');
+    Route::post('/monitoring/competitors/check-analyse-state-batch', 'MonitoringController@checkChangesDatesStateBatch')->name('monitoring.changes.dates.check.batch');
     Route::post('/monitoring/competitors/remove-analyse', 'MonitoringController@removeChangesDatesState')->name('monitoring.changes.dates.remove');
     Route::get('/monitoring/competitors/result-analyse/{project}', 'MonitoringController@resultChangesDatesState')->name('monitoring.changes.dates.result');
     Route::get('/monitoring/top-100/{project}', 'MonitoringTopController@index')->name('monitoring.top100');
@@ -471,7 +495,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/monitoring-competitors/{project}', 'MonitoringController@getProjectCompetitorsInfo')->name('get.monitoring.competitors');
     Route::post('/monitoring/projects/competitors', 'MonitoringController@getCompetitorsInfo')->name('monitoring.get.competitors');
     Route::post('/monitoring/projects/competitors-domain', 'MonitoringController@getCompetitorsDomain')->name('monitoring.get.competitors.domain');
+    Route::post('/monitoring/projects/competitors-page-stats', 'MonitoringController@getCompetitorsPageStats')->name('monitoring.get.competitors.page.stats');
+    Route::post('/monitoring/projects/competitors-snapshot', 'MonitoringController@getCompetitorsSnapshot')->name('monitoring.get.competitors.snapshot');
     Route::get('/monitoring/{project}/competitors/positions', 'MonitoringController@competitorsPositions')->name('monitoring.competitors.positions');
+    Route::get('/monitoring/{project}/competitors/dynamics', 'MonitoringController@competitorsDynamics')->name('monitoring.competitors.dynamics');
     Route::post('/monitoring/competitors/visibility', 'MonitoringController@getStatistics')->name('monitoring.get.competitors.statistics');
     Route::post('/monitoring/wait-result', 'MonitoringController@getMonitoringCompetitorsResult')->name('monitoring.wait.result');
 

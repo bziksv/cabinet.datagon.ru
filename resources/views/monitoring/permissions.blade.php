@@ -1,78 +1,99 @@
-@component('component.card', ['title' => __('Monitoring position')])
+@extends('layouts.app')
 
-    @slot('css')
-        <!-- Toastr -->
-        <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
-    @endslot
+@section('title', __('Monitoring perm page title'))
 
-    <div class="row">
-        <div class="col-6">
-            @include('monitoring.admin._btn')
+@section('css')
+    <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-admin.css') }}?v={{ @filemtime(public_path('css/cabinet-monitoring-admin.css')) ?: time() }}">
+@endsection
 
-            <form action="{{ route('monitoring-permissions.store') }}" method="post">
-                @csrf
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Настройка прав</h3>
-                    </div>
-                    <!-- /.card-header -->
-                    <div class="card-body">
-                        <div id="accordion">
-                            @foreach ($roles as $role)
-                                <div class="card card-info">
-                                    <div class="card-header">
-                                        <h4 class="card-title w-100">
-                                            <a class="d-block w-100" data-bs-toggle="collapse" href="#collapse{{ $role->id }}" aria-expanded="true">
-                                                {{ $role->title }}
-                                            </a>
-                                        </h4>
-                                    </div>
-                                    <div id="collapse{{ $role->id }}" class="collapse @if ($loop->first) show @endif" data-parent="#accordion">
-                                        <div class="card-body">
-                                            @foreach ($permissions as $permission)
-                                                <div class="form-group">
-                                                    <div class="custom-control custom-switch">
-                                                        <input type="checkbox" name="permissions[{{$role->name}}][{{$permission->name}}]" class="custom-control-input" id="{{ Str::slug(join([$role->name, $permission->name]), '-') }}" @if ($role->hasPermissionTo($permission)) checked @endif>
-                                                        <label class="custom-control-label" for="{{ Str::slug(join([$role->name, $permission->name]), '-') }}">{{ $permission->title }}</label>
-                                                    </div>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                    <!-- /.card-body -->
-                </div>
-            </form>
+@section('content')
+    <div class="cabinet-mon-admin-page cabinet-mon-perm-page">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+            <div>
+                <h2 class="h4 mb-2 d-flex flex-wrap align-items-center gap-1">
+                    <i class="bi bi-shield-lock text-primary" aria-hidden="true"></i>
+                    <span>{{ __('Monitoring perm page title') }}</span>
+                    @include('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-monitoring'])
+                </h2>
+                <p class="text-secondary small mb-0" style="max-width: 46rem;">
+                    {{ __('Monitoring perm page lead') }}
+                </p>
+            </div>
         </div>
+
+        @include('monitoring.admin.partials.nav', ['active' => 'permissions'])
+
+        <div class="row g-2 g-md-3 mb-3">
+            <div class="col-6 col-md-4">
+                <div class="info-box mb-0">
+                    <span class="info-box-icon text-bg-primary shadow-sm"><i class="bi bi-person-badge"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">{{ __('Monitoring perm kpi roles') }}</span>
+                        <span class="info-box-number">{{ $roles->count() }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4">
+                <div class="info-box mb-0">
+                    <span class="info-box-icon text-bg-info shadow-sm"><i class="bi bi-key"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">{{ __('Monitoring perm kpi permissions') }}</span>
+                        <span class="info-box-number">{{ $permissions->count() }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="info-box mb-0">
+                    <span class="info-box-icon text-bg-secondary shadow-sm"><i class="bi bi-diagram-3"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">{{ __('Monitoring perm kpi scope') }}</span>
+                        <span class="info-box-number small">{{ __('Monitoring perm kpi scope value') }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @include('monitoring.permissions.partials.guide')
+
+        <form action="{{ route('monitoring-permissions.store') }}" method="post" id="mon-perm-form" class="cabinet-mon-perm-form">
+            @csrf
+            <section class="card shadow-sm border-0">
+                <div class="card-header bg-white py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <div>
+                        <h3 class="h6 mb-0">{{ __('Monitoring perm matrix title') }}</h3>
+                        <p class="small text-secondary mb-0">{{ __('Monitoring perm matrix lead') }}</p>
+                    </div>
+                    <span class="small text-secondary" id="mon-perm-save-status" aria-live="polite"></span>
+                </div>
+                <div class="card-body p-2 p-md-3">
+                    <div class="accordion cabinet-mon-perm-accordion" id="mon-perm-accordion">
+                        @foreach($roles as $role)
+                            @include('monitoring.permissions.partials.role-accordion', [
+                                'role' => $role,
+                                'loop' => $loop,
+                                'enabledCount' => \App\Support\MonitoringPermissionsCatalog::roleEnabledCount($role, $permissions),
+                            ])
+                        @endforeach
+                    </div>
+                </div>
+            </section>
+        </form>
     </div>
+@endsection
 
-    @slot('js')
-        <!-- Toastr -->
-        <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
-        <!-- Bootstrap 4 -->
-
-        <script>
-            toastr.options = {
-                "timeOut": "1000"
-            };
-
-            $('input[type="checkbox"]').change(function () {
-                let form = $(this).closest('form');
-                let data = form.serialize();
-                let action = form.attr('action');
-
-                axios.post(action, data).then(function (response) {
-                    if (response.data.status) {
-                        toastr.success(response.data.message);
-                    }
-                });
-            });
-
-        </script>
-    @endslot
-
-
-@endcomponent
+@section('js')
+    <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
+    <script src="{{ asset('js/cabinet-monitoring-permissions.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-permissions.js')) ?: time() }}"></script>
+    <script>
+        window.cabinetMonitoringPermissionsConfig = {
+            saveUrl: @json(route('monitoring-permissions.store')),
+            i18n: {
+                saved: @json(__('Monitoring perm saved')),
+                saving: @json(__('Monitoring perm saving')),
+                error: @json(__('Monitoring perm save error')),
+                enabledCount: @json(__('Monitoring perm enabled count', ['enabled' => ':enabled', 'total' => ':total'])),
+            },
+        };
+    </script>
+@endsection

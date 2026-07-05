@@ -69,6 +69,15 @@ class CabinetAdminMenu
             ];
         })->values()->all();
 
+        if (\Illuminate\Support\Facades\Route::has('admin.notifications.index')) {
+            $items[] = [
+                'id' => 0,
+                'title' => __('Notifications management'),
+                'link' => route('admin.notifications.index'),
+                'external' => false,
+            ];
+        }
+
         if (\Illuminate\Support\Facades\Route::has('admin.telegram-proxy.index')) {
             $items[] = [
                 'id' => 0,
@@ -83,6 +92,15 @@ class CabinetAdminMenu
                 'id' => 0,
                 'title' => __('Database management'),
                 'link' => route('admin.database.index'),
+                'external' => false,
+            ];
+        }
+
+        if (\Illuminate\Support\Facades\Route::has('admin.queue.index')) {
+            $items[] = [
+                'id' => 0,
+                'title' => __('Queue management'),
+                'link' => route('admin.queue.index'),
                 'external' => false,
             ];
         }

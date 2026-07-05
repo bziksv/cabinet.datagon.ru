@@ -8,7 +8,7 @@ namespace App\Services;
  * Новые модули: копировать renderBinary() / pagebreak / header-footer как есть;
  * менять только buildViewData() и pdf-body.blade.php.
  *
- * Документация: datagon.ru/docs/cabinet-pdf-report-template.md
+ * Документация: titlo.ru/docs/cabinet-pdf-report-template.md
  */
 use App\Support\TextAnalyzerPdfBranding;
 use App\TextAnalyzer;

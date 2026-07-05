@@ -6,15 +6,15 @@ namespace App\Support;
  * Брендинг и графика PDF-отчёта (mPDF, DejaVu Sans).
  *
  * Эталон для всех модулей: обложка GD-PNG, logo-icon-pdf.png, verifyCoverPng.
- * datagon.ru/docs/cabinet-pdf-report-template.md
+ * titlo.ru/docs/cabinet-pdf-report-template.md
  */
 class TextAnalyzerPdfBranding
 {
-    public const BRAND_NAME = 'Датагон';
+    public const BRAND_NAME = 'Титло';
 
     public const BRAND_TAGLINE = 'SEO-инструменты для специалистов';
 
-    public const BRAND_SITE = 'https://datagon.ru';
+    public const BRAND_SITE = 'https://titlo.ru';
 
     public const COLOR_PRIMARY = '#2f5de0';
 
@@ -35,7 +35,7 @@ class TextAnalyzerPdfBranding
             'brandName' => self::BRAND_NAME,
             'brandTagline' => self::BRAND_TAGLINE,
             'brandSite' => self::BRAND_SITE,
-            'brandSiteHost' => parse_url(self::BRAND_SITE, PHP_URL_HOST) ?: 'datagon.ru',
+            'brandSiteHost' => parse_url(self::BRAND_SITE, PHP_URL_HOST) ?: 'titlo.ru',
             'logoIconPath' => self::logoIconPath(),
             'logoFullPath' => self::logoFullPath(),
             'coverBackgroundPath' => self::coverBackgroundPath(),
@@ -232,7 +232,7 @@ class TextAnalyzerPdfBranding
     }
 
     /**
-     * Горизонтальный логотип «иконка + Датагон» из logo.svg для тёмной обложки.
+     * Горизонтальный логотип «иконка + Титло» из logo.svg для тёмной обложки.
      */
     public static function ensureCoverLogoRaster(): void
     {
@@ -1121,7 +1121,7 @@ class TextAnalyzerPdfBranding
         }
 
         imageline($im, $padL, $footerLineY, $width - $padL, $footerLineY, $cLine);
-        self::drawCoverText($im, $font, 18, $padL, $footerY, $cFooter, parse_url(self::BRAND_SITE, PHP_URL_HOST) ?: 'datagon.ru');
+        self::drawCoverText($im, $font, 18, $padL, $footerY, $cFooter, parse_url(self::BRAND_SITE, PHP_URL_HOST) ?: 'titlo.ru');
         $footerReport = $payload['cover_footer'] !== ''
             ? $payload['cover_footer']
             : (string) __('Text analyzer report');

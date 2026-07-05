@@ -22,6 +22,7 @@
     @include('layouts.partials.document-title')
     @include('layouts.partials.lte4-head')
     <link rel="stylesheet" href="{{ asset('css/cabinet-telegram-prompt.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-schedule-prompt.css') }}">
     @yield('css')
     <script src="{{ asset('plugins/jquery/jquery.min.js') }}"></script>
 </head>
@@ -53,13 +54,29 @@
     </main>
     <footer class="app-footer" id="main-footer">
         <div class="float-end d-none d-sm-inline"></div>
-        <strong>&copy; 2021&ndash;{{ date('Y') }} <a href="https://datagon.ru/" class="text-decoration-none">Датагон</a>. Все права защищены.</strong>
+        <strong>&copy; 2021&ndash;{{ date('Y') }} <a href="https://titlo.ru/" class="text-decoration-none">Титло</a>. Все права защищены.</strong>
     </footer>
 </div>
 
 @include('layouts.partials.telegram-connect-prompt')
 
+@php
+    $isMonitoringPositionsModule = request()->is(
+        'monitoring',
+        'monitoring/*',
+        'monitoring-v2',
+        'monitoring-v2/*'
+    );
+    $showMonitoringSchedulePaidPrompt = $isMonitoringPositionsModule
+        && auth()->check()
+        && auth()->user()->shouldShowMonitoringSchedulePaidPrompt();
+@endphp
+@if($showMonitoringSchedulePaidPrompt)
+    @include('monitoring.partials.schedule-paid-prompt', ['showMonitoringSchedulePaidPrompt' => true])
+@endif
+
 @include('layouts.partials.lte4-scripts')
+<script src="{{ asset('js/cabinet-modal-queue.js') }}?v={{ @filemtime(public_path('js/cabinet-modal-queue.js')) ?: time() }}"></script>
 <script src="{{ asset('js/cabinet-jquery-modal-bridge.js') }}"></script>
 <script src="{{ asset('js/cabinet-bs5-shim.js') }}"></script>
 <script src="{{ asset('js/cabinet-select2-defaults.js') }}?v={{ @filemtime(public_path('js/cabinet-select2-defaults.js')) ?: time() }}"></script>

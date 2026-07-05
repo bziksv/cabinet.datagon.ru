@@ -1,368 +1,125 @@
-@component('component.card', ['title' => $project->mainProject->name . ' ' . $project->range])
+@php
+    $reportTitle = ($monitoringProject->name ?? __('Project')) . ' — ' . $changeRecord->range;
+    $positionsUrl = $monitoringProject
+        ? route('monitoring.competitors.dynamics', ['project' => $monitoringProject->id, 'region' => $request['region'] ?? null])
+        : route('monitoring.v2');
+    $snapshotCount = count($resultData);
+    $domainCount = 0;
+    if ($snapshotCount > 0) {
+        $domainCount = count(reset($resultData));
+    }
+@endphp
+@component('component.card', [
+    'title' => $reportTitle,
+    'titleHtml' => '<span class="cabinet-mon-dates-result-page-title">' . e($reportTitle) . '</span>',
+])
     @slot('css')
-        <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
         @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-css'])
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/common.css') }}"/>
-        <style>
-            .custom-info-bg {
-                background-color: rgba(23, 162, 184, 0.5) !important;
-            }
-
-            .exist-position {
-                color: #28a745 !important;
-                font-weight: bold;
-            }
-
-            .chart-container {
-                width: 100%;
-                height: 527px;
-            }
-
-            #history-block > table > thead > tr:nth-child(1) > th:nth-child(2),
-            #history-block > table > thead > tr:nth-child(1) > th:nth-child(3),
-            #history-block > table > thead > tr:nth-child(1) > th:nth-child(4),
-            #history-block > table > thead > tr:nth-child(1) > th:nth-child(5) {
-                text-align: center;
-            }
-
-            .grow-color {
-                background-color: rgb(153, 228, 185);
-            }
-
-            .shrink-color {
-                background-color: rgb(251, 225, 223);
-            }
-
-            table {
-                width: 100%;
-                border-collapse: separate !important;
-                table-layout: fixed;
-                border-spacing: 0 !important;
-            }
-
-            thead {
-                position: sticky;
-                top: 0;
-                background-color: white;
-            }
-
-            #avg-position_wrapper,
-            #top3_wrapper,
-            #top10_wrapper,
-            #top100_wrapper {
-                width: 50%;
-            }
-
-            #avg-position,
-            #top3,
-            #top10,
-            #top100 {
-                width: 100% !important;
-            }
-
-            #tableHeadRow th {
-                min-width: 100px;
-                max-width: 100px;
-            }
-
-            .min-value {
-                background-color: rgb(153, 228, 185);
-            }
-
-            #tableHeadRow th,
-            #tableBody td {
-                width: 150px;
-                min-width: 150px;
-                max-width: 150px;
-            }
-
-            #history-results td {
-                width: 100px !important;
-                min-width: 100px !important;
-                max-width: 100px !important;
-            }
-
-            #table_wrapper > div:nth-child(2) > div {
-                overflow: auto;
-                width: 100%;
-                max-height: 950px;
-            }
-
-            #history-results_wrapper > div:nth-child(2) > div {
-                overflow: auto;
-                width: 100%;
-                max-height: 850px;
-            }
-
-            #history-results {
-                width: auto;
-            }
-
-            .percentage-block {
-                text-align: center;
-                justify-content: center;
-            }
-
-            .fa.fa-trash {
-                cursor: pointer;
-            }
-
-            .antiquewhite {
-                background: antiquewhite;
-            }
-
-            th:first-child,
-            td:first-child {
-                position: sticky;
-                background-color: #FFF;
-                left: -8px;
-            }
-
-            thead {
-                z-index: 9999;
-            }
-        </style>
+        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ @filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time() }}">
     @endslot
 
-    <div>
-        <h3 class="mb-3">{{ $request['region'] }}</h3>
-        <div id="history-block">
-            <div class="mb-2 btn-group" id="visibility-buttons">
-                <button data-action="hide" data-order="0" class="btn btn-default btn-sm column-visible">
-                    {{ __('Domain') }}
-                </button>
-                <button data-action="hide" class="btn btn-default btn-sm column-visible add-order">
-                    {{ __('Average position') }}
-                </button>
-                <button data-action="hide" class="btn btn-default btn-sm column-visible add-order">
-                    {{ __('Top') }} 3
-                </button>
-                <button data-action="hide" class="btn btn-default btn-sm column-visible add-order">
-                    {{ __('Top') }} 10
-                </button>
-                <button data-action="hide" class="btn btn-default btn-sm column-visible add-order">
-                    {{ __('Top') }} 100
-                </button>
-                <button data-action="off" class="btn btn-default btn-sm" id="switch-color">
-                    {{ __('Turn off the coloring') }}
-                </button>
+    <div class="cabinet-mon-dates-result-page" id="cabinet-mon-dates-result-root">
+        <header class="cabinet-mon-dates-result-head">
+            <div class="cabinet-mon-dates-result-head__intro">
+                <p class="cabinet-mon-dates-result-head__hint text-secondary small mb-2">
+                    {{ __('Monitoring comp dates result hint') }}
+                </p>
+                <dl class="cabinet-mon-dates-result-meta mb-0">
+                    <div class="cabinet-mon-dates-result-meta__row">
+                        <dt>{{ __('Date range') }}</dt>
+                        <dd>{{ $changeRecord->range }}</dd>
+                    </div>
+                    <div class="cabinet-mon-dates-result-meta__row">
+                        <dt>{{ __('Region') }}</dt>
+                        <dd>{{ $regionLabel }}</dd>
+                    </div>
+                    <div class="cabinet-mon-dates-result-meta__row">
+                        <dt>{{ __('Monitoring comp dates result snapshots') }}</dt>
+                        <dd>{{ number_format($snapshotCount, 0, ',', ' ') }} · {{ number_format($domainCount, 0, ',', ' ') }} {{ __('domains') }}</dd>
+                    </div>
+                </dl>
             </div>
-        </div>
+            <div class="cabinet-mon-dates-result-head__actions">
+                @include('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-monitoring'])
+                <a href="{{ $positionsUrl }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>{{ __('Monitoring comp dates result back') }}
+                </a>
+            </div>
+        </header>
+
+        @if($snapshotCount === 0)
+            <div class="cabinet-mon-dates-result-empty alert alert-secondary mb-0" role="status">
+                {{ __('There are no positions for the selected date ranges') }}
+            </div>
+        @else
+            <div class="cabinet-mon-dates-result-toolbar">
+                <div class="cabinet-mon-dates-result-toolbar__group" role="group" aria-label="{{ __('Monitoring comp dates result metric') }}">
+                    <span class="cabinet-mon-dates-result-toolbar__label">{{ __('Monitoring comp dates result metric') }}</span>
+                    <div class="btn-group btn-group-sm" id="dates-result-metric">
+                        <button type="button" class="btn btn-outline-secondary" data-metric="avg">{{ __('Average position') }}</button>
+                        <button type="button" class="btn btn-outline-secondary" data-metric="top_3">{{ __('Top') }} 3</button>
+                        <button type="button" class="btn btn-outline-secondary active" data-metric="top_10">{{ __('Top') }} 10</button>
+                        <button type="button" class="btn btn-outline-secondary" data-metric="top_100">{{ __('Top') }} 100</button>
+                    </div>
+                </div>
+                <div class="cabinet-mon-dates-result-toolbar__group" role="group" aria-label="{{ __('Monitoring comp dates result view') }}">
+                    <span class="cabinet-mon-dates-result-toolbar__label">{{ __('Monitoring comp dates result view') }}</span>
+                    <div class="btn-group btn-group-sm" id="dates-result-view">
+                        <button type="button" class="btn btn-outline-secondary active" data-view="both">{{ __('Monitoring comp dates result view both') }}</button>
+                        <button type="button" class="btn btn-outline-secondary" data-view="chart">{{ __('Monitoring comp dates result view chart') }}</button>
+                        <button type="button" class="btn btn-outline-secondary" data-view="table">{{ __('Monitoring comp dates result view table') }}</button>
+                    </div>
+                </div>
+            </div>
+
+            <section class="cabinet-mon-dates-result-chart card" id="dates-result-chart-section" aria-label="{{ __('Monitoring comp dates result chart aria') }}">
+                <div class="cabinet-mon-dates-result-chart__head">
+                    <h2 class="h6 mb-0" id="dates-result-chart-title">{{ __('Percentage of getting into the top') }} 10</h2>
+                    <p class="text-secondary small mb-0">{{ __('Monitoring comp dates result chart hint') }}</p>
+                </div>
+                <div class="cabinet-mon-dates-result-chart__body">
+                    <canvas id="dates-result-chart" height="120" aria-labelledby="dates-result-chart-title"></canvas>
+                </div>
+                <div class="cabinet-mon-dates-result-legend" id="dates-result-legend" role="group" aria-label="{{ __('Monitoring comp dates result legend aria') }}"></div>
+            </section>
+
+            <section class="cabinet-mon-dates-result-table card" id="dates-result-table-section" aria-label="{{ __('Monitoring comp dates result table aria') }}">
+                <div class="cabinet-mon-dates-result-table__head">
+                    <h2 class="h6 mb-0">{{ __('Monitoring comp dates result table title') }}</h2>
+                    <p class="text-secondary small mb-0">{{ __('Monitoring comp dates result table hint') }}</p>
+                </div>
+                <div class="cabinet-mon-dates-result-table__host table-responsive">
+                    <table class="table table-sm table-hover mb-0 cabinet-mon-dates-result-table" id="dates-result-table"></table>
+                </div>
+            </section>
+        @endif
     </div>
 
     @slot('js')
-        <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
-        @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
-        @include('monitoring.partials.smart-search-script')
+        <script src="{{ asset('plugins/chart.js/2.7.3/chart.min.js') }}"></script>
         <script>
-            let historyTable
-
-            $(document).ready(function () {
-                renderHistoryPositions({!! $project['result'] !!})
-                $('#history-results_wrapper > div:nth-child(1) > div:nth-child(1)').append($('#visibility-buttons'))
-            })
-
-            function renderHistoryPositions(data) {
-                const sortedKeys = Object.keys(data).sort((a, b) => new Date(a.split('-').reverse().join('-')) - new Date(b.split('-').reverse().join('-')));
-                sortedKeys.reverse()
-
-                const sortedData = {};
-                let length = 0
-
-                sortedKeys.forEach(key => {
-                    sortedData[key] = data[key];
-                    length++;
-                });
-
-                let result
-                let domains = []
-                let dates = []
-
-                let bottomHead = ''
-                $.each(sortedData, function (k, v) {
-                    bottomHead += '<td>' + k + '</td>'
-                    dates.push(k)
-                    $.each(v, function (k1, v1) {
-                        domains.push(k1)
-                    })
-                })
-
-                domains = getUniqueValues(domains)
-                dates = getUniqueValues(dates)
-
-                let keys = ['avg', 'top_3', 'top_10', 'top_100']
-                let trs = ''
-                $.each(domains, function (k, domain) {
-                    trs += '<tr><td>' + domain + '</td>'
-                    $.each(keys, function (key, name) {
-                        $.each(dates, function (k1, date) {
-                            let firstElement = k1 === 0;
-                            if (firstElement) {
-                                trs += '<td style="border-left: 2px solid grey; box-sizing: border-box;">' + data[date][domain][name] + '</td>'
-                            } else {
-                                trs += '<td>' + data[date][domain][name] + '</td>'
-                            }
-                        })
-                    })
-                    trs += "</tr>"
-                })
-
-                if (bottomHead === '') {
-                    $('#visibility-buttons').remove()
-                    $('#history-block').append('<table class="table table-hover table-bordered w-25" id="history-results">' +
-                        '    <thead>' +
-                        '        <tr>' +
-                        '            <th class="text-center">{{ __('Domain') }}</th>' +
-                        '            <th colspan="' + length + '" class="text-center">{{ __('Statistics') }}</th>' +
-                        '        </tr>' +
-                        '    </thead>' +
-                        '    <tbody>' +
-                        '    <tr>' +
-                        '        <td colspan="2">{{ __('There are no positions for the selected date ranges') }}</td>' +
-                        '    </tr>' +
-                        '    </tbody>' +
-                        '</table>')
-                } else {
-                    result =
-                        '<table class="table table-hover table-bordered" id="history-results">' +
-                        '    <thead>' +
-                        '        <tr>' +
-                        '            <th class="text-center">{{ __('Domain') }}</th>' +
-                        '            <th colspan="' + length + '" class="text-center">{{ __('Average position') }}</th>' +
-                        '            <th colspan="' + length + '" class="text-center">{{ __('Percentage of getting into the top') }} 3</th>' +
-                        '            <th colspan="' + length + '" class="text-center">{{ __('Percentage of getting into the top') }} 10</th>' +
-                        '            <th colspan="' + length + '" class="text-center">{{ __('Percentage of getting into the top') }} 100</th>' +
-                        '        </tr>' +
-                        '        <tr><td></td>' +
-                        bottomHead +
-                        bottomHead +
-                        bottomHead +
-                        bottomHead +
-                        '        </tr>' +
-                        '    </thead>' +
-                        '    <tbody>' + trs + '</tbody>' +
-                        '</table>'
-
-
-                    $('#history-block').append(result)
-
-                    historyTable = $('#history-results').DataTable({
-                        paging: false,
-                        bAutoWidth: false,
-                        bSort: false,
-                        lengthMenu: [10, 25, 50, 100],
-                        pageLength: 50,
-                        language: {
-                            lengthMenu: "_MENU_",
-                            search: "_INPUT_",
-                            searchPlaceholder: "{{ __('Search') }}",
-                            paginate: {
-                                "first": "«",
-                                "last": "»",
-                                "next": "»",
-                                "previous": "«"
-                            },
-                            emptyTable: "{{ __('There are no positions for the selected date ranges') }}"
-                        },
-                        initComplete: function () {
-                            if (window.cabinetMonitoringSearch) {
-                                window.cabinetMonitoringSearch.dataTableInitComplete.call(this);
-                            }
-                        },
-                    })
-
-                    $.each($('#history-results > tbody > tr'), function (k, v) {
-                        for (let j = 0; j < 4; j++) {
-                            let res = length * j
-                            let bool = j === 0
-                            colorCells($(this), res, length * (j + 1), bool)
-                        }
-                    })
-
-                    setDataOrders(length)
-
-                    $('.column-visible').unbind().on('click', function () {
-                        if ($(this).attr('data-action') === 'hide') {
-                            $(this).addClass('antiquewhite')
-                            $(this).attr('data-action', 'show')
-                            historyTable.columns(String($(this).attr('data-order')).split(',')).visible(false);
-                        } else {
-                            $(this).removeClass('antiquewhite')
-                            String($(this).attr('data-order')).split(',')
-                            $(this).attr('data-action', 'hide')
-                            historyTable.columns(String($(this).attr('data-order')).split(',')).visible(true);
-                        }
-
-                        $('#table').css({
-                            'width': '100%'
-                        })
-                    })
-
-                    $('#switch-color').unbind().on('click', function () {
-                        let action = $(this).attr('data-action')
-
-                        if (action === 'off') {
-                            $(this).text("{{ __("Turn on the coloring") }}")
-                            $(this).attr('data-action', 'on')
-                            $('.grow-color').addClass('grow-color-hide').removeClass('grow-color')
-                            $('.shrink-color').addClass('shrink-color-hide').removeClass('shrink-color')
-                        } else {
-                            $(this).text("{{ __('Turn off the coloring') }}")
-                            $(this).attr('data-action', 'off')
-                            $('.grow-color-hide').addClass('grow-color').removeClass('grow-color-hide')
-                            $('.shrink-color-hide').addClass('shrink-color').removeClass('shrink-color-hide')
-                        }
-                    })
-                }
-            }
-
-            function colorCells(elem, start, end, inverse) {
-                for (let i = start + 1; i < end; i++) {
-                    let targetElement = elem.children('td').eq(i)
-                    let afterElement = elem.children('td').eq(i + 1)
-
-                    let result = Number(targetElement.text()) - Number(afterElement.text())
-                    if (result !== 0) {
-                        let substring = String(result).substring(0, 5)
-                        if (inverse) {
-                            if (result > 0) {
-                                targetElement.addClass('shrink-color')
-                                targetElement.text(targetElement.text() + ' (+' + substring + ')')
-                            } else {
-                                targetElement.addClass('grow-color')
-                                targetElement.text(targetElement.text() + ' (' + substring + ')')
-                            }
-                        } else {
-                            if (result > 0) {
-                                targetElement.addClass('grow-color')
-                                targetElement.text(targetElement.text() + ' (+' + substring + ')')
-                            } else {
-                                targetElement.addClass('shrink-color')
-                                targetElement.text(targetElement.text() + ' (' + substring + ')')
-                            }
-                        }
-                    }
-                }
-            }
-
-            function setDataOrders(length) {
-                let buttonCounter = 1;
-                $.each($('.add-order'), function (k, v) {
-                    let orders = buttonCounter
-                    for (let i = 1; i < length; i++) {
-                        buttonCounter++
-                        orders += ',' + buttonCounter
-                    }
-                    $(this).attr('data-order', orders)
-                    buttonCounter++
-                })
-            }
-
-            function getUniqueValues(data) {
-                data = new Set([...data])
-
-                return [...data]
-            }
+            window.cabinetMonDatesResultConfig = {
+                ownDomain: @json($ownDomain),
+                resultData: @json($resultData),
+                i18n: {
+                    avg: @json(__('Average position')),
+                    top_3: @json(__('Percentage of getting into the top') . ' 3'),
+                    top_10: @json(__('Percentage of getting into the top') . ' 10'),
+                    top_100: @json(__('Percentage of getting into the top') . ' 100'),
+                    date: @json(__('Date')),
+                    yourSite: @json(__('Your website')),
+                    leader: @json(__('Monitoring comp dates result leader')),
+                    chartYAvg: @json(__('Monitoring comp dates result chart y avg')),
+                    chartYTop: @json(__('Monitoring comp dates result chart y top')),
+                },
+                metrics: {
+                    avg: { label: @json(__('Average position')), higherBetter: false },
+                    top_3: { label: @json(__('Percentage of getting into the top') . ' 3'), higherBetter: true },
+                    top_10: { label: @json(__('Percentage of getting into the top') . ' 10'), higherBetter: true },
+                    top_100: { label: @json(__('Percentage of getting into the top') . ' 100'), higherBetter: true },
+                },
+            };
         </script>
+        <script src="{{ asset('js/cabinet-monitoring-competitors-dates-result.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-competitors-dates-result.js')) ?: time() }}"></script>
     @endslot
 @endcomponent

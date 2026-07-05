@@ -2,7 +2,7 @@
 /**
  * Проверка POST /api/demo/klasterizator-klyuchevykh-slov/run + poll
  *
- * cd cabinet.datagon.ru && php scripts/verify-cluster-demo.php
+ * cd cabinet.titlo.ru && php scripts/verify-cluster-demo.php
  */
 
 $base = getenv('CABINET_BASE') ?: 'http://127.0.0.1:3002';

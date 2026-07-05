@@ -163,7 +163,7 @@ class ProjectFaviconService
         $ctx = stream_context_create([
             'http' => [
                 'timeout' => 12,
-                'user_agent' => 'DatagonCabinetFaviconImport/1',
+                'user_agent' => 'TitloCabinetFaviconImport/1',
                 'follow_location' => 1,
                 'ignore_errors' => true,
             ],

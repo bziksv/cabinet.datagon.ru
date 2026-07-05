@@ -4,7 +4,7 @@ return [
     /**
      * Видимая версия модуля «Анализ конкурентов» (badge в шапке карточки).
      * Стабильная база: 2.9.1s (см. text-analyzer 6.9s). Эксперименты — 2.9.2 или 2.9.1s-dev.
-     * Журнал: datagon.ru/docs/cabinet-competitor-analysis-changelog.md
+     * Журнал: titlo.ru/docs/cabinet-competitor-analysis-changelog.md
      */
     'version' => '2.9.2',
 
@@ -109,7 +109,7 @@ return [
     'max_regions' => 5,
 
     /**
-     * Демо на datagon.ru/analiz-konkurentov/ — POST /api/demo/analiz-konkurentov/run
+     * Демо на titlo.ru/analiz-konkurentov/ — POST /api/demo/analiz-konkurentov/run
      * Только SERP (ТОП-10, Яндекс, 1 фраза), без разбора страниц.
      */
     'demo' => [

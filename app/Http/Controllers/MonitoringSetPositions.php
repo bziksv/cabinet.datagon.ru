@@ -17,16 +17,31 @@ class MonitoringSetPositions extends Controller
     {
         $projects = (new MonitoringProject())->all();
 
-        return view('monitoring.admin.set_positions.index', compact('projects'));
+        return view('monitoring.admin.set_positions.index', [
+            'projects' => $projects,
+            'projectCount' => $projects->count(),
+        ]);
     }
 
     public function insertPositions(Request $request)
     {
+        $request->validate([
+            'projectId' => 'required|integer',
+            'engineId' => 'required|integer',
+            'startDate' => 'required|date',
+            'endDate' => 'required|date|after_or_equal:startDate',
+        ]);
+
         (new Positions\Fill(
-            $request->input('projectId'),
-            $request->input('engineId'),
+            (int) $request->input('projectId'),
+            (int) $request->input('engineId'),
             $request->input('startDate'),
             $request->input('endDate')
         ))->execute();
+
+        return response()->json([
+            'status' => true,
+            'message' => __('Monitoring set pos run done'),
+        ]);
     }
 }

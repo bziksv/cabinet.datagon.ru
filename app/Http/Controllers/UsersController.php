@@ -11,6 +11,8 @@ use App\Common;
 use App\Exports\FilteredUsersExport;
 use App\Exports\VerifiedUsersExport;
 use App\MainProject;
+use App\Support\MonitoringStaleScheduleReport;
+use App\Support\UserStorageFootprintService;
 use App\Support\UsersActivityDashboard;
 use App\Support\UserVisitStatisticsReport;
 use App\Support\UsersVisitStatisticsReport;
@@ -67,6 +69,14 @@ class UsersController extends Controller
             'roles' => Role::orderBy('name')->pluck('name', 'name'),
             'activity' => UsersActivityDashboard::snapshotCached(),
             'stats' => $this->usersIndexStats(),
+            'staleMonitoring' => Cache::remember(
+                'cabinet.monitoring.stale_schedules.summary',
+                now()->addMinutes(5),
+                static function () {
+                    return MonitoringStaleScheduleReport::summary();
+                }
+            ),
+            'footprintRefreshedAt' => Cache::get('cabinet.users.footprint_refreshed_at'),
         ]);
     }
 
@@ -129,28 +139,38 @@ class UsersController extends Controller
             ? (clone $query)->count()
             : $recordsTotal;
 
+        $orderColumn = null;
+        $orderDir = 'desc';
         if ($order = Arr::first($request->get('order'))) {
             $columns = $request->get('columns');
-            $columnName = $columns[$order['column']]['name'] ?? null;
-            if ($columnName && in_array($columnName, ['id', 'name', 'email', 'created_at', 'last_online_at'], true)) {
-                $query->orderBy($columnName, $order['dir']);
-            } else {
-                $query->orderByDesc('id');
-            }
-        } else {
-            $query->orderByDesc('id');
+            $orderColumn = $columns[$order['column']]['name'] ?? null;
+            $orderDir = (string) ($order['dir'] ?? 'desc');
         }
 
-        $users = $query->with([
+        $userWith = [
             'pay' => static function ($payQuery) {
                 $payQuery->where('status', true)
                     ->select(['id', 'user_id', 'status', 'class_tariff', 'active_to']);
             },
             'roles:id,name',
-        ])->skip($start)->take($length)->get();
+        ];
 
-        $data = $users->map(function (User $user) {
-            return $this->formatUserDataTableRow($user);
+        if ($orderColumn === 'storage_footprint') {
+            $users = $this->usersDataTablePageByFootprintSort($query, $start, $length, $orderDir, $userWith);
+        } else {
+            if ($orderColumn) {
+                $this->applyUserListOrder($query, $orderColumn, $orderDir);
+            } else {
+                $query->orderByDesc('users.id');
+            }
+
+            $users = $query->with($userWith)->skip($start)->take($length)->get();
+        }
+
+        $footprints = UserStorageFootprintService::getManyCached($users->pluck('id')->all());
+
+        $data = $users->map(function (User $user) use ($footprints) {
+            return $this->formatUserDataTableRow($user, $footprints[(int) $user->id] ?? null);
         })->values()->all();
 
         return response()->json([
@@ -162,18 +182,101 @@ class UsersController extends Controller
     }
 
     /**
+     * Сортировка «Данные в БД» по кэшированному footprint (без колонки в users).
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param array<string, mixed> $userWith
+     * @return \Illuminate\Support\Collection<int, User>
+     */
+    protected function usersDataTablePageByFootprintSort($query, int $start, int $length, string $dir, array $userWith)
+    {
+        $ids = (clone $query)->pluck('users.id')->map(static function ($id) {
+            return (int) $id;
+        })->all();
+
+        if ($ids === []) {
+            return collect();
+        }
+
+        $footprints = UserStorageFootprintService::getManyCached($ids);
+        $dirAsc = strtolower($dir) === 'asc';
+
+        usort($ids, static function (int $a, int $b) use ($footprints, $dirAsc) {
+            $ra = isset($footprints[$a]) ? (int) ($footprints[$a]['rows'] ?? 0) : null;
+            $rb = isset($footprints[$b]) ? (int) ($footprints[$b]['rows'] ?? 0) : null;
+
+            if ($ra === null && $rb === null) {
+                return $b <=> $a;
+            }
+            if ($ra === null) {
+                return $dirAsc ? 1 : -1;
+            }
+            if ($rb === null) {
+                return $dirAsc ? -1 : 1;
+            }
+            if ($ra === $rb) {
+                return $b <=> $a;
+            }
+
+            return $dirAsc ? ($ra <=> $rb) : ($rb <=> $ra);
+        });
+
+        $pageIds = array_slice($ids, $start, $length);
+        if ($pageIds === []) {
+            return collect();
+        }
+
+        $select = [
+            'users.id',
+            'users.name',
+            'users.last_name',
+            'users.email',
+            'users.email_verified_at',
+            'users.read_letter',
+            'users.created_at',
+            'users.last_online_at',
+            'users.metrics',
+        ];
+
+        return User::query()
+            ->select($select)
+            ->whereIn('users.id', $pageIds)
+            ->with($userWith)
+            ->get()
+            ->sortBy(static function (User $user) use ($pageIds) {
+                $pos = array_search((int) $user->id, $pageIds, true);
+
+                return $pos === false ? PHP_INT_MAX : $pos;
+            })
+            ->values();
+    }
+
+    /**
      * Компактная строка для DataTables (без лишних полей User и без tariff() на каждую запись).
      *
      * @return array<string, mixed>
      */
-    protected function formatUserDataTableRow(User $user): array
+    protected function formatUserDataTableRow(User $user, ?array $footprint = null): array
     {
+        app(PermissionRegistrar::class)->setPermissionsTeamId(1);
+        $tariffName = $this->resolveTariffNameForUser($user);
         $tariff = [];
+
         if ($pay = $user->pay->first()) {
             $tariff = [
-                'name' => $this->resolveTariffNameForUser($user),
+                'name' => $tariffName,
                 'active_to' => $pay->active_to ? $pay->active_to->format('d.m.Y H:i') : null,
                 'active_to_diffForHumans' => $pay->active_to ? $pay->active_to->diffForHumans() : null,
+                'role_only' => false,
+                'is_free' => $user->onFreeTariff(),
+            ];
+        } elseif ($tariffName !== null) {
+            $tariff = [
+                'name' => $tariffName,
+                'active_to' => null,
+                'active_to_diffForHumans' => null,
+                'role_only' => true,
+                'is_free' => $user->onFreeTariff(),
             ];
         }
 
@@ -196,6 +299,8 @@ class UsersController extends Controller
             'last_online' => $loa ? $loa->format('d.m.Y H:i') : null,
             'last_online_diffForHumans' => $loa ? $loa->diffForHumans() : null,
             'metrics' => $user->metrics,
+            'storage' => $footprint,
+            'storage_sort' => $footprint !== null ? (int) ($footprint['rows'] ?? 0) : null,
         ];
     }
 
@@ -204,7 +309,11 @@ class UsersController extends Controller
      */
     protected function resolveTariffNameForUser(User $user): ?string
     {
-        $roles = $user->relationLoaded('roles') ? $user->getRoleNames() : collect();
+        app(PermissionRegistrar::class)->setPermissionsTeamId(1);
+        if (!$user->relationLoaded('roles')) {
+            $user->load('roles');
+        }
+        $roles = $user->getRoleNames();
 
         foreach ($this->tariff->getTariffs() as $tariff) {
             if ($roles->contains($tariff->code())) {
@@ -217,6 +326,76 @@ class UsersController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     */
+    protected function applyUserListOrder($query, ?string $columnName, string $dir): void
+    {
+        if ($columnName === null || $columnName === '') {
+            $query->orderByDesc('users.id');
+
+            return;
+        }
+
+        $dir = strtolower($dir) === 'asc' ? 'asc' : 'desc';
+        $userClass = str_replace('\\', '\\\\', User::class);
+
+        switch ($columnName) {
+            case 'tariff':
+                $codes = $this->tariffRoleCodesForSort();
+                $in = implode("','", array_map('addslashes', $codes));
+                $query->orderByRaw(
+                    "(SELECT MIN(r.name) FROM model_has_roles mhr INNER JOIN roles r ON r.id = mhr.role_id "
+                    . "WHERE mhr.model_id = users.id AND mhr.model_type = '{$userClass}' AND r.name IN ('{$in}')) {$dir}"
+                );
+                break;
+            case 'roles':
+                $query->orderByRaw(
+                    "(SELECT MIN(r.name) FROM model_has_roles mhr INNER JOIN roles r ON r.id = mhr.role_id "
+                    . "WHERE mhr.model_id = users.id AND mhr.model_type = '{$userClass}') {$dir}"
+                );
+                break;
+            case 'name':
+                $query->orderByRaw("CONCAT(COALESCE(users.name, ''), ' ', COALESCE(users.last_name, '')) {$dir}");
+                break;
+            case 'last_online_at':
+                if ($dir === 'asc') {
+                    $query->orderByRaw('users.last_online_at IS NULL DESC')
+                        ->orderBy('users.last_online_at', 'asc');
+                } else {
+                    $query->orderByRaw('users.last_online_at IS NULL ASC')
+                        ->orderBy('users.last_online_at', 'desc');
+                }
+                break;
+            case 'id':
+            case 'email':
+            case 'created_at':
+                $query->orderBy('users.' . $columnName, $dir);
+                break;
+            default:
+                $query->orderByDesc('users.id');
+
+                return;
+        }
+
+        if ($columnName !== 'id') {
+            $query->orderByDesc('users.id');
+        }
+    }
+
+    /**
+     * @return string[]
+     */
+    protected function tariffRoleCodesForSort(): array
+    {
+        $codes = array_map(static function (Tariff $tariff) {
+            return $tariff->code();
+        }, $this->tariff->getTariffs());
+        $codes[] = 'Free';
+
+        return $codes;
     }
 
     /**
@@ -282,7 +461,7 @@ class UsersController extends Controller
 
     protected function userListHasActiveFilters(Request $request): bool
     {
-        foreach (['filter_role', 'filter_verify', 'filter_tariff', 'filter_online', 'filter_statistic', 'filter_telegram', 'filter_id_from', 'filter_id_to'] as $key) {
+        foreach (['filter_role', 'filter_verify', 'filter_tariff', 'filter_online', 'filter_statistic', 'filter_telegram', 'filter_id_from', 'filter_id_to', 'filter_stale_monitoring', 'filter_name', 'filter_email', 'filter_created_from', 'filter_created_to'] as $key) {
             if (trim((string) $request->input($key, '')) !== '') {
                 return true;
             }
@@ -356,14 +535,30 @@ class UsersController extends Controller
         }
 
         $tariff = trim((string) $request->input('filter_tariff', ''));
-        if ($tariff === 'none') {
-            $paidCodes = array_map(static function (Tariff $t) {
-                return $t->code();
-            }, $this->tariff->getTariffs());
+        $paidCodes = array_map(static function (Tariff $t) {
+            return $t->code();
+        }, $this->tariff->getTariffs());
 
+        if ($tariff === 'none') {
             if (count($paidCodes) > 0) {
                 $query->whereDoesntHave('roles', static function ($q) use ($paidCodes) {
                     $q->whereIn('name', $paidCodes);
+                });
+            }
+        } elseif ($tariff === 'Free') {
+            $query->whereHas('roles', static function ($q) {
+                $q->where('name', 'Free');
+            });
+            if (count($paidCodes) > 0) {
+                $query->whereDoesntHave('roles', static function ($q) use ($paidCodes) {
+                    $q->whereIn('name', $paidCodes);
+                });
+            }
+        } elseif ($tariff === 'no_role') {
+            $tariffRoles = array_merge($paidCodes, ['Free']);
+            if (count($tariffRoles) > 0) {
+                $query->whereDoesntHave('roles', static function ($q) use ($tariffRoles) {
+                    $q->whereIn('name', $tariffRoles);
                 });
             }
         } elseif ($tariff !== '') {
@@ -424,6 +619,113 @@ class UsersController extends Controller
                     ->orWhere('chat_id', '=', '');
             });
         }
+
+        $staleMonitoring = trim((string) $request->input('filter_stale_monitoring', ''));
+        if ($staleMonitoring === '1') {
+            $staleIds = MonitoringStaleScheduleReport::staleCreatorUserIds();
+            if ($staleIds === []) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->whereIn('id', $staleIds);
+            }
+        }
+
+        $name = trim((string) $request->input('filter_name', ''));
+        if ($name !== '') {
+            $like = '%' . $name . '%';
+            $query->where(static function ($q) use ($like) {
+                $q->where('name', 'like', $like)
+                    ->orWhere('last_name', 'like', $like)
+                    ->orWhereRaw("CONCAT(COALESCE(name, ''), ' ', COALESCE(last_name, '')) LIKE ?", [$like]);
+            });
+        }
+
+        $email = trim((string) $request->input('filter_email', ''));
+        if ($email !== '') {
+            $query->where('email', 'like', '%' . $email . '%');
+        }
+
+        $createdFrom = trim((string) $request->input('filter_created_from', ''));
+        if ($createdFrom !== '') {
+            try {
+                $query->whereDate('created_at', '>=', Carbon::parse($createdFrom)->format('Y-m-d'));
+            } catch (\Throwable $e) {
+                // ignore invalid date
+            }
+        }
+
+        $createdTo = trim((string) $request->input('filter_created_to', ''));
+        if ($createdTo !== '') {
+            try {
+                $query->whereDate('created_at', '<=', Carbon::parse($createdTo)->format('Y-m-d'));
+            } catch (\Throwable $e) {
+                // ignore invalid date
+            }
+        }
+    }
+
+    public function refreshStorageFootprint(Request $request): JsonResponse
+    {
+        $userId = (int) $request->input('user_id', 0);
+        if ($userId > 0) {
+            $payload = UserStorageFootprintService::computeForUser($userId);
+
+            return response()->json([
+                'success' => true,
+                'user_id' => $userId,
+                'footprint' => $payload,
+                'label' => UserStorageFootprintService::formatBrief($payload),
+            ]);
+        }
+
+        $userIds = $request->input('user_ids');
+        if (is_array($userIds) && count($userIds) > 0) {
+            set_time_limit(max(60, (int) ini_get('max_execution_time')));
+            $result = UserStorageFootprintService::refreshForUserIds($userIds);
+
+            return response()->json([
+                'success' => true,
+                'users' => $result['users'],
+                'errors' => $result['errors'],
+                'refreshed_at' => Cache::get('cabinet.users.footprint_refreshed_at'),
+            ]);
+        }
+
+        set_time_limit(max(120, (int) ini_get('max_execution_time')));
+        $direction = strtolower((string) $request->input('direction', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $cursorId = (int) $request->input('cursor_id', $request->input('after_id', 0));
+        $result = UserStorageFootprintService::refreshBatch(
+            $cursorId,
+            (int) $request->input('limit', 15),
+            $direction
+        );
+
+        return response()->json([
+            'success' => true,
+            'users' => $result['users'],
+            'errors' => $result['errors'],
+            'last_id' => $result['last_id'],
+            'cursor_id' => $result['last_id'],
+            'done' => $result['done'],
+            'remaining' => $result['remaining'],
+            'direction' => $result['direction'],
+            'total' => $result['total'],
+            'refreshed_at' => Cache::get('cabinet.users.footprint_refreshed_at'),
+        ]);
+    }
+
+    public function userStorageFootprint(User $user): JsonResponse
+    {
+        $payload = UserStorageFootprintService::getCached((int) $user->id);
+        if ($payload === null) {
+            $payload = UserStorageFootprintService::computeForUser((int) $user->id);
+        }
+
+        return response()->json([
+            'user_id' => (int) $user->id,
+            'footprint' => $payload,
+            'label' => UserStorageFootprintService::formatBrief($payload),
+        ]);
     }
 
     public function storeTariff(Request $request)
@@ -561,6 +863,7 @@ class UsersController extends Controller
             'activePay' => $activePay,
             'tariffName' => $tariffName,
             'telegramConnected' => $user->isTelegramConnected(),
+            'storageFootprint' => UserStorageFootprintService::getCached((int) $user->id),
         ]);
     }
 

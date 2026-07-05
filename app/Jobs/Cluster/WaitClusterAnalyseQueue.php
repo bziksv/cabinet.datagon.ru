@@ -5,6 +5,7 @@ namespace App\Jobs\Cluster;
 use App\Cluster;
 use App\ClusterResults;
 use App\Support\ClusterAnalysisDebugLog;
+use App\Support\ClusterProgress;
 use App\Support\ClusterQueues;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
@@ -40,7 +41,18 @@ class WaitClusterAnalyseQueue implements ShouldQueue
         $result = ClusterResults::where('progress_id', '=', $progressId)->first();
         if (isset($result)) {
             ClusterAnalysisDebugLog::info($progressId, 'job.wait.already_saved');
-            exit();
+
+            return;
+        }
+
+        if (ClusterProgress::getFailed($progressId)) {
+            ClusterAnalysisDebugLog::info($progressId, 'job.wait.already_failed');
+
+            return;
+        }
+
+        if (ClusterProgress::abortIfStale($progressId)) {
+            return;
         }
 
         $done = $this->cluster->getProgressTotal();

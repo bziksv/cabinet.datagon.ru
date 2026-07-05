@@ -96,7 +96,11 @@
                 }
 
                 var modal = bootstrap.Modal.getOrCreateInstance(modalEl, {backdrop: true, keyboard: true});
-                modal.show();
+                if (window.CabinetModalQueue) {
+                    window.CabinetModalQueue.enqueue(modalEl, 10);
+                } else {
+                    modal.show();
+                }
 
                 snoozeBtn = document.getElementById('cabinet-telegram-connect-snooze');
                 if (snoozeBtn) {

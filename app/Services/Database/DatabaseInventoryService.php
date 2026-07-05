@@ -485,4 +485,52 @@ class DatabaseInventoryService
 
         return $result;
     }
+
+    /**
+     * TRUNCATE + OPTIMIZE для таблиц из clearable_tables (только failed_jobs по умолчанию).
+     *
+     * @return array{table: string, deleted: int}
+     */
+    public function clearTable(string $table): array
+    {
+        $table = strtolower(trim($table));
+        if (! preg_match('/^[a-z][a-z0-9_]{0,62}$/', $table)) {
+            throw new \InvalidArgumentException(__('Database preview invalid table'));
+        }
+
+        $allowed = array_flip(config('cabinet-database-admin.clearable_tables', []));
+        if (! isset($allowed[$table])) {
+            throw new \InvalidArgumentException(__('Database table clear not allowed'));
+        }
+
+        if (! $this->tableExists($table)) {
+            throw new \InvalidArgumentException(__('Database preview table not found'));
+        }
+
+        $deleted = (int) DB::table($table)->count();
+        DB::statement('TRUNCATE TABLE `' . $table . '`');
+
+        try {
+            DB::statement('OPTIMIZE TABLE `' . $table . '`');
+        } catch (\Throwable $e) {
+            // OPTIMIZE может быть недоступен — данные уже удалены
+        }
+
+        $this->refreshMetadata();
+
+        return [
+            'table' => $table,
+            'deleted' => $deleted,
+        ];
+    }
+
+    private function tableExists(string $table): bool
+    {
+        $schema = (string) DB::connection()->getDatabaseName();
+
+        return (bool) DB::selectOne(
+            'SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? LIMIT 1',
+            [$schema, $table]
+        );
+    }
 }

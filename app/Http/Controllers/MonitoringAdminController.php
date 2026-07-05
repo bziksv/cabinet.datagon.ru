@@ -6,9 +6,12 @@ use App\Classes\Monitoring\StatisticsAdmin;
 use App\Jobs;
 use App\MonitoringProject;
 use App\MonitoringSettings;
+use App\Support\MonitoringStaleScheduleReport;
 use App\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class MonitoringAdminController extends Controller
@@ -30,8 +33,9 @@ class MonitoringAdminController extends Controller
 
     public function statPage(Request $request)
     {
-        if ($request->ajax())
+        if ($request->ajax()) {
             return $this->getQueuesForDataTable($request);
+        }
 
         $statistics = (new StatisticsAdmin())->getDashboardStatistics();
 
@@ -46,26 +50,196 @@ class MonitoringAdminController extends Controller
 
     public function adminPage()
     {
-        $settings = [];
+        $sections = $this->adminSettingsSections();
+        $values = $this->settings->getValuesAsArray(
+            collect($sections)->flatMap(static function (array $section) {
+                return collect($section['fields'])->pluck('name');
+            })
+        );
 
-        $globalSettingsField = $this->globalSettingsFields();
-
-        $settings['global']['request'] = $this->settings->getValuesAsArray($globalSettingsField->pluck('name'));
-        $settings['global']['fields'] = $globalSettingsField;
-
-        return view('monitoring.admin.admin', compact('settings'));
+        return view('monitoring.admin.admin', [
+            'sections' => $sections,
+            'values' => $values,
+            'staleMonitoring' => Cache::remember(
+                'cabinet.monitoring.stale_schedules.summary',
+                now()->addMinutes(5),
+                static function () {
+                    return MonitoringStaleScheduleReport::summary();
+                }
+            ),
+        ]);
     }
 
-    protected function globalSettingsFields()
+    public function staleSchedulesList(Request $request): JsonResponse
     {
-        return collect([
-            ['type' => 'text', 'name' => 'pagination_items', 'label' => 'Меню постраничной навигации', 'placeholder' => '10,20,30,50,100,200,500,1000'],
-            ['type' => 'number', 'name' => 'pagination_project', 'label' => 'Количество элементов на странице проекты', 'placeholder' => '10'],
-            ['type' => 'number', 'name' => 'pagination_query', 'label' => 'Количество элементов на странице запросы', 'placeholder' => '100'],
-            ['type' => 'time', 'name' => 'data_projects', 'label' => 'Обновление данных проекты', 'placeholder' => 'Format time 24Hr'],
-            ['type' => 'textarea', 'name' => 'ignored_domains', 'label' => 'Игнорируемые домены (Мои конкуренты)', 'placeholder' => 'example.com'],
-            ['type' => 'number', 'name' => 'search_indices_days_delete', 'label' => 'Оставить записи в таблице  search_indices, количество дней', 'placeholder' => '180'],
+        $start = max(0, (int) $request->input('start', 0));
+        $length = max(1, min((int) $request->input('length', 25), 100));
+        $inactiveDays = (int) $request->input('inactive_days', MonitoringStaleScheduleReport::inactiveDays());
+        $freeOnly = $request->boolean('free_only');
+
+        $sortColumns = ['url', 'email', 'last_online_at', 'tariff', 'keywords_count', 'auto_regions'];
+        $orderColumn = (int) $request->input('order.0.column', 4);
+        $sortBy = $sortColumns[$orderColumn] ?? 'keywords_count';
+        $sortDir = strtolower((string) $request->input('order.0.dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+
+        $page = MonitoringStaleScheduleReport::listPage(
+            $start,
+            $length,
+            $inactiveDays,
+            $freeOnly,
+            $sortBy,
+            $sortDir
+        );
+
+        return response()->json([
+            'draw' => (int) $request->input('draw', 0),
+            'recordsTotal' => $page['total'],
+            'recordsFiltered' => $page['total'],
+            'data' => $page['rows'],
+            'summary' => MonitoringStaleScheduleReport::summary($inactiveDays),
         ]);
+    }
+
+    public function disableStaleSchedules(Request $request): JsonResponse
+    {
+        $projectId = (int) $request->input('project_id', 0);
+        $userId = (int) $request->input('user_id', 0);
+
+        if ($projectId > 0) {
+            $updated = MonitoringStaleScheduleReport::disableProjectSchedule($projectId);
+        } elseif ($userId > 0) {
+            $updated = MonitoringStaleScheduleReport::disableUserSchedules($userId);
+        } else {
+            return response()->json(['success' => false, 'message' => __('Users stale monitoring nothing selected')], 422);
+        }
+
+        Cache::forget('cabinet.monitoring.stale_schedules.summary');
+        Cache::forget('cabinet.users.stale_monitoring.summary');
+
+        return response()->json([
+            'success' => true,
+            'updated' => $updated,
+            'message' => __('Users stale monitoring disabled', ['count' => $updated]),
+        ]);
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    protected function adminSettingsSections(): array
+    {
+        return [
+            'interface' => [
+                'icon' => 'bi-layout-text-window',
+                'title_key' => 'Monitoring admin section interface',
+                'lead_key' => 'Monitoring admin section interface lead',
+                'fields' => [
+                    [
+                        'type' => 'text',
+                        'name' => 'pagination_items',
+                        'label_key' => 'Monitoring admin field pagination items',
+                        'hint_key' => 'Monitoring admin field pagination items hint',
+                        'placeholder' => '10,20,30,50,100,200,500,1000',
+                        'col' => 12,
+                    ],
+                    [
+                        'type' => 'number',
+                        'name' => 'pagination_project',
+                        'label_key' => 'Monitoring admin field pagination project',
+                        'hint_key' => 'Monitoring admin field pagination project hint',
+                        'placeholder' => '10',
+                        'col' => 6,
+                        'min' => 1,
+                        'max' => 500,
+                    ],
+                    [
+                        'type' => 'number',
+                        'name' => 'pagination_query',
+                        'label_key' => 'Monitoring admin field pagination query',
+                        'hint_key' => 'Monitoring admin field pagination query hint',
+                        'placeholder' => '100',
+                        'col' => 6,
+                        'min' => 10,
+                        'max' => 2000,
+                    ],
+                ],
+            ],
+            'cron' => [
+                'icon' => 'bi-clock-history',
+                'title_key' => 'Monitoring admin section cron',
+                'lead_key' => 'Monitoring admin section cron lead',
+                'fields' => [
+                    [
+                        'type' => 'time',
+                        'name' => 'data_projects',
+                        'label_key' => 'Monitoring admin field data projects',
+                        'hint_key' => 'Monitoring admin field data projects hint',
+                        'placeholder' => '00:00',
+                        'col' => 6,
+                    ],
+                ],
+            ],
+            'competitors' => [
+                'icon' => 'bi-people',
+                'title_key' => 'Monitoring admin section competitors',
+                'lead_key' => 'Monitoring admin section competitors lead',
+                'fields' => [
+                    [
+                        'type' => 'textarea',
+                        'name' => 'ignored_domains',
+                        'label_key' => 'Monitoring admin field ignored domains',
+                        'hint_key' => 'Monitoring admin field ignored domains hint',
+                        'placeholder' => 'example.com',
+                        'col' => 12,
+                        'rows' => 4,
+                    ],
+                ],
+            ],
+            'storage' => [
+                'icon' => 'bi-database-gear',
+                'title_key' => 'Monitoring admin section storage',
+                'lead_key' => 'Monitoring admin section storage lead',
+                'fields' => [
+                    [
+                        'type' => 'number',
+                        'name' => 'search_indices_days_delete',
+                        'label_key' => 'Monitoring admin field search indices retention',
+                        'hint_key' => 'Monitoring admin field search indices retention hint',
+                        'hint_detail_key' => 'Monitoring admin field search indices retention detail',
+                        'placeholder' => '180',
+                        'col' => 12,
+                        'min' => 0,
+                        'max' => 3650,
+                        'default' => 30,
+                        'cmd' => 'php artisan search-indices:count',
+                    ],
+                    [
+                        'type' => 'number',
+                        'name' => 'free_tariff_positions_retention_days',
+                        'label_key' => 'Monitoring admin field free positions retention',
+                        'hint_key' => 'Monitoring admin field free positions retention hint',
+                        'placeholder' => '365',
+                        'col' => 12,
+                        'min' => 0,
+                        'max' => 3650,
+                        'default' => (int) config('cabinet-monitoring.free_tariff_positions_retention_days', 365),
+                        'cmd' => 'php artisan monitoring:prune-free-positions --dry-run',
+                    ],
+                    [
+                        'type' => 'number',
+                        'name' => 'competitors_changes_dates_retention_days',
+                        'label_key' => 'Monitoring admin field dynamics retention',
+                        'hint_key' => 'Monitoring admin field dynamics retention hint',
+                        'placeholder' => '180',
+                        'col' => 12,
+                        'min' => 0,
+                        'max' => 3650,
+                        'default' => (int) config('cabinet-monitoring.competitors_changes_dates_retention_days', 180),
+                        'cmd' => 'php artisan monitoring:prune-competitors-dynamics --dry-run',
+                    ],
+                ],
+            ],
+        ];
     }
 
     public function deleteQueues(Request $request)
@@ -96,11 +270,13 @@ class MonitoringAdminController extends Controller
                         $jobData = unserialize($item->payload['data']['command']);
                         $keyword = $jobData->getModel();
 
-                        if (array_key_exists('user', $params->toArray()))
+                        if (array_key_exists('user', $params->toArray())) {
                             return ($keyword->project->admin->first()->id == $params['user']);
+                        }
 
-                        if (array_key_exists('project', $params->toArray()))
+                        if (array_key_exists('project', $params->toArray())) {
                             return ($keyword->project->url == $params['project']);
+                        }
 
                     });
                 }
@@ -160,13 +336,14 @@ class MonitoringAdminController extends Controller
                 $forgetKeys[] = $key;
                 $item->delete();
             }
+
             return $item;
         });
 
-        if (count($forgetKeys) > 0)
+        if (count($forgetKeys) > 0) {
             $jobs->forget($forgetKeys);
+        }
 
         return $jobs;
     }
-
 }

@@ -68,27 +68,42 @@ if (! function_exists('cabinet_skip_heavy_web')) {
 
 if (! function_exists('localize_cabinet_url')) {
     /**
-     * В local ссылки из БД часто абсолютные на lk.redbox.su — подменяем на APP_URL.
+     * Ссылки main_projects в БД часто абсолютные на lk.redbox.su (общая БД с legacy).
+     * На cabinet.titlo.ru и local подменяем на config('app.url'); на lk — не трогаем.
      */
     function localize_cabinet_url(?string $url): ?string
     {
-        if ($url === null || $url === '' || ! app()->environment('local')) {
+        if ($url === null || $url === '') {
             return $url;
         }
 
-        $local = rtrim(config('app.url'), '/');
-        $prefixes = [
+        $local = rtrim((string) config('app.url'), '/');
+        if ($local === '') {
+            return $url;
+        }
+
+        if (preg_match('#^https?://(lk\.redbox\.su|www\.lk\.redbox\.su)(/|$)#i', $local)) {
+            return $url;
+        }
+
+        $legacyPrefixes = [
             'https://lk.redbox.su',
             'http://lk.redbox.su',
-            'https://cabinet.titlo.ru',
-            'http://cabinet.titlo.ru',
             'https://cabinet.datagon.ru',
             'http://cabinet.datagon.ru',
         ];
 
-        foreach ($prefixes as $prefix) {
+        foreach ($legacyPrefixes as $prefix) {
             if (strpos($url, $prefix) === 0) {
                 return $local . substr($url, strlen($prefix));
+            }
+        }
+
+        if (app()->environment('local')) {
+            foreach (['https://cabinet.titlo.ru', 'http://cabinet.titlo.ru'] as $prefix) {
+                if (strpos($url, $prefix) === 0) {
+                    return $local . substr($url, strlen($prefix));
+                }
             }
         }
 

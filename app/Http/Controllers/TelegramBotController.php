@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Services\TelegramConnectBonusService;
-use App\Services\TelegramBotService;
 use App\Support\TelegramStartPayload;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -22,30 +21,30 @@ class TelegramBotController extends Controller
             $reply = $this->buildReplyForMessage($message, $chatId);
         }
 
-        if ($chatId !== null && $reply !== null && $reply !== '' && function_exists('fastcgi_finish_request')) {
-            response('ok', 200)->send();
-            fastcgi_finish_request();
-            $this->sendTelegramReply($chatId, $reply);
-            exit(0);
-        }
-
         if ($chatId !== null && $reply !== null && $reply !== '') {
-            $this->sendTelegramReply($chatId, $reply);
+            $this->dispatchDeferredReply($chatId, $reply);
         }
 
         return response('ok', 200);
     }
 
-    private function sendTelegramReply(int $chatId, string $reply): void
+    private function dispatchDeferredReply(int $chatId, string $reply): void
     {
-        try {
-            (new TelegramBotService($chatId))->sendMsg($reply);
-        } catch (\Throwable $e) {
-            Log::warning('Telegram webhook reply failed', [
-                'chat_id' => $chatId,
-                'error' => $e->getMessage(),
-            ]);
-        }
+        $payload = base64_encode(json_encode([
+            'chat_id' => $chatId,
+            'text' => $reply,
+        ], JSON_UNESCAPED_UNICODE));
+
+        $php = PHP_BINARY;
+        $artisan = base_path('artisan');
+        $command = sprintf(
+            '%s %s telegram:webhook-reply %s > /dev/null 2>&1 &',
+            escapeshellarg($php),
+            escapeshellarg($artisan),
+            escapeshellarg($payload)
+        );
+
+        @exec($command);
     }
 
     private function buildReplyForMessage(array $message, int $chatId): ?string

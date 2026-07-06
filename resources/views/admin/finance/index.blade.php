@@ -380,7 +380,7 @@
                             <th scope="col">{{ __('Status') }}</th>
                             <th scope="col" class="text-end">{{ __('Sum') }}</th>
                             <th scope="col">{{ __('Source') }}</th>
-                            <th scope="col" class="text-end pe-3">{{ __('Finance col user balance') }}</th>
+                            <th scope="col" class="text-end pe-3">{{ __('Finance col balance before after') }}</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -446,9 +446,15 @@
                                     @endif
                                 </td>
                                 <td class="text-secondary">{{ __($tx->source) }}</td>
-                                <td class="text-end pe-3 cabinet-finance-amount text-nowrap">
-                                    @if($user)
-                                        {{ number_format((float) $user->balance, 0, '.', ' ') }} ₽
+                                <td class="text-end pe-3 cabinet-finance-amount text-nowrap small">
+                                    @php
+                                        $balanceBefore = $tx->ledgerBalanceBefore();
+                                        $balanceAfter = $tx->ledgerBalanceAfter();
+                                    @endphp
+                                    @if($balanceBefore !== null && $balanceAfter !== null)
+                                        <span class="text-secondary">{{ number_format($balanceBefore, 0, '.', ' ') }}</span>
+                                        <span class="text-secondary mx-1" aria-hidden="true">→</span>
+                                        <span class="fw-semibold">{{ number_format($balanceAfter, 0, '.', ' ') }} ₽</span>
                                     @else
                                         —
                                     @endif

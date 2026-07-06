@@ -237,7 +237,14 @@ class FinanceAdminService
     public function transactions(array $filters, int $perPage = 25, bool $excludeAdmins = true): LengthAwarePaginator
     {
         $query = Balance::query()
-            ->with(['user:id,name,last_name,email,balance', 'promoCode:id,code'])
+            ->select('balances.*')
+            ->selectRaw(
+                'SUM(CASE WHEN balances.status = 1 THEN balances.sum '
+                . 'WHEN balances.status = 2 THEN -balances.sum ELSE 0 END) '
+                . 'OVER (PARTITION BY balances.user_id ORDER BY balances.created_at ASC, balances.id ASC) '
+                . 'AS ledger_balance_after'
+            )
+            ->with(['user:id,name,last_name,email', 'promoCode:id,code'])
             ->orderByDesc('created_at')
             ->orderByDesc('id');
 

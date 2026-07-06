@@ -40,4 +40,34 @@ class Balance extends Model
     {
         return (int) $this->status === 0;
     }
+
+    /** Изменение баланса по этой операции (неуспешные платежи — 0). */
+    public function ledgerSignedDelta(): int
+    {
+        if ($this->isTopUp()) {
+            return (int) $this->sum;
+        }
+
+        if ($this->isExpense()) {
+            return -(int) $this->sum;
+        }
+
+        return 0;
+    }
+
+    public function ledgerBalanceAfter(): ?int
+    {
+        if (!array_key_exists('ledger_balance_after', $this->attributes)) {
+            return null;
+        }
+
+        return (int) $this->attributes['ledger_balance_after'];
+    }
+
+    public function ledgerBalanceBefore(): ?int
+    {
+        $after = $this->ledgerBalanceAfter();
+
+        return $after === null ? null : $after - $this->ledgerSignedDelta();
+    }
 }

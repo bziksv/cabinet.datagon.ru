@@ -304,4 +304,108 @@ class TelegramBotService
 
         return $order;
     }
+
+    /**
+     * @return array{ok: bool, updates: array<int, array>, error: string}
+     */
+    public static function fetchUpdates(int $offset = 0): array
+    {
+        $token = config('app.telegram_bot_token');
+        if ($token === null || $token === '') {
+            return ['ok' => false, 'updates' => [], 'error' => 'empty token'];
+        }
+
+        TelegramProxyRegistry::syncLegacyConfig();
+
+        $query = http_build_query([
+            'offset' => max(0, $offset),
+            'timeout' => 0,
+            'limit' => 50,
+            'allowed_updates' => json_encode(['message']),
+        ]);
+
+        $url = 'https://api.telegram.org/bot' . $token . '/getUpdates?' . $query;
+        $attempts = self::buildStaticSendAttempts();
+        $lastError = 'no attempts';
+
+        foreach ($attempts as $attempt) {
+            $result = self::curlGetJson($url, $attempt['proxy'], 20);
+            if (!$result['ok']) {
+                $lastError = $result['error'];
+                continue;
+            }
+
+            $decoded = $result['json'];
+            if (!is_array($decoded) || empty($decoded['ok'])) {
+                $lastError = is_array($decoded) ? ($decoded['description'] ?? 'API error') : 'invalid JSON';
+
+                continue;
+            }
+
+            $updates = $decoded['result'] ?? [];
+
+            return [
+                'ok' => true,
+                'updates' => is_array($updates) ? $updates : [],
+                'error' => '',
+            ];
+        }
+
+        return ['ok' => false, 'updates' => [], 'error' => $lastError];
+    }
+
+    /**
+     * @return array<int, array{send_via: string, proxy: string|null}>
+     */
+    private static function buildStaticSendAttempts(): array
+    {
+        $service = new self(0);
+        $reflection = new \ReflectionClass($service);
+        $method = $reflection->getMethod('buildSendAttempts');
+        $method->setAccessible(true);
+
+        return $method->invoke($service);
+    }
+
+    /**
+     * @return array{ok: bool, json: ?array, error: string}
+     */
+    private static function curlGetJson(string $url, ?string $proxy, int $timeout): array
+    {
+        if (!function_exists('curl_init')) {
+            return ['ok' => false, 'json' => null, 'error' => 'curl missing'];
+        }
+
+        $ch = curl_init($url);
+        $options = [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $timeout,
+            CURLOPT_CONNECTTIMEOUT => min(10, $timeout),
+            CURLOPT_HTTPGET => true,
+            CURLOPT_NOSIGNAL => true,
+        ];
+
+        if ($proxy !== null && $proxy !== '') {
+            $options[CURLOPT_PROXY] = $proxy;
+            $options[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+        }
+
+        curl_setopt_array($ch, $options);
+        $body = curl_exec($ch);
+        $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError !== '') {
+            return ['ok' => false, 'json' => null, 'error' => $curlError];
+        }
+
+        if ($httpCode !== 200 || !is_string($body)) {
+            return ['ok' => false, 'json' => null, 'error' => 'HTTP ' . $httpCode];
+        }
+
+        $json = json_decode($body, true);
+
+        return ['ok' => true, 'json' => is_array($json) ? $json : null, 'error' => ''];
+    }
 }

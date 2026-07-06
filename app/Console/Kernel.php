@@ -87,6 +87,8 @@ class Kernel extends ConsoleKernel
 
         $schedule->call(new ProcessTriggerCampaigns())->everyMinute();
 
+        $schedule->command('telegram:poll-updates')->everyMinute();
+
         // $schedule->command('inspire')
         //          ->hourly();
 

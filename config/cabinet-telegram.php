@@ -13,6 +13,9 @@ return [
     'connect_bonus_enabled' => true,
     'connect_bonus_amount' => 500,
 
+    /** getUpdates по cron — на VPS входящий webhook от Telegram часто недоступен. */
+    'poll_updates' => true,
+
     'modules' => [
         [
             'slug' => 'profile',

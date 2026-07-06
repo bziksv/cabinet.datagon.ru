@@ -13,7 +13,27 @@
     color: #e8e8e8;
 }
 
-.cabinet-supervisor-admin-page form.d-inline + form.d-inline {
+.cabinet-supervisor-admin-page .cabinet-supervisor-processes-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.cabinet-supervisor-admin-page .cabinet-supervisor-processes-header__actions {
+    margin-left: auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.25rem;
+}
+
+.cabinet-supervisor-admin-page .cabinet-supervisor-admin-table .cabinet-supervisor-row-actions {
+    white-space: nowrap;
+}
+
+.cabinet-supervisor-admin-page .cabinet-supervisor-row-actions form.d-inline + form.d-inline {
     margin-left: 0.15rem;
 }
 

@@ -168,10 +168,10 @@
         @endif
 
         <div class="card mb-3">
-            <div class="card-header py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div class="card-header py-2 cabinet-supervisor-processes-header">
                 <strong>{{ __('Supervisor processes') }}</strong>
                 @if(($probe['ok'] ?? false) && count($processes) > 0)
-                    <div class="d-flex flex-wrap gap-1">
+                    <div class="cabinet-supervisor-processes-header__actions">
                         @foreach([
                             'start' => ['label' => __('Supervisor action all start'), 'class' => 'btn-outline-success'],
                             'stop' => ['label' => __('Supervisor action all stop'), 'class' => 'btn-outline-danger'],
@@ -222,7 +222,7 @@
                                         <td><span class="badge bg-{{ $badge }}">{{ $status }}</span></td>
                                         <td>{{ $proc['pid'] ?: '—' }}</td>
                                         <td>{{ $proc['uptime'] ?: '—' }}</td>
-                                        <td class="text-end text-nowrap">
+                                        <td class="text-end cabinet-supervisor-row-actions">
                                             @if($proc['controllable'] ?? false)
                                                 @foreach(['start' => __('Supervisor action start'), 'stop' => __('Supervisor action stop'), 'restart' => __('Supervisor action restart')] as $action => $actionLabel)
                                                     @php

@@ -19,8 +19,8 @@ class MenuComposer
 
         if (cabinet_skip_heavy_web()) {
             $stamp = MenuProjectRegistry::structureStamp();
-            $cached = session('cabinet_menu_modules_v4');
-            $cachedStamp = session('cabinet_menu_modules_v4_stamp');
+            $cached = session('cabinet_menu_modules_v5');
+            $cachedStamp = session('cabinet_menu_modules_v5_stamp');
             if (is_array($cached) && $cachedStamp === $stamp && $this->cachedMenuHasItems($cached)) {
                 $view->with('modules', CabinetAdminMenu::filterModules($cached));
 
@@ -72,8 +72,8 @@ class MenuComposer
 
         if (cabinet_skip_heavy_web()) {
             session([
-                'cabinet_menu_modules_v4' => $modules,
-                'cabinet_menu_modules_v4_stamp' => MenuProjectRegistry::structureStamp(),
+                'cabinet_menu_modules_v5' => $modules,
+                'cabinet_menu_modules_v5_stamp' => MenuProjectRegistry::structureStamp(),
             ]);
         }
 

@@ -102,12 +102,15 @@
                                         <td class="text-end text-nowrap">
                                             @if($proc['controllable'] ?? false)
                                                 @foreach(['start' => __('Supervisor action start'), 'stop' => __('Supervisor action stop'), 'restart' => __('Supervisor action restart')] as $action => $actionLabel)
-                                                    <form action="{{ route('admin.supervisor.action') }}" method="post" class="d-inline">
+                                                    @php
+                                                        $supervisorConfirm = __('Supervisor confirm action', ['action' => $action, 'program' => $proc['name']]);
+                                                    @endphp
+                                                    <form action="{{ route('admin.supervisor.action') }}" method="post" class="d-inline"
+                                                          onsubmit='return confirm(@json($supervisorConfirm));'>
                                                         @csrf
                                                         <input type="hidden" name="program" value="{{ $proc['name'] }}">
                                                         <input type="hidden" name="action" value="{{ $action }}">
-                                                        <button type="submit" class="btn btn-xs btn-outline-secondary btn-sm"
-                                                                onclick="return confirm(@json(__('Supervisor confirm action', ['action' => $action, 'program' => $proc['name']])))">
+                                                        <button type="submit" class="btn btn-xs btn-outline-secondary btn-sm">
                                                             {{ $actionLabel }}
                                                         </button>
                                                     </form>

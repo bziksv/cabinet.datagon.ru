@@ -2,5 +2,5 @@
 
 /** Админ: /admin/notifications — справочник каналов оповещений. */
 return [
-    'version' => '1.2.1s',
+    'version' => '1.3.1s',
 ];

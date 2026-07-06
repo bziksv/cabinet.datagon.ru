@@ -2,13 +2,14 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Concerns\LocalizesMailContent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class sendNotificationAboutChangeDNS extends Notification
 {
+    use LocalizesMailContent;
     use Queueable;
 
     public $project;
@@ -42,13 +43,16 @@ class sendNotificationAboutChangeDNS extends Notification
      */
     public function toMail($notifiable): MailMessage
     {
+        $this->applyMailLocale($notifiable);
+
         return (new MailMessage)
-            ->line('This message is generated automatically and does not need to be answered.')
-            ->line('Domain ' . $this->project->domain)
-            ->line('DNS change')
-            ->line('New' . $this->project->dns)
-            ->action('Check your projects', route('domain.information'))
-            ->line('Thank you for using our application!');
+            ->greeting(__('Mail notify greeting'))
+            ->line(__('Mail notify auto disclaimer'))
+            ->line(__('Mail notify dns domain', ['domain' => $this->project->domain]))
+            ->line(__('Mail notify dns change'))
+            ->line(__('Mail notify dns new', ['dns' => $this->project->dns]))
+            ->action(__('Mail notify check projects'), route('domain.information'))
+            ->line(__('Mail notify thanks app'));
     }
 
     /**

@@ -15,11 +15,19 @@ class TelegramBot extends Model
     {
         $user = Auth::user();
         if ($user->chat_id) {
-            (new TelegramBotService($user->chat_id))->sendMsg(__('Проверка получения уведомлений пройдена!'));
+            (new TelegramBotService($user->chat_id))->sendMsg(
+                __('Profile telegram test notify passed'),
+                null,
+                [
+                    'event_id' => 'profile-telegram-test',
+                    'user_id' => (int) $user->id,
+                    'source' => 'system',
+                ]
+            );
         }
     }
 
-    public static function brokenDomainNotification($project, $chatId)
+    public static function brokenDomainNotification($project, $chatId, string $eventId = 'site-mon-broken', string $source = 'system')
     {
         $link = TelegramBot::removeProtocol($project);
         $uptimePercent = round($project->uptime_percent, 2);
@@ -35,10 +43,10 @@ class TelegramBot extends Model
         " . __('Go to the service:') . "
         <a href='$cabinetUrl' target='_blank'>$cabinetUrl</a>";
 
-        (new TelegramBotService($chatId))->sendMsg($text);
+        (new TelegramBotService($chatId))->sendMsg($text, null, self::dispatchMeta($eventId, $project, $source));
     }
 
-    public static function repairedDomainNotification($project, $chatId)
+    public static function repairedDomainNotification($project, $chatId, string $source = 'system')
     {
         $link = TelegramBot::removeProtocol($project);
         $uptimePercent = round($project->uptime_percent, 2);
@@ -54,7 +62,7 @@ class TelegramBot extends Model
         " . __('Go to the service:') . "
         <a href='$cabinetUrl' target='_blank'>$cabinetUrl</a>";
 
-        (new TelegramBotService($chatId))->sendMsg($text);
+        (new TelegramBotService($chatId))->sendMsg($text, null, self::dispatchMeta('site-mon-repaired', $project, $source));
     }
 
     public static function sendNotificationAboutChangeStateProject($project, $chatId)
@@ -70,7 +78,7 @@ class TelegramBot extends Model
             . __('Go to the service:')
             . " <a href='https://lk.redbox.su/domain-information' target='_blank'>https://lk.redbox.su/domain-information</a>";
 
-        (new TelegramBotService($chatId))->sendMsg($text);
+        (new TelegramBotService($chatId))->sendMsg($text, null, self::dispatchMeta('domain-dns-changed', $project));
     }
 
     public static function sendSuccessMessage($chatId)
@@ -80,7 +88,7 @@ class TelegramBot extends Model
         (new TelegramBotService($chatId))->sendMsg($text);
     }
 
-    public static function sendNotificationAboutChangeDNS($project, $chatId, $dns)
+    public static function sendNotificationAboutChangeDNS($project, $chatId, $dns, string $source = 'system')
     {
         $text = __('Domain') . ' ' . $project->domain
             . "\n"
@@ -94,10 +102,10 @@ class TelegramBot extends Model
             . __('Go to the service:')
             . " <a href='https://lk.redbox.su/domain-information' target='_blank'>https://lk.redbox.su/domain-information</a>";
 
-        (new TelegramBotService($chatId))->sendMsg($text);
+        (new TelegramBotService($chatId))->sendMsg($text, null, self::dispatchMeta('domain-dns-changed', $project, $source));
     }
 
-    public static function sendNotificationAboutExpirationRegistrationPeriod($project, $chatId, $diffInDays)
+    public static function sendNotificationAboutExpirationRegistrationPeriod($project, $chatId, $diffInDays, string $source = 'system')
     {
         $text = __('Domain') . ' ' . $project->domain
             . "\n"
@@ -109,7 +117,7 @@ class TelegramBot extends Model
             . __('Go to the service:')
             . " <a href='https://lk.redbox.su/domain-information' target='_blank'>https://lk.redbox.su/domain-information</a>";
 
-        (new TelegramBotService($chatId))->sendMsg($text);
+        (new TelegramBotService($chatId))->sendMsg($text, null, self::dispatchMeta('domain-expiration', $project, $source));
     }
 
     /**
@@ -159,7 +167,24 @@ class TelegramBot extends Model
             $replyMarkup = null;
         }
 
-        return (new TelegramBotService($chatId))->sendMsg(implode("\n", $lines), $replyMarkup);
+        return (new TelegramBotService($chatId))->sendMsg(
+            implode("\n", $lines),
+            $replyMarkup,
+            self::dispatchMeta('backlink-telegram-summary', $project, $isTest ? 'admin_test' : 'system')
+        );
+    }
+
+    /**
+     * @param  object  $project
+     * @return array{event_id: string, user_id: int|null, source: string}
+     */
+    private static function dispatchMeta(string $eventId, $project, string $source = 'system'): array
+    {
+        return [
+            'event_id' => $eventId,
+            'user_id' => isset($project->user_id) ? (int) $project->user_id : null,
+            'source' => $source,
+        ];
     }
 
     private static function escapeTelegramHtml(string $text): string

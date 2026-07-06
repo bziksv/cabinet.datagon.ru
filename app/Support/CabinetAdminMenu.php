@@ -69,6 +69,15 @@ class CabinetAdminMenu
             ];
         })->values()->all();
 
+        if (\Illuminate\Support\Facades\Route::has('admin.smtp.index')) {
+            $items[] = [
+                'id' => 0,
+                'title' => __('SMTP management'),
+                'link' => route('admin.smtp.index'),
+                'external' => false,
+            ];
+        }
+
         if (\Illuminate\Support\Facades\Route::has('admin.notifications.index')) {
             $items[] = [
                 'id' => 0,
@@ -114,9 +123,58 @@ class CabinetAdminMenu
             ];
         }
 
-        self::$itemsCache = self::sortItemsByTitle($items);
+        self::$itemsCache = self::pinNotificationsAfterSmtp(self::sortItemsByTitle($items));
 
         return self::$itemsCache;
+    }
+
+    /**
+     * «Управление рассылками» — сразу после «Управление SMTP».
+     *
+     * @param array<int, array{id:int,title:string,link:string,external:bool}> $items
+     * @return array<int, array{id:int,title:string,link:string,external:bool}>
+     */
+    private static function pinNotificationsAfterSmtp(array $items): array
+    {
+        if (! \Illuminate\Support\Facades\Route::has('admin.smtp.index')
+            || ! \Illuminate\Support\Facades\Route::has('admin.notifications.index')) {
+            return $items;
+        }
+
+        $smtpLink = route('admin.smtp.index');
+        $notifyLink = route('admin.notifications.index');
+
+        $notifyItem = null;
+        $rest = [];
+
+        foreach ($items as $item) {
+            if (($item['link'] ?? '') === $notifyLink) {
+                $notifyItem = $item;
+                continue;
+            }
+            $rest[] = $item;
+        }
+
+        if ($notifyItem === null) {
+            return $items;
+        }
+
+        $out = [];
+        $inserted = false;
+
+        foreach ($rest as $item) {
+            $out[] = $item;
+            if (!$inserted && ($item['link'] ?? '') === $smtpLink) {
+                $out[] = $notifyItem;
+                $inserted = true;
+            }
+        }
+
+        if (!$inserted) {
+            $out[] = $notifyItem;
+        }
+
+        return $out;
     }
 
     /**

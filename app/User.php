@@ -12,6 +12,8 @@ use App\Notifications\RegisterPasswordEmail;
 use App\Notifications\RepairDomainNotification;
 use App\Notifications\sendNotificationAboutChangeDNS;
 use App\Notifications\sendNotificationAboutExpirationRegistrationPeriod;
+use App\Support\NotificationDispatchLogger;
+use App\Support\NotificationLocale;
 use Carbon\Carbon;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -84,6 +86,7 @@ class User extends Authenticatable implements MustVerifyEmail
         $verificationCode = $this->verificationCode($verificationUrl);
 
         Mail::to($user->email)->send(new VerifyEmail($user, $verificationUrl, $verificationCode));
+        NotificationDispatchLogger::log('auth-verify-email', NotificationDispatchLogger::CHANNEL_EMAIL, (int) $this->id);
     }
 
     private function verificationUrl($notifiable): string
@@ -142,6 +145,8 @@ class User extends Authenticatable implements MustVerifyEmail
         if (!config('cabinet-backlink.notifications.telegram_enabled', true) || !$this->isTelegramConnected()) {
             return false;
         }
+
+        NotificationLocale::apply($this);
 
         return TelegramBot::brokenLinkProjectNotification($project, $this->chat_id, $problemCount, $isTest);
     }
@@ -215,13 +220,13 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * @param $project
      */
-    public function brokenDomainNotification($project)
+    public function brokenDomainNotification($project, string $dispatchEventId = 'site-mon-broken')
     {
         if (!$this->canReceiveSiteMonitoringEmail()) {
             return;
         }
 
-        $this->notify(new BrokenDomainNotification($project));
+        $this->notify(new BrokenDomainNotification($project, $dispatchEventId));
     }
 
     /**

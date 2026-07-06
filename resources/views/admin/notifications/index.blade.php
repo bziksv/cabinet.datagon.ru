@@ -12,6 +12,11 @@
     @php
         $nStats = ($notifications ?? [])['stats'] ?? [];
         $rows = $tableRows ?? [];
+        $dispatchTotals = $dispatchTotals ?? [
+            'today' => ['telegram' => 0, 'email' => 0],
+            'yesterday' => ['telegram' => 0, 'email' => 0],
+            'month' => ['telegram' => 0, 'email' => 0],
+        ];
     @endphp
 
     <div class="cabinet-notifications-admin-page"
@@ -30,6 +35,11 @@
                 <p class="text-secondary small mb-0 cabinet-notify-lead">{{ __('Users notify table lead') }}</p>
             </div>
             <div class="d-flex flex-wrap gap-2">
+                @if(Route::has('admin.smtp.index'))
+                    <a href="{{ route('admin.smtp.index') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-envelope-at me-1"></i>{{ __('SMTP management') }}
+                    </a>
+                @endif
                 @if(Route::has('admin.telegram-proxy.index'))
                     <a href="{{ route('admin.telegram-proxy.index') }}" class="btn btn-sm btn-outline-secondary">
                         <i class="bi bi-shield-lock me-1"></i>{{ __('Telegram proxy management') }}
@@ -41,6 +51,12 @@
                     </a>
                 @endif
             </div>
+        </div>
+
+        <div class="alert alert-info mb-3">
+            <p class="fw-semibold mb-2">{{ __('Users notify send how title') }}</p>
+            <p class="small mb-2">{{ __('Users notify send how body') }}</p>
+            <p class="small mb-0">{{ __('Users notify lang test hint') }}</p>
         </div>
 
         @if(!$telegramConnected)
@@ -81,10 +97,47 @@
             </div>
             <div class="col-6 col-lg-3 d-flex">
                 <div class="info-box mb-0 flex-fill shadow-sm">
+                    <span class="info-box-icon text-bg-warning shadow-sm">
+                        <img src="{{ asset('img/flags/'.($adminLang ?? 'ru').'.png') }}" class="img-flag" alt="">
+                    </span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">{{ __('Users notify admin profile lang') }}</span>
+                        <span class="info-box-number small text-uppercase">{{ $adminLang ?? 'ru' }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3 d-flex">
+                <div class="info-box mb-0 flex-fill shadow-sm">
                     <span class="info-box-icon text-bg-secondary shadow-sm"><i class="bi bi-list-check"></i></span>
                     <div class="info-box-content">
                         <span class="info-box-text">{{ __('Users notify events title') }}</span>
                         <span class="info-box-number">{{ count($rows) }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3 d-flex">
+                <div class="info-box mb-0 flex-fill shadow-sm">
+                    <span class="info-box-icon text-bg-info shadow-sm"><i class="bi bi-send-check"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">{{ __('Users notify dispatch today total') }}</span>
+                        <span class="info-box-number small">
+                            <i class="bi bi-telegram me-1"></i>{{ number_format($dispatchTotals['today']['telegram'] ?? 0, 0, ',', ' ') }}
+                            <span class="text-secondary mx-1">/</span>
+                            <i class="bi bi-envelope me-1"></i>{{ number_format($dispatchTotals['today']['email'] ?? 0, 0, ',', ' ') }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3 d-flex">
+                <div class="info-box mb-0 flex-fill shadow-sm">
+                    <span class="info-box-icon text-bg-dark shadow-sm"><i class="bi bi-calendar-month"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text">{{ __('Users notify dispatch month total') }}</span>
+                        <span class="info-box-number small">
+                            <i class="bi bi-telegram me-1"></i>{{ number_format($dispatchTotals['month']['telegram'] ?? 0, 0, ',', ' ') }}
+                            <span class="text-secondary mx-1">/</span>
+                            <i class="bi bi-envelope me-1"></i>{{ number_format($dispatchTotals['month']['email'] ?? 0, 0, ',', ' ') }}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -107,7 +160,8 @@
                             <th>{{ __('Users notify when') }}</th>
                             <th>{{ __('Users notify who') }}</th>
                             <th>{{ __('Users notify channels row') }}</th>
-                            <th class="text-end cabinet-notify-col-actions">{{ __('Users notify col test') }}</th>
+                            <th class="cabinet-notify-col-dispatch">{{ __('Users notify col dispatch') }}</th>
+                            <th class="text-end cabinet-notify-col-actions">{{ __('Users notify col test langs') }}</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -138,44 +192,11 @@
                                         <span class="badge text-bg-light text-dark border">{{ __('Users notify channel in app only') }}</span>
                                     @endforelse
                                 </td>
+                                <td class="cabinet-notify-col-dispatch">
+                                    @include('admin.notifications.partials.dispatch-stats', ['row' => $row])
+                                </td>
                                 <td class="text-end text-nowrap cabinet-notify-col-actions">
-                                    @if($row['can_preview_modal'])
-                                        <button type="button"
-                                                class="btn btn-sm btn-outline-primary cabinet-notify-btn-preview-modal"
-                                                data-event-id="{{ $row['id'] }}"
-                                                title="{{ __('Users notify btn preview modal') }}">
-                                            <i class="bi bi-window"></i>
-                                        </button>
-                                    @endif
-                                    @if($row['can_test_telegram'])
-                                        <button type="button"
-                                                class="btn btn-sm btn-info text-white cabinet-notify-btn-test-tg {{ empty($row['telegram_ready']) ? 'disabled' : '' }}"
-                                                data-event-id="{{ $row['id'] }}"
-                                                @if(empty($row['telegram_ready'])) disabled @endif
-                                                title="{{ __('Users notify btn send tg') }}">
-                                            <i class="bi bi-telegram"></i>
-                                        </button>
-                                    @endif
-                                    @if($row['can_test_email'])
-                                        <div class="btn-group btn-group-sm d-inline-flex" role="group">
-                                            <a href="{{ route('admin.notifications.preview.email', ['eventId' => $row['id']]) }}"
-                                               class="btn btn-outline-warning cabinet-notify-btn-preview-email"
-                                               target="_blank"
-                                               rel="noopener"
-                                               title="{{ __('Users notify btn preview email') }}">
-                                                <i class="bi bi-envelope"></i>
-                                            </a>
-                                            <button type="button"
-                                                    class="btn btn-warning cabinet-notify-btn-test-email"
-                                                    data-event-id="{{ $row['id'] }}"
-                                                    title="{{ __('Users notify btn send email') }}">
-                                                <i class="bi bi-send"></i>
-                                            </button>
-                                        </div>
-                                    @endif
-                                    @if(!$row['can_preview_modal'] && !$row['can_test_telegram'] && !$row['can_test_email'])
-                                        <span class="text-secondary small">—</span>
-                                    @endif
+                                    @include('admin.notifications.partials.locale-test-buttons', ['row' => $row])
                                 </td>
                             </tr>
                         @endforeach

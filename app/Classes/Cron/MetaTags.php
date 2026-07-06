@@ -115,7 +115,11 @@ class MetaTags extends MetaTagsController
                     $link_compare = route('meta.history.compare', [$ideal->id, $history->id]);
                     $telegram = view('meta-tags.telegram', compact('model', 'link_compare'))->render();
                     
-                    (new TelegramBotService($model->user->chat_id))->sendMsg($telegram);
+                    (new TelegramBotService($model->user->chat_id))->sendMsg($telegram, null, [
+                        'event_id' => 'meta-tags-changed',
+                        'user_id' => (int) $model->user->id,
+                        'source' => 'system',
+                    ]);
                 }
             }
         }

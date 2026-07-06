@@ -2,13 +2,14 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Concerns\LocalizesMailContent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class DomainInformationNotification extends Notification
 {
+    use LocalizesMailContent;
     use Queueable;
 
     public $project;
@@ -42,12 +43,15 @@ class DomainInformationNotification extends Notification
      */
     public function toMail($notifiable)
     {
+        $this->applyMailLocale($notifiable);
+
         return (new MailMessage)
-            ->line('This message is generated automatically and does not need to be answered')
-            ->line(__('Domain') . ' ' . $this->project->domain)
+            ->greeting(__('Mail notify greeting'))
+            ->line(__('Mail notify auto disclaimer'))
+            ->line(__('Mail notify dns domain', ['domain' => $this->project->domain]))
             ->line($this->project->domain_information)
-            ->action('Check your projects', route('domain.information'))
-            ->line('Thank you for using our application!');
+            ->action(__('Mail notify check projects'), route('domain.information'))
+            ->line(__('Mail notify thanks app'));
     }
 
     /**

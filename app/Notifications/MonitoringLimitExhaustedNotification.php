@@ -2,13 +2,14 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Concerns\LocalizesMailContent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class MonitoringLimitExhaustedNotification extends Notification
 {
+    use LocalizesMailContent;
     use Queueable;
 
     /**
@@ -40,12 +41,14 @@ class MonitoringLimitExhaustedNotification extends Notification
      */
     public function toMail($notifiable)
     {
+        $this->applyMailLocale($notifiable);
+
         return (new MailMessage)
-            ->greeting('Здравствуйте!')
-            ->line('Это сообщение было сгенерированно автоматически, на него не нужно отвечать.')
-            ->line('Лимит модуля Мониторинг позиций исчерпан.')
-            ->subject('Уведомление о лимите Мониторинг позиций.')
-            ->line('Спасибо, что пользуетесь нашим сервисом!');
+            ->greeting(__('Mail notify greeting'))
+            ->subject(__('Mail notify monitoring limit subject'))
+            ->line(__('Mail notify auto disclaimer'))
+            ->line(__('Mail notify monitoring limit line'))
+            ->line(__('Mail notify thanks service'));
     }
 
     /**

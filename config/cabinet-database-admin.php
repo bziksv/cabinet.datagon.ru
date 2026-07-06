@@ -151,6 +151,7 @@ return [
         'users_jobs' => ['title' => 'Фоновые задачи пользователей', 'uri' => '/'],
         'locations' => ['title' => 'Справочник регионов', 'uri' => '/monitoring'],
         'telegram_proxies' => ['title' => 'Telegram-прокси (админ)', 'uri' => '/admin/telegram-proxy'],
+        'smtp_settings' => ['title' => 'SMTP (админ)', 'uri' => '/admin/smtp'],
     ],
 
     /** Подсказки для таблиц без привязки к модулю */

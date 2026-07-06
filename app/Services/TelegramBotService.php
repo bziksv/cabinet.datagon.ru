@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\NotificationDispatchLogger;
 use App\Support\TelegramProxyRegistry;
 use App\User;
 use GuzzleHttp\Client;
@@ -32,7 +33,10 @@ class TelegramBotService
         return User::where('email', $email)->update(['chat_id' => $this->getChatId(), 'telegram_bot_active' => 1]);
     }
 
-    public function sendMsg(string $text, ?array $replyMarkup = null): bool
+    /**
+     * @param  array{event_id?: string, user_id?: int|null, source?: string}  $dispatch
+     */
+    public function sendMsg(string $text, ?array $replyMarkup = null, array $dispatch = []): bool
     {
         self::$lastError = '';
         self::$lastSendDiagnostics = [];
@@ -74,6 +78,15 @@ class TelegramBotService
             );
 
             if ($lastResult['success']) {
+                if (!empty($dispatch['event_id'])) {
+                    NotificationDispatchLogger::log(
+                        (string) $dispatch['event_id'],
+                        NotificationDispatchLogger::CHANNEL_TELEGRAM,
+                        isset($dispatch['user_id']) ? (int) $dispatch['user_id'] : null,
+                        (string) ($dispatch['source'] ?? 'system')
+                    );
+                }
+
                 return true;
             }
 

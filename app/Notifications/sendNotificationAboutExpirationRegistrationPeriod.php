@@ -2,13 +2,14 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Concerns\LocalizesMailContent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class sendNotificationAboutExpirationRegistrationPeriod extends Notification
 {
+    use LocalizesMailContent;
     use Queueable;
 
     public $project;
@@ -46,21 +47,15 @@ class sendNotificationAboutExpirationRegistrationPeriod extends Notification
      */
     public function toMail($notifiable): MailMessage
     {
-        if($notifiable->lang === 'ru'){
-            return (new MailMessage)
-                ->line('Это сообщение сгенерированно автоматически, на него не нужно отвечать.')
-                ->line('Домен ' . $this->project->domain)
-                ->line("Регистрация заканчивается через $this->diffInDays дней")
-                ->action('Проверьте ваши проекты', route('domain.information'))
-                ->line('Спасибо за то что вы с нами!');
-        } else {
-            return (new MailMessage)
-                ->line('This message is generated automatically and does not need to be answered.')
-                ->line('Domain ' . $this->project->domain)
-                ->line("Registration ends after $this->diffInDays days")
-                ->action('Check your projects', route('domain.information'))
-                ->line('Thank you for using our application!');
-        }
+        $this->applyMailLocale($notifiable);
+
+        return (new MailMessage)
+            ->greeting(__('Mail notify greeting'))
+            ->line(__('Mail notify auto disclaimer'))
+            ->line(__('Mail notify dns domain', ['domain' => $this->project->domain]))
+            ->line(__('Mail notify domain expire days', ['days' => $this->diffInDays]))
+            ->action(__('Mail notify check your projects'), route('domain.information'))
+            ->line(__('Mail notify thanks with us'));
     }
 
     /**

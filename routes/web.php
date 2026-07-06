@@ -109,6 +109,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/admin/xml-providers', 'XmlProvidersAdminController@index')->name('admin.xml-providers.index');
     Route::post('/admin/xml-providers/refresh', 'XmlProvidersAdminController@refresh')->name('admin.xml-providers.refresh');
 
+    Route::get('/admin/smtp', 'SmtpAdminController@index')->name('admin.smtp.index');
+    Route::put('/admin/smtp', 'SmtpAdminController@update')->name('admin.smtp.update');
+    Route::post('/admin/smtp/import-env', 'SmtpAdminController@importFromEnv')->name('admin.smtp.import-env');
+    Route::post('/admin/smtp/test-email', 'SmtpAdminController@testEmail')->name('admin.smtp.test-email');
+
     Route::get('/admin/telegram-proxy', 'TelegramProxyAdminController@index')->name('admin.telegram-proxy.index');
     Route::post('/admin/telegram-proxy/proxies', 'TelegramProxyAdminController@storeProxy')->name('admin.telegram-proxy.proxies.store');
     Route::put('/admin/telegram-proxy/proxies/{id}', 'TelegramProxyAdminController@updateProxy')->name('admin.telegram-proxy.proxies.update');

@@ -30,11 +30,89 @@
 }
 
 .cabinet-notifications-admin-page .cabinet-notify-col-actions {
-    min-width: 9.5rem;
+    min-width: 11rem;
+}
+
+.cabinet-notifications-admin-page .cabinet-notify-lang-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.2rem;
+}
+
+.cabinet-notifications-admin-page .cabinet-notify-lang-channel {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    color: var(--bs-secondary-color);
+    flex-shrink: 0;
+}
+
+.cabinet-notifications-admin-page .cabinet-notify-btn-lang {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    padding: 0.15rem 0.35rem;
+}
+
+.cabinet-notifications-admin-page .cabinet-notify-btn-lang .img-flag {
+    width: 1rem;
+    height: auto;
+    vertical-align: middle;
+}
+
+.cabinet-notifications-admin-page .cabinet-notify-email-lang-group {
+    vertical-align: middle;
+}
+
+.cabinet-notifications-admin-page .cabinet-notify-stats .info-box-icon .img-flag {
+    width: 1.75rem;
+    height: auto;
 }
 
 .cabinet-notifications-admin-page .cabinet-notify-col-actions .btn {
     padding: 0.2rem 0.45rem;
+}
+
+.cabinet-notifications-admin-page .cabinet-notify-col-dispatch {
+    min-width: 9.5rem;
+}
+
+.cabinet-notifications-admin-page .cabinet-notify-dispatch-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.cabinet-notifications-admin-page .cabinet-notify-dispatch-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    line-height: 1.2;
+}
+
+.cabinet-notifications-admin-page .cabinet-notify-dispatch-period {
+    color: var(--bs-secondary-color);
+    white-space: nowrap;
+}
+
+.cabinet-notifications-admin-page .cabinet-notify-dispatch-channels {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    white-space: nowrap;
+}
+
+.cabinet-notifications-admin-page .cabinet-notify-dispatch-channel {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    font-weight: 600;
 }
 
 .cabinet-notifications-admin-page .cabinet-notify-table-search {

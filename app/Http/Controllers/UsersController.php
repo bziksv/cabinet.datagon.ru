@@ -461,10 +461,14 @@ class UsersController extends Controller
 
     protected function userListHasActiveFilters(Request $request): bool
     {
-        foreach (['filter_role', 'filter_verify', 'filter_tariff', 'filter_online', 'filter_statistic', 'filter_telegram', 'filter_id_from', 'filter_id_to', 'filter_stale_monitoring', 'filter_name', 'filter_email', 'filter_created_from', 'filter_created_to'] as $key) {
+        foreach (['filter_role', 'filter_verify', 'filter_online', 'filter_statistic', 'filter_telegram', 'filter_id_from', 'filter_id_to', 'filter_stale_monitoring', 'filter_name', 'filter_email', 'filter_created_from', 'filter_created_to'] as $key) {
             if (trim((string) $request->input($key, '')) !== '') {
                 return true;
             }
+        }
+
+        if (count($this->parseActiveTariffFilters($request)) > 0) {
+            return true;
         }
 
         $searchRaw = $request->input('filter_q');
@@ -534,46 +538,16 @@ class UsersController extends Controller
             $query->whereNull('email_verified_at');
         }
 
-        $tariff = trim((string) $request->input('filter_tariff', ''));
-        $paidCodes = array_map(static function (Tariff $t) {
-            return $t->code();
-        }, $this->tariff->getTariffs());
-
-        if ($tariff === 'none') {
-            if (count($paidCodes) > 0) {
-                $query->whereDoesntHave('roles', static function ($q) use ($paidCodes) {
-                    $q->whereIn('name', $paidCodes);
-                });
-            }
-        } elseif ($tariff === 'Free') {
-            $query->whereHas('roles', static function ($q) {
-                $q->where('name', 'Free');
-            });
-            if (count($paidCodes) > 0) {
-                $query->whereDoesntHave('roles', static function ($q) use ($paidCodes) {
-                    $q->whereIn('name', $paidCodes);
-                });
-            }
-        } elseif ($tariff === 'no_role') {
-            $tariffRoles = array_merge($paidCodes, ['Free']);
-            if (count($tariffRoles) > 0) {
-                $query->whereDoesntHave('roles', static function ($q) use ($tariffRoles) {
-                    $q->whereIn('name', $tariffRoles);
-                });
-            }
-        } elseif ($tariff !== '') {
-            $tariffInstance = $this->tariff->getTariffByCode($tariff);
-            if ($tariffInstance) {
-                $code = $tariffInstance->code();
-                $class = get_class($tariffInstance);
-                $query->where(static function ($q) use ($code, $class) {
-                    $q->whereHas('roles', static function ($rq) use ($code) {
-                        $rq->where('name', $code);
-                    })->orWhereHas('pay', static function ($pq) use ($class) {
-                        $pq->where('status', true)->where('class_tariff', $class);
+        $tariffFilters = $this->parseActiveTariffFilters($request);
+        if (count($tariffFilters) > 0) {
+            $paidCodes = $this->paidTariffRoleCodes();
+            $query->where(function ($outer) use ($tariffFilters, $paidCodes) {
+                foreach ($tariffFilters as $tariff) {
+                    $outer->orWhere(function ($q) use ($tariff, $paidCodes) {
+                        $this->applySingleActiveTariffFilter($q, $tariff, $paidCodes);
                     });
-                });
-            }
+                }
+            });
         }
 
         $online = trim((string) $request->input('filter_online', ''));
@@ -662,6 +636,95 @@ class UsersController extends Controller
                 // ignore invalid date
             }
         }
+    }
+
+    /**
+     * @return string[]
+     */
+    protected function parseActiveTariffFilters(Request $request): array
+    {
+        $raw = $request->input('filter_active_tariffs', []);
+        if (!is_array($raw)) {
+            $raw = array_filter(explode(',', (string) $raw));
+        }
+
+        $allowed = array_merge(
+            $this->paidTariffRoleCodes(),
+            ['Free', '__none__', '__no_role__']
+        );
+
+        return array_values(array_unique(array_filter(array_map(static function ($value) use ($allowed) {
+            $value = trim((string) $value);
+
+            return in_array($value, $allowed, true) ? $value : null;
+        }, $raw))));
+    }
+
+    /**
+     * @return string[]
+     */
+    protected function paidTariffRoleCodes(): array
+    {
+        return array_map(static function (Tariff $t) {
+            return $t->code();
+        }, $this->tariff->getTariffs());
+    }
+
+    /**
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     */
+    protected function applySingleActiveTariffFilter($query, string $tariff, array $paidCodes): void
+    {
+        if ($tariff === '__none__') {
+            if (count($paidCodes) > 0) {
+                $query->whereDoesntHave('roles', static function ($q) use ($paidCodes) {
+                    $q->whereIn('name', $paidCodes);
+                });
+            }
+
+            return;
+        }
+
+        if ($tariff === 'Free') {
+            $query->whereHas('roles', static function ($q) {
+                $q->where('name', 'Free');
+            });
+            if (count($paidCodes) > 0) {
+                $query->whereDoesntHave('roles', static function ($q) use ($paidCodes) {
+                    $q->whereIn('name', $paidCodes);
+                });
+            }
+
+            return;
+        }
+
+        if ($tariff === '__no_role__') {
+            $tariffRoles = array_merge($paidCodes, ['Free']);
+            if (count($tariffRoles) > 0) {
+                $query->whereDoesntHave('roles', static function ($q) use ($tariffRoles) {
+                    $q->whereIn('name', $tariffRoles);
+                });
+            }
+
+            return;
+        }
+
+        $tariffInstance = $this->tariff->getTariffByCode($tariff);
+        if (!$tariffInstance) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $code = $tariffInstance->code();
+        $class = get_class($tariffInstance);
+        $query->where(static function ($q) use ($code, $class) {
+            $q->whereHas('roles', static function ($rq) use ($code) {
+                $rq->where('name', $code);
+            })->orWhereHas('pay', static function ($pq) use ($class) {
+                $pq->where('status', true)->where('class_tariff', $class);
+            });
+        });
     }
 
     public function refreshStorageFootprint(Request $request): JsonResponse

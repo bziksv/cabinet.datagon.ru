@@ -53,12 +53,17 @@
     page.querySelectorAll('.cabinet-notify-btn-test-tg').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var eventId = btn.getAttribute('data-event-id');
-            postJson(testTelegramUrl, { event_id: eventId }, btn).then(function (result) {
+            var lang = btn.getAttribute('data-lang') || '';
+            postJson(testTelegramUrl, { event_id: eventId, lang: lang }, btn).then(function (result) {
                 if (result.ok && result.data.ok) {
                     notify('success', result.data.message || 'OK');
                 } else {
                     notify('error', (result.data && result.data.message) || 'Error');
                 }
+            }).catch(function () {
+                notify('error', document.documentElement.lang === 'ru'
+                    ? 'Ошибка сети при отправке в Telegram'
+                    : 'Network error while sending to Telegram');
             });
         });
     });
@@ -71,7 +76,8 @@
                 return;
             }
             var eventId = btn.getAttribute('data-event-id');
-            postJson(testEmailUrl, { event_id: eventId }, btn).then(function (result) {
+            var lang = btn.getAttribute('data-lang') || '';
+            postJson(testEmailUrl, { event_id: eventId, lang: lang }, btn).then(function (result) {
                 if (result.ok && result.data.ok) {
                     notify('success', result.data.message || 'OK');
                 } else {
@@ -84,6 +90,7 @@
     page.querySelectorAll('.cabinet-notify-btn-preview-modal').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var eventId = btn.getAttribute('data-event-id');
+            var lang = btn.getAttribute('data-lang') || '';
             var modalEl = document.getElementById('cabinetNotifyPreviewModal');
             var titleEl = document.getElementById('cabinetNotifyPreviewModalTitle');
             var bodyEl = document.getElementById('cabinetNotifyPreviewModalBody');
@@ -92,7 +99,7 @@
             }
 
             btn.disabled = true;
-            fetch(previewModalBase + '/' + encodeURIComponent(eventId), {
+            fetch(previewModalBase + '/' + encodeURIComponent(eventId) + '?lang=' + encodeURIComponent(lang), {
                 headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin'
             }).then(function (response) {

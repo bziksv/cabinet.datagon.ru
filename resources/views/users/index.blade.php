@@ -5,6 +5,8 @@
 @section('css')
     @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-min'])
     <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.css') }}">
+    <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.css') }}">
     <link rel="stylesheet" href="{{ asset('css/cabinet-users.css') }}">
 @endsection
 
@@ -227,7 +229,7 @@
                 d.filter_q = $('#cabinet-users-q').val().trim();
                 d.filter_verify = $('#filter-verify').val() || '';
                 d.filter_role = $('#filter-role').val() || '';
-                d.filter_tariff = $('#filter-tariff').val() || '';
+                d.filter_active_tariffs = $('#filter-active-tariffs').val() || [];
                 d.filter_online = $('#filter-online').val() || '';
                 d.filter_statistic = $('#filter-statistic').val() || '';
                 d.filter_telegram = $('#filter-telegram').val() || '';
@@ -254,7 +256,12 @@
             function cabinetUsersUpdateFilterBadge() {
                 var n = 0;
                 $('[data-filter]').each(function () {
-                    if (($(this).val() || '').toString().trim() !== '') {
+                    var $el = $(this);
+                    if ($el.data('filter') === 'multi') {
+                        if (($el.val() || []).length > 0) {
+                            n++;
+                        }
+                    } else if (($el.val() || '').toString().trim() !== '') {
                         n++;
                     }
                 });
@@ -483,7 +490,8 @@
             });
 
             $('#cabinet-users-filters-reset').on('click', function () {
-                $('[data-filter]').val('');
+                $('[data-filter]').not('[data-filter="multi"]').val('');
+                $('#filter-active-tariffs').val(null).trigger('change');
                 $('#cabinet-users-q').val('');
                 usersTable.ajax.reload();
                 cabinetUsersUpdateFilterBadge();
@@ -491,6 +499,16 @@
             });
 
             $('[data-filter]').on('change', cabinetUsersUpdateFilterBadge);
+
+            if ($('#filter-active-tariffs').length && $.fn.select2) {
+                $('#filter-active-tariffs').select2({
+                    width: '100%',
+                    theme: 'bootstrap4',
+                    placeholder: $('#filter-active-tariffs').data('placeholder') || '',
+                    allowClear: true,
+                    closeOnSelect: false,
+                });
+            }
 
             $('#cabinet-users-q').on('input', function () {
                 cabinetUsersToggleSearchClear();

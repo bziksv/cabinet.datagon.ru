@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Support\NotificationLocale;
 use App\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -39,6 +40,8 @@ class VerifyEmail extends Mailable
      */
     public function build()
     {
-        return $this->view('emails.files.verify_email')->subject($this->user->lang === 'ru' ? 'Верификация почты' : 'Verify mail');
+        NotificationLocale::apply($this->user);
+
+        return $this->view('emails.files.verify_email')->subject(__('Mail verify subject'));
     }
 }

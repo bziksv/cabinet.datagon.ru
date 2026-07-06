@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Services\NotificationAdminTestService;
+use App\Support\NotificationDispatchLogger;
 use App\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +38,18 @@ class UserNotificationsRegistry
     {
         $channelLabels = self::channelLabelMap();
         $rows = [];
+        $eventIds = [];
+
+        foreach ((array) config('cabinet-users-notifications.events', []) as $group) {
+            foreach ((array) ($group['items'] ?? []) as $item) {
+                $eventId = (string) ($item['id'] ?? '');
+                if ($eventId !== '') {
+                    $eventIds[] = $eventId;
+                }
+            }
+        }
+
+        $dispatchStats = NotificationDispatchLogger::statsForEvents(array_values(array_unique($eventIds)));
 
         foreach ((array) config('cabinet-users-notifications.events', []) as $group) {
             $moduleTitle = __($group['title'] ?? '');
@@ -66,6 +79,11 @@ class UserNotificationsRegistry
                     'can_test_telegram' => $tester->supportsTelegram($eventId),
                     'can_test_email' => $tester->supportsEmail($eventId),
                     'telegram_ready' => $user ? $user->isTelegramConnected() : false,
+                    'dispatch_stats' => $dispatchStats[$eventId] ?? [
+                        'today' => ['telegram' => 0, 'email' => 0],
+                        'yesterday' => ['telegram' => 0, 'email' => 0],
+                        'month' => ['telegram' => 0, 'email' => 0],
+                    ],
                 ];
             }
         }

@@ -2,24 +2,30 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Concerns\LocalizesMailContent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class BrokenDomainNotification extends Notification
 {
+    use LocalizesMailContent;
     use Queueable;
 
     public $project;
+
+    /** @var string */
+    public $dispatchEventId = 'site-mon-broken';
 
     /**
      * Create a new notification instance.
      *
      * @param $project
      */
-    public function __construct($project)
+    public function __construct($project, string $dispatchEventId = 'site-mon-broken')
     {
         $this->project = $project;
+        $this->dispatchEventId = $dispatchEventId;
     }
 
     /**
@@ -41,28 +47,18 @@ class BrokenDomainNotification extends Notification
      */
     public function toMail($notifiable): MailMessage
     {
-        if ($notifiable->lang === 'ru') {
-            return (new MailMessage)
-                ->greeting('Здравствуйте!')
-                ->line('Это сообщение было сгенерированно автоматически, на него не нужно отвечать')
-                ->line('Сайт ' . $this->project->link . ' отправил не корректный ответ')
-                ->line('Статус код: ' . $this->project->code)
-                ->line('Состояние: не ожиданный код ответа')
-                ->line('Текущий аптайм: ' . $this->project->uptime_percent . '%')
-                ->action('Проверьте свои проекты', route('site.monitoring'))
-                ->subject('Уведомление о недоступности домена')
-                ->line('Спасибо, что пользуетесь нашим сервисом!');
-        } else {
-            return (new MailMessage)
-                ->line('This message is generated automatically and does not need to be answered.')
-                ->line('Site ' . $this->project->link . ' broken')
-                ->line('Status code: ' . $this->project->code)
-                ->line('State:' . $this->project->status)
-                ->line('Uptime: ' . $this->project->uptime_percent . '%')
-                ->action('Check your projects', route('site.monitoring'))
-                ->line('Thank you for using our application!');
-        }
+        $this->applyMailLocale($notifiable);
 
+        return (new MailMessage)
+            ->greeting(__('Mail notify greeting'))
+            ->subject(__('Mail notify site broken subject'))
+            ->line(__('Mail notify auto disclaimer'))
+            ->line(__('Mail notify site broken line', ['url' => $this->project->link]))
+            ->line(__('Mail notify site broken status', ['code' => $this->project->code]))
+            ->line(__('Mail notify site broken state unexpected'))
+            ->line(__('Mail notify site broken uptime', ['percent' => $this->project->uptime_percent]))
+            ->action(__('Mail notify check projects'), route('site.monitoring'))
+            ->line(__('Mail notify thanks service'));
     }
 
     /**

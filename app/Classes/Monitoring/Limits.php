@@ -57,7 +57,11 @@ abstract class Limits
         if($this->user['telegram_bot_active']){
             $text = "Здравствуйте! Лимит модуля Мониторинг позиций исчерпан.";
 
-            (new TelegramBotService($this->user['chat_id']))->sendMsg($text);
+            (new TelegramBotService($this->user['chat_id']))->sendMsg($text, null, [
+                'event_id' => 'monitoring-limit-exhausted',
+                'user_id' => (int) $this->user['id'],
+                'source' => 'system',
+            ]);
         }
     }
 }

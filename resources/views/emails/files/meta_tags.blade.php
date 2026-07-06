@@ -5,5 +5,5 @@
 @endcomponent
 
 Thanks,<br>
-{{ config('app.name') }}
+{{ __('Mail brand name') }}
 @endcomponent

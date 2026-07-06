@@ -30,15 +30,19 @@
                     </select>
                 </div>
                 <div class="col-12 col-md-6 col-lg-4">
-                    <label class="form-label small mb-1" for="filter-tariff">{{ __('Tariff') }}</label>
-                    <select class="form-select form-select-sm" id="filter-tariff" data-filter>
-                        <option value="">{{ __('Any tariff') }}</option>
-                        <option value="none">{{ __('No active tariff') }}</option>
+                    <label class="form-label small mb-1" for="filter-active-tariffs">{{ __('Active tariff') }}</label>
+                    <select class="form-select form-select-sm cabinet-users-filter-tariffs"
+                            id="filter-active-tariffs"
+                            name="filter_active_tariffs[]"
+                            multiple
+                            data-filter="multi"
+                            data-placeholder="{{ __('Users active tariff filter placeholder') }}">
                         @foreach($tariffSelect['tariff'] as $code => $name)
                             <option value="{{ $code }}">{{ $name }}</option>
                         @endforeach
                         <option value="Free">{{ __('Free') }}</option>
-                        <option value="no_role">{{ __('Users tariff filter no role') }}</option>
+                        <option value="__none__">{{ __('No active tariff') }}</option>
+                        <option value="__no_role__">{{ __('Users tariff filter no role') }}</option>
                     </select>
                 </div>
                 <div class="col-12 col-md-6 col-lg-4">

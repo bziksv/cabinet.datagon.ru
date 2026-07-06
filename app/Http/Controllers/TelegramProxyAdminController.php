@@ -187,7 +187,7 @@ class TelegramProxyAdminController extends Controller
 
         try {
             $sent = (new TelegramBotService((int) $user->chat_id))->sendMsg(
-                __('Проверка получения уведомлений пройдена!')
+                __('Profile telegram test notify passed')
             );
         } catch (\Throwable $e) {
             TelegramProxyDebugLog::logSendResult(false, $e->getMessage(), TelegramBotService::$lastSendDiagnostics);

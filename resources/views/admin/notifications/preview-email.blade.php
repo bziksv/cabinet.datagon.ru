@@ -14,6 +14,7 @@
     <div class="preview-toolbar">
         <strong>{{ __('Users notify email preview title') }}</strong>
         · <code>{{ $eventId }}</code>
+        · <span class="text-uppercase">{{ $locale ?? app()->getLocale() }}</span>
         · {{ __('Users notify email preview hint') }}
     </div>
     <div class="preview-frame">

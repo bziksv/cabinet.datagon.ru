@@ -2,13 +2,14 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Concerns\LocalizesMailContent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 
 class RegisterPasswordEmail extends Notification
 {
+    use LocalizesMailContent;
     use Queueable;
 
     private $request;
@@ -45,25 +46,17 @@ class RegisterPasswordEmail extends Notification
      */
     public function toMail($notifiable)
     {
+        $this->applyMailLocale($notifiable);
+
         $password = $this->request->input('password', null);
 
-        if ($this->user->lang == 'ru') {
-            return (new MailMessage)
-                ->greeting('Здравствуйте!')
-                ->subject(__('Сброс пароля'))
-                ->line('Уведомление о сбросе пароля.')
-                ->line('Ваш новый пароль: ' . $password)
-                ->action('Ваш профиль', url('/profile'))
-                ->line('Благодарим вас за использование нашего приложения!');
-        } else {
-            return (new MailMessage)
-                ->subject(__('Reset password'))
-                ->line('Send the password reset notification.')
-                ->line('Your new password: ' . $password)
-                ->action('Your profile', url('/profile'))
-                ->line('Thank you for using our application!');
-        }
-
+        return (new MailMessage)
+            ->greeting(__('Mail notify greeting'))
+            ->subject(__('Mail notify password subject'))
+            ->line(__('Mail notify password line'))
+            ->line(__('Mail notify password new', ['password' => $password]))
+            ->action(__('Mail notify profile action'), url('/profile'))
+            ->line(__('Mail notify thanks app'));
     }
 
     /**

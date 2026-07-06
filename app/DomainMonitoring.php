@@ -145,7 +145,7 @@ class DomainMonitoring extends Model
                 $user->brokenDomainNotification($project);
             }
             if ($telegramOn) {
-                TelegramBot::brokenDomainNotification($project, $user->chat_id);
+                TelegramBot::brokenDomainNotification($project, $user->chat_id, 'site-mon-broken');
             }
             $project->time_last_notification = Carbon::now();
         }
@@ -159,10 +159,10 @@ class DomainMonitoring extends Model
             || $lastNotification->diffInMinutes(Carbon::now()) >= $repeatMinutes
         )) {
             if ($emailOn) {
-                $user->brokenDomainNotification($project);
+                $user->brokenDomainNotification($project, 'site-mon-repeat');
             }
             if ($telegramOn) {
-                TelegramBot::brokenDomainNotification($project, $user->chat_id);
+                TelegramBot::brokenDomainNotification($project, $user->chat_id, 'site-mon-repeat');
             }
             $project->time_last_notification = Carbon::now();
         }

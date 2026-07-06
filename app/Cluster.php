@@ -870,7 +870,11 @@ class Cluster
 <a href='https://lk.redbox.su/download-cluster-result/" . $this->newCluster->id . "/csv'>Скачать CSV</a>
 <a href='https://lk.redbox.su/download-cluster-result/" . $this->newCluster->id . "/xls'>Скачать XLS</a>";
 
-        (new TelegramBotService($this->user->chat_id))->sendMsg($message);
+        (new TelegramBotService($this->user->chat_id))->sendMsg($message, null, [
+            'event_id' => 'cluster-done',
+            'user_id' => (int) $this->user->id,
+            'source' => 'system',
+        ]);
     }
 
     public static function recalculateClusterInfo(ClusterResults $cluster, array $clusters)

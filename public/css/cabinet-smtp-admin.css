@@ -1,0 +1,11 @@
+.cabinet-smtp-admin-page .info-box {
+    min-height: 5rem;
+}
+
+.cabinet-smtp-admin-page .form-text {
+    max-width: 36rem;
+}
+
+.cabinet-smtp-admin-page code {
+    font-size: 0.875em;
+}

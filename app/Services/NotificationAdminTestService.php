@@ -10,6 +10,7 @@ use App\Notifications\RepairDomainNotification;
 use App\Notifications\sendNotificationAboutChangeDNS;
 use App\Notifications\sendNotificationAboutExpirationRegistrationPeriod;
 use App\ProjectTracking;
+use App\Support\NotificationLocale;
 use App\TelegramBot;
 use App\User;
 use Carbon\Carbon;
@@ -74,7 +75,7 @@ class NotificationAdminTestService
     /**
      * @return array{ok: bool, message: string}
      */
-    public function sendTelegram(string $eventId, User $user): array
+    public function sendTelegram(string $eventId, User $user, ?string $locale = null): array
     {
         if (!$this->supportsTelegram($eventId)) {
             return ['ok' => false, 'message' => __('Users notify test unsupported')];
@@ -88,13 +89,20 @@ class NotificationAdminTestService
             return ['ok' => false, 'message' => __('Telegram proxy admin no token')];
         }
 
-        App::setLocale($user->lang ?: 'ru');
+        $this->applyLocale($user, $locale);
+        $activeLocale = app()->getLocale();
 
         try {
             switch ($eventId) {
                 case 'profile-telegram-test':
                     $sent = (new TelegramBotService((int) $user->chat_id))->sendMsg(
-                        $this->testPrefix() . __('Проверка получения уведомлений пройдена!')
+                        $this->testPrefix($activeLocale) . __('Profile telegram test notify passed'),
+                        null,
+                        [
+                            'event_id' => 'profile-telegram-test',
+                            'user_id' => (int) $user->id,
+                            'source' => 'admin_test',
+                        ]
                     );
                     break;
 
@@ -104,30 +112,50 @@ class NotificationAdminTestService
                     break;
 
                 case 'site-mon-broken':
+                    TelegramBot::brokenDomainNotification(
+                        $this->mockSiteMonitoringProject($user),
+                        $user->chat_id,
+                        'site-mon-broken',
+                        'admin_test'
+                    );
+                    $sent = true;
+                    break;
+
                 case 'site-mon-repeat':
-                    TelegramBot::brokenDomainNotification($this->mockSiteMonitoringProject(), $user->chat_id);
+                    TelegramBot::brokenDomainNotification(
+                        $this->mockSiteMonitoringProject($user),
+                        $user->chat_id,
+                        'site-mon-repeat',
+                        'admin_test'
+                    );
                     $sent = true;
                     break;
 
                 case 'site-mon-repaired':
-                    TelegramBot::repairedDomainNotification($this->mockSiteMonitoringProject(), $user->chat_id);
+                    TelegramBot::repairedDomainNotification(
+                        $this->mockSiteMonitoringProject($user),
+                        $user->chat_id,
+                        'admin_test'
+                    );
                     $sent = true;
                     break;
 
                 case 'domain-dns-changed':
                     TelegramBot::sendNotificationAboutChangeDNS(
-                        $this->mockDomainInformationProject(),
+                        $this->mockDomainInformationProject($user),
                         $user->chat_id,
-                        'ns1.old-demo.ru, ns2.old-demo.ru'
+                        'ns1.old-demo.ru, ns2.old-demo.ru',
+                        'admin_test'
                     );
                     $sent = true;
                     break;
 
                 case 'domain-expiration':
                     TelegramBot::sendNotificationAboutExpirationRegistrationPeriod(
-                        $this->mockDomainInformationProject(),
+                        $this->mockDomainInformationProject($user),
                         $user->chat_id,
-                        14
+                        14,
+                        'admin_test'
                     );
                     $sent = true;
                     break;
@@ -135,20 +163,38 @@ class NotificationAdminTestService
                 case 'meta-tags-changed':
                     $model = (object) ['name' => 'demo-test.example.ru'];
                     $linkCompare = url('/meta-tags');
-                    $text = $this->testPrefix() . view('meta-tags.telegram', [
+                    $text = $this->testPrefix($activeLocale) . view('meta-tags.telegram', [
                         'model' => $model,
                         'link_compare' => $linkCompare,
                     ])->render();
-                    $sent = (new TelegramBotService((int) $user->chat_id))->sendMsg($text);
+                    $sent = (new TelegramBotService((int) $user->chat_id))->sendMsg($text, null, [
+                        'event_id' => 'meta-tags-changed',
+                        'user_id' => (int) $user->id,
+                        'source' => 'admin_test',
+                    ]);
                     break;
 
                 case 'cluster-done':
-                    $sent = (new TelegramBotService((int) $user->chat_id))->sendMsg($this->clusterDoneMessage());
+                    $sent = (new TelegramBotService((int) $user->chat_id))->sendMsg(
+                        $this->clusterDoneMessage($activeLocale),
+                        null,
+                        [
+                            'event_id' => 'cluster-done',
+                            'user_id' => (int) $user->id,
+                            'source' => 'admin_test',
+                        ]
+                    );
                     break;
 
                 case 'monitoring-limit-exhausted':
                     $sent = (new TelegramBotService((int) $user->chat_id))->sendMsg(
-                        $this->testPrefix() . 'Здравствуйте! Лимит модуля Мониторинг позиций исчерпан.'
+                        $this->testPrefix($activeLocale) . __('Monitoring limit exhausted telegram notify'),
+                        null,
+                        [
+                            'event_id' => 'monitoring-limit-exhausted',
+                            'user_id' => (int) $user->id,
+                            'source' => 'admin_test',
+                        ]
                     );
                     break;
 
@@ -163,13 +209,18 @@ class NotificationAdminTestService
             return ['ok' => false, 'message' => TelegramBotService::$lastError ?: __('Unknown error')];
         }
 
-        return ['ok' => true, 'message' => __('Users notify test tg sent')];
+        return [
+            'ok' => true,
+            'message' => __('Users notify test tg sent', [
+                'lang' => strtoupper($activeLocale),
+            ]),
+        ];
     }
 
     /**
      * @return array{ok: bool, message: string}
      */
-    public function sendEmail(string $eventId, User $user): array
+    public function sendEmail(string $eventId, User $user, ?string $locale = null): array
     {
         if (!$this->supportsEmail($eventId)) {
             return ['ok' => false, 'message' => __('Users notify test unsupported')];
@@ -179,7 +230,7 @@ class NotificationAdminTestService
             return ['ok' => false, 'message' => __('Users notify test no email')];
         }
 
-        App::setLocale($user->lang ?: 'ru');
+        $this->applyLocale($user, $locale);
 
         try {
             switch ($eventId) {
@@ -196,21 +247,24 @@ class NotificationAdminTestService
                     break;
 
                 case 'site-mon-broken':
+                    $user->notify(new BrokenDomainNotification($this->mockSiteMonitoringProject($user)));
+                    break;
+
                 case 'site-mon-repeat':
-                    $user->notify(new BrokenDomainNotification($this->mockSiteMonitoringProject()));
+                    $user->notify(new BrokenDomainNotification($this->mockSiteMonitoringProject($user), 'site-mon-repeat'));
                     break;
 
                 case 'site-mon-repaired':
-                    $user->notify(new RepairDomainNotification($this->mockSiteMonitoringProject()));
+                    $user->notify(new RepairDomainNotification($this->mockSiteMonitoringProject($user)));
                     break;
 
                 case 'domain-dns-changed':
-                    $user->notify(new sendNotificationAboutChangeDNS($this->mockDomainInformationProject()));
+                    $user->notify(new sendNotificationAboutChangeDNS($this->mockDomainInformationProject($user)));
                     break;
 
                 case 'domain-expiration':
                     $user->notify(new sendNotificationAboutExpirationRegistrationPeriod(
-                        $this->mockDomainInformationProject(),
+                        $this->mockDomainInformationProject($user),
                         14
                     ));
                     break;
@@ -232,17 +286,20 @@ class NotificationAdminTestService
 
         return [
             'ok' => true,
-            'message' => __('Users notify test email sent', ['email' => $user->email]),
+            'message' => __('Users notify test email sent', [
+                'email' => $user->email,
+                'lang' => strtoupper(app()->getLocale()),
+            ]),
         ];
     }
 
-    public function renderEmailPreview(string $eventId, User $user): string
+    public function renderEmailPreview(string $eventId, User $user, ?string $locale = null): string
     {
         if (!$this->supportsEmail($eventId)) {
             abort(404);
         }
 
-        App::setLocale($user->lang ?: 'ru');
+        $this->applyLocale($user, $locale);
 
         switch ($eventId) {
             case 'profile-password-reset':
@@ -256,20 +313,20 @@ class NotificationAdminTestService
 
             case 'site-mon-broken':
             case 'site-mon-repeat':
-                $mail = (new BrokenDomainNotification($this->mockSiteMonitoringProject()))->toMail($user);
+                $mail = (new BrokenDomainNotification($this->mockSiteMonitoringProject($user)))->toMail($user);
                 break;
 
             case 'site-mon-repaired':
-                $mail = (new RepairDomainNotification($this->mockSiteMonitoringProject()))->toMail($user);
+                $mail = (new RepairDomainNotification($this->mockSiteMonitoringProject($user)))->toMail($user);
                 break;
 
             case 'domain-dns-changed':
-                $mail = (new sendNotificationAboutChangeDNS($this->mockDomainInformationProject()))->toMail($user);
+                $mail = (new sendNotificationAboutChangeDNS($this->mockDomainInformationProject($user)))->toMail($user);
                 break;
 
             case 'domain-expiration':
                 $mail = (new sendNotificationAboutExpirationRegistrationPeriod(
-                    $this->mockDomainInformationProject(),
+                    $this->mockDomainInformationProject($user),
                     14
                 ))->toMail($user);
                 break;
@@ -292,11 +349,13 @@ class NotificationAdminTestService
     /**
      * @return array{title: string, html: string}
      */
-    public function renderModalPreview(string $eventId, User $user): array
+    public function renderModalPreview(string $eventId, User $user, ?string $locale = null): array
     {
         if (!$this->supportsModalPreview($eventId)) {
             abort(404);
         }
+
+        $this->applyLocale($user, $locale);
 
         switch ($eventId) {
             case 'modal-telegram-connect':
@@ -325,6 +384,17 @@ class NotificationAdminTestService
         }
     }
 
+    private function applyLocale(User $user, ?string $locale): void
+    {
+        $lang = $locale ?: ($user->lang ?: 'ru');
+        if (!in_array($lang, ['ru', 'en'], true)) {
+            $lang = 'ru';
+        }
+
+        NotificationLocale::override($locale !== null ? $lang : null);
+        App::setLocale($lang);
+    }
+
     private function findEventConfig(string $eventId): ?array
     {
         foreach ((array) config('cabinet-users-notifications.events', []) as $group) {
@@ -338,14 +408,20 @@ class NotificationAdminTestService
         return null;
     }
 
-    private function testPrefix(): string
+    private function testPrefix(?string $locale = null): string
     {
-        return '<b>[TEST]</b> ';
+        $tag = strtoupper((string) ($locale ?: app()->getLocale() ?: 'ru'));
+        if (!in_array($tag, ['RU', 'EN'], true)) {
+            $tag = 'RU';
+        }
+
+        return '<b>[TEST ' . $tag . ']</b> ';
     }
 
-    private function mockSiteMonitoringProject(): object
+    private function mockSiteMonitoringProject(User $user): object
     {
         return (object) [
+            'user_id' => (int) $user->id,
             'project_name' => 'demo-test.example.ru',
             'link' => 'https://demo-test.example.ru/',
             'last_check' => Carbon::now()->format('Y-m-d H:i:s'),
@@ -356,9 +432,10 @@ class NotificationAdminTestService
         ];
     }
 
-    private function mockDomainInformationProject(): object
+    private function mockDomainInformationProject(User $user): object
     {
         return (object) [
+            'user_id' => (int) $user->id,
             'domain' => 'demo-test.example.ru',
             'dns' => 'ns1.demo.ru, ns2.demo.ru',
             'domain_information' => __('Registration date') . ' 2020-01-15' . "\n"
@@ -390,19 +467,12 @@ class NotificationAdminTestService
         return $project;
     }
 
-    private function clusterDoneMessage(): string
+    private function clusterDoneMessage(?string $locale = null): string
     {
         $cabinetUrl = url(route('cluster', [], false));
 
-        return $this->testPrefix() . "Модуль: <a href='{$cabinetUrl}'>Кластеризатор</a>\n"
-            . "Выполнена задача № 99999 (TEST)\n"
-            . "Домен: demo-test.example.ru\n"
-            . "Комментарий: admin test\n"
-            . "Количество фраз: 120\n"
-            . "Количество групп: 8\n"
-            . "Топ: 10\n"
-            . "Режим: soft\n"
-            . "Регион: Москва\n"
-            . "<a href='{$cabinetUrl}'>Просмотр результатов</a>";
+        return $this->testPrefix($locale) . __('Users notify cluster done telegram body', [
+            'url' => $cabinetUrl,
+        ]);
     }
 }

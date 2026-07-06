@@ -1,0 +1,18 @@
+.cabinet-supervisor-admin-page .cabinet-supervisor-admin-table td,
+.cabinet-supervisor-admin-page .cabinet-supervisor-admin-table th {
+    vertical-align: middle;
+}
+
+.cabinet-supervisor-admin-log {
+    max-height: 28rem;
+    overflow: auto;
+    padding: 1rem;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    background: #1e1e1e;
+    color: #e8e8e8;
+}
+
+.cabinet-supervisor-admin-page form.d-inline + form.d-inline {
+    margin-left: 0.15rem;
+}

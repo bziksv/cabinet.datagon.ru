@@ -1,0 +1,62 @@
+; Supervisor для cabinet.titlo.ru — отдельный файл, не трогаем конфиги FastPanel/nginx.
+; Установка (один раз, от root на VPS):
+;   apt install supervisor
+;   cp deploy/supervisor/cabinet-titlo.conf.example /etc/supervisor/conf.d/cabinet-titlo.conf
+;   mkdir -p /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs
+;   chown cabinet_titl_usr:cabinet_titl_usr .../storage/logs
+;   supervisorctl reread && supervisorctl update
+;
+; В .env кабинета:
+;   SUPERVISOR_ADMIN_ENABLED=true
+;   SUPERVISORCTL_BIN=/usr/bin/supervisorctl
+;   ; если PHP-FPM не может вызывать supervisorctl — см. sudoers в комментарии ниже
+;
+; Web-интерфейс :9001 как на lk.redbox.su НЕ открываем наружу.
+; Управление — /admin/supervisor в кабинете (роль admin).
+
+[program:cabinet-titlo-queue-default]
+process_name=%(program_name)s_%(process_num)02d
+command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=default,cluster_high,high,medium --sleep=1 --tries=2 --timeout=600
+directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
+user=cabinet_titl_usr
+numprocs=2
+autostart=true
+autorestart=true
+stopwaitsecs=660
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-queue-default.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-queue-default.log
+stdout_logfile_maxbytes=20MB
+stderr_logfile_maxbytes=20MB
+
+[program:cabinet-titlo-queue-cluster]
+process_name=%(program_name)s_%(process_num)02d
+command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=main_cluster,child_cluster,cluster_wait --sleep=1 --tries=2 --timeout=600
+directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
+user=cabinet_titl_usr
+numprocs=4
+autostart=true
+autorestart=true
+stopwaitsecs=660
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-queue-cluster.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-queue-cluster.log
+stdout_logfile_maxbytes=20MB
+stderr_logfile_maxbytes=20MB
+
+[program:cabinet-titlo-queue-monitoring]
+process_name=%(program_name)s_%(process_num)02d
+command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=monitoring_helper,monitoring_change_dates,position_high,position_low --sleep=1 --tries=2 --timeout=600
+directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
+user=cabinet_titl_usr
+numprocs=2
+autostart=true
+autorestart=true
+stopwaitsecs=660
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-queue-monitoring.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-queue-monitoring.log
+stdout_logfile_maxbytes=20MB
+stderr_logfile_maxbytes=20MB
+
+; Опционально — sudoers для кнопок start/stop из /admin/supervisor (PHP-FPM = cabinet_titl_usr):
+; /etc/sudoers.d/cabinet-titlo-supervisor:
+; cabinet_titl_usr ALL=(root) NOPASSWD: /usr/bin/supervisorctl start cabinet-titlo-*, /usr/bin/supervisorctl stop cabinet-titlo-*, /usr/bin/supervisorctl restart cabinet-titlo-*, /usr/bin/supervisorctl status *
+; Тогда в .env: SUPERVISORCTL_BIN="sudo /usr/bin/supervisorctl"

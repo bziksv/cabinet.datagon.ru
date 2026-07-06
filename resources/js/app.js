@@ -67,7 +67,7 @@ window.loading = function () {
 
     let msg = $('<p />').css({
         "font-size": '18px',
-        "margin": '0 0 1.5rem',
+        "margin": '0 auto 1.5rem',
         color: '#FFF',
         "text-align": 'center',
         "max-width": '22rem',
@@ -78,7 +78,10 @@ window.loading = function () {
 
     let spinner = $('<div />', {
         class: 'sk-spinner sk-' + sc
-    }).css('margin', '0 auto').append($('<div />').addClass(`sk-${sc}-cube`)[0].outerHTML.repeat(4));
+    }).css({
+        margin: '0 auto',
+        '--sk-color': '#fff',
+    }).append($('<div />').addClass(`sk-${sc}-cube`)[0].outerHTML.repeat(4));
 
     let loadingParams = {
         logo: "/img/logo.svg",

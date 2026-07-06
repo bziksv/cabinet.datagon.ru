@@ -176,6 +176,7 @@
         <script src="{{ asset('js/cabinet-monitoring-chart-scales.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-chart-scales.js')) ?: time() }}"></script>
         @include('monitoring.partials.smart-search-script')
         <script src="{{ asset('js/cabinet-monitoring-v2-chart-settings.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-v2-chart-settings.js')) ?: time() }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-child-charts.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-child-charts.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-monitoring-v2-dashboard.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-v2-dashboard.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-monitoring-v2-list.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-v2-list.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-monitoring-v2-public-share.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-v2-public-share.js')) ?: time() }}"></script>

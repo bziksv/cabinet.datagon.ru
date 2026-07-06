@@ -91,6 +91,29 @@
             .projects .table-avatar img, .projects img.table-avatar.admin-monitoring {
                 border-color: #138496;
             }
+
+            .cabinet-mon-v2-child-chart-controls__row {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.75rem 1.25rem;
+                align-items: flex-end;
+                margin-bottom: 0.5rem;
+            }
+
+            .cabinet-mon-v2-child-chart-controls__field {
+                min-width: 10rem;
+            }
+
+            .cabinet-mon-v2-child-chart-wrap--loading .cabinet-mon-v2-child-chart-canvas-wrap {
+                opacity: 0.45;
+                pointer-events: none;
+            }
+
+            .cabinet-mon-v2-child-chart-canvas-wrap {
+                position: relative;
+                height: 300px;
+                width: 100%;
+            }
         </style>
 
     @endslot
@@ -129,6 +152,20 @@
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <!-- Tempusdominus Bootstrap 4 -->
         <script src="{{ asset('plugins/tempusdominus-bootstrap-4/js/tempusdominus-bootstrap-4.min.js') }}"></script>
+        <script src="{{ asset('plugins/chart.js/3.9.1/chart.js') }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-chart-scales.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-chart-scales.js')) ?: time() }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-v2-chart-settings.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-v2-chart-settings.js')) ?: time() }}"></script>
+        <script>
+            window.cabinetMonitoringChildChartsConfig = {
+                chartsUrl: @json(url('/monitoring/charts')),
+                i18n: {
+                    childChartShow: @json(__('Monitoring child chart show')),
+                    childChartHide: @json(__('Monitoring child chart hide')),
+                    loadError: @json(__('Monitoring show chart load error')),
+                },
+            };
+        </script>
+        <script src="{{ asset('js/cabinet-monitoring-child-charts.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-child-charts.js')) ?: time() }}"></script>
 
         <script>
             const PROJECTS_COUNT = '{{ $count }}';
@@ -327,6 +364,10 @@
                                     animation: false,
                                     trigger: 'hover',
                                 });
+
+                                if (window.cabinetMonitoringChildCharts) {
+                                    window.cabinetMonitoringChildCharts.wire(content, data.id);
+                                }
                             }).catch(function () {
                                 toastr.error(@json(__('Monitoring v2 regions load error')));
                             }).finally(function () {

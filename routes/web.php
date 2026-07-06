@@ -107,6 +107,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/admin/queues/cancel-monitoring-report', 'QueueAdminController@cancelMonitoringReport')->name('admin.queue.cancel-monitoring-report');
     Route::post('/admin/queues/purge-orphan-clusters', 'QueueAdminController@purgeOrphanClusters')->name('admin.queue.purge-orphan-clusters');
 
+    Route::get('/admin/supervisor', 'SupervisorAdminController@index')->name('admin.supervisor.index');
+    Route::post('/admin/supervisor/action', 'SupervisorAdminController@action')->name('admin.supervisor.action');
+
     Route::get('/admin/xml-providers', 'XmlProvidersAdminController@index')->name('admin.xml-providers.index');
     Route::post('/admin/xml-providers/refresh', 'XmlProvidersAdminController@refresh')->name('admin.xml-providers.refresh');
 

@@ -8,6 +8,12 @@
         max-height: 3rem;
         object-fit: contain;
     }
+
+    /* max-width без margin: auto уезжал влево под сайдбар */
+    .pg-loading-screen .loading-message {
+        margin-left: auto;
+        margin-right: auto;
+    }
 </style>
 <script>
 (function () {
@@ -27,7 +33,7 @@
         var instance = originalLoading.apply(this, arguments);
         var text = window.cabinetPleaseWaitMessage || 'Загрузка данных…';
         setTimeout(function () {
-            document.querySelectorAll('.loading-message').forEach(function (el) {
+            document.querySelectorAll('.pg-loading-screen .loading-message').forEach(function (el) {
                 el.textContent = text;
             });
         }, 0);

@@ -123,6 +123,15 @@ class CabinetAdminMenu
             ];
         }
 
+        if (\Illuminate\Support\Facades\Route::has('admin.supervisor.index')) {
+            $items[] = [
+                'id' => 0,
+                'title' => __('Supervisor management'),
+                'link' => route('admin.supervisor.index'),
+                'external' => false,
+            ];
+        }
+
         if (\Illuminate\Support\Facades\Route::has('admin.xml-providers.index')) {
             $items[] = [
                 'id' => 0,

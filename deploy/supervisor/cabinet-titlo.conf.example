@@ -1,62 +1,200 @@
-; Supervisor для cabinet.titlo.ru — отдельный файл, не трогаем конфиги FastPanel/nginx.
-; Установка (один раз, от root на VPS):
-;   apt install supervisor
+; Supervisor для cabinet.titlo.ru — паритет с lk.redbox.su (54 процесса).
+; Отдельный файл, не трогаем конфиги FastPanel/nginx.
+;
+; Установка / обновление (от root):
 ;   cp deploy/supervisor/cabinet-titlo.conf.example /etc/supervisor/conf.d/cabinet-titlo.conf
-;   mkdir -p /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs
-;   chown cabinet_titl_usr:cabinet_titl_usr .../storage/logs
 ;   supervisorctl reread && supervisorctl update
 ;
-; В .env кабинета:
-;   SUPERVISOR_ADMIN_ENABLED=true
-;   SUPERVISORCTL_BIN=/usr/bin/supervisorctl
-;   ; если PHP-FPM не может вызывать supervisorctl — см. sudoers в комментарии ниже
-;
-; Web-интерфейс :9001 как на lk.redbox.su НЕ открываем наружу.
-; Управление — /admin/supervisor в кабинете (роль admin).
+; Управление — /admin/supervisor (роль admin). Порт :9001 наружу не открываем.
 
-[program:cabinet-titlo-queue-default]
+; --- shared paths (заменить при другом деплое) ---
+; APP=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
+; PHP=/opt/php74/bin/php
+; USER=cabinet_titl_usr
+
+[program:cabinet-titlo-default]
 process_name=%(program_name)s_%(process_num)02d
 command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=default,cluster_high,high,medium --sleep=1 --tries=2 --timeout=600
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
+numprocs=6
+autostart=true
+autorestart=true
+stopwaitsecs=660
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-default.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-default.log
+stdout_logfile_maxbytes=20MB
+stderr_logfile_maxbytes=20MB
+
+[program:cabinet-titlo-cluster-child]
+process_name=%(program_name)s_%(process_num)02d
+command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=child_cluster --sleep=1 --tries=2 --timeout=600
+directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
+user=cabinet_titl_usr
+numprocs=6
+autostart=true
+autorestart=true
+stopwaitsecs=660
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-cluster-child.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-cluster-child.log
+stdout_logfile_maxbytes=20MB
+stderr_logfile_maxbytes=20MB
+
+[program:cabinet-titlo-cluster-main]
+process_name=%(program_name)s_%(process_num)02d
+command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=main_cluster --sleep=1 --tries=2 --timeout=600
+directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
+user=cabinet_titl_usr
+numprocs=3
+autostart=true
+autorestart=true
+stopwaitsecs=660
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-cluster-main.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-cluster-main.log
+stdout_logfile_maxbytes=20MB
+stderr_logfile_maxbytes=20MB
+
+[program:cabinet-titlo-cluster-wait]
+process_name=%(program_name)s_%(process_num)02d
+command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=cluster_wait --sleep=1 --tries=2 --timeout=600
+directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
+user=cabinet_titl_usr
+numprocs=6
+autostart=true
+autorestart=true
+stopwaitsecs=660
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-cluster-wait.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-cluster-wait.log
+stdout_logfile_maxbytes=20MB
+stderr_logfile_maxbytes=20MB
+
+[program:cabinet-titlo-position]
+process_name=%(program_name)s_%(process_num)02d
+command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=position_high,position_low --sleep=1 --tries=2 --timeout=600
+directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
+user=cabinet_titl_usr
+numprocs=6
+autostart=true
+autorestart=true
+stopwaitsecs=660
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-position.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-position.log
+stdout_logfile_maxbytes=20MB
+stderr_logfile_maxbytes=20MB
+
+[program:cabinet-titlo-relevance]
+process_name=%(program_name)s_%(process_num)02d
+command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=relevance_high_priority,relevance_medium_priority,relevance_normal_priority --sleep=1 --tries=2 --timeout=600
+directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
+user=cabinet_titl_usr
+numprocs=6
+autostart=true
+autorestart=true
+stopwaitsecs=660
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-relevance.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-relevance.log
+stdout_logfile_maxbytes=20MB
+stderr_logfile_maxbytes=20MB
+
+[program:cabinet-titlo-monitoring-helper]
+process_name=%(program_name)s_%(process_num)02d
+command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=monitoring_helper --sleep=1 --tries=2 --timeout=600
+directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
+user=cabinet_titl_usr
+numprocs=5
+autostart=true
+autorestart=true
+stopwaitsecs=660
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-monitoring-helper.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-monitoring-helper.log
+stdout_logfile_maxbytes=20MB
+stderr_logfile_maxbytes=20MB
+
+[program:cabinet-titlo-monitoring-change-dates]
+process_name=%(program_name)s_%(process_num)02d
+command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=monitoring_change_dates --sleep=1 --tries=2 --timeout=600
+directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
+user=cabinet_titl_usr
 numprocs=2
 autostart=true
 autorestart=true
 stopwaitsecs=660
-stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-queue-default.log
-stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-queue-default.log
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-monitoring-change-dates.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-monitoring-change-dates.log
 stdout_logfile_maxbytes=20MB
 stderr_logfile_maxbytes=20MB
 
-[program:cabinet-titlo-queue-cluster]
+[program:cabinet-titlo-monitoring-wait]
 process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=main_cluster,child_cluster,cluster_wait --sleep=1 --tries=2 --timeout=600
-directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
-user=cabinet_titl_usr
-numprocs=4
-autostart=true
-autorestart=true
-stopwaitsecs=660
-stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-queue-cluster.log
-stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-queue-cluster.log
-stdout_logfile_maxbytes=20MB
-stderr_logfile_maxbytes=20MB
-
-[program:cabinet-titlo-queue-monitoring]
-process_name=%(program_name)s_%(process_num)02d
-command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=monitoring_helper,monitoring_change_dates,position_high,position_low --sleep=1 --tries=2 --timeout=600
+command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=monitoring_wait --sleep=1 --tries=2 --timeout=600
 directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
 user=cabinet_titl_usr
 numprocs=2
 autostart=true
 autorestart=true
 stopwaitsecs=660
-stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-queue-monitoring.log
-stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-queue-monitoring.log
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-monitoring-wait.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-monitoring-wait.log
 stdout_logfile_maxbytes=20MB
 stderr_logfile_maxbytes=20MB
 
-; Опционально — sudoers для кнопок start/stop из /admin/supervisor (PHP-FPM = cabinet_titl_usr):
+[program:cabinet-titlo-monitoring-competitors-stat]
+process_name=%(program_name)s_%(process_num)02d
+command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=monitoring_competitors_stat --sleep=1 --tries=2 --timeout=600
+directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
+user=cabinet_titl_usr
+numprocs=1
+autostart=true
+autorestart=true
+stopwaitsecs=660
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-monitoring-competitors-stat.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-monitoring-competitors-stat.log
+stdout_logfile_maxbytes=20MB
+stderr_logfile_maxbytes=20MB
+
+[program:cabinet-titlo-competitor-analyse]
+process_name=%(program_name)s_%(process_num)02d
+command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=competitor_analyse --sleep=1 --tries=2 --timeout=1200
+directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
+user=cabinet_titl_usr
+numprocs=5
+autostart=true
+autorestart=true
+stopwaitsecs=1260
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-competitor-analyse.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-competitor-analyse.log
+stdout_logfile_maxbytes=20MB
+stderr_logfile_maxbytes=20MB
+
+[program:cabinet-titlo-ai-generation]
+process_name=%(program_name)s_%(process_num)02d
+command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan queue:work database --queue=ai_generation --sleep=1 --tries=2 --timeout=600
+directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
+user=cabinet_titl_usr
+numprocs=5
+autostart=true
+autorestart=true
+stopwaitsecs=660
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-ai-generation.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-ai-generation.log
+stdout_logfile_maxbytes=20MB
+stderr_logfile_maxbytes=20MB
+
+[program:cabinet-titlo-websockets]
+process_name=%(program_name)s_%(process_num)02d
+command=/opt/php74/bin/php /var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/artisan websockets:serve --host=127.0.0.1 --port=6001
+directory=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru
+user=cabinet_titl_usr
+numprocs=1
+autostart=true
+autorestart=true
+stopwaitsecs=30
+stdout_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-websockets.log
+stderr_logfile=/var/www/cabinet_titl_usr/data/www/cabinet.titlo.ru/storage/logs/supervisor-websockets.log
+stdout_logfile_maxbytes=20MB
+stderr_logfile_maxbytes=20MB
+
+; sudoers для /admin/supervisor (PHP-FPM = cabinet_titl_usr):
 ; /etc/sudoers.d/cabinet-titlo-supervisor:
-; cabinet_titl_usr ALL=(root) NOPASSWD: /usr/bin/supervisorctl start cabinet-titlo-*, /usr/bin/supervisorctl stop cabinet-titlo-*, /usr/bin/supervisorctl restart cabinet-titlo-*, /usr/bin/supervisorctl status *
-; Тогда в .env: SUPERVISORCTL_BIN="sudo /usr/bin/supervisorctl"
+; Defaults:cabinet_titl_usr !requiretty
+; cabinet_titl_usr ALL=(root) NOPASSWD: /usr/bin/supervisorctl status, /usr/bin/supervisorctl status *, /usr/bin/supervisorctl start cabinet-titlo-*, /usr/bin/supervisorctl stop cabinet-titlo-*, /usr/bin/supervisorctl restart cabinet-titlo-*

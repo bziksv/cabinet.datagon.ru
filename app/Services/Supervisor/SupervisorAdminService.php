@@ -39,7 +39,7 @@ class SupervisorAdminService
         }
 
         try {
-            $this->runSupervisorctl(['version']);
+            $this->runSupervisorctl(['status']);
         } catch (\Throwable $e) {
             return $this->lastProbe = [
                 'ok' => false,
@@ -224,6 +224,10 @@ class SupervisorAdminService
         $bin = trim($bin, " \t\n\r\0\x0B\"'");
 
         $prefix = preg_split('/\s+/', $bin, -1, PREG_SPLIT_NO_EMPTY) ?: ['/usr/bin/supervisorctl'];
+
+        if (($prefix[0] ?? '') === 'sudo' && ($prefix[1] ?? '') !== '-n') {
+            array_splice($prefix, 1, 0, ['-n']);
+        }
 
         return array_merge($prefix, $args);
     }

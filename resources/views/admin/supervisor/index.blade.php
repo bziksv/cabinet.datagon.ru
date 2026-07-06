@@ -42,7 +42,7 @@
             </div>
         @endif
 
-        @if(config('app.env') === 'local')
+        @if(app()->environment('local') && !in_array(request()->getHost(), ['cabinet.titlo.ru', 'www.cabinet.titlo.ru'], true))
             <div class="alert alert-info">
                 <strong>{{ __('Supervisor local notice title') }}</strong>
                 <p class="mb-0 small">

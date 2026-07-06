@@ -36,6 +36,15 @@
                     </span>
                 </li>
             @endif
+            @if($admin ?? false)
+                <li class="nav-item">
+                    <a href="{{ route('backlink.config') }}"
+                       class="nav-link{{ $active === 'config' ? ' active' : '' }}"
+                       @if($active === 'config') aria-current="page" @endif>
+                        <i class="bi bi-gear me-1" aria-hidden="true"></i>{{ __('Module administration') }}
+                    </a>
+                </li>
+            @endif
         </ul>
     </div>
 </nav>

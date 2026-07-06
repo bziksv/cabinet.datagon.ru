@@ -9,6 +9,10 @@ return [
     'debug_log' => true,
     'debug_log_max_entries' => 80,
 
+    /** Бонус на баланс при первой привязке Telegram через бота. */
+    'connect_bonus_enabled' => true,
+    'connect_bonus_amount' => 500,
+
     'modules' => [
         [
             'slug' => 'profile',

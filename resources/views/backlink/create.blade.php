@@ -4,7 +4,7 @@
     @endslot
 
     <div class="cabinet-backlink-page">
-        @include('backlink.partials.module-nav', ['active' => 'create'])
+        @include('backlink.partials.module-nav', ['active' => 'create', 'admin' => $admin ?? false])
 
         <div class="d-flex flex-column gap-2">
             @include('backlink.partials.free-tariff-email-notice')

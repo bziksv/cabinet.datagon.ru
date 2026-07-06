@@ -1,0 +1,90 @@
+.cabinet-mod-config-page .cabinet-mod-nav-card,
+.cabinet-mod-config-page .cabinet-mod-module-nav {
+    border-radius: var(--bs-border-radius, 0.375rem);
+}
+
+.cabinet-mod-registry-kpi .card-body {
+    padding: 1rem 1.1rem;
+}
+
+.cabinet-mod-registry-kpi__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+}
+
+.cabinet-mod-registry-kpi__value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+
+.cabinet-mod-registry-kpi__label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+
+.cabinet-mod-registry-kpi--alert {
+    box-shadow: 0 0 0 1px rgba(var(--bs-danger-rgb), 0.2);
+}
+
+.cabinet-mod-registry-user {
+    min-width: 10rem;
+    max-width: 14rem;
+}
+
+.cabinet-mod-registry-table thead th {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.cabinet-mod-registry-table td {
+    font-size: 0.8125rem;
+    vertical-align: middle;
+}
+
+.cabinet-mod-registry-notify-channels {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+}
+
+.cabinet-mod-registry-notify-badge {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.cabinet-mod-registry-notify-badge--telegram {
+    color: #fff !important;
+    background-color: #0d6efd !important;
+}
+
+.cabinet-mod-registry-notify-badge--email {
+    color: #fff !important;
+    background-color: #8b5e14 !important;
+}
+
+.cabinet-mod-registry-notify-legend {
+    line-height: 1.6;
+}
+
+.cabinet-mod-config-page .cabinet-mod-datatable .dataTables_wrapper {
+    padding: 0;
+}
+
+.cabinet-bl-module-nav__list .nav-link.active,
+.cabinet-mod-module-nav .nav-link.active {
+    font-weight: 600;
+}

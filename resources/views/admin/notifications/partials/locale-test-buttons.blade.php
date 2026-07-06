@@ -45,14 +45,14 @@
         @foreach($locales as $locale)
             <div class="btn-group btn-group-sm cabinet-notify-email-lang-group" role="group">
                 <a href="{{ route('admin.notifications.preview.email', ['eventId' => $row['id'], 'lang' => $locale]) }}"
-                   class="btn btn-outline-warning cabinet-notify-btn-preview-email cabinet-notify-btn-lang"
+                   class="btn btn-outline-cabinet-email cabinet-notify-btn-preview-email cabinet-notify-btn-lang"
                    target="_blank"
                    rel="noopener"
                    title="{{ __('Users notify btn preview email') }} · {{ $locale === 'ru' ? __('Users notify test lang ru') : __('Users notify test lang en') }}">
                     <img src="{{ asset('img/flags/'.$locale.'.png') }}" class="img-flag" alt="{{ strtoupper($locale) }}">
                 </a>
                 <button type="button"
-                        class="btn btn-warning cabinet-notify-btn-test-email cabinet-notify-btn-lang"
+                        class="btn btn-cabinet-email cabinet-notify-btn-test-email cabinet-notify-btn-lang"
                         data-event-id="{{ $row['id'] }}"
                         data-lang="{{ $locale }}"
                         title="{{ __('Users notify btn send email') }} · {{ $locale === 'ru' ? __('Users notify test lang ru') : __('Users notify test lang en') }}">

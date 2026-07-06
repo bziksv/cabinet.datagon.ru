@@ -2,13 +2,16 @@
 
 namespace App\Notifications;
 
+use App\Contracts\EmailPreferenceAware;
+use App\Notifications\Concerns\AppendsMailUnsubscribe;
 use App\Notifications\Concerns\LocalizesMailContent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class DomainInformationNotification extends Notification
+class DomainInformationNotification extends Notification implements EmailPreferenceAware
 {
+    use AppendsMailUnsubscribe;
     use LocalizesMailContent;
     use Queueable;
 
@@ -45,13 +48,21 @@ class DomainInformationNotification extends Notification
     {
         $this->applyMailLocale($notifiable);
 
-        return (new MailMessage)
+        return $this->appendMailUnsubscribe(
+            (new MailMessage)
             ->greeting(__('Mail notify greeting'))
             ->line(__('Mail notify auto disclaimer'))
             ->line(__('Mail notify dns domain', ['domain' => $this->project->domain]))
             ->line($this->project->domain_information)
             ->action(__('Mail notify check projects'), route('domain.information'))
-            ->line(__('Mail notify thanks app'));
+            ->line(__('Mail notify thanks app')),
+            $this->emailPreferenceKey()
+        );
+    }
+
+    public function emailPreferenceKey(): ?string
+    {
+        return 'domain-dns-changed';
     }
 
     /**

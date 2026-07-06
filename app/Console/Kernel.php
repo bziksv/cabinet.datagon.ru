@@ -12,6 +12,7 @@ use App\Classes\Cron\MonitoringCompetitorsDynamicsCleanup;
 use App\Classes\Cron\MonitoringFreeTariffPositionsCleanup;
 use App\Classes\Cron\MonitoringPublicSharesDelete;
 use App\Classes\Cron\HtmlEditorPublicSharesDelete;
+use App\Classes\Cron\ProcessTriggerCampaigns;
 use App\Classes\Cron\RelevancePublicSharesDelete;
 use App\Classes\Cron\RelevanceCleaningResults;
 use App\Classes\Cron\SiteMonitoringPublicSharesDelete;
@@ -83,6 +84,8 @@ class Kernel extends ConsoleKernel
         $schedule->command(SearchIndicesRemoveAll::class)->daily();
         $schedule->call(new MonitoringFreeTariffPositionsCleanup())->dailyAt('04:20');
         $schedule->call(new MonitoringCompetitorsDynamicsCleanup())->dailyAt('04:25');
+
+        $schedule->call(new ProcessTriggerCampaigns())->everyMinute();
 
         // $schedule->command('inspire')
         //          ->hourly();

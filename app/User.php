@@ -54,6 +54,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'email_verified_at' => 'datetime',
         'last_online_at' => 'datetime',
         'telegram_prompt_snoozed_until' => 'datetime',
+        'telegram_connect_bonus_at' => 'datetime',
         'monitoring_schedule_prompt_snoozed_until' => 'datetime',
         'news_comments_blocked_at' => 'datetime',
         'metrics' => 'json',
@@ -129,12 +130,17 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Оповещения по проблемной ссылке: Telegram (все тарифы при подключённом боте), email — платные.
      */
-    public function sendBrokenLinkAlerts($error, $link): void
+    public function sendBrokenLinkAlerts($error, $link, ?ProjectTracking $project = null): void
     {
-        if ($this->canReceiveBacklinkEmail()) {
-            $this->notify(new BrokenLinkNotification($error, $link));
+        if ($project && !(bool) $project->notify_email) {
+            return;
         }
 
+        if (!BacklinkConfig::emailEnabled() || !$this->canReceiveBacklinkEmail()) {
+            return;
+        }
+
+        $this->notify(new BrokenLinkNotification($error, $link));
     }
 
     /**
@@ -142,7 +148,11 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function sendBrokenLinkProjectTelegram(ProjectTracking $project, int $problemCount, bool $isTest = false): bool
     {
-        if (!config('cabinet-backlink.notifications.telegram_enabled', true) || !$this->isTelegramConnected()) {
+        if (!(bool) $project->notify_telegram && !$isTest) {
+            return false;
+        }
+
+        if (!BacklinkConfig::telegramEnabled() || !$this->isTelegramConnected()) {
             return false;
         }
 
@@ -153,7 +163,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function receivesBacklinkExternalAlerts(): bool
     {
-        if (config('cabinet-backlink.notifications.telegram_enabled', true) && $this->isTelegramConnected()) {
+        if (BacklinkConfig::telegramEnabled() && $this->isTelegramConnected()) {
             return true;
         }
 
@@ -198,7 +208,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function canReceiveSiteMonitoringEmail(): bool
     {
-        return !$this->onFreeTariff();
+        return $this->hasPaidTariffRole();
     }
 
     /**
@@ -206,7 +216,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function canReceiveDomainInformationEmail(): bool
     {
-        return !$this->onFreeTariff();
+        return $this->hasPaidTariffRole();
     }
 
     /**
@@ -214,7 +224,7 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function canReceiveBacklinkEmail(): bool
     {
-        return !$this->onFreeTariff();
+        return $this->hasPaidTariffRole();
     }
 
     /**
@@ -342,6 +352,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function pay()
     {
         return $this->hasMany(TariffPay::class);
+    }
+
+    public function visitStatistics(): HasMany
+    {
+        return $this->hasMany(VisitStatistic::class);
     }
 
     public function metaTags()
@@ -501,6 +516,8 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function telegramBotSubscribeUrl(): string
     {
-        return 'https://t.me/RedBoxServiceBot?start=' . base64_encode($this->email);
+        $username = config('app.telegram_bot_username', 'TitloServiceBot');
+
+        return 'https://t.me/' . $username . '?start=' . base64_encode($this->email);
     }
 }

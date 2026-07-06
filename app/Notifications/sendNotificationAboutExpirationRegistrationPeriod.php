@@ -2,13 +2,16 @@
 
 namespace App\Notifications;
 
+use App\Contracts\EmailPreferenceAware;
+use App\Notifications\Concerns\AppendsMailUnsubscribe;
 use App\Notifications\Concerns\LocalizesMailContent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class sendNotificationAboutExpirationRegistrationPeriod extends Notification
+class sendNotificationAboutExpirationRegistrationPeriod extends Notification implements EmailPreferenceAware
 {
+    use AppendsMailUnsubscribe;
     use LocalizesMailContent;
     use Queueable;
 
@@ -49,13 +52,21 @@ class sendNotificationAboutExpirationRegistrationPeriod extends Notification
     {
         $this->applyMailLocale($notifiable);
 
-        return (new MailMessage)
+        return $this->appendMailUnsubscribe(
+            (new MailMessage)
             ->greeting(__('Mail notify greeting'))
             ->line(__('Mail notify auto disclaimer'))
             ->line(__('Mail notify dns domain', ['domain' => $this->project->domain]))
             ->line(__('Mail notify domain expire days', ['days' => $this->diffInDays]))
             ->action(__('Mail notify check your projects'), route('domain.information'))
-            ->line(__('Mail notify thanks with us'));
+            ->line(__('Mail notify thanks with us')),
+            $this->emailPreferenceKey()
+        );
+    }
+
+    public function emailPreferenceKey(): ?string
+    {
+        return 'domain-expiration';
     }
 
     /**

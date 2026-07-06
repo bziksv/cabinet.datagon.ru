@@ -19,7 +19,7 @@
                 <span class="cabinet-notify-dispatch-channel text-info" title="Telegram">
                     <i class="bi bi-telegram" aria-hidden="true"></i>{{ number_format($tg, 0, ',', ' ') }}
                 </span>
-                <span class="cabinet-notify-dispatch-channel text-warning" title="{{ __('Email') }}">
+                <span class="cabinet-notify-dispatch-channel text-cabinet-email" title="{{ __('Email') }}">
                     <i class="bi bi-envelope" aria-hidden="true"></i>{{ number_format($email, 0, ',', ' ') }}
                 </span>
             </span>

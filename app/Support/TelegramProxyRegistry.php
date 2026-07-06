@@ -240,6 +240,22 @@ class TelegramProxyRegistry
     /**
      * @return array{id: string, label: string, supplier: ?string, url_masked: string, enabled: bool, priority: int, probe: array}
      */
+    public static function rowWithoutProbe(array $proxy): array
+    {
+        return [
+            'id' => $proxy['id'],
+            'label' => $proxy['label'],
+            'supplier' => $proxy['supplier'] ?? null,
+            'url_masked' => TelegramConnectivityService::maskProxyUrl($proxy['url']),
+            'enabled' => $proxy['enabled'],
+            'priority' => $proxy['priority'],
+            'probe' => [],
+        ];
+    }
+
+    /**
+     * @return array{id: string, label: string, supplier: ?string, url_masked: string, enabled: bool, priority: int, probe: array}
+     */
     public static function rowWithProbe(array $proxy, TelegramConnectivityService $connectivity): array
     {
         $probe = $connectivity->probe($proxy['url'], 12);

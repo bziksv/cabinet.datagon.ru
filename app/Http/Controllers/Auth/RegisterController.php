@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\User;
 use App\Http\Controllers\Controller;
+use App\Support\SignupEmailPolicy;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -59,7 +60,10 @@ class RegisterController extends Controller
             return Str::before($val, '.');
         });
 
-        return view('auth.register', compact('lang'));
+        return view('auth.register', [
+            'lang' => $lang,
+            'emailPolicy' => SignupEmailPolicy::clientConfig(),
+        ]);
     }
 
     /**
@@ -70,13 +74,17 @@ class RegisterController extends Controller
      */
     protected function validator(array $data)
     {
-        return Validator::make($data, [
+        $validator = Validator::make($data, [
             'lang' => ['required', 'string'],
             'name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
+
+        SignupEmailPolicy::appendValidation($validator, $data['email'] ?? null);
+
+        return $validator;
     }
 
     public function validateData(Request $request): JsonResponse

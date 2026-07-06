@@ -6,6 +6,15 @@
     $selectedCode = array_key_first($select['tariffs']);
     $freeTariffPlan = new FreeTariff();
 
+    $planCardHighlightCodes = [
+        'RelevanceAnalysis',
+        'TextAnalyzer',
+        'CompetitorAnalysisPhrases',
+        'Clusters',
+        'domainMonitoringProject',
+        'monitoring',
+    ];
+
     $plans = [];
     foreach ($tariffsArray as $tariff) {
         $code = array_search($tariff['name'], $select['tariffs'], true);
@@ -173,7 +182,9 @@
                                 {{ __('Select') }}
                             </button>
                             <ul class="list-unstyled small mb-0 mt-3">
-                                @foreach(collect($plan['settings'])->take(5) as $setting)
+                                @foreach(collect($planCardHighlightCodes)->map(function ($code) use ($plan) {
+                                    return $plan['settings'][$code] ?? null;
+                                })->filter() as $setting)
                                     @php $fname = $setting['name'] ?? ''; @endphp
                                     @if($fname !== '' && $fname !== 'Цена тарифа')
                                         <li class="mb-2 d-flex align-items-start gap-2">
@@ -218,8 +229,8 @@
                     </div>
                     <div class="card-footer d-grid gap-2">
                         {!! Form::submit(__('Buy'), ['class' => 'btn btn-success btn-lg']) !!}
-                        <a href="{{ route('balance.index') }}" class="btn btn-link btn-sm text-center">
-                            {{ __('Top up your balance') }}
+                        <a href="{{ route('balance.index') }}" class="btn btn-outline-primary">
+                            <i class="bi bi-wallet2 me-1"></i>{{ __('Top up your balance') }}
                         </a>
                     </div>
                     {!! Form::close() !!}

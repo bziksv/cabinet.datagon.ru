@@ -3,6 +3,38 @@
     align-items: flex-start;
 }
 
+.cabinet-telegram-connect-modal__bonus {
+    padding: 0.875rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(25, 135, 84, 0.35);
+    background: linear-gradient(135deg, rgba(25, 135, 84, 0.08) 0%, rgba(13, 110, 253, 0.06) 100%);
+}
+
+.cabinet-telegram-connect-modal__bonus-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.5rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #146c43;
+    background: rgba(25, 135, 84, 0.12);
+}
+
+.cabinet-telegram-connect-modal__bonus-title {
+    font-weight: 600;
+    color: var(--bs-body-color);
+}
+
+.cabinet-telegram-connect-modal__bonus-text {
+    font-size: 0.875rem;
+    color: var(--bs-secondary-color);
+}
+
 .cabinet-telegram-connect-modal .modal-footer .btn-outline-secondary {
     white-space: normal;
     text-align: left;

@@ -73,6 +73,11 @@
                         </span>
                         @enderror
                     </div>
+                    <div id="signup-email-policy-slot" class="mb-3">
+                        @if($errors->has('email_policy_html'))
+                            {!! $errors->first('email_policy_html') !!}
+                        @endif
+                    </div>
 
                     <div class="input-group mb-3">
                         <input id="password" type="password"
@@ -265,6 +270,10 @@
                             messages = JSON.stringify(response.responseJSON.errors);
                             $(".render-li").remove()
                             $.each(response.responseJSON.errors, function (key, value) {
+                                if (key === 'email_policy_html') {
+                                    $('#signup-email-policy-slot').html(value.join(''));
+                                    return;
+                                }
                                 $('#validate-messages').append('<li class="render-li alert p-0">' + value.join() + '</li>')
                             })
                         }
@@ -275,6 +284,7 @@
                     },
                     success: function () {
                         $('.render-li').remove()
+                        $('#signup-email-policy-slot').empty()
                         $('#fakeButton').hide();
                         $('#sendFormButton').show();
                         $('#sendFormButton').attr('type', 'submit')
@@ -287,4 +297,51 @@
             }
         }
     </script>
+
+    @if(!empty($emailPolicy))
+        <script>
+            (function () {
+                var policy = @json($emailPolicy);
+
+                function emailDomain(email) {
+                    email = $.trim(String(email || '')).toLowerCase();
+                    var at = email.lastIndexOf('@');
+                    return at >= 0 ? email.slice(at + 1) : '';
+                }
+
+                function isAllowedSignupEmail(email) {
+                    var domain = emailDomain(email);
+                    if (!domain) {
+                        return false;
+                    }
+                    var tldRe = new RegExp('\\.(' + policy.allowedTlds.join('|') + ')$', 'u');
+                    if (tldRe.test(domain)) {
+                        return true;
+                    }
+                    for (var i = 0; i < policy.allowedProviders.length; i++) {
+                        var provider = policy.allowedProviders[i];
+                        if (domain === provider || domain.slice(-('.' + provider).length) === '.' + provider) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+
+                function showPolicyNotice() {
+                    $('#signup-email-policy-slot').html(policy.noticeHtml);
+                    $('#fakeButton').show();
+                    $('#sendFormButton').hide().attr('type', 'button');
+                }
+
+                $('#email').on('blur keyup', function () {
+                    var email = $(this).val();
+                    if (email && !isAllowedSignupEmail(email)) {
+                        showPolicyNotice();
+                    } else {
+                        $('#signup-email-policy-slot').empty();
+                    }
+                });
+            })();
+        </script>
+    @endif
 @endsection

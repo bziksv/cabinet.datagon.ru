@@ -2,6 +2,7 @@
 
 namespace App\ViewComposers;
 
+use App\Services\TelegramConnectBonusService;
 use App\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -16,6 +17,8 @@ class TelegramConnectPromptComposer
             $view->with([
                 'showTelegramConnectPrompt' => false,
                 'telegramBotSubscribeUrl' => null,
+                'telegramConnectBonusAmount' => 0,
+                'telegramConnectBonusEligible' => false,
             ]);
 
             return;
@@ -24,6 +27,8 @@ class TelegramConnectPromptComposer
         $view->with([
             'showTelegramConnectPrompt' => $user->shouldShowTelegramConnectPrompt(),
             'telegramBotSubscribeUrl' => $user->telegramBotSubscribeUrl(),
+            'telegramConnectBonusAmount' => app(TelegramConnectBonusService::class)->bonusAmount(),
+            'telegramConnectBonusEligible' => app(TelegramConnectBonusService::class)->userEligibleForBonus($user),
         ]);
     }
 }

@@ -126,17 +126,29 @@
                     </span>
                 </h3>
                 <div class="cabinet-sm-form-section__body">
-                    <input type="hidden" name="send_notification" value="0">
-                    <div class="form-check">
-                        <input type="checkbox"
-                               class="form-check-input"
-                               name="send_notification"
-                               value="1"
-                               id="cabinet-sm-send-notification"
-                               @if(old('send_notification', $defaultNotify ?? true)) checked @endif>
-                        <label class="form-check-label" for="cabinet-sm-send-notification">
-                            {{ __('Receive notifications for this project') }}
-                        </label>
+                    <input type="hidden" name="notify_telegram" value="0">
+                    <input type="hidden" name="notify_email" value="0">
+                    <div class="cabinet-sm-notify-group">
+                        <div class="form-check form-switch mb-2">
+                            <input type="checkbox"
+                                   class="form-check-input"
+                                   name="notify_telegram"
+                                   value="1"
+                                   id="cabinet-sm-notify-telegram"
+                                   @if(old('notify_telegram', ($onFreeTariff ?? false) ? false : ($defaultNotify ?? true))) checked @endif>
+                            <label class="form-check-label" for="cabinet-sm-notify-telegram">{{ __('Telegram') }}</label>
+                        </div>
+                        <div class="form-check form-switch mb-0">
+                            <input type="checkbox"
+                                   class="form-check-input"
+                                   name="notify_email"
+                                   value="1"
+                                   id="cabinet-sm-notify-email"
+                                   @if(old('notify_email')) checked @endif
+                                   @if(!($siteMonitoringEmailAvailable ?? true)) disabled @endif>
+                            <label class="form-check-label @if(!($siteMonitoringEmailAvailable ?? true)) text-secondary @endif"
+                                   for="cabinet-sm-notify-email">{{ __('Email') }}</label>
+                        </div>
                     </div>
                     <div class="form-text mt-2 mb-0">{{ __('Site monitoring hint notifications short') }}</div>
                     @if($onFreeTariff ?? false)
@@ -161,15 +173,34 @@
         <script src="{{ asset('plugins/site-monitoring/js/site-monitoring.js') }}"></script>
         <script>
             (function () {
-                var box = document.getElementById('cabinet-sm-send-notification');
+                var tgBox = document.getElementById('cabinet-sm-notify-telegram');
+                var emailBox = document.getElementById('cabinet-sm-notify-email');
                 var hint = document.getElementById('cabinet-sm-notify-off-hint');
-                if (box && hint) {
-                    function syncNotifyHint() {
-                        hint.classList.toggle('d-none', box.checked);
-                    }
-                    box.addEventListener('change', syncNotifyHint);
-                    syncNotifyHint();
+                var emailAvailable = @json($siteMonitoringEmailAvailable ?? true);
+
+                function anyNotifyOn() {
+                    return (tgBox && tgBox.checked) || (emailBox && emailBox.checked);
                 }
+
+                function syncNotifyHint() {
+                    if (hint) {
+                        hint.classList.toggle('d-none', anyNotifyOn());
+                    }
+                }
+
+                if (tgBox) {
+                    tgBox.addEventListener('change', syncNotifyHint);
+                }
+                if (emailBox) {
+                    emailBox.addEventListener('change', syncNotifyHint);
+                    if (!emailAvailable) {
+                        emailBox.addEventListener('click', function (e) {
+                            e.preventDefault();
+                            emailBox.checked = false;
+                        });
+                    }
+                }
+                syncNotifyHint();
             })();
         </script>
     @endslot

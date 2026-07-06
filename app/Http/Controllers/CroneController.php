@@ -68,18 +68,23 @@ class CroneController extends Controller
                     if (isset($this->result['error'])) {
                         if (!(boolean)$link->mail_sent) {
                             $user = $link->project ? $link->project->user : null;
-                            if ($user) {
-                                $user->sendBrokenLinkAlerts($this->result['error'], $link);
-                                $projectId = $link->project_tracking_id;
-                                if (!isset($telegramByUserProject[$user->id][$projectId])) {
-                                    $telegramByUserProject[$user->id][$projectId] = [
-                                        'project' => $link->project,
-                                        'count' => 0,
-                                    ];
+                            $project = $link->project;
+                            if ($user && $project) {
+                                if ((bool) $project->notify_email) {
+                                    $user->sendBrokenLinkAlerts($this->result['error'], $link, $project);
                                 }
-                                $telegramByUserProject[$user->id][$projectId]['count']++;
+                                $projectId = $link->project_tracking_id;
+                                if ((bool) $project->notify_telegram) {
+                                    if (!isset($telegramByUserProject[$user->id][$projectId])) {
+                                        $telegramByUserProject[$user->id][$projectId] = [
+                                            'project' => $link->project,
+                                            'count' => 0,
+                                        ];
+                                    }
+                                    $telegramByUserProject[$user->id][$projectId]['count']++;
+                                }
                             }
-                            $this->saveResult($link, true, true);
+                            $this->saveResult($link, true, (bool) ($project && $project->notify_email));
                         } else {
                             $this->saveResult($link, true);
                         }

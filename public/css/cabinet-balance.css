@@ -74,3 +74,73 @@
 .cabinet-balance-page .cabinet-balance-empty {
     padding: 2.5rem 1rem;
 }
+
+.cabinet-balance-page .cabinet-balance-topup-fields__label-spacer {
+    visibility: hidden;
+    user-select: none;
+    pointer-events: none;
+}
+
+@media (max-width: 991.98px) {
+    .cabinet-balance-page .cabinet-balance-topup-fields__label-spacer {
+        display: none;
+    }
+}
+
+.cabinet-balance-page .cabinet-balance-topup-fields .input-group-lg > .btn {
+    white-space: nowrap;
+}
+
+.cabinet-balance-page .cabinet-balance-promo-input .form-control {
+    font-weight: 400;
+    letter-spacing: normal;
+}
+
+.cabinet-balance-page .cabinet-balance-promo-input .form-control:not(:placeholder-shown) {
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+.cabinet-balance-page .cabinet-balance-promo-input .form-control::placeholder {
+    font-size: 0.875rem;
+    font-weight: 400;
+    letter-spacing: normal;
+    color: var(--bs-secondary-color);
+    opacity: 0.55;
+    text-transform: none;
+}
+
+.cabinet-balance-page .cabinet-balance-promo-summary {
+    border: 1px solid rgba(var(--bs-success-rgb), 0.35);
+    background: rgba(var(--bs-success-rgb), 0.08);
+    border-radius: var(--bs-border-radius);
+    padding: 0.75rem 1rem;
+}
+
+.cabinet-balance-page .cabinet-balance-promo-summary__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.9375rem;
+}
+
+.cabinet-balance-page .cabinet-balance-promo-summary__row + .cabinet-balance-promo-summary__row {
+    margin-top: 0.35rem;
+}
+
+.cabinet-balance-page .cabinet-balance-promo-summary__row--bonus strong {
+    color: var(--bs-success);
+}
+
+.cabinet-balance-page .cabinet-balance-promo-summary__row--total {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed rgba(var(--bs-success-rgb), 0.35);
+    font-size: 1rem;
+}
+
+.cabinet-balance-page .cabinet-balance-promo-summary__row--total strong {
+    color: var(--bs-success);
+    font-size: 1.125rem;
+}

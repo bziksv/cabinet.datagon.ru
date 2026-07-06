@@ -1,6 +1,6 @@
 @component('component.card', ['title' => __('Balance')])
     @slot('css')
-        <link rel="stylesheet" href="{{ asset('css/cabinet-balance.css') }}">
+        <link rel="stylesheet" href="{{ asset('css/cabinet-balance.css') }}?v={{ @filemtime(public_path('css/cabinet-balance.css')) ?: time() }}">
     @endslot
 
     @php
@@ -73,8 +73,15 @@
                     <a href="{{ route('tariff.index') }}" class="text-nowrap">{{ __('Tariffs') }}</a>
                 </p>
 
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-5 col-lg-4">
+                @if(!empty($promoLock['locked']))
+                    <div class="alert alert-warning py-2 px-3 mb-3 small">
+                        <i class="bi bi-shield-lock me-1"></i>
+                        {{ __('Promo lock active', ['until' => $promoLock['locked_until_human']]) }}
+                    </div>
+                @endif
+
+                <div class="row g-3 align-items-start cabinet-balance-topup-fields">
+                    <div class="col-12 col-lg-4">
                         {!! Form::label('sum', __('Sum'), ['class' => 'form-label']) !!}
                         <div class="input-group input-group-lg">
                             {!! Form::number('sum', old('sum'), [
@@ -90,7 +97,41 @@
                             <div class="invalid-feedback d-block">{{ $message }}</div>
                         @enderror
                     </div>
-                    <div class="col-md-7 col-lg-5">
+                    <div class="col-12 col-lg-5">
+                        <label class="form-label" for="balance-promo-code">
+                            <i class="bi bi-ticket-perforated me-1"></i>{{ __('Balance promo label') }}
+                        </label>
+                        <div class="input-group input-group-lg cabinet-balance-promo-input">
+                            <input type="text"
+                                   name="promo_code"
+                                   id="balance-promo-code"
+                                   class="form-control text-uppercase {{ $errors->has('promo_code') ? 'is-invalid' : '' }}"
+                                   value="{{ old('promo_code') }}"
+                                   maxlength="64"
+                                   placeholder="{{ __('Balance promo placeholder') }}"
+                                   autocomplete="off"
+                                   spellcheck="false"
+                                   @if(!empty($promoLock['locked'])) disabled @endif>
+                            <button type="button"
+                                    class="btn btn-outline-secondary"
+                                    id="balance-promo-check"
+                                    title="{{ __('Balance promo check') }}"
+                                    @if(!empty($promoLock['locked'])) disabled @endif>
+                                {{ __('Balance promo check') }}
+                            </button>
+                        </div>
+                        @error('promo_code')
+                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                        @enderror
+                    </div>
+                    <div class="col-12 col-lg-3">
+                        <label class="form-label cabinet-balance-topup-fields__label-spacer" aria-hidden="true">&nbsp;</label>
+                        {!! Form::submit(__('Replenish'), ['class' => 'btn btn-success btn-lg w-100']) !!}
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-1">
+                    <div class="col-12 col-lg-4">
                         <span class="form-label d-block">{{ __('Quick amount') }}</span>
                         <div class="d-flex flex-wrap gap-2">
                             @foreach([500, 1000, 3000, 5000, 10000] as $preset)
@@ -102,9 +143,51 @@
                             @endforeach
                         </div>
                     </div>
-                    <div class="col-12 col-lg-3">
-                        {!! Form::submit(__('Replenish'), ['class' => 'btn btn-success btn-lg w-100']) !!}
+                    <div class="col-12 col-lg-8">
+                        @if(empty($promoLock['locked']) && ($promoLock['failed_in_window'] ?? 0) > 0)
+                            <p id="balance-promo-attempts-hint" class="form-text text-warning mb-2">
+                                {{ __('Promo lock attempts left', ['count' => $promoLock['attempts_left']]) }}
+                            </p>
+                        @else
+                            <p id="balance-promo-attempts-hint" class="form-text text-warning mb-2 d-none"></p>
+                        @endif
+                        <p class="form-text mb-2">{{ __('Balance promo hint') }}</p>
+                        <p class="form-text mb-2 small">{{ __('Promo standalone hint unified') }}</p>
+                        <div id="balance-promo-summary" class="cabinet-balance-promo-summary d-none" aria-live="polite"></div>
+                        <div id="balance-promo-error" class="alert alert-danger py-2 px-3 mb-0 d-none small"></div>
                     </div>
+                </div>
+
+                <div class="cabinet-balance-standalone-promo mt-4 pt-3 border-top d-none" aria-hidden="true">
+                    <h4 class="h6 mb-2">
+                        <i class="bi bi-gift me-1"></i>{{ __('Promo standalone title') }}
+                    </h4>
+                    <p class="text-secondary small mb-3">{{ __('Promo standalone lead') }}</p>
+                    <form method="post" action="{{ route('balance.promo.redeem') }}" class="row g-2 align-items-start">
+                        @csrf
+                        <div class="col-12 col-md-8 col-lg-5">
+                            <label class="form-label" for="balance-standalone-promo-code">{{ __('Promo code field code') }}</label>
+                            <input type="text"
+                                   name="standalone_promo_code"
+                                   id="balance-standalone-promo-code"
+                                   class="form-control text-uppercase {{ $errors->has('standalone_promo_code') ? 'is-invalid' : '' }}"
+                                   value="{{ old('standalone_promo_code') }}"
+                                   maxlength="64"
+                                   placeholder="{{ __('Promo standalone placeholder') }}"
+                                   autocomplete="off"
+                                   spellcheck="false"
+                                   @if(!empty($promoLock['locked'])) disabled @endif>
+                            @error('standalone_promo_code')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-12 col-md-4 col-lg-3">
+                            <label class="form-label cabinet-balance-topup-fields__label-spacer" aria-hidden="true">&nbsp;</label>
+                            <button type="submit" class="btn btn-outline-success w-100" @if(!empty($promoLock['locked'])) disabled @endif>
+                                <i class="bi bi-check2-circle me-1"></i>{{ __('Promo standalone submit') }}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
             {!! Form::close() !!}
@@ -165,9 +248,18 @@
                                     @if($balance->status === 2)
                                         −{{ number_format((float) $balance->sum, 0, '.', ' ') }}
                                     @else
-                                        {{ number_format((float) $balance->sum, 0, '.', ' ') }}
+                                        +{{ number_format((float) $balance->sum, 0, '.', ' ') }}
                                     @endif
                                     ₽
+                                    @if((int) $balance->bonus_sum > 0 && (int) $balance->status === 1)
+                                        <span class="small d-block text-success fw-normal">
+                                            {{ __('Promo ledger breakdown', [
+                                                'paid' => number_format((int) ($balance->paid_sum ?? ($balance->sum - $balance->bonus_sum)), 0, '.', ' '),
+                                                'bonus' => number_format((int) $balance->bonus_sum, 0, '.', ' '),
+                                                'code' => optional($balance->promoCode)->code,
+                                            ]) }}
+                                        </span>
+                                    @endif
                                 </td>
                                 <td class="text-secondary">{{ __($balance->source) }}</td>
                                 <td class="text-end text-secondary text-nowrap">
@@ -213,15 +305,208 @@
     @slot('js')
         <script>
             (function () {
+                var sumInput = document.getElementById('balance-sum');
+                var promoInput = document.getElementById('balance-promo-code');
+                var checkBtn = document.getElementById('balance-promo-check');
+                var summaryBox = document.getElementById('balance-promo-summary');
+                var errorBox = document.getElementById('balance-promo-error');
+                var previewTimer = null;
+
+                var labels = {
+                    pay: @json(__('Balance promo summary pay')),
+                    bonus: @json(__('Balance promo summary bonus')),
+                    total: @json(__('Balance promo summary total')),
+                    needSum: @json(__('Promo preview need sum')),
+                    needCode: @json(__('Balance promo need code')),
+                    attemptsLeft: @json(__('Promo lock attempts left')),
+                    standaloneCredit: @json(__('Promo standalone summary credit')),
+                    standaloneActivate: @json(__('Promo standalone submit')),
+                };
+
+                var promoLock = @json($promoLock ?? ['locked' => false, 'attempts_left' => 10, 'failed_in_window' => 0]);
+
+                function setPromoLocked(locked) {
+                    if (promoInput) {
+                        promoInput.disabled = !!locked;
+                    }
+                    if (checkBtn) {
+                        checkBtn.disabled = !!locked;
+                    }
+                }
+
+                function updateAttemptsHint(lockStatus) {
+                    var hint = document.getElementById('balance-promo-attempts-hint');
+                    if (!hint) {
+                        return;
+                    }
+                    if (lockStatus.locked || !lockStatus.failed_in_window) {
+                        hint.classList.add('d-none');
+                        return;
+                    }
+                    hint.textContent = labels.attemptsLeft.replace(':count', lockStatus.attempts_left);
+                    hint.classList.remove('d-none');
+                }
+
+                function formatMoney(value) {
+                    return Number(value || 0).toLocaleString('ru-RU') + ' ₽';
+                }
+
+                function hidePromoMessages() {
+                    if (summaryBox) {
+                        summaryBox.classList.add('d-none');
+                        summaryBox.innerHTML = '';
+                    }
+                    if (errorBox) {
+                        errorBox.classList.add('d-none');
+                        errorBox.textContent = '';
+                    }
+                }
+
+                function showError(message) {
+                    hidePromoMessages();
+                    if (errorBox) {
+                        errorBox.textContent = message;
+                        errorBox.classList.remove('d-none');
+                    }
+                }
+
+                function showSummary(response) {
+                    hidePromoMessages();
+                    if (!summaryBox) {
+                        return;
+                    }
+                    summaryBox.innerHTML =
+                        '<div class="cabinet-balance-promo-summary__row">' +
+                        '<span>' + labels.pay + '</span><strong>' + formatMoney(response.paid_sum) + '</strong>' +
+                        '</div>' +
+                        '<div class="cabinet-balance-promo-summary__row cabinet-balance-promo-summary__row--bonus">' +
+                        '<span>' + labels.bonus + ' (' + (response.promo_code || '') + ')</span><strong>+' + formatMoney(response.bonus_sum) + '</strong>' +
+                        '</div>' +
+                        '<div class="cabinet-balance-promo-summary__row cabinet-balance-promo-summary__row--total">' +
+                        '<span>' + labels.total + '</span><strong>' + formatMoney(response.total_sum) + '</strong>' +
+                        '</div>';
+                    summaryBox.classList.remove('d-none');
+                }
+
+                function showStandaloneSummary(response) {
+                    hidePromoMessages();
+                    if (!summaryBox) {
+                        return;
+                    }
+                    summaryBox.innerHTML =
+                        '<div class="cabinet-balance-promo-summary__row cabinet-balance-promo-summary__row--total">' +
+                        '<span>' + labels.standaloneCredit + ' (' + (response.promo_code || '') + ')</span>' +
+                        '<strong>+' + formatMoney(response.bonus_sum) + '</strong>' +
+                        '</div>' +
+                        '<p class="small text-secondary mb-2 mt-2">' + (response.message || '') + '</p>' +
+                        '<button type="button" class="btn btn-success btn-sm" id="balance-promo-activate-standalone">' +
+                        '<i class="bi bi-check2-circle me-1"></i>' + labels.standaloneActivate +
+                        '</button>';
+                    summaryBox.classList.remove('d-none');
+
+                    var activateBtn = document.getElementById('balance-promo-activate-standalone');
+                    if (activateBtn) {
+                        activateBtn.addEventListener('click', function () {
+                            var form = document.createElement('form');
+                            form.method = 'POST';
+                            form.action = @json(route('balance.promo.redeem'));
+
+                            var token = document.createElement('input');
+                            token.type = 'hidden';
+                            token.name = '_token';
+                            token.value = $('meta[name="csrf-token"]').attr('content');
+                            form.appendChild(token);
+
+                            var codeInput = document.createElement('input');
+                            codeInput.type = 'hidden';
+                            codeInput.name = 'promo_code';
+                            codeInput.value = response.promo_code || '';
+                            form.appendChild(codeInput);
+
+                            document.body.appendChild(form);
+                            form.submit();
+                        });
+                    }
+                }
+
+                window.cabinetBalancePreviewPromo = function () {
+                    if (!promoInput || promoLock.locked) {
+                        return;
+                    }
+
+                    var sum = sumInput ? parseInt(sumInput.value, 10) : 0;
+                    var code = (promoInput.value || '').trim();
+
+                    if (!code) {
+                        hidePromoMessages();
+                        return;
+                    }
+
+                    $.ajax({
+                        type: 'POST',
+                        dataType: 'json',
+                        url: @json(route('balance.promo.preview')),
+                        data: {
+                            _token: $('meta[name="csrf-token"]').attr('content'),
+                            sum: sum > 0 ? sum : 0,
+                            promo_code: code,
+                        },
+                        success: function (response) {
+                            if (response.promo_lock) {
+                                promoLock = response.promo_lock;
+                                setPromoLocked(promoLock.locked);
+                                updateAttemptsHint(promoLock);
+                            }
+                            if (response.valid && response.mode === 'standalone') {
+                                showStandaloneSummary(response);
+                            } else if (response.valid) {
+                                showSummary(response);
+                            } else {
+                                showError(response.message || labels.needCode);
+                            }
+                        },
+                        error: function () {
+                            showError(@json(__('Balance promo check failed')));
+                        },
+                    });
+                };
+
+                function schedulePreview() {
+                    clearTimeout(previewTimer);
+                    previewTimer = setTimeout(window.cabinetBalancePreviewPromo, 400);
+                }
+
                 document.querySelectorAll('.cabinet-balance-preset').forEach(function (btn) {
                     btn.addEventListener('click', function () {
-                        var input = document.getElementById('balance-sum');
-                        if (input) {
-                            input.value = btn.getAttribute('data-sum');
-                            input.focus();
+                        if (sumInput) {
+                            sumInput.value = btn.getAttribute('data-sum');
+                            sumInput.focus();
+                            if ((promoInput.value || '').trim()) {
+                                window.cabinetBalancePreviewPromo();
+                            }
                         }
                     });
                 });
+
+                if (sumInput) {
+                    sumInput.addEventListener('input', schedulePreview);
+                }
+                if (promoInput) {
+                    promoInput.addEventListener('input', schedulePreview);
+                    promoInput.addEventListener('keydown', function (e) {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            window.cabinetBalancePreviewPromo();
+                        }
+                    });
+                }
+                if (checkBtn) {
+                    checkBtn.addEventListener('click', window.cabinetBalancePreviewPromo);
+                }
+
+                if (promoInput && (promoInput.value || '').trim()) {
+                    window.cabinetBalancePreviewPromo();
+                }
             })();
         </script>
 

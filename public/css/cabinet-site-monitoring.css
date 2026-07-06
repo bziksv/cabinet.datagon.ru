@@ -174,9 +174,40 @@
 }
 
 .cabinet-site-mon-page #table .cabinet-sm-td-notify {
-    width: 4.5rem;
-    min-width: 4.5rem;
+    width: 9rem;
+    min-width: 9rem;
+    max-width: 10rem;
     text-align: center;
+    vertical-align: middle;
+}
+
+.cabinet-site-mon-page #table .cabinet-sm-td-notify .cabinet-sm-cell {
+    min-height: 0;
+    justify-content: center;
+}
+
+.cabinet-site-mon-page #table .cabinet-sm-notify-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    width: 100%;
+}
+
+.cabinet-site-mon-page #table .cabinet-sm-notify-group .cabinet-sm-notify-row {
+    min-height: 1.25rem;
+    margin: 0;
+    padding-left: 2.5em;
+}
+
+.cabinet-site-mon-page #table .cabinet-sm-notify-group .form-check-input {
+    margin-top: 0;
+    cursor: pointer;
+}
+
+.cabinet-site-mon-page #table .cabinet-sm-notify-group .form-check-label {
+    line-height: 1.25;
+    white-space: nowrap;
 }
 
 .cabinet-site-mon-page #table .cabinet-sm-td-check {
@@ -232,16 +263,11 @@
     outline-offset: 2px;
 }
 
-.cabinet-site-mon-page #table .cabinet-sm-notify-switch {
+.cabinet-site-mon-create .cabinet-sm-notify-group {
     display: flex;
-    justify-content: center;
-    min-height: 1.25rem;
-    padding-left: 2.5em;
-}
-
-.cabinet-site-mon-page #table .cabinet-sm-notify-switch .form-check-input {
-    margin-top: 0;
-    cursor: pointer;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 16rem;
 }
 
 .cabinet-site-mon-page #table .cabinet-sm-status {
@@ -689,6 +715,39 @@
 
 .cabinet-sm-registry-table a {
     word-break: break-all;
+}
+
+.cabinet-sm-registry-col-notify {
+    min-width: 7.5rem;
+}
+
+.cabinet-sm-registry-notify-channels {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+}
+
+.cabinet-sm-registry-notify-badge {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+
+.cabinet-sm-registry-notify-badge--telegram {
+    color: #fff !important;
+    background-color: #0d6efd !important;
+}
+
+.cabinet-sm-registry-notify-badge--email {
+    color: #fff !important;
+    background-color: #8b5e14 !important;
+}
+
+.cabinet-sm-registry-notify-legend {
+    line-height: 1.6;
 }
 
 .cabinet-sm-registry-timing .badge {

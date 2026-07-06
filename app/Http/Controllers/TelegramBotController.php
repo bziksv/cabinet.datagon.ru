@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\TelegramConnectBonusService;
 use App\Services\TelegramBotService;
 use App\TelegramBot;
 use App\User;
@@ -29,8 +30,19 @@ class TelegramBotController extends Controller
                 ]);
 
                 if ($validator->passes()) {
-                    if ($telegram->updateUserChatID($email)) {
-                        $telegram->sendMsg(__('You have successfully subscribed to the notification newsletter'));
+                    $result = app(TelegramConnectBonusService::class)
+                        ->linkUserFromTelegramStart((int) $message['chat']['id'], $email);
+
+                    if ($result['linked']) {
+                        $telegram = new TelegramBotService($message['chat']['id']);
+                        if ($result['bonus_granted']) {
+                            $amount = app(TelegramConnectBonusService::class)->bonusAmount();
+                            $telegram->sendMsg(__('Telegram connect bonus success message', [
+                                'amount' => number_format($amount, 0, '.', ' '),
+                            ]));
+                        } else {
+                            $telegram->sendMsg(__('You have successfully subscribed to the notification newsletter'));
+                        }
                     }
                 } else {
                     $telegram->sendMsg("Команда не распознана");

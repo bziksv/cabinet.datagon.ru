@@ -12,6 +12,20 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                 </div>
                 <div class="modal-body pt-2">
+                    @if(($telegramConnectBonusEligible ?? false) && ($telegramConnectBonusAmount ?? 0) > 0)
+                        <div class="cabinet-telegram-connect-modal__bonus mb-3" role="note">
+                            <div class="cabinet-telegram-connect-modal__bonus-badge">
+                                <i class="bi bi-gift-fill" aria-hidden="true"></i>
+                                {{ __('Telegram connect bonus badge') }}
+                            </div>
+                            <p class="cabinet-telegram-connect-modal__bonus-title mb-1">
+                                {{ __('Telegram connect bonus title', ['amount' => number_format($telegramConnectBonusAmount, 0, '.', ' ')]) }}
+                            </p>
+                            <p class="cabinet-telegram-connect-modal__bonus-text mb-0">
+                                {{ __('Telegram connect bonus description') }}
+                            </p>
+                        </div>
+                    @endif
                     <p class="mb-3">
                         {{ __('Connect our Telegram bot so you do not miss project updates: statuses, monitoring alerts, and other important events.') }}
                     </p>

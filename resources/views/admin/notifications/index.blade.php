@@ -97,7 +97,7 @@
             </div>
             <div class="col-6 col-lg-3 d-flex">
                 <div class="info-box mb-0 flex-fill shadow-sm">
-                    <span class="info-box-icon text-bg-warning shadow-sm">
+                    <span class="info-box-icon text-bg-cabinet-lang shadow-sm">
                         <img src="{{ asset('img/flags/'.($adminLang ?? 'ru').'.png') }}" class="img-flag" alt="">
                     </span>
                     <div class="info-box-content">

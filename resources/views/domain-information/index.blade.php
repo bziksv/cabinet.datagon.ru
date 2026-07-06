@@ -32,6 +32,8 @@
     </div>
 
     <div class="cabinet-di-page">
+        @include('domain-information.partials.module-nav', ['active' => 'projects', 'admin' => $admin ?? false])
+
         <div class="d-flex flex-column gap-2">
             @include('domain-information.partials.free-tariff-email-notice')
             @include('partials.cabinet-telegram-notify-notice', ['extraClass' => 'cabinet-di-cabinet-only-notice'])

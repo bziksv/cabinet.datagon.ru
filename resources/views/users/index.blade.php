@@ -329,15 +329,16 @@
                 },
                 order: [[0, 'desc']],
                 createdRow: function (row, data) {
-                    $(row).find('td').eq(6).attr('data-order', data.last_online_strtotime || 0);
+                    $(row).find('td').eq(6).attr('data-order', data.telegram_sort || 0);
+                    $(row).find('td').eq(7).attr('data-order', data.last_online_strtotime || 0);
                     var storageOrder = data.storage ? (data.storage.rows != null ? data.storage.rows : -1) : -1;
-                    $(row).find('td').eq(7).attr('data-order', storageOrder);
+                    $(row).find('td').eq(8).attr('data-order', storageOrder);
                 },
                 columnDefs: [
-                    {orderable: true, targets: [0, 1, 2, 3, 4, 5, 6, 7]},
-                    {orderable: false, targets: [8]},
-                    {className: 'cabinet-users-storage-col text-nowrap', targets: [7]},
-                    {className: 'cabinet-users-actions-col text-nowrap', targets: [8]},
+                    {orderable: true, targets: [0, 1, 2, 3, 4, 5, 6, 7, 8]},
+                    {orderable: false, targets: [9]},
+                    {className: 'cabinet-users-storage-col text-nowrap', targets: [8]},
+                    {className: 'cabinet-users-actions-col text-nowrap', targets: [9]},
                 ],
                 columns: [
                     {
@@ -410,6 +411,23 @@
                             });
                             return html;
                         },
+                    },
+                    {
+                        name: 'telegram',
+                        title: @json(__('Telegram')),
+                        data: function (row) {
+                            if (row.telegram_connected) {
+                                var html = '<span class="badge text-bg-info"><i class="bi bi-telegram me-1" aria-hidden="true"></i>' +
+                                    @json(__('Telegram connected')) + '</span>';
+                                if (row.telegram_chat_id) {
+                                    html += '<br><small class="text-secondary">ID ' +
+                                        $('<div>').text(row.telegram_chat_id).html() + '</small>';
+                                }
+                                return html;
+                            }
+                            return '<span class="text-secondary small">' + @json(__('Telegram not connected')) + '</span>';
+                        },
+                        className: 'text-nowrap',
                     },
                     {
                         name: 'last_online_at',

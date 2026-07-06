@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => '1.7.0s',
+    'version' => '1.7.3s',
 
     /** Последних проверок в PDF и публичной ссылке. */
     'report_export_log_limit' => 100,

@@ -7,4 +7,6 @@
 Посмотреть в кабинете
 @endcomponent
 
+{{ \App\Support\MailNotificationFooter::unsubscribeMarkdown() }}
+
 @endcomponent

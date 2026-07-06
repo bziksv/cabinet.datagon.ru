@@ -1,5 +1,53 @@
 /* /admin/notifications — таблица + тесты */
 
+.cabinet-notifications-admin-page {
+    --cabinet-notify-email-bg: #8b5e14;
+    --cabinet-notify-email-bg-hover: #744d10;
+    --cabinet-notify-email-border: #744d10;
+    --cabinet-notify-email-text: #5c4a0f;
+    --cabinet-notify-lang-bg: #495057;
+}
+
+.cabinet-notifications-admin-page .text-bg-email {
+    color: #fff !important;
+    background-color: var(--cabinet-notify-email-bg) !important;
+}
+
+.cabinet-notifications-admin-page .text-bg-cabinet-lang {
+    color: #fff !important;
+    background-color: var(--cabinet-notify-lang-bg) !important;
+}
+
+.cabinet-notifications-admin-page .text-cabinet-email {
+    color: var(--cabinet-notify-email-text) !important;
+}
+
+.cabinet-notifications-admin-page .btn-cabinet-email {
+    color: #fff;
+    background-color: var(--cabinet-notify-email-bg);
+    border-color: var(--cabinet-notify-email-border);
+}
+
+.cabinet-notifications-admin-page .btn-cabinet-email:hover,
+.cabinet-notifications-admin-page .btn-cabinet-email:focus {
+    color: #fff;
+    background-color: var(--cabinet-notify-email-bg-hover);
+    border-color: var(--cabinet-notify-email-bg-hover);
+}
+
+.cabinet-notifications-admin-page .btn-outline-cabinet-email {
+    color: var(--cabinet-notify-email-text);
+    border-color: var(--cabinet-notify-email-border);
+    background-color: transparent;
+}
+
+.cabinet-notifications-admin-page .btn-outline-cabinet-email:hover,
+.cabinet-notifications-admin-page .btn-outline-cabinet-email:focus {
+    color: #fff;
+    background-color: var(--cabinet-notify-email-bg);
+    border-color: var(--cabinet-notify-email-border);
+}
+
 .cabinet-notifications-admin-page .cabinet-notify-lead {
     max-width: 52rem;
 }

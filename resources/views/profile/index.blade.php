@@ -62,6 +62,13 @@
                                     @endif
                                 </button>
                             </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="profile-notifications-tab" data-bs-toggle="tab"
+                                        data-bs-target="#profile-notifications" type="button" role="tab"
+                                        aria-controls="profile-notifications" aria-selected="false">
+                                    <i class="bi bi-envelope me-1"></i>{{ __('Profile notify tab') }}
+                                </button>
+                            </li>
                             @hasanyrole('Super Admin|admin')
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link" id="profile-tariff-tab" data-bs-toggle="tab"
@@ -134,6 +141,9 @@
                                     {!! Form::label('email', __('Email'), ['class' => 'form-label']) !!}
                                     {!! Form::email('email', null, ['class' => 'form-control' . ($errors->has('email') ? ' is-invalid' : ''), 'required' => true]) !!}
                                     @error('email') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                                    @if($errors->has('email_policy_html'))
+                                        <div class="mt-2">{!! $errors->first('email_policy_html') !!}</div>
+                                    @endif
                                     @if($emailPending)
                                         <div class="form-text text-warning">{{ __('After changing email you will need to verify it again.') }}</div>
                                     @endif
@@ -219,7 +229,7 @@
                                     @endif
                                 </p>
                                 <div class="d-flex flex-wrap gap-2">
-                                    <a href="https://t.me/RedBoxServiceBot?start={{ base64_encode($user->email) }}"
+                                    <a href="{{ $user->telegramBotSubscribeUrl() }}"
                                        target="_blank"
                                        rel="noopener noreferrer"
                                        class="btn btn-primary">
@@ -234,6 +244,13 @@
                                 @if (!($telegramConnected ?? false))
                                     <p class="small text-secondary mt-3 mb-0">{{ __('After subscribing in Telegram, refresh this page.') }}</p>
                                 @endif
+                            </div>
+
+                            <div class="tab-pane fade" id="profile-notifications" role="tabpanel" aria-labelledby="profile-notifications-tab" tabindex="0">
+                                @if (session('notification_status'))
+                                    <div class="alert alert-success">{{ session('notification_status') }}</div>
+                                @endif
+                                @include('profile.partials.notifications')
                             </div>
 
                             @hasanyrole('Super Admin|admin')
@@ -265,7 +282,12 @@
 
             function showProfileTabFromHash() {
                 var hash = (window.location.hash || '').replace('#', '');
-                var map = {password: 'profile-password-tab', telegram: 'profile-telegram-tab', tariff: 'profile-tariff-tab'};
+                var map = {
+                    password: 'profile-password-tab',
+                    telegram: 'profile-telegram-tab',
+                    notifications: 'profile-notifications-tab',
+                    tariff: 'profile-tariff-tab'
+                };
                 var id = map[hash];
                 if (!id) {
                     return;
@@ -273,6 +295,18 @@
                 var el = document.getElementById(id);
                 if (el && window.bootstrap) {
                     bootstrap.Tab.getOrCreateInstance(el).show();
+                }
+            }
+
+            function scrollToHighlightedNotification() {
+                var params = new URLSearchParams(window.location.search);
+                var pref = params.get('pref');
+                if (!pref) {
+                    return;
+                }
+                var row = document.querySelector('.cabinet-profile-notify-row[data-pref-key="' + CSS.escape(pref) + '"]');
+                if (row) {
+                    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
             }
 
@@ -291,6 +325,8 @@
                             history.replaceState(null, '', '#password');
                         } else if (target === '#profile-telegram') {
                             history.replaceState(null, '', '#telegram');
+                        } else if (target === '#profile-notifications') {
+                            history.replaceState(null, '', '#notifications');
                         } else if (target === '#profile-tariff') {
                             history.replaceState(null, '', '#tariff');
                         } else {
@@ -298,6 +334,14 @@
                         }
                     });
                 });
+
+                var notificationsTab = document.getElementById('profile-notifications-tab');
+                if (notificationsTab) {
+                    notificationsTab.addEventListener('shown.bs.tab', scrollToHighlightedNotification);
+                }
+                if ((window.location.hash || '').replace('#', '') === 'notifications') {
+                    scrollToHighlightedNotification();
+                }
 
                 var $lang = $('.flags');
                 if ($lang.length && $.fn.select2) {

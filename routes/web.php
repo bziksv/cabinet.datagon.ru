@@ -43,6 +43,7 @@ Route::get('public/share/site-monitoring/{token}', 'SiteMonitoringPublicShareCon
 Route::get('public/share/domain-information/{token}', 'DomainInformationPublicShareController@show')->name('domain.information.public.share.view');
 Route::get('public/share/monitoring-v2/{token}', 'MonitoringPublicShareController@show')->name('monitoring.public.share.view');
 Route::post('/balance-add/result', 'BalanceAddController@result')->name('balance.add.result');
+Route::get('/email/open/trigger/{token}.png', 'TriggerCampaignEmailOpenController@pixel')->name('email.trigger.open');
 Route::get('/personal-data/ru', 'AccessController@getRuPersonalData');
 Route::get('/personal-data/en', 'AccessController@getEnPersonalData');
 Route::get('/privacy-policy/ru', 'AccessController@getRuPrivacyPolicy');
@@ -109,6 +110,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/admin/xml-providers', 'XmlProvidersAdminController@index')->name('admin.xml-providers.index');
     Route::post('/admin/xml-providers/refresh', 'XmlProvidersAdminController@refresh')->name('admin.xml-providers.refresh');
 
+    Route::get('/admin/finance', 'FinanceAdminController@index')->name('admin.finance.index');
+    Route::get('/admin/finance/users-search', 'FinanceAdminController@searchUsers')->name('admin.finance.users-search');
+    Route::post('/admin/finance/credit', 'FinanceAdminController@credit')->name('admin.finance.credit');
+    Route::post('/admin/finance/promo', 'FinanceAdminController@storePromo')->name('admin.finance.promo.store');
+    Route::put('/admin/finance/promo/{promoCode}', 'FinanceAdminController@updatePromo')->name('admin.finance.promo.update');
+    Route::patch('/admin/finance/promo/{promoCode}/toggle', 'FinanceAdminController@togglePromo')->name('admin.finance.promo.toggle');
+    Route::post('/admin/finance/promo/simulate', 'FinanceAdminController@simulateTopUp')->name('admin.finance.promo.simulate');
+    Route::put('/admin/finance/trigger/{triggerCampaign}', 'FinanceAdminController@updateTriggerCampaign')->name('admin.finance.trigger.update');
+    Route::patch('/admin/finance/trigger/{triggerCampaign}/toggle', 'FinanceAdminController@toggleTriggerCampaign')->name('admin.finance.trigger.toggle');
+    Route::patch('/admin/finance/trigger/{triggerCampaign}/pause', 'FinanceAdminController@pauseTriggerCampaign')->name('admin.finance.trigger.pause');
+    Route::patch('/admin/finance/trigger/{triggerCampaign}/resume', 'FinanceAdminController@resumeTriggerCampaign')->name('admin.finance.trigger.resume');
+    Route::post('/admin/finance/trigger/{triggerCampaign}/test', 'FinanceAdminController@testTriggerCampaign')->name('admin.finance.trigger.test');
+    Route::get('/admin/finance/trigger/{triggerCampaign}/stats', 'FinanceAdminController@triggerCampaignStats')->name('admin.finance.trigger.stats');
+
     Route::get('/admin/smtp', 'SmtpAdminController@index')->name('admin.smtp.index');
     Route::put('/admin/smtp', 'SmtpAdminController@update')->name('admin.smtp.update');
     Route::post('/admin/smtp/import-env', 'SmtpAdminController@importFromEnv')->name('admin.smtp.import-env');
@@ -148,6 +163,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::redirect('/meta-tags/statistic', '/meta-tags/settings#cabinet-mt-admin-registry', 301)->middleware(['role:Super Admin|admin']);
     Route::resource('meta-tags', 'MetaTagsController');
 
+    Route::patch('profile/notifications', 'ProfilesController@updateNotifications')->name('profile.notifications.update');
     Route::get('profile/', 'ProfilesController@index')->name('profile.index');
     Route::post('profile/', 'ProfilesController@update')->name('profile.update');
     Route::patch('profile/', 'ProfilesController@password')->name('profile.password');
@@ -244,6 +260,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('edit-link', 'BacklinkController@editLink')->name('edit.link');
     Route::get('add-link/{id}', 'BacklinkController@addLinkView')->name('add.link.view');
     Route::post('edit-backlink', 'BacklinkController@editBacklink')->name('edit.backlink');
+    Route::get('backlink-config', 'BacklinkController@config')->name('backlink.config');
+    Route::post('backlink-config', 'BacklinkController@editConfig')->name('backlink.edit.config');
     Route::post('add-link', 'BacklinkController@storeLink');
 
     Route::get('site-monitoring', 'MonitoringDomainController@index')->name('site.monitoring');
@@ -276,6 +294,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('domain-information-export-pdf', 'DomainInformationController@exportPdf')->name('domain.information.export.pdf');
     Route::post('domain-information-public-share', 'DomainInformationController@createPublicShare')->name('domain.information.public.share.create');
     Route::post('domain-information-public-share/revoke', 'DomainInformationController@revokePublicShare')->name('domain.information.public.share.revoke');
+    Route::get('domain-information-config', 'DomainInformationController@config')->name('domain.information.config');
+    Route::post('domain-information-config', 'DomainInformationController@editConfig')->name('domain.information.edit.config');
 
     Route::get('text-analyzer', 'TextAnalyzerController@index')->name('text.analyzer.view');
     Route::get('/redirect-to-text-analyzer/{url}', 'TextAnalyzerController@redirectToAnalyse')->name('text.analyzer.redirect');
@@ -364,6 +384,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/edit-policy-files', 'AdminController@editPolicyFiles')->name('edit.policy.files');
     Route::post('/get-policy-document', 'AdminController@getPolicyDocument')->name('get.policy.document');
     Route::get('/balance/{response?}', 'BalanceController@index')->name('balance.index');
+    Route::post('/balance/promo/preview', 'BalancePromoController@preview')->name('balance.promo.preview');
+    Route::post('/balance/promo/redeem', 'BalancePromoController@redeem')->name('balance.promo.redeem');
     Route::post('/counting/yandex-metrics/', 'BalanceController@countingMetrics')->name('counting.metrics');
     Route::resource('balance-add', 'BalanceAddController');
 

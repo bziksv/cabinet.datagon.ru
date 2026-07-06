@@ -2,13 +2,16 @@
 
 namespace App\Notifications;
 
+use App\Contracts\EmailPreferenceAware;
+use App\Notifications\Concerns\AppendsMailUnsubscribe;
 use App\Notifications\Concerns\LocalizesMailContent;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class BrokenLinkNotification extends Notification
+class BrokenLinkNotification extends Notification implements EmailPreferenceAware
 {
+    use AppendsMailUnsubscribe;
     use LocalizesMailContent;
     use Queueable;
 
@@ -48,7 +51,8 @@ class BrokenLinkNotification extends Notification
     {
         $this->applyMailLocale($notifiable);
 
-        return (new MailMessage)
+        return $this->appendMailUnsubscribe(
+            (new MailMessage)
             ->greeting(__('Mail notify greeting'))
             ->line(__('Mail notify auto disclaimer'))
             ->line(__('Mail notify backlink donor', ['donor' => $this->link->site_donor]))
@@ -56,7 +60,14 @@ class BrokenLinkNotification extends Notification
             ->line(__('Mail notify backlink anchor', ['anchor' => $this->link->anchor]))
             ->line(__('Mail notify backlink error', ['error' => $this->request]))
             ->action(__('Mail notify check projects'), route('backlink'))
-            ->line(__('Mail notify thanks app'));
+            ->line(__('Mail notify thanks app')),
+            $this->emailPreferenceKey()
+        );
+    }
+
+    public function emailPreferenceKey(): ?string
+    {
+        return 'backlink-email-link';
     }
 
     /**

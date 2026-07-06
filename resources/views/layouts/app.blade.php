@@ -108,7 +108,7 @@
 
         function closeCabinetAdminGear() {
             var $menu = cabinetAdminGearMenu();
-            $menu.removeClass('is-open').css({top: '', left: '', display: ''});
+            $menu.removeClass('is-open').css({top: '', left: '', display: '', maxHeight: ''});
             var $home = $menu.data('gear-home');
             if ($home && $home.length) {
                 $menu.appendTo($home);
@@ -130,7 +130,8 @@
             $menu.addClass('is-open');
             var rect = $btn[0].getBoundingClientRect();
             var menuWidth = $menu.outerWidth() || 272;
-            var menuHeight = $menu.outerHeight() || 240;
+            var maxMenuHeight = Math.min(window.innerHeight * 0.75, 576);
+            var menuHeight = Math.min($menu.outerHeight() || 240, maxMenuHeight);
             var top = rect.top;
             var left = rect.right + 6;
             if (left + menuWidth > window.innerWidth - 8) {
@@ -139,7 +140,7 @@
             if (top + menuHeight > window.innerHeight - 8) {
                 top = Math.max(8, window.innerHeight - menuHeight - 8);
             }
-            $menu.css({top: top + 'px', left: left + 'px'});
+            $menu.css({top: top + 'px', left: left + 'px', maxHeight: maxMenuHeight + 'px'});
         }
         $(document).on('click', '.cabinet-admin-gear__toggle', function (e) {
             e.preventDefault();

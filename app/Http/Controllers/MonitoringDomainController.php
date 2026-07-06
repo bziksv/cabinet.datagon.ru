@@ -111,11 +111,21 @@ class MonitoringDomainController extends Controller
 
         $monitoring = new DomainMonitoring($data);
         $monitoring->user_id = $user->id;
-        $monitoring->send_notification = (int) $request->input('send_notification', SiteMonitoringConfig::defaultSendNotification() ? 1 : 0);
+
+        $defaultNotify = SiteMonitoringConfig::defaultSendNotification();
+        if ($user->onFreeTariff()) {
+            $monitoring->notify_telegram = 0;
+            $monitoring->notify_email = 0;
+        } else {
+            $monitoring->notify_telegram = (int) $request->input('notify_telegram', $defaultNotify ? 1 : 0);
+            $emailRequested = (int) $request->input('notify_email', 0);
+            $monitoring->notify_email = $user->canReceiveSiteMonitoringEmail() ? $emailRequested : 0;
+        }
+        $monitoring->send_notification = (int) ($monitoring->notify_telegram || $monitoring->notify_email);
         $monitoring->save();
 
         $user = Auth::user();
-        if ($user && !$user->receivesSiteMonitoringExternalAlerts((bool) $monitoring->send_notification)) {
+        if ($user && !$user->receivesSiteMonitoringExternalAlerts($monitoring->notify_telegram || $monitoring->notify_email)) {
             flash()->overlay(__('Site monitoring cabinet only flash'), ' ')->info();
         } else {
             flash()->overlay(__('Monitoring was successfully created'), ' ')->success();
@@ -341,10 +351,18 @@ class MonitoringDomainController extends Controller
      */
     public function edit(Request $request): JsonResponse
     {
-        $allowed = ['project_name', 'link', 'phrase', 'timing', 'waiting_time'];
+        $notifyFields = ['notify_telegram', 'notify_email'];
+        $allowed = array_merge(['project_name', 'link', 'phrase', 'timing', 'waiting_time'], $notifyFields);
         $field = (string) $request->input('name', '');
         if (!in_array($field, $allowed, true)) {
             return response()->json(['message' => __('An error has occurred')], 400);
+        }
+
+        if (in_array($field, $notifyFields, true)) {
+            $user = Auth::user();
+            if ($field === 'notify_email' && !$user->canReceiveSiteMonitoringEmail()) {
+                return response()->json(['message' => __('Site monitoring free tariff email notice title')], 403);
+            }
         }
 
         $value = $request->input('option');
@@ -353,7 +371,9 @@ class MonitoringDomainController extends Controller
         }
         $value = is_string($value) ? trim($value) : $value;
 
-        if ($field !== 'phrase' && $value === '') {
+        if (in_array($field, $notifyFields, true)) {
+            $value = (int) $value;
+        } elseif ($field !== 'phrase' && $value === '') {
             return response()->json(['message' => __('The field must contain more than 0 characters')], 400);
         }
 
@@ -373,16 +393,20 @@ class MonitoringDomainController extends Controller
             $value = 'https://' . $value;
         }
 
-        $updated = DomainMonitoring::query()
+        $project = DomainMonitoring::query()
             ->where('id', $projectId)
             ->where('user_id', Auth::id())
-            ->update([
-                $field => $value,
-            ]);
+            ->first();
 
-        if ($updated < 1) {
+        if (!$project) {
             return response()->json(['message' => __('An error has occurred')], 404);
         }
+
+        $project->{$field} = $value;
+        if (in_array($field, $notifyFields, true)) {
+            $project->send_notification = (int) ($project->notify_telegram || $project->notify_email);
+        }
+        $project->save();
 
         return response()->json([
             'ok' => true,

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Finance\PromoCodeRateLimitService;
 use App\Balance;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,11 +20,12 @@ class BalanceController extends Controller
     public function index($response = null)
     {
         $user = Auth::user();
-        $balances = $user->balances()->orderBy('id', 'desc')->paginate(10);
+        $balances = $user->balances()->with('promoCode:id,code')->orderBy('id', 'desc')->paginate(10);
         $topUpsCount = $user->balances()->where('status', 1)->count();
         $lastTopUp = $user->balances()->where('status', 1)->orderBy('id', 'desc')->first();
+        $promoLock = app(PromoCodeRateLimitService::class)->statusForUser($user);
 
-        return view('balance.index', compact('balances', 'response', 'topUpsCount', 'lastTopUp'));
+        return view('balance.index', compact('balances', 'response', 'topUpsCount', 'lastTopUp', 'promoLock'));
     }
 
     /**

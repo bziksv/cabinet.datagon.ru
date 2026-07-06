@@ -68,6 +68,15 @@
         </div>
     </div>
 
+    <div class="alert alert-light border small mb-3 py-2 cabinet-sm-registry-notify-legend" role="note">
+        <span class="fw-semibold me-1">{{ __('Site monitoring registry notify legend title') }}:</span>
+        <span class="badge rounded-pill cabinet-sm-registry-notify-badge cabinet-sm-registry-notify-badge--telegram me-1"><i class="bi bi-telegram me-1" aria-hidden="true"></i>TG</span>{{ __('Site monitoring registry notify legend telegram') }}
+        <span class="mx-2 text-secondary">·</span>
+        <span class="badge rounded-pill cabinet-sm-registry-notify-badge cabinet-sm-registry-notify-badge--email me-1"><i class="bi bi-envelope me-1" aria-hidden="true"></i>{{ __('Email') }}</span>{{ __('Site monitoring registry notify legend email') }}
+        <span class="mx-2 text-secondary">·</span>
+        {{ __('Site monitoring registry notify legend free') }}
+    </div>
+
     <div class="card shadow-sm">
         <div class="card-body p-0">
             @if(count($rows) === 0)
@@ -84,7 +93,7 @@
                             <th>{{ __('Project name') }}</th>
                             <th>{{ __('Link') }}</th>
                             <th class="text-nowrap">{{ __('Monitoring frequency') }}</th>
-                            <th class="text-center">{{ __('Notifications') }}</th>
+                            <th class="text-center cabinet-sm-registry-col-notify">{{ __('Site monitoring registry notify delivery') }}</th>
                             <th>{{ __('Status') }}</th>
                             <th class="text-nowrap">{{ __('Last check') }}</th>
                         </tr>
@@ -110,14 +119,7 @@
                                     @endif
                                 </td>
                                 <td data-order="{{ $row['tariff_sort'] }} {{ $row['tariff_label'] }}">
-                                    <div class="d-flex flex-wrap align-items-center gap-1">
-                                        <span class="badge text-bg-secondary">{{ $row['tariff_label'] }}</span>
-                                        @if($row['telegram'])
-                                            <span class="badge text-bg-info" title="Telegram">
-                                                <i class="bi bi-telegram" aria-hidden="true"></i>
-                                            </span>
-                                        @endif
-                                    </div>
+                                    <span class="badge text-bg-secondary">{{ $row['tariff_label'] }}</span>
                                 </td>
                                 <td data-order="{{ $row['project_name'] }}">
                                     <span class="fw-medium">{{ $row['project_name'] }}</span>
@@ -131,12 +133,8 @@
                                     {{ $row['timing'] }} {{ __('min') }}
                                     <span class="text-secondary">· {{ $row['waiting_time'] }} {{ __('sec') }}</span>
                                 </td>
-                                <td data-order="{{ $row['send_notification'] ? 1 : 0 }}" class="text-center">
-                                    @if($row['send_notification'])
-                                        <i class="bi bi-bell-fill text-success" title="{{ __('On') }}"></i>
-                                    @else
-                                        <i class="bi bi-bell-slash text-secondary" title="{{ __('Off') }}"></i>
-                                    @endif
+                                <td data-order="{{ $row['notify_delivery_sort'] ?? 0 }}" class="text-center cabinet-sm-registry-col-notify">
+                                    @include('site-monitoring.partials.registry-notify-delivery', ['row' => $row])
                                 </td>
                                 <td data-order="{{ $row['broken'] ? 0 : 1 }} {{ $row['status_label'] }}">
                                     @if($row['status'])

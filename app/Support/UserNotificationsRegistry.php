@@ -278,7 +278,7 @@ class UserNotificationsRegistry
                 'key' => 'email_event',
                 'label' => __($channels['email_event']['title'] ?? 'email_event'),
                 'icon' => $channels['email_event']['icon'] ?? 'bi-envelope-exclamation',
-                'color' => $channels['email_event']['color'] ?? 'warning',
+                'color' => $channels['email_event']['color'] ?? 'email',
             ],
             'email_service' => [
                 'key' => 'email_service',

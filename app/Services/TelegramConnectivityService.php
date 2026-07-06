@@ -9,7 +9,11 @@ class TelegramConnectivityService
 {
     public const SEND_ORDER_CACHE_KEY = 'telegram_send_attempt_order_v3';
 
+    public const DISPLAY_STATUS_CACHE_KEY = 'telegram_connectivity_display_v1';
+
     private const SEND_ORDER_CACHE_MINUTES = 5;
+
+    private const DISPLAY_STATUS_CACHE_MINUTES = 30;
 
     /**
      * Порядок для sendMessage: direct, затем proxy:{id} по приоритету.
@@ -34,6 +38,11 @@ class TelegramConnectivityService
     public static function forgetSendAttemptOrderCache(): void
     {
         Cache::forget(self::SEND_ORDER_CACHE_KEY);
+    }
+
+    public static function forgetDisplayStatusCache(): void
+    {
+        Cache::forget(self::DISPLAY_STATUS_CACHE_KEY);
     }
 
     /**
@@ -119,6 +128,8 @@ class TelegramConnectivityService
     }
 
     /**
+     * Быстрый статус для GET /admin/telegram-proxy (без curl к api.telegram.org).
+     *
      * @return array{
      *   direct: array,
      *   proxies: array<int, array>,
@@ -127,10 +138,36 @@ class TelegramConnectivityService
      *   proxy_masked: string,
      *   env_proxy_masked: string,
      *   token_configured: bool,
-     *   send_order: array<int, string>
+     *   send_order: array<int, string>,
+     *   probes_checked: bool
      * }
      */
-    public function status(): array
+    public function displayStatus(): array
+    {
+        $cached = Cache::get(self::DISPLAY_STATUS_CACHE_KEY);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        return $this->statusSummary();
+    }
+
+    /**
+     * Полная проверка connectivity (curl direct + каждый прокси). Только по кнопке «Проверить снова».
+     *
+     * @return array{
+     *   direct: array,
+     *   proxies: array<int, array>,
+     *   proxy_count: int,
+     *   proxy_configured: bool,
+     *   proxy_masked: string,
+     *   env_proxy_masked: string,
+     *   token_configured: bool,
+     *   send_order: array<int, string>,
+     *   probes_checked: bool
+     * }
+     */
+    public function probeStatus(): array
     {
         TelegramProxyRegistry::syncLegacyConfig();
 
@@ -152,8 +189,78 @@ class TelegramConnectivityService
             'env_proxy_masked' => self::maskProxyUrl($envUrl),
             'token_configured' => config('app.telegram_bot_token') !== null
                 && config('app.telegram_bot_token') !== '',
-            'send_order' => $this->sendAttemptOrder(false),
+            'send_order' => $this->sendAttemptOrder(true),
+            'probes_checked' => true,
         ];
+    }
+
+    /**
+     * @return array{
+     *   direct: array,
+     *   proxies: array<int, array>,
+     *   proxy_count: int,
+     *   proxy_configured: bool,
+     *   proxy_masked: string,
+     *   env_proxy_masked: string,
+     *   token_configured: bool,
+     *   send_order: array<int, string>,
+     *   probes_checked: bool
+     * }
+     */
+    public function refreshDisplayStatus(): array
+    {
+        self::forgetSendAttemptOrderCache();
+        $status = $this->probeStatus();
+        Cache::put(self::DISPLAY_STATUS_CACHE_KEY, $status, now()->addMinutes(self::DISPLAY_STATUS_CACHE_MINUTES));
+
+        return $status;
+    }
+
+    /**
+     * @return array{
+     *   direct: array,
+     *   proxies: array<int, array>,
+     *   proxy_count: int,
+     *   proxy_configured: bool,
+     *   proxy_masked: string,
+     *   env_proxy_masked: string,
+     *   token_configured: bool,
+     *   send_order: array<int, string>,
+     *   probes_checked: bool
+     * }
+     */
+    public function statusSummary(): array
+    {
+        TelegramProxyRegistry::syncLegacyConfig();
+
+        $proxies = [];
+        foreach (TelegramProxyRegistry::all() as $row) {
+            $proxies[] = TelegramProxyRegistry::rowWithoutProbe($row);
+        }
+
+        $enabled = TelegramProxyRegistry::enabled();
+        $primaryUrl = $enabled[0]['url'] ?? null;
+        $envUrl = TelegramProxyRegistry::configProxyUrl();
+        $sendOrder = Cache::get(self::SEND_ORDER_CACHE_KEY);
+
+        return [
+            'direct' => [],
+            'proxies' => $proxies,
+            'proxy_count' => count($proxies),
+            'proxy_configured' => count($enabled) > 0 || $envUrl !== '',
+            'proxy_masked' => self::maskProxyUrl((string) ($primaryUrl ?? '')),
+            'env_proxy_masked' => self::maskProxyUrl($envUrl),
+            'token_configured' => config('app.telegram_bot_token') !== null
+                && config('app.telegram_bot_token') !== '',
+            'send_order' => is_array($sendOrder) ? $sendOrder : [],
+            'probes_checked' => false,
+        ];
+    }
+
+    /** @deprecated Use probeStatus() or displayStatus() */
+    public function status(): array
+    {
+        return $this->probeStatus();
     }
 
     public static function maskProxyUrl(string $proxy): string

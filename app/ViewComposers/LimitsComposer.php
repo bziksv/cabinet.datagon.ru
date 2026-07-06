@@ -108,16 +108,22 @@ class LimitsComposer
                     'position' => 5
                 ];
 
+            case 'monitoring':
+                return [
+                    'count' => (new PositionLimit($user))->getCounter(),
+                    'position' => 6,
+                ];
+
             case 'DomainInformation':
                 return [
                     'count' => (int)DomainInformation::where('user_id', '=', $user->id)->count(),
-                    'position' => 6
+                    'position' => 7
                 ];
 
             case 'MetaTagsProject':
                 return [
                     'count' => MetaTag::where('user_id', '=', Auth::id())->count(),
-                    'position' => 7,
+                    'position' => 8,
                 ];
 
             case 'MetaTagsPages':
@@ -129,12 +135,6 @@ class LimitsComposer
                                 ->where('user_id', $user->id);
                         })
                         ->count(),
-                    'position' => 8,
-                ];
-
-            case 'monitoring':
-                return [
-                    'count' => (new PositionLimit($user))->getCounter(),
                     'position' => 9,
                 ];
 
@@ -247,23 +247,23 @@ class LimitsComposer
             case 'domainMonitoringProject':
                 return 5;
 
-            case 'DomainInformation':
+            case 'monitoring':
                 return 6;
 
-            case 'MetaTagsProject':
+            case 'DomainInformation':
                 return 7;
 
-            case 'MetaTagsPages':
+            case 'MetaTagsProject':
                 return 8;
+
+            case 'MetaTagsPages':
+                return 9;
 
             case 'BacklinkProject':
                 return 11;
 
             case 'BacklinkLinks':
                 return 12;
-
-            case 'monitoring':
-                return 13;
 
             case 'ListComparison':
                 return 14;

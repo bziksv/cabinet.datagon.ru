@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\BacklinkConfig;
 use App\Classes\SimpleHtmlDom\HtmlDocument;
 use App\LinkTracking;
 use App\ProjectTracking;
+use App\Support\BacklinkAdminStats;
 use App\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -35,6 +37,8 @@ class BacklinkController extends Controller
         $user = Auth::user();
         $onFreeTariff = $user->onFreeTariff();
         $telegramConnected = $user->isTelegramConnected();
+        $backlinkEmailAvailable = $user->canReceiveBacklinkEmail();
+        $admin = User::isUserAdmin();
 
         if (count($backlinks) === 0) {
             return $this->createView();
@@ -43,7 +47,9 @@ class BacklinkController extends Controller
         return view('backlink.index', compact(
             'backlinks',
             'onFreeTariff',
-            'telegramConnected'
+            'telegramConnected',
+            'backlinkEmailAvailable',
+            'admin'
         ));
     }
 
@@ -68,8 +74,10 @@ class BacklinkController extends Controller
         $monitoring = $this->getMonitoringOptions();
         $onFreeTariff = $user->onFreeTariff();
         $telegramConnected = $user->isTelegramConnected();
+        $backlinkEmailAvailable = $user->canReceiveBacklinkEmail();
+        $admin = User::isUserAdmin();
 
-        return view('backlink.create', compact('monitoring', 'onFreeTariff', 'telegramConnected'));
+        return view('backlink.create', compact('monitoring', 'onFreeTariff', 'telegramConnected', 'backlinkEmailAvailable', 'admin'));
     }
 
     public function addLinkView($id)
@@ -142,9 +150,41 @@ class BacklinkController extends Controller
 
     public function editBacklink(Request $request): JsonResponse
     {
-        ProjectTracking::where('id', $request->id)->update([
-            $request->name => $request->option
-        ]);
+        $allowed = ['project_name', 'notify_telegram', 'notify_email'];
+        $field = (string) $request->input('name', '');
+        if (!in_array($field, $allowed, true)) {
+            return response()->json([], 400);
+        }
+
+        if ($field === 'notify_email') {
+            $user = Auth::user();
+            if (!$user->canReceiveBacklinkEmail()) {
+                return response()->json(['message' => __('Backlink free tariff email notice title')], 403);
+            }
+        }
+
+        $projectId = (int) $request->input('id');
+        if ($projectId < 1) {
+            return response()->json([], 400);
+        }
+
+        $value = $request->input('option');
+        if (in_array($field, ['notify_telegram', 'notify_email'], true)) {
+            $value = (int) $value;
+        } elseif ($field === 'project_name' && strlen((string) $value) < 1) {
+            return response()->json([], 400);
+        }
+
+        $updated = ProjectTracking::query()
+            ->where('id', $projectId)
+            ->where('user_id', Auth::id())
+            ->update([
+                $field => $value,
+            ]);
+
+        if ($updated < 1) {
+            return response()->json([], 404);
+        }
 
         return response()->json([]);
     }
@@ -465,5 +505,46 @@ class BacklinkController extends Controller
         }
 
         return $options;
+    }
+
+    public function config()
+    {
+        if (!User::isUserAdmin()) {
+            abort(403);
+        }
+
+        $registry = BacklinkAdminStats::snapshot();
+
+        return view('backlink.config', [
+            'admin' => true,
+            'config' => BacklinkConfig::instance(),
+            'stats' => $registry['summary'],
+            'registry' => $registry,
+        ]);
+    }
+
+    public function editConfig(Request $request): RedirectResponse
+    {
+        if (!User::isUserAdmin()) {
+            abort(403);
+        }
+
+        $request->validate([
+            'default_notify_telegram' => 'nullable|boolean',
+            'default_notify_email' => 'nullable|boolean',
+            'email_notifications_enabled' => 'nullable|boolean',
+            'telegram_notifications_enabled' => 'nullable|boolean',
+        ]);
+
+        BacklinkConfig::instance()->update([
+            'default_notify_telegram' => $request->has('default_notify_telegram'),
+            'default_notify_email' => $request->has('default_notify_email'),
+            'email_notifications_enabled' => $request->has('email_notifications_enabled'),
+            'telegram_notifications_enabled' => $request->has('telegram_notifications_enabled'),
+        ]);
+
+        flash()->overlay(__('Settings updated'), ' ')->success();
+
+        return Redirect::route('backlink.config');
     }
 }

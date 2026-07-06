@@ -56,7 +56,7 @@ class TelegramProxyAdminController extends Controller
         TelegramProxyRegistry::seedFromConfigIfNeeded();
 
         return view('admin.telegram-proxy.index', [
-            'status' => $connectivity->status(),
+            'status' => $connectivity->displayStatus(),
             'proxies' => TelegramProxyRegistry::all(),
             'proxyRegistry' => collect(TelegramProxyRegistry::all())->keyBy('id'),
             'modules' => $modules,
@@ -84,6 +84,7 @@ class TelegramProxyAdminController extends Controller
             $data['supplier']
         );
         TelegramConnectivityService::forgetSendAttemptOrderCache();
+        TelegramConnectivityService::forgetDisplayStatusCache();
         flash()->overlay(__('Telegram proxy saved'), ' ')->success();
 
         return $this->redirectToIndex();
@@ -114,6 +115,7 @@ class TelegramProxyAdminController extends Controller
             $data['supplier']
         );
         TelegramConnectivityService::forgetSendAttemptOrderCache();
+        TelegramConnectivityService::forgetDisplayStatusCache();
         flash()->overlay(__('Telegram proxy updated'), ' ')->success();
 
         return $this->redirectToIndex();
@@ -123,6 +125,7 @@ class TelegramProxyAdminController extends Controller
     {
         TelegramProxyRegistry::remove($id);
         TelegramConnectivityService::forgetSendAttemptOrderCache();
+        TelegramConnectivityService::forgetDisplayStatusCache();
         flash()->overlay(__('Telegram proxy removed'), ' ')->success();
 
         return $this->redirectToIndex();
@@ -137,6 +140,7 @@ class TelegramProxyAdminController extends Controller
         }
 
         TelegramConnectivityService::forgetSendAttemptOrderCache();
+        TelegramConnectivityService::forgetDisplayStatusCache();
         flash()->overlay(__('Telegram proxy imported env'), ' ')->success();
 
         return $this->redirectToIndex();
@@ -145,13 +149,14 @@ class TelegramProxyAdminController extends Controller
     public function refreshStatus(TelegramConnectivityService $connectivity): RedirectResponse
     {
         TelegramConnectivityService::forgetSendAttemptOrderCache();
+        TelegramConnectivityService::forgetDisplayStatusCache();
         TelegramProxyDebugLog::begin('refresh-status');
         TelegramProxyDebugLog::logUserContext(Auth::user());
         TelegramProxyDebugLog::logTelegramConfig();
         TelegramProxyDebugLog::logConnectivity($connectivity);
 
         return $this->redirectToIndex()
-            ->with('telegram_proxy_status', $connectivity->status());
+            ->with('telegram_proxy_status', $connectivity->refreshDisplayStatus());
     }
 
     public function clearDebugLog(): RedirectResponse

@@ -12,9 +12,15 @@
         $direct = $status['direct'] ?? [];
         $proxyRows = $status['proxies'] ?? [];
         $sendOrder = $status['send_order'] ?? [];
+        $probesChecked = !empty($status['probes_checked']);
     @endphp
 
     <div class="cabinet-telegram-proxy-page">
+        @if(!$probesChecked)
+            <div class="alert alert-info py-2 small mb-3" role="status">
+                {{ __('Telegram proxy probe pending') }}
+            </div>
+        @endif
         <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
             <div>
                 <h2 class="h4 mb-2 d-flex flex-wrap align-items-center gap-1">
@@ -150,13 +156,21 @@
                                     @endif
                                 </td>
                                 <td class="text-center">
-                                    @if(!empty($probe['http_code']))
+                                    @if(!$probesChecked)
+                                        <span class="badge text-bg-secondary">—</span>
+                                    @elseif(!empty($probe['http_code']))
                                         <span class="badge text-bg-{{ !empty($probe['ok']) ? 'success' : 'danger' }}">{{ $probe['http_code'] }}</span>
                                     @else
                                         <span class="badge text-bg-danger">—</span>
                                     @endif
                                 </td>
-                                <td class="small text-secondary">{{ $probe['elapsed_ms'] ?? 0 }} ms</td>
+                                <td class="small text-secondary">
+                                    @if($probesChecked)
+                                        {{ $probe['elapsed_ms'] ?? 0 }} ms
+                                    @else
+                                        —
+                                    @endif
+                                </td>
                                 <td class="text-end text-nowrap">
                                     @if($editRow)
                                         <button type="button"
@@ -282,15 +296,25 @@
                         <tr>
                             <td>{{ __('Telegram proxy direct') }}</td>
                             <td class="text-center">
-                                @if(!empty($direct['http_code']))
+                                @if(!$probesChecked)
+                                    <span class="badge text-bg-secondary">—</span>
+                                @elseif(!empty($direct['http_code']))
                                     <span class="badge text-bg-{{ !empty($direct['ok']) ? 'success' : 'danger' }}">{{ $direct['http_code'] }}</span>
                                 @else
                                     <span class="badge text-bg-danger">—</span>
                                 @endif
                             </td>
-                            <td class="small text-secondary">{{ $direct['elapsed_ms'] ?? 0 }} ms</td>
+                            <td class="small text-secondary">
+                                @if($probesChecked)
+                                    {{ $direct['elapsed_ms'] ?? 0 }} ms
+                                @else
+                                    —
+                                @endif
+                            </td>
                             <td class="small">
-                                @if(!empty($direct['curl_error']))
+                                @if(!$probesChecked)
+                                    <span class="text-secondary">{{ __('Telegram proxy probe pending short') }}</span>
+                                @elseif(!empty($direct['curl_error']))
                                     <span class="text-danger">{{ $direct['curl_error'] }}</span>
                                 @elseif(!empty($direct['ok']))
                                     <span class="text-success">{{ __('OK') }}</span>

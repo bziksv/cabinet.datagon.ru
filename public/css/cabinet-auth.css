@@ -31,3 +31,55 @@
     margin-right: 0.35rem;
     vertical-align: middle;
 }
+
+.cabinet-signup-email-policy-notice {
+    border: 1px solid #f0ad4e;
+    border-radius: 0.5rem;
+    background: #fff8eb;
+    color: #4a3b1f;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+}
+
+.cabinet-signup-email-policy-notice__inner {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.85rem 0.95rem;
+}
+
+.cabinet-signup-email-policy-notice__icon {
+    flex-shrink: 0;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 50%;
+    background: #f0ad4e;
+    color: #fff;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.cabinet-signup-email-policy-notice__title {
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+}
+
+.cabinet-signup-email-policy-notice__text p {
+    margin-bottom: 0.45rem;
+}
+
+.cabinet-signup-email-policy-notice__text p:last-child {
+    margin-bottom: 0;
+}
+
+.cabinet-signup-email-policy-notice__legal {
+    font-size: 0.75rem;
+    color: #6c5a3a;
+}
+
+.cabinet-signup-email-policy-notice__text a {
+    color: #8b5e14;
+    font-weight: 600;
+}

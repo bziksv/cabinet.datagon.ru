@@ -33,6 +33,12 @@
                                         <p style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol';box-sizing:border-box;color:#3d4852;font-size:16px;line-height:1.5em;margin-top:0;text-align:left">
                                             {!! __('Mail verify code line', ['code' => '<b>' . e($code) . '</b>']) !!}
                                         </p>
+                                        @if(!empty($manageNotificationsUrl))
+                                        <p style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji','Segoe UI Symbol';box-sizing:border-box;color:#74787e;font-size:13px;line-height:1.5em;margin-top:1.5em;text-align:left">
+                                            <a href="{{ $manageNotificationsUrl }}" style="color:#3869d4;text-decoration:underline;">{{ __('Mail notifications unsubscribe link') }}</a>
+                                            {{ __('Mail notifications unsubscribe suffix') }}
+                                        </p>
+                                        @endif
                                     </td>
                                 </tr>
                                 </tbody>

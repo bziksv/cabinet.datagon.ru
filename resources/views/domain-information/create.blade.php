@@ -7,6 +7,8 @@
     @endslot
 
     <div class="cabinet-di-page cabinet-di-create">
+        @include('domain-information.partials.module-nav', ['active' => 'projects', 'admin' => $admin ?? false])
+
         <div class="d-flex flex-column gap-2 mb-3">
             @include('domain-information.partials.free-tariff-email-notice')
             @include('partials.cabinet-telegram-notify-notice', ['extraClass' => 'cabinet-di-cabinet-only-notice'])

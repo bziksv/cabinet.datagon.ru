@@ -115,7 +115,7 @@ class DomainMonitoring extends Model
 
     public static function sendNotifications($project, $oldState)
     {
-        if (!$project->send_notification) {
+        if (!(bool) $project->notify_telegram && !(bool) $project->notify_email) {
             return;
         }
 
@@ -124,8 +124,11 @@ class DomainMonitoring extends Model
             return;
         }
 
-        $emailOn = SiteMonitoringConfig::emailEnabled() && $user->canReceiveSiteMonitoringEmail();
-        $telegramOn = SiteMonitoringConfig::telegramEnabled()
+        $emailOn = (bool) $project->notify_email
+            && SiteMonitoringConfig::emailEnabled()
+            && $user->canReceiveSiteMonitoringEmail();
+        $telegramOn = (bool) $project->notify_telegram
+            && SiteMonitoringConfig::telegramEnabled()
             && $user->telegram_bot_active
             && $user->chat_id;
         $repeatMinutes = SiteMonitoringConfig::repeatBrokenMinutes();

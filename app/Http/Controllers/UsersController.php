@@ -121,6 +121,8 @@ class UsersController extends Controller
                 'users.read_letter',
                 'users.created_at',
                 'users.last_online_at',
+                'users.telegram_bot_active',
+                'users.chat_id',
                 'users.metrics',
             ])
             ->without(['pay', 'roles']);
@@ -235,6 +237,8 @@ class UsersController extends Controller
             'users.read_letter',
             'users.created_at',
             'users.last_online_at',
+            'users.telegram_bot_active',
+            'users.chat_id',
             'users.metrics',
         ];
 
@@ -298,6 +302,9 @@ class UsersController extends Controller
             'last_online_strtotime' => $loa ? $loa->timestamp : 0,
             'last_online' => $loa ? $loa->format('d.m.Y H:i') : null,
             'last_online_diffForHumans' => $loa ? $loa->diffForHumans() : null,
+            'telegram_connected' => $user->isTelegramConnected(),
+            'telegram_chat_id' => $user->isTelegramConnected() ? (string) $user->chat_id : null,
+            'telegram_sort' => $user->isTelegramConnected() ? 1 : 0,
             'metrics' => $user->metrics,
             'storage' => $footprint,
             'storage_sort' => $footprint !== null ? (int) ($footprint['rows'] ?? 0) : null,
@@ -368,6 +375,11 @@ class UsersController extends Controller
                     $query->orderByRaw('users.last_online_at IS NULL ASC')
                         ->orderBy('users.last_online_at', 'desc');
                 }
+                break;
+            case 'telegram':
+                $query->orderByRaw(
+                    '(users.telegram_bot_active = 1 AND users.chat_id IS NOT NULL AND users.chat_id != \'\') ' . $dir
+                );
                 break;
             case 'id':
             case 'email':

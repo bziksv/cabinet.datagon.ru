@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\UserNotificationPreferenceService;
+use App\Support\SignupEmailPolicy;
 use App\TariffSetting;
 use App\TariffSettingUserValue;
 use App\TelegramBot;
@@ -12,7 +14,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ProfilesController extends Controller
 {
@@ -67,6 +71,7 @@ class ProfilesController extends Controller
             'name' => $name,
             'tariffProperties' => $tariffProperties,
             'telegramConnected' => $user->isTelegramConnected(),
+            'notificationGroups' => app(UserNotificationPreferenceService::class)->profileGroupsForUser($user),
         ]);
     }
 
@@ -122,12 +127,18 @@ class ProfilesController extends Controller
      */
     public function update(Request $request)
     {
-        $this->validate($request, [
+        $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'min:3', 'max:255'],
             'last_name' => ['required', 'string', 'min:3', 'max:255'],
             'email' => ['required', 'string', 'email', 'min:3', 'max:255'],
             'image' => ['nullable', 'image', 'mimes:jpeg,jpg,png', 'max:2048'],
         ]);
+
+        SignupEmailPolicy::appendValidation($validator, $request->input('email'));
+
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
 
         $user = $this->user;
         $disk = Storage::disk('public');
@@ -232,6 +243,20 @@ class ProfilesController extends Controller
         }
 
         return redirect()->back()->with('status', __('Test notification sent.'));
+    }
+
+    /**
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function updateNotifications(Request $request)
+    {
+        $preferences = (array) $request->input('notifications', []);
+
+        app(UserNotificationPreferenceService::class)->syncFromRequest($this->user, $preferences);
+
+        return redirect()
+            ->to(route('profile.index') . '#notifications')
+            ->with('notification_status', __('Profile notify saved'));
     }
 
     /**

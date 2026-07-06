@@ -1,0 +1,349 @@
+/* Управление финансами — админка */
+.cabinet-finance-admin-page .cabinet-finance-promo-card .card-header {
+    background: rgba(255, 193, 7, 0.12);
+}
+
+.cabinet-finance-admin-page .cabinet-finance-promo-card .card-header .card-title {
+    float: left;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-promo-card .card-header > .card-tools {
+    float: right;
+    margin-right: 0;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-promo-card .card-header::after {
+    content: "";
+    display: block;
+    clear: both;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-promo-toggle__icon {
+    transition: transform 0.2s ease;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-promo-toggle.collapsed .cabinet-finance-promo-toggle__icon {
+    transform: rotate(180deg);
+}
+
+.cabinet-finance-admin-page .cabinet-finance-promo-toggle__label {
+    margin-right: 0.35rem;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-ledger-card .card-header .card-title {
+    float: none;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-ledger-card .card-header > .card-tools {
+    float: none;
+    margin-right: 0;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-ledger-toggle__icon {
+    transition: transform 0.2s ease;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-ledger-toggle.collapsed .cabinet-finance-ledger-toggle__icon {
+    transform: rotate(180deg);
+}
+
+.cabinet-finance-admin-page .cabinet-finance-ledger-toggle__label {
+    margin-right: 0.35rem;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-credit-card .card-header {
+    background: rgba(25, 135, 84, 0.08);
+}
+
+.cabinet-finance-admin-page .cabinet-finance-credit-card .card-header .card-title {
+    float: left;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-credit-card .card-header > .card-tools {
+    float: right;
+    margin-right: 0;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-credit-card .card-header::after {
+    content: "";
+    display: block;
+    clear: both;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-credit-toggle__icon {
+    transition: transform 0.2s ease;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-credit-toggle.collapsed .cabinet-finance-credit-toggle__icon {
+    transform: rotate(180deg);
+}
+
+.cabinet-finance-admin-page .cabinet-finance-credit-toggle__label {
+    margin-right: 0.35rem;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-credit-preset {
+    min-width: 4.25rem;
+}
+
+.cabinet-finance-admin-page #finance-credit-user-preview strong {
+    color: var(--bs-body-color);
+}
+
+.cabinet-finance-admin-page .select2-container--bootstrap4 .select2-selection {
+    min-height: calc(1.5em + 0.75rem + 2px);
+}
+
+.cabinet-finance-admin-page .cabinet-finance-stats .info-box {
+    height: 100%;
+    min-height: 5.5rem;
+    margin-bottom: 0;
+    align-items: stretch;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-stats .info-box-icon {
+    width: 70px;
+    min-width: 70px;
+    height: 70px;
+    min-height: 70px;
+    font-size: 1.75rem;
+    line-height: 1;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-stats .info-box-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 70px;
+    line-height: 1.35;
+    overflow: hidden;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-stats .info-box-text {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-stats .info-box-number {
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.25;
+    display: block;
+    margin-top: 0.15rem;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-stats .info-box-meta {
+    display: block;
+    font-size: 0.8125rem;
+    line-height: 1.25;
+    margin-top: 0.2rem;
+    color: var(--bs-secondary-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-chart-wrap {
+    position: relative;
+    min-height: 280px;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-chart-wrap canvas {
+    max-height: 320px;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-user-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-user-link:hover {
+    color: var(--bs-primary);
+    text-decoration: underline;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-amount {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-amount--in {
+    color: var(--bs-success);
+    font-weight: 600;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-amount--out {
+    color: var(--bs-info);
+    font-weight: 600;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-amount--fail {
+    color: var(--bs-danger);
+}
+
+.cabinet-finance-admin-page .cabinet-finance-rank {
+    width: 2rem;
+    text-align: center;
+    font-weight: 600;
+    color: var(--bs-secondary-color);
+}
+
+.cabinet-finance-admin-page .cabinet-finance-rank--top {
+    color: var(--bs-warning);
+}
+
+.cabinet-finance-admin-page .table > :not(caption) > * > * {
+    vertical-align: middle;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-filters .form-label {
+    font-size: 0.8125rem;
+    margin-bottom: 0.25rem;
+}
+
+.cabinet-finance-admin-page .card-footer .pagination {
+    margin-bottom: 0;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-net-positive {
+    color: var(--bs-success);
+}
+
+.cabinet-finance-admin-page .cabinet-finance-net-negative {
+    color: var(--bs-danger);
+}
+
+.cabinet-finance-admin-page .cabinet-finance-empty {
+    padding: 2.5rem 1rem;
+}
+
+@media (max-width: 575.98px) {
+    .cabinet-finance-admin-page .cabinet-finance-stats .info-box-number {
+        font-size: 1.15rem;
+    }
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-card .card-header {
+    background: rgba(13, 202, 240, 0.12);
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-card .card-header .card-title {
+    float: left;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-card .card-header > .card-tools {
+    float: right;
+    margin-right: 0;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-card .card-header::after {
+    content: "";
+    display: block;
+    clear: both;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-toggle__icon {
+    transition: transform 0.2s ease;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-toggle.collapsed .cabinet-finance-trigger-toggle__icon {
+    transform: rotate(180deg);
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-toggle__label {
+    margin-right: 0.35rem;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+    gap: 0.75rem;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-stat {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    padding: 0.65rem 0.75rem;
+    height: 100%;
+    min-height: 5.5rem;
+    background: rgba(var(--bs-light-rgb), 0.5);
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-stat__label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.15rem;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-stat__value {
+    font-size: 1.125rem;
+    line-height: 1.2;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-stat__meta,
+.cabinet-finance-admin-page .cabinet-finance-trigger-stat__hint,
+.cabinet-finance-admin-page .cabinet-finance-trigger-stat__spacer {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+    margin-top: auto;
+    padding-top: 0.15rem;
+    min-height: 1.125rem;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-stat__spacer {
+    visibility: hidden;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-stat--link {
+    color: inherit;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-stat--link:hover {
+    border-color: rgba(13, 202, 240, 0.65);
+    box-shadow: 0 0.125rem 0.5rem rgba(13, 202, 240, 0.12);
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-stats-chart-wrap {
+    position: relative;
+    min-height: 220px;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-stats-chart-wrap--timeline {
+    min-height: 280px;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-stats-chart-wrap canvas {
+    max-height: 320px;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-campaign-toggle__icon {
+    transition: transform 0.2s ease;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-campaign-toggle.collapsed .cabinet-finance-trigger-campaign-toggle__icon {
+    transform: rotate(180deg);
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-campaign-toggle__label {
+    margin-right: 0.35rem;
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-field-en {
+    background: rgba(13, 202, 240, 0.06);
+    border-color: rgba(13, 202, 240, 0.35);
+}
+
+.cabinet-finance-admin-page .cabinet-finance-trigger-card code {
+    font-size: 0.8125rem;
+}

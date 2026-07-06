@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\DomainInformation;
+use App\DomainInformationConfig;
 use App\DomainInformationPublicShare;
 use App\Services\DomainInformationPdfService;
+use App\Support\DomainInformationAdminStats;
 use App\Support\DomainInformationListSummary;
 use App\Support\DomainInformationProjectStats;
 use App\Support\DomainInformationPublicShareTtl;
@@ -39,6 +41,7 @@ class DomainInformationController extends Controller
 
         $onFreeTariff = $user->onFreeTariff();
         $domainInformationEmailAvailable = $user->canReceiveDomainInformationEmail();
+        $admin = User::isUserAdmin();
 
         $listSummary = DomainInformationListSummary::fromProjects($projects);
 
@@ -47,7 +50,8 @@ class DomainInformationController extends Controller
             'countProjects',
             'listSummary',
             'onFreeTariff',
-            'domainInformationEmailAvailable'
+            'domainInformationEmailAvailable',
+            'admin'
         ));
     }
 
@@ -58,6 +62,7 @@ class DomainInformationController extends Controller
         return view('domain-information.create', [
             'onFreeTariff' => $user->onFreeTariff(),
             'domainInformationEmailAvailable' => $user->canReceiveDomainInformationEmail(),
+            'admin' => User::isUserAdmin(),
         ]);
     }
 
@@ -357,5 +362,48 @@ class DomainInformationController extends Controller
             'ttl_days' => $share ? $share->ttlDaysFromPayload() : 30,
             'ttl_options' => DomainInformationPublicShareTtl::labelsForUi(),
         ];
+    }
+
+    public function config()
+    {
+        if (!User::isUserAdmin()) {
+            abort(403);
+        }
+
+        $registry = DomainInformationAdminStats::snapshot();
+
+        return view('domain-information.config', [
+            'admin' => true,
+            'config' => DomainInformationConfig::instance(),
+            'stats' => $registry['summary'],
+            'registry' => $registry,
+        ]);
+    }
+
+    public function editConfig(Request $request): RedirectResponse
+    {
+        if (!User::isUserAdmin()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'expiration_alert_days' => 'required|integer|min:1|max:365',
+            'default_check_dns' => 'nullable|boolean',
+            'default_check_registration_date' => 'nullable|boolean',
+            'email_notifications_enabled' => 'nullable|boolean',
+            'telegram_notifications_enabled' => 'nullable|boolean',
+        ]);
+
+        DomainInformationConfig::instance()->update([
+            'expiration_alert_days' => (int) $validated['expiration_alert_days'],
+            'default_check_dns' => $request->has('default_check_dns'),
+            'default_check_registration_date' => $request->has('default_check_registration_date'),
+            'email_notifications_enabled' => $request->has('email_notifications_enabled'),
+            'telegram_notifications_enabled' => $request->has('telegram_notifications_enabled'),
+        ]);
+
+        flash()->overlay(__('Settings updated'), ' ')->success();
+
+        return Redirect::route('domain.information.config');
     }
 }

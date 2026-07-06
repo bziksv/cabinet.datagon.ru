@@ -19,7 +19,7 @@ return [
         ],
         'email_event' => [
             'icon' => 'bi-envelope-exclamation',
-            'color' => 'warning',
+            'color' => 'email',
             'title' => 'Users notify channel email event',
             'description' => 'Users notify channel email event desc',
         ],
@@ -65,6 +65,7 @@ return [
             'slug' => 'backlink',
             'title' => 'Telegram admin module backlink',
             'route' => 'backlink',
+            'admin_route' => 'backlink.config',
             'modal' => false,
             'telegram' => true,
             'email_event' => true,
@@ -88,6 +89,7 @@ return [
             'slug' => 'domain-information',
             'title' => 'Telegram admin module domain information',
             'route' => 'domain.information',
+            'admin_route' => 'domain.information.config',
             'modal' => false,
             'telegram' => true,
             'email_event' => true,
@@ -176,7 +178,7 @@ return [
         ],
         [
             'icon' => 'bi-envelope-exclamation',
-            'color' => 'warning',
+            'color' => 'email',
             'title' => 'Users notify rule email title',
             'body' => 'Users notify rule email body',
         ],
@@ -256,6 +258,7 @@ return [
             'slug' => 'backlink',
             'title' => 'Telegram admin module backlink',
             'route' => 'backlink',
+            'admin_route' => 'backlink.config',
             'items' => [
                 [
                     'id' => 'backlink-telegram-summary',
@@ -329,6 +332,7 @@ return [
             'slug' => 'domain-information',
             'title' => 'Telegram admin module domain information',
             'route' => 'domain.information',
+            'admin_route' => 'domain.information.config',
             'items' => [
                 [
                     'id' => 'domain-dns-changed',

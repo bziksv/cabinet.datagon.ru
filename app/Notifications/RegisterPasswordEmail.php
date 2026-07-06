@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Notifications\Concerns\LocalizesMailContent;
+use App\Support\MailNotificationFooter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -56,7 +57,8 @@ class RegisterPasswordEmail extends Notification
             ->line(__('Mail notify password line'))
             ->line(__('Mail notify password new', ['password' => $password]))
             ->action(__('Mail notify profile action'), url('/profile'))
-            ->line(__('Mail notify thanks app'));
+            ->line(__('Mail notify thanks app'))
+            ->line(MailNotificationFooter::unsubscribeMarkdown());
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App;
 
 use App\Support\DomainInformationDns;
 use App\Support\DomainInformationDisplay;
+use App\DomainInformationConfig;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Iodev\Whois\Exceptions\ConnectionException;
@@ -20,6 +21,11 @@ class DomainInformation extends Model
     public function checkLogs()
     {
         return $this->hasMany(DomainInformationCheckLog::class, 'domain_information_id');
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 
     /**
@@ -101,11 +107,11 @@ class DomainInformation extends Model
         $user = User::find($project->user_id);
 
         if (DomainInformationDns::hasChanged($oldDNS, $newDNS ?? $project->dns)) {
-            if ($user->telegram_bot_active and $project->check_dns) {
+            if ($user->telegram_bot_active && $project->check_dns && DomainInformationConfig::telegramEnabled()) {
                 TelegramBot::sendNotificationAboutChangeDNS($project, $user->chat_id, $oldDNS);
             }
 
-            if ($project->check_dns_email && $user->canReceiveDomainInformationEmail()) {
+            if ($project->check_dns_email && $user->canReceiveDomainInformationEmail() && DomainInformationConfig::emailEnabled()) {
                 $user->sendNotificationAboutChangeDNS($project);
             }
         }
@@ -113,13 +119,14 @@ class DomainInformation extends Model
         if (isset($freeDate)) {
             $freeDate = new Carbon($freeDate);
             $diffInDays = $freeDate->diffInDays(Carbon::now());
+            $alertDays = DomainInformationConfig::expirationAlertDays();
 
-            if ($diffInDays < 20) {
-                if ($user->telegram_bot_active and $project->check_registration_date) {
+            if ($diffInDays < $alertDays) {
+                if ($user->telegram_bot_active && $project->check_registration_date && DomainInformationConfig::telegramEnabled()) {
                     TelegramBot::sendNotificationAboutExpirationRegistrationPeriod($project, $user->chat_id, $diffInDays);
                 }
 
-                if ($project->check_registration_date_email && $user->canReceiveDomainInformationEmail()) {
+                if ($project->check_registration_date_email && $user->canReceiveDomainInformationEmail() && DomainInformationConfig::emailEnabled()) {
                     $user->sendNotificationAboutExpirationRegistrationPeriod($project, $diffInDays);
                 }
             }

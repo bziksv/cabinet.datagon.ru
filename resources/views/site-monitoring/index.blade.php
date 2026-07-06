@@ -158,17 +158,29 @@
                         @include('site-monitoring.partials.uptime-cell', ['project' => $project])
                     </div>
                 </td>
-                <td data-order="{{ $project->send_notification }}" class="cabinet-sm-td-notify">
+                <td data-order="{{ (int) $project->notify_telegram + (int) $project->notify_email }}" class="cabinet-sm-td-notify">
                     <div class="cabinet-sm-cell cabinet-sm-cell--center">
-                        <div class="form-check form-switch form-switch-sm mb-0 cabinet-sm-notify-switch">
-                            <input type="checkbox"
-                                   class="form-check-input send-notification-switch"
-                                   role="switch"
-                                   @if($project->send_notification) checked @endif
-                                   id="notifySwitch{{ $project->id }}">
-                            <label class="form-check-label visually-hidden" for="notifySwitch{{ $project->id }}">
-                                {{ __('Notifications') }}
-                            </label>
+                        <div class="cabinet-sm-notify-group">
+                            <div class="form-check form-switch form-check-sm cabinet-sm-notify-row">
+                                <input type="checkbox"
+                                       name="notify_telegram"
+                                       class="form-check-input"
+                                       role="switch"
+                                       @if($project->notify_telegram) checked @endif
+                                       id="sm-tg-{{ $project->id }}">
+                                <label class="form-check-label small" for="sm-tg-{{ $project->id }}">{{ __('Telegram') }}</label>
+                            </div>
+                            <div class="form-check form-switch form-check-sm cabinet-sm-notify-row">
+                                <input type="checkbox"
+                                       name="notify_email"
+                                       class="form-check-input"
+                                       role="switch"
+                                       @if($project->notify_email) checked @endif
+                                       @if(!($siteMonitoringEmailAvailable ?? true)) disabled @endif
+                                       id="sm-email-{{ $project->id }}">
+                                <label class="form-check-label small @if(!($siteMonitoringEmailAvailable ?? true)) text-secondary @endif"
+                                       for="sm-email-{{ $project->id }}">{{ __('Notify toggle email') }}</label>
+                            </div>
                         </div>
                     </div>
                 </td>
@@ -272,6 +284,7 @@
                     'validUntil' => __('Valid until'),
                     'publicLinkCreated' => __('Public link created'),
                     'publicLinkRevoked' => __('Public link revoked'),
+                    'freeEmailNotice' => __('Site monitoring free tariff email notice title'),
                 ],
                 'modal' => [
                     'checkHistory' => __('Site monitoring check history'),
@@ -299,6 +312,7 @@
             const cabinetSmLabels = @json($cabinetSmI18n['labels']);
             const cabinetSmModal = @json($cabinetSmI18n['modal']);
             const cabinetSmDt = @json($cabinetSmI18n['dt']);
+            const cabinetSmEmailAvailable = @json($siteMonitoringEmailAvailable ?? true);
 
             let statsModalProjectId = null;
 
@@ -645,25 +659,42 @@
             });
 
 
-            $('input.send-notification-switch').click(function () {
+            $('input.cabinet-sm-notify-input, .cabinet-sm-notify-group input[type="checkbox"]').on('change', function () {
+                const $input = $(this);
+                if (!cabinetSmEmailAvailable && $input.attr('name') === 'notify_email') {
+                    $input.prop('checked', false);
+                    cabinetSmToastError(cabinetSmLabels.freeEmailNotice);
+                    return;
+                }
                 $.ajax({
-                    type: "POST",
-                    dataType: "json",
+                    type: 'POST',
+                    dataType: 'json',
                     url: "{{ route('edit.domain') }}",
                     data: {
-                        id: $(this).closest('tr').attr('id'),
-                        name: 'send_notification',
-                        option: $(this).is(':checked') ? 1 : 0,
-                        _token: $('meta[name="csrf-token"]').attr('content')
+                        id: $input.closest('tr').attr('id'),
+                        name: $input.attr('name'),
+                        option: $input.is(':checked') ? 1 : 0,
+                        _token: $('meta[name="csrf-token"]').attr('content'),
                     },
                     success: function () {
-                        cabinetSmToastSuccess()
+                        cabinetSmToastSuccess();
                     },
-                    error: function () {
-                        cabinetSmToastError()
-                    }
+                    error: function (xhr) {
+                        $input.prop('checked', !$input.is(':checked'));
+                        const msg = xhr.responseJSON && xhr.responseJSON.message
+                            ? xhr.responseJSON.message
+                            : cabinetSmLabels.errorGeneric;
+                        cabinetSmToastError(msg);
+                    },
                 });
-            })
+            });
+
+            $(document).on('click', 'label[for^="sm-email-"]', function (e) {
+                if (!cabinetSmEmailAvailable) {
+                    e.preventDefault();
+                    cabinetSmToastError(cabinetSmLabels.freeEmailNotice);
+                }
+            });
             $(document).on('change', '.checbox-for-remove-project .cabinet-sm-row-select__input', function () {
                 let $checkbox = $(this)
                 let selectedId = $checkbox.attr('id').substr(8)

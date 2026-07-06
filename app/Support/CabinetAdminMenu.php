@@ -14,8 +14,8 @@ class CabinetAdminMenu
     /** main_projects.id — пункты шестерёнки (в меню сортируются по алфавиту по title). */
     public const PROJECT_IDS = [16, 26, 29, 17, 27, 33, 31];
 
-    /** Скрыты из шестерёнки, но остаются в PROJECT_IDS (не дублируются в сайдбаре). 17 = /html/ (LTE demo), без badge-версии. */
-    public const GEAR_HIDDEN_IDS = [17];
+    /** Скрыты из шестерёнки, но остаются в PROJECT_IDS (не дублируются в сайдбаре). 17 = /html/ (LTE demo), без badge-версии. 27 = legacy LTE на lk.redbox.su. */
+    public const GEAR_HIDDEN_IDS = [17, 27];
 
     /** @var array<int, array{id:int,title:string,link:string,external:bool}>|null */
     private static $itemsCache;
@@ -68,6 +68,15 @@ class CabinetAdminMenu
                     || strpos((string) $link, 'docs.google.com') !== false,
             ];
         })->values()->all();
+
+        if (\Illuminate\Support\Facades\Route::has('admin.finance.index')) {
+            $items[] = [
+                'id' => 0,
+                'title' => __('Finance and referral management'),
+                'link' => route('admin.finance.index'),
+                'external' => false,
+            ];
+        }
 
         if (\Illuminate\Support\Facades\Route::has('admin.smtp.index')) {
             $items[] = [
@@ -123,9 +132,29 @@ class CabinetAdminMenu
             ];
         }
 
-        self::$itemsCache = self::pinNotificationsAfterSmtp(self::sortItemsByTitle($items));
+        self::$itemsCache = self::appendGoogleDocumentation(
+            self::pinNotificationsAfterSmtp(self::sortItemsByTitle($items))
+        );
 
         return self::$itemsCache;
+    }
+
+    /**
+     * Ссылка на Google Docs — всегда последним пунктом шестерёнки.
+     *
+     * @param array<int, array{id:int,title:string,link:string,external:bool}> $items
+     * @return array<int, array{id:int,title:string,link:string,external:bool}>
+     */
+    private static function appendGoogleDocumentation(array $items): array
+    {
+        $items[] = [
+            'id' => 0,
+            'title' => __('Google documentation'),
+            'link' => 'https://docs.google.com/document/d/1TpjCQjXYV_ZWyxD-c8plld7m2-dce4fSGuMz0fgytK4/edit?tab=t.0',
+            'external' => true,
+        ];
+
+        return $items;
     }
 
     /**

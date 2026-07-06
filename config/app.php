@@ -127,6 +127,9 @@ return [
 
     'telegram_bot_token' => env('TELEGRAM_BOT_TOKEN'),
 
+    /** @username бота без @, для ссылок t.me/...?start= */
+    'telegram_bot_username' => env('TELEGRAM_BOT_USERNAME', 'TitloServiceBot'),
+
     /** SOCKS5/HTTP proxy для api.telegram.org (если исходящий 443 с VPS заблокирован). */
     'telegram_proxy' => env('TELEGRAM_PROXY'),
 

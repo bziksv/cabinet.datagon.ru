@@ -45,4 +45,14 @@ class SupervisorAdminController extends Controller
             ->route('admin.supervisor.index')
             ->with($result['ok'] ? 'success' : 'error', $result['message']);
     }
+
+    public function actionAll(Request $request, SupervisorAdminService $supervisor): RedirectResponse
+    {
+        $action = (string) $request->input('action', '');
+        $result = $supervisor->controlAll($action);
+
+        return redirect()
+            ->route('admin.supervisor.index')
+            ->with($result['ok'] ? 'success' : 'error', $result['message']);
+    }
 }

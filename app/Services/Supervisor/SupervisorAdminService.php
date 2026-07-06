@@ -301,11 +301,93 @@ class SupervisorAdminService
             return ['ok' => false, 'message' => $e->getMessage()];
         }
 
+        $this->lastProbe = null;
+
         return [
             'ok' => true,
             'message' => __('Supervisor action done', [
                 'action' => $action,
                 'program' => $program,
+            ]),
+        ];
+    }
+
+    /**
+     * start/stop/restart всех программ cabinet-titlo-* (группы program:*).
+     *
+     * @return array{ok:bool, message:string}
+     */
+    public function controlAll(string $action): array
+    {
+        $action = strtolower(trim($action));
+
+        if (! in_array($action, ['start', 'stop', 'restart'], true)) {
+            return ['ok' => false, 'message' => __('Supervisor invalid action')];
+        }
+
+        $probe = $this->probe();
+        if (! $probe['ok']) {
+            return ['ok' => false, 'message' => $probe['message']];
+        }
+
+        $programs = array_keys(config('cabinet-supervisor-admin.program_capacity', []));
+        if (! is_array($programs) || $programs === []) {
+            return ['ok' => false, 'message' => __('Supervisor no processes')];
+        }
+
+        $this->lastProbe = null;
+
+        $okCount = 0;
+        $failed = [];
+
+        foreach ($programs as $program) {
+            $program = trim((string) $program);
+            if ($program === '' || ! Str::startsWith($program, 'cabinet-titlo-')) {
+                continue;
+            }
+
+            $target = $program . ':*';
+            if (! $this->isProgramAllowed($target)) {
+                $failed[$program] = __('Supervisor program not allowed');
+
+                continue;
+            }
+
+            try {
+                $this->runSupervisorctl([$action, $target], 120);
+                $okCount++;
+            } catch (\Throwable $e) {
+                $failed[$program] = $e->getMessage();
+            }
+        }
+
+        if ($failed === []) {
+            return [
+                'ok' => true,
+                'message' => __('Supervisor action all done', [
+                    'action' => $action,
+                    'count' => $okCount,
+                ]),
+            ];
+        }
+
+        if ($okCount > 0) {
+            return [
+                'ok' => false,
+                'message' => __('Supervisor action all partial', [
+                    'action' => $action,
+                    'ok' => $okCount,
+                    'fail' => count($failed),
+                    'detail' => implode('; ', array_slice(array_values($failed), 0, 2)),
+                ]),
+            ];
+        }
+
+        return [
+            'ok' => false,
+            'message' => __('Supervisor action all failed', [
+                'action' => $action,
+                'detail' => implode('; ', array_slice(array_values($failed), 0, 2)),
             ]),
         ];
     }
@@ -396,11 +478,11 @@ class SupervisorAdminService
     /**
      * @param array<int, string> $args
      */
-    private function runSupervisorctl(array $args): string
+    private function runSupervisorctl(array $args, int $timeoutSeconds = 15): string
     {
         $command = $this->supervisorctlArgv($args);
 
-        $process = new Process($command, base_path(), null, null, 15);
+        $process = new Process($command, base_path(), null, null, max(5, $timeoutSeconds));
         $process->run();
 
         if (! $process->isSuccessful()) {

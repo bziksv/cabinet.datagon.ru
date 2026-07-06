@@ -109,6 +109,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/admin/supervisor', 'SupervisorAdminController@index')->name('admin.supervisor.index');
     Route::post('/admin/supervisor/action', 'SupervisorAdminController@action')->name('admin.supervisor.action');
+    Route::post('/admin/supervisor/action-all', 'SupervisorAdminController@actionAll')->name('admin.supervisor.action-all');
 
     Route::get('/admin/xml-providers', 'XmlProvidersAdminController@index')->name('admin.xml-providers.index');
     Route::post('/admin/xml-providers/refresh', 'XmlProvidersAdminController@refresh')->name('admin.xml-providers.refresh');

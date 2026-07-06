@@ -164,8 +164,27 @@
         @endif
 
         <div class="card mb-3">
-            <div class="card-header py-2">
+            <div class="card-header py-2 d-flex flex-wrap align-items-center justify-content-between gap-2">
                 <strong>{{ __('Supervisor processes') }}</strong>
+                @if(($probe['ok'] ?? false) && count($processes) > 0)
+                    <div class="d-flex flex-wrap gap-1">
+                        @foreach([
+                            'start' => ['label' => __('Supervisor action all start'), 'class' => 'btn-outline-success'],
+                            'stop' => ['label' => __('Supervisor action all stop'), 'class' => 'btn-outline-danger'],
+                            'restart' => ['label' => __('Supervisor action all restart'), 'class' => 'btn-outline-warning'],
+                        ] as $bulkAction => $bulkMeta)
+                            @php
+                                $bulkConfirm = __('Supervisor confirm action all', ['action' => $bulkAction]);
+                            @endphp
+                            <form action="{{ route('admin.supervisor.action-all') }}" method="post" class="d-inline"
+                                  onsubmit='return confirm(@json($bulkConfirm));'>
+                                @csrf
+                                <input type="hidden" name="action" value="{{ $bulkAction }}">
+                                <button type="submit" class="btn btn-sm {{ $bulkMeta['class'] }}">{{ $bulkMeta['label'] }}</button>
+                            </form>
+                        @endforeach
+                    </div>
+                @endif
             </div>
             <div class="card-body p-0">
                 @if(($probe['ok'] ?? false) && count($processes) > 0)

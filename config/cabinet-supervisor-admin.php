@@ -6,7 +6,7 @@
  * @see App\Services\Supervisor\SupervisorAdminService
  */
 return [
-    'version' => '1.1.0s',
+    'version' => '1.2.0s',
 
     /** false — страница только для чтения с подсказкой по установке */
     'enabled' => filter_var(env('SUPERVISOR_ADMIN_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
@@ -28,6 +28,27 @@ return [
         'SUPERVISOR_CONFIG_HINT',
         '/etc/supervisor/conf.d/cabinet-titlo.conf'
     ),
+
+    /**
+     * Модуль кабинета для программы supervisord (label — ключ __(), route — имя route()).
+     *
+     * @see App\Services\Supervisor\SupervisorAdminService::moduleForProgram()
+     */
+    'program_modules' => [
+        'cabinet-titlo-default' => ['label' => 'Queue management', 'route' => 'admin.queue.index'],
+        'cabinet-titlo-cluster-child' => ['label' => 'Cluster', 'route' => 'cluster'],
+        'cabinet-titlo-cluster-main' => ['label' => 'Cluster', 'route' => 'cluster'],
+        'cabinet-titlo-cluster-wait' => ['label' => 'Cluster', 'route' => 'cluster'],
+        'cabinet-titlo-position' => ['label' => 'Position monitoring', 'route' => 'monitoring.v2'],
+        'cabinet-titlo-relevance' => ['label' => 'Relevance', 'route' => 'relevance-analysis'],
+        'cabinet-titlo-monitoring-helper' => ['label' => 'Position monitoring', 'route' => 'monitoring.v2'],
+        'cabinet-titlo-monitoring-change-dates' => ['label' => 'Position monitoring', 'route' => 'monitoring.v2'],
+        'cabinet-titlo-monitoring-wait' => ['label' => 'Position monitoring', 'route' => 'monitoring.v2'],
+        'cabinet-titlo-monitoring-competitors-stat' => ['label' => 'Position monitoring', 'route' => 'monitoring.v2'],
+        'cabinet-titlo-competitor-analyse' => ['label' => 'Competitor analysis', 'route' => 'competitor.analysis'],
+        'cabinet-titlo-ai-generation' => ['label' => 'Supervisor module ai generation', 'route' => 'ai.generation.story'],
+        'cabinet-titlo-websockets' => ['label' => 'Supervisor module websockets', 'route' => null],
+    ],
 
     /** Логи воркеров относительно корня проекта (storage/logs/...) */
     'log_files' => [

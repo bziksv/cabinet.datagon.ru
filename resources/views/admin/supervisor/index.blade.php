@@ -82,6 +82,7 @@
                             <thead>
                                 <tr>
                                     <th>{{ __('Supervisor program') }}</th>
+                                    <th>{{ __('Supervisor module') }}</th>
                                     <th>{{ __('Status') }}</th>
                                     <th>{{ __('PID') }}</th>
                                     <th>{{ __('Uptime') }}</th>
@@ -96,6 +97,13 @@
                                     @endphp
                                     <tr>
                                         <td class="font-monospace">{{ $proc['name'] }}</td>
+                                        <td>
+                                            @if(!empty($proc['module_url']))
+                                                <a href="{{ $proc['module_url'] }}" class="cabinet-supervisor-admin-module-link">{{ $proc['module_label'] ?? '—' }}</a>
+                                            @else
+                                                <span class="text-secondary">{{ $proc['module_label'] ?? '—' }}</span>
+                                            @endif
+                                        </td>
                                         <td><span class="badge bg-{{ $badge }}">{{ $status }}</span></td>
                                         <td>{{ $proc['pid'] ?: '—' }}</td>
                                         <td>{{ $proc['uptime'] ?: '—' }}</td>

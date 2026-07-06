@@ -2,6 +2,7 @@
 
 namespace App\Services\Supervisor;
 
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
 
@@ -60,7 +61,7 @@ class SupervisorAdminService
     }
 
     /**
-     * @return array<int, array{name:string, status:string, detail:string, uptime:string, pid:string, controllable:bool}>
+     * @return array<int, array{name:string, status:string, detail:string, uptime:string, pid:string, controllable:bool, module_label:string, module_url:?string}>
      */
     public function processes(): array
     {
@@ -85,6 +86,9 @@ class SupervisorAdminService
             }
 
             $parsed['controllable'] = $this->isProgramAllowed($parsed['name']);
+            $module = $this->moduleForProgram($parsed['name']);
+            $parsed['module_label'] = $module['label'];
+            $parsed['module_url'] = $module['url'];
             $processes[] = $parsed;
         }
 
@@ -186,6 +190,32 @@ class SupervisorAdminService
         }
 
         return false;
+    }
+
+    /**
+     * @return array{label:string, url:?string}
+     */
+    public function moduleForProgram(string $programName): array
+    {
+        $base = preg_replace('/:.*$/', '', $programName) ?: $programName;
+        $modules = config('cabinet-supervisor-admin.program_modules', []);
+
+        if (! is_array($modules)) {
+            return ['label' => '—', 'url' => null];
+        }
+
+        $def = $modules[$base] ?? null;
+        if (! is_array($def)) {
+            return ['label' => '—', 'url' => null];
+        }
+
+        $routeName = isset($def['route']) ? trim((string) $def['route']) : '';
+        $url = ($routeName !== '' && Route::has($routeName)) ? route($routeName) : null;
+
+        return [
+            'label' => __((string) ($def['label'] ?? '—')),
+            'url' => $url,
+        ];
     }
 
     /**

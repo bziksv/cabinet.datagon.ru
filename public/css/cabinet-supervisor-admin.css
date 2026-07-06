@@ -16,3 +16,12 @@
 .cabinet-supervisor-admin-page form.d-inline + form.d-inline {
     margin-left: 0.15rem;
 }
+
+.cabinet-supervisor-admin-module-link {
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.cabinet-supervisor-admin-module-link:hover {
+    text-decoration: underline;
+}

@@ -38,7 +38,7 @@
 
     <div class="cabinet-mon-project-toolbar__compare" id="cabinetMonProjectCompare">
         <label class="visually-hidden" for="cabinet-mon-compare-project">{{ __('Monitoring show compare project') }}</label>
-        <select class="form-select form-select-sm cabinet-mon-compare-project-select" id="cabinet-mon-compare-project" title="{{ __('Monitoring show compare project') }}" data-placeholder="{{ __('Monitoring show compare search placeholder') }}">
+        <select class="form-select form-select-sm cabinet-mon-compare-project-select" id="cabinet-mon-compare-project" title="{{ __('Monitoring show compare toolbar hint') }}" data-placeholder="{{ __('Monitoring show compare search placeholder') }}">
             <option value="">{{ __('Monitoring show compare none') }}</option>
         </select>
         <label class="visually-hidden" for="cabinet-mon-compare-group">{{ __('Monitoring show compare group') }}</label>

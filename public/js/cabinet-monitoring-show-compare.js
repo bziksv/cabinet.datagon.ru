@@ -333,14 +333,25 @@
         if (count <= 0) {
             var emptyLabel =
                 (cfg.i18n && cfg.i18n.compareIntersectEmpty) ||
-                'Нет общих запросов в выбранных папках — график сравнения пуст.';
-            $hint.text(emptyLabel).removeClass('d-none');
+                'Нет общих запросов в выбранных папках — на графиках сравнение будет пустым.';
+            $hint.html('<span class="cabinet-mon-compare-intersect__lead">' + escapeHtml(emptyLabel) + '</span>').removeClass('d-none');
             return;
         }
         var template =
             (cfg.i18n && cfg.i18n.compareIntersectHint) ||
-            'Сравнение по :count общим запросам в выбранных папках.';
-        $hint.text(template.replace(':count', String(count))).removeClass('d-none');
+            ':count общих запросов в выбранных папках.';
+        var note =
+            (cfg.i18n && cfg.i18n.compareIntersectChartsNote) ||
+            'Сравнение — на графиках (вкладка «Обзор»), в таблице ключей его нет.';
+        $hint
+            .html(
+                '<span class="cabinet-mon-compare-intersect__lead">' +
+                    escapeHtml(template.replace(':count', String(count))) +
+                    '</span><span class="cabinet-mon-compare-intersect__note">' +
+                    escapeHtml(note) +
+                    '</span>'
+            )
+            .removeClass('d-none');
     }
 
     function appendIntersectParams(params, forBaseProject) {

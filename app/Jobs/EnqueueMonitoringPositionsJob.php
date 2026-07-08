@@ -25,16 +25,20 @@ class EnqueueMonitoringPositionsJob implements ShouldQueue
     /** @var string */
     private $targetQueue;
 
+    /** @var int|null */
+    private $googleDepthOverride;
+
     public $timeout = 600;
 
     /**
      * @param int[] $regionIds
      */
-    public function __construct(int $projectId, array $regionIds, string $targetQueue = 'position_high')
+    public function __construct(int $projectId, array $regionIds, string $targetQueue = 'position_high', ?int $googleDepthOverride = null)
     {
         $this->projectId = $projectId;
         $this->regionIds = array_values(array_map('intval', $regionIds));
         $this->targetQueue = $targetQueue;
+        $this->googleDepthOverride = $googleDepthOverride;
     }
 
     public function handle(): void
@@ -55,8 +59,9 @@ class EnqueueMonitoringPositionsJob implements ShouldQueue
 
         $project->keywords()->orderBy('id')->chunkById(100, function ($keywords) use ($engines) {
             foreach ($engines as $engine) {
+                $depthOverride = $engine->engine === 'google' ? $this->googleDepthOverride : null;
                 foreach ($keywords as $keyword) {
-                    dispatch((new AutoUpdatePositionQueue($keyword, $engine))->onQueue($this->targetQueue));
+                    dispatch((new AutoUpdatePositionQueue($keyword, $engine, $depthOverride))->onQueue($this->targetQueue));
                 }
             }
         });

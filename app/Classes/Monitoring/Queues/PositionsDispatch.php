@@ -4,6 +4,7 @@
 namespace App\Classes\Monitoring\Queues;
 
 
+use App\Classes\Monitoring\MonitoringGoogleDepth;
 use App\Classes\Monitoring\PositionLimit;
 use App\Jobs\AutoUpdatePositionQueue;
 use App\User;
@@ -19,7 +20,7 @@ class PositionsDispatch extends QueueDispatcher
     public function dispatch()
     {
         $queries = $this->getData();
-        $this->countOff = count($queries);
+        $this->countOff = $this->countLimits($queries);
 
         if (!$this->reserveLimits($this->countOff)) {
             return;
@@ -28,6 +29,25 @@ class PositionsDispatch extends QueueDispatcher
         foreach ($queries as $ar) {
             dispatch((new AutoUpdatePositionQueue($ar['query'], $ar['region']))->onQueue($this->queue));
         }
+    }
+
+    /**
+     * @param array<int, array{query: mixed, region: \App\MonitoringSearchengine}> $queries
+     */
+    private function countLimits(array $queries): int
+    {
+        $total = 0;
+
+        foreach ($queries as $ar) {
+            $engine = $ar['region'];
+            if ($engine->engine === 'google') {
+                $total += MonitoringGoogleDepth::limitsMultiplier($engine->google_depth);
+            } else {
+                $total += 1;
+            }
+        }
+
+        return $total;
     }
 
     public function reserveLimits(int $count): bool

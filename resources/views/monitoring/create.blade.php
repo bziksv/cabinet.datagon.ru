@@ -117,7 +117,7 @@
                 },
             };
         </script>
-        <script src="{{ asset('js/cabinet-monitoring-create.js') }}?v={{ config('cabinet-monitoring.version') }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-create.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-create.js')) ?: time()) . '-r3' }}"></script>
     @endslot
 
 @endcomponent

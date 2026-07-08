@@ -635,10 +635,9 @@ class MonitoringKeywordsController extends Controller
             foreach ($regions as $region) {
                 $occurrence = $occurrencesByKey->get($item->id . ':' . $region['id']);
                 if ($occurrence) {
-                    $item->base += $occurrence->base;
-                    $item->phrasal += $occurrence->phrasal;
-                    $item->exact += $occurrence->exact;
-
+                    $item->base = (int) $occurrence->base;
+                    $item->phrasal = (int) $occurrence->phrasal;
+                    $item->exact = (int) $occurrence->exact;
                     $item->occurrenceCreateAt = $occurrence->updated_at;
                 }
             }

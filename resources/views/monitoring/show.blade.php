@@ -1,5 +1,5 @@
 @component('component.card', [
-    'title' => $project->name,
+    'title' => $project->name . ' — ' . __('Position monitoring'),
     'titleHtml' => '<span class="visually-hidden">' . e($project->name) . '</span>',
 ])
     @slot('css')
@@ -9,7 +9,7 @@
         <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/datatables-fixedcolumns/css/fixedColumns.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ @filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time() }}">
+        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc21' }}">
     @endslot
 
     <div class="cabinet-mon-project-page" id="cabinet-mon-project-root" data-view="keywords">
@@ -56,6 +56,7 @@
 
     @include('monitoring.keywords.modal.main')
     @include('monitoring.keywords.modal.delete-confirm')
+    @include('monitoring.partials.queue-confirm-modal')
 
     <div id="cabinetMonTableControlsTpl" hidden aria-hidden="true">
         @include('monitoring.keywords.controls', [
@@ -81,6 +82,13 @@
                     'label' => \App\Classes\Monitoring\MonitoringLocationLabel::filterOption($monChartRegion),
                 ];
             }
+            $monRegions = $project->searchengines->map(function ($search) {
+                return [
+                    'id' => (int) $search->id,
+                    'engine' => (string) $search->engine,
+                    'google_depth' => (int) ($search->google_depth ?? 10),
+                ];
+            })->values();
         @endphp
         <script>
             window.cabinetMonProjectConfig = {
@@ -127,7 +135,7 @@
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables-fixedcolumns/js/dataTables.fixedColumns.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables-fixedcolumns/js/fixedColumns.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time() }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time()) . '-fc21' }}"></script>
         <!-- Select2 -->
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script src="{{ asset('js/cabinet-select2-defaults.js') }}?v={{ @filemtime(public_path('js/cabinet-select2-defaults.js')) ?: time() }}"></script>
@@ -172,6 +180,7 @@
             const LENGTH_MENU = JSON.parse('{{ $lengthMenu }}');
             const MAIN_COLUMNS_COUNT = 7;
             const MON_KEYWORD_COUNT = {{ (int) ($kpiSummary['words'] ?? 0) }};
+            const MON_REGIONS = @json($monRegions);
 
             function monModalSetBusy($modal, busy, busyLabel) {
                 const $btn = $modal.find('.modal-footer .btn-success');
@@ -205,6 +214,8 @@
                         val: $opt.val(),
                         text: $opt.text(),
                         selected: $opt.prop('selected'),
+                        engine: $opt.data('engine') || '',
+                        google_depth: parseInt($opt.data('googleDepth'), 10) || 10,
                     });
                 });
                 return opts;
@@ -212,6 +223,62 @@
 
             function monYandexRegionOptions() {
                 return monRegionOptions(true);
+            }
+
+            function monModalEl(selector) {
+                if (typeof selector === 'string') {
+                    return document.querySelector(selector);
+                }
+                return selector && selector.length ? selector[0] : selector;
+            }
+
+            function monModalShow(el) {
+                el = monModalEl(el);
+                if (!el) {
+                    return null;
+                }
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    const inst = bootstrap.Modal.getOrCreateInstance(el);
+                    inst.show();
+                    return inst;
+                }
+                $(el).modal('show');
+                return null;
+            }
+
+            function monModalHide(el) {
+                el = monModalEl(el);
+                if (!el) {
+                    return;
+                }
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    const inst = bootstrap.Modal.getInstance(el);
+                    if (inst) {
+                        inst.hide();
+                    }
+                    return;
+                }
+                $(el).modal('hide');
+            }
+
+            function monRunAfterModalHidden(el, callback) {
+                el = monModalEl(el);
+                if (!el || typeof callback !== 'function') {
+                    if (typeof callback === 'function') {
+                        callback();
+                    }
+                    return;
+                }
+                let done = false;
+                function run() {
+                    if (done) {
+                        return;
+                    }
+                    done = true;
+                    window.setTimeout(callback, 30);
+                }
+                el.addEventListener('hidden.bs.modal', run, { once: true });
+                window.setTimeout(run, 400);
             }
 
             function monPickRegion(onPick, options) {
@@ -238,7 +305,8 @@
                     return;
                 }
 
-                $('.modal.general').modal('show').BootstrapModalFormTemplates({
+                const $picker = $('.modal.general');
+                $picker.modal('show').BootstrapModalFormTemplates({
                     title: title,
                     fields: [
                         {
@@ -254,8 +322,10 @@
                             toastr.error(@json(__('Monitoring parse select region single')));
                             return;
                         }
-                        m.modal('hide');
-                        onPick(String(region));
+                        monRunAfterModalHidden(m[0], function () {
+                            onPick(String(region));
+                        });
+                        monModalHide(m[0]);
                     },
                 });
             }
@@ -280,6 +350,467 @@
                 if ($btn.data('orig-html')) {
                     $btn.html($btn.data('orig-html'));
                 }
+            }
+
+            const MON_QUEUE_ETA_JOBS_PER_MIN = {
+                occurrence: 30,
+                positions: 45,
+            };
+
+            function monQueueModalEl() {
+                return document.getElementById('cabinetMonQueueConfirmModal');
+            }
+
+            function monQueueModalShow() {
+                return monModalShow(monQueueModalEl());
+            }
+
+            function monQueueModalHide() {
+                monModalHide(monQueueModalEl());
+            }
+
+            function monRegionMetaById(regionId) {
+                const id = String(regionId);
+                const fromOpt = monRegionOptions(false).find(function (r) {
+                    return String(r.val) === id;
+                });
+                if (fromOpt) {
+                    return fromOpt;
+                }
+                return (MON_REGIONS || []).find(function (r) {
+                    return String(r.id) === id;
+                }) || null;
+            }
+
+            function monGoogleDepthMultiplier(depth) {
+                return Math.max(1, Math.round(parseInt(depth, 10) / 10) || 1);
+            }
+
+            function monPositionsJobCount(keywords, regionIds, googleDepth) {
+                let total = 0;
+                (regionIds || []).forEach(function (regionId) {
+                    const meta = monRegionMetaById(regionId);
+                    if (!meta) {
+                        total += keywords;
+                        return;
+                    }
+                    if (meta.engine === 'google') {
+                        total += keywords * monGoogleDepthMultiplier(googleDepth);
+                    } else {
+                        total += keywords;
+                    }
+                });
+                return total;
+            }
+
+            function monHasGoogleRegions(regionIds) {
+                return (regionIds || []).some(function (regionId) {
+                    const meta = monRegionMetaById(regionId);
+                    return meta && meta.engine === 'google';
+                });
+            }
+
+            function monDefaultGoogleDepth(regionIds) {
+                let depth = 10;
+                (regionIds || []).forEach(function (regionId) {
+                    const meta = monRegionMetaById(regionId);
+                    if (meta && meta.engine === 'google' && meta.google_depth) {
+                        depth = Math.max(depth, parseInt(meta.google_depth, 10) || 10);
+                    }
+                });
+                return depth;
+            }
+
+            function monQueueEstimateDuration(pairs, queueType) {
+                const rate = MON_QUEUE_ETA_JOBS_PER_MIN[queueType] || 30;
+                const pairsCount = Math.max(0, parseInt(pairs, 10) || 0);
+                if (!pairsCount) {
+                    return @json(__('Monitoring queue duration unknown'));
+                }
+
+                const minMinutes = Math.max(1, Math.ceil(pairsCount / rate));
+                const maxMinutes = Math.max(minMinutes, Math.ceil(pairsCount / Math.max(1, rate / 2)));
+
+                let range;
+                if (maxMinutes <= 1) {
+                    range = '< 1 ' + @json(__('min'));
+                } else if (maxMinutes < 60) {
+                    range = minMinutes === maxMinutes
+                        ? ('~' + minMinutes + ' ' + @json(__('min')))
+                        : ('~' + minMinutes + '–' + maxMinutes + ' ' + @json(__('min')));
+                } else {
+                    const minHours = Math.floor(minMinutes / 60);
+                    const maxHours = Math.ceil(maxMinutes / 60);
+                    range = minHours === maxHours
+                        ? ('~' + minHours + ' ' + @json(__('h')))
+                        : ('~' + minHours + '–' + maxHours + ' ' + @json(__('h')));
+                }
+
+                return @json(__('Monitoring queue duration estimate'))
+                    .replace(':duration', range);
+            }
+
+            function monQueueConfirmModal(options) {
+                const $modal = $('#cabinetMonQueueConfirmModal');
+                if (!$modal.length) {
+                    return;
+                }
+
+                let stats = $.extend({}, options.stats || {});
+                const mode = options.mode || 'all';
+                const queueType = options.queueType || 'occurrence';
+                const title = options.title || @json(__('Monitoring queue confirm title'));
+                const limitsHint = options.limitsHint || @json(__('Monitoring occurrence limits hint'));
+                const onConfirm = typeof options.onConfirm === 'function' ? options.onConfirm : function () {};
+                const showScopeChoice = options.showScopeChoice !== false && mode === 'all';
+                const regionIds = options.regionIds || [];
+                const showRegionPicker = !!options.showRegionPicker;
+                const showRegionsPicker = !!options.showRegionsPicker;
+                const regionOptions = options.regionOptions || [];
+                let activeRegionIds = regionIds.slice();
+                const showGoogleDepth = !!options.showGoogleDepth && (monHasGoogleRegions(activeRegionIds) || showRegionsPicker || showRegionPicker);
+
+                const formatAllMeta = options.formatAllMeta || function (s) {
+                    return @json(__('Monitoring queue scope all meta'))
+                        .replace(':keywords', s.keywords)
+                        .replace(':regions', s.regions || s.yandex_regions || 0)
+                        .replace(':limits', s.limits_all);
+                };
+                const formatMissingMeta = options.formatMissingMeta || function (s) {
+                    return @json(__('Monitoring queue scope missing meta'))
+                        .replace(':pairs', s.pairs_missing)
+                        .replace(':limits', s.limits_missing);
+                };
+                const formatSelectedSummary = options.formatSelectedSummary || function (s) {
+                    return @json(__('Monitoring queue selected summary'))
+                        .replace(':keywords', s.keywords)
+                        .replace(':context', s.context || '');
+                };
+
+                const $depthWrap = $modal.find('[data-mon-queue-google-depth-wrap]');
+                const $depthSelect = $modal.find('[data-mon-queue-google-depth]');
+                const $regionWrap = $modal.find('[data-mon-queue-region-wrap]');
+                const $regionSelect = $modal.find('[data-mon-queue-region]');
+                const $regionsWrap = $modal.find('[data-mon-queue-regions-wrap]');
+                const $regionsList = $modal.find('[data-mon-queue-regions-list]');
+
+                function updateConfirmState() {
+                    const blocked = (showRegionsPicker && !activeRegionIds.length)
+                        || (showRegionPicker && !String($regionSelect.val() || '').length)
+                        || !(stats.limits_all > 0);
+                    $confirmBtn.prop('disabled', blocked).toggleClass('disabled', blocked);
+                }
+
+                function syncRegionLimits() {
+                    if (showRegionsPicker) {
+                        activeRegionIds = [];
+                        $regionsList.find('input[type=checkbox]:checked').each(function () {
+                            activeRegionIds.push(String($(this).val()));
+                        });
+                    } else if (showRegionPicker) {
+                        const picked = String($regionSelect.val() || '');
+                        activeRegionIds = picked ? [picked] : [];
+                    }
+                    const depth = monHasGoogleRegions(activeRegionIds)
+                        ? (parseInt($depthSelect.val(), 10) || options.defaultGoogleDepth || 10)
+                        : 10;
+                    const limits = monPositionsJobCount(stats.keywords || 0, activeRegionIds, depth);
+                    stats.limits_all = limits;
+                    stats.pairs_all = limits;
+                    stats.google_depth = depth;
+                    stats.regions = activeRegionIds.length;
+                    stats.context = activeRegionIds.length
+                        ? activeRegionIds.map(function (regionId) {
+                            const fromOpt = regionOptions.find(function (r) {
+                                return String(r.val) === String(regionId);
+                            });
+                            if (fromOpt && fromOpt.text) {
+                                return fromOpt.text;
+                            }
+                            const meta = monRegionMetaById(regionId);
+                            return ($('#searchengines option[value="' + regionId + '"]').text() || '');
+                        }).join(', ')
+                        : (stats.context || '');
+                }
+
+                function refreshGoogleDepthLimits() {
+                    syncRegionLimits();
+                    const needGoogleDepth = monHasGoogleRegions(activeRegionIds);
+                    $depthWrap.toggleClass('d-none', !needGoogleDepth);
+                    updateConfirmState();
+                }
+
+                function renderLimitsSummary() {
+                    if (mode === 'all' && !showScopeChoice) {
+                        $modal.find('[data-mon-queue-selected-summary]').html(
+                            (options.summaryHtml || formatAllMeta(stats))
+                            + '<p class="mb-0 fw-semibold mt-2">' + @json(__('Monitoring parse limits confirm')) + ' '
+                            + (stats.limits_all || 0) + '</p>'
+                        );
+                    } else if (mode === 'selected') {
+                        $modal.find('[data-mon-queue-selected-summary]').text(formatSelectedSummary(stats));
+                        $modal.find('[data-mon-queue-selected-limits]').text(stats.limits_all || 0);
+                    }
+                    $modal.find('[data-mon-queue-duration]').text(
+                        monQueueEstimateDuration(stats.pairs_all || stats.keywords || 0, queueType)
+                    );
+                    updateConfirmState();
+                }
+
+                $modal.find('#cabinetMonQueueConfirmModalLabel').text(title);
+                $modal.find('[data-mon-queue-limits-hint]').text(
+                    (showGoogleDepth || showRegionPicker || showRegionsPicker)
+                        ? @json(__('Monitoring google depth limits hint'))
+                        : limitsHint
+                );
+                $modal.find('[data-mon-queue-mode="all"]').toggleClass('d-none', !showScopeChoice);
+                $modal.find('[data-mon-queue-mode="selected"]').toggleClass('d-none', mode !== 'selected');
+
+                const $confirmBtn = $modal.find('[data-mon-queue-confirm]');
+
+                $regionsWrap.toggleClass('d-none', !showRegionsPicker);
+                if (showRegionsPicker) {
+                    $regionsList.empty();
+                    const initialChecked = (options.initialCheckedRegions || activeRegionIds || []).map(String);
+                    regionOptions.forEach(function (opt) {
+                        const id = 'monQueueRegionPick_' + opt.val;
+                        const checked = initialChecked.indexOf(String(opt.val)) !== -1;
+                        const $check = $('<div class="form-check"/>');
+                        $check.append(
+                            $('<input>', {
+                                type: 'checkbox',
+                                class: 'form-check-input',
+                                id: id,
+                                name: 'mon_queue_regions[]',
+                                value: opt.val,
+                                checked: checked,
+                            })
+                        );
+                        $check.append(
+                            $('<label>', {
+                                class: 'form-check-label',
+                                for: id,
+                                text: opt.text,
+                            })
+                        );
+                        $regionsList.append($check);
+                    });
+                    $regionsList.off('change.monQueueRegions').on('change.monQueueRegions', 'input[type=checkbox]', function () {
+                        refreshGoogleDepthLimits();
+                        renderLimitsSummary();
+                    });
+                } else {
+                    $regionsList.off('change.monQueueRegions');
+                }
+
+                $regionWrap.toggleClass('d-none', !showRegionPicker || showRegionsPicker);
+                if (showRegionPicker) {
+                    $regionSelect.empty();
+                    regionOptions.forEach(function (opt) {
+                        $regionSelect.append(
+                            $('<option/>', { value: opt.val, text: opt.text })
+                        );
+                    });
+                    if (options.initialRegion) {
+                        $regionSelect.val(String(options.initialRegion));
+                    }
+                    $regionSelect.off('change.monQueueRegion').on('change.monQueueRegion', function () {
+                        refreshGoogleDepthLimits();
+                        renderLimitsSummary();
+                    });
+                } else {
+                    $regionSelect.off('change.monQueueRegion');
+                }
+
+                refreshGoogleDepthLimits();
+                const needGoogleDepthInitially = monHasGoogleRegions(activeRegionIds);
+                $depthWrap.toggleClass('d-none', !needGoogleDepthInitially);
+                if (needGoogleDepthInitially || showRegionsPicker || showRegionPicker) {
+                    $depthSelect.val(String(options.defaultGoogleDepth || monDefaultGoogleDepth(activeRegionIds)));
+                    $depthSelect.off('change.monGoogleDepth').on('change.monGoogleDepth', function () {
+                        refreshGoogleDepthLimits();
+                        renderLimitsSummary();
+                    });
+                } else {
+                    $depthSelect.off('change.monGoogleDepth');
+                    if (mode === 'selected' && !showRegionPicker && !showRegionsPicker) {
+                        syncRegionLimits();
+                    }
+                }
+
+                if (mode === 'all' && !showScopeChoice) {
+                    renderLimitsSummary();
+                    $modal.find('[data-mon-queue-mode="selected"]').removeClass('d-none');
+                }
+
+                if (mode === 'all') {
+                    if (showScopeChoice) {
+                        $modal.find('[data-mon-queue-all-meta]').text(formatAllMeta(stats));
+                        $modal.find('[data-mon-queue-missing-meta]').text(formatMissingMeta(stats));
+
+                        const $missingRadio = $modal.find('#queueConfirmScopeMissing');
+                        const $allRadio = $modal.find('#queueConfirmScopeAll');
+                        const missingDisabled = !stats.limits_missing;
+
+                        $missingRadio.prop('disabled', missingDisabled);
+                        if (missingDisabled) {
+                            $allRadio.prop('checked', true);
+                        } else if (!$modal.find('input[name="queue_confirm_scope"]:checked:not(:disabled)').length) {
+                            $allRadio.prop('checked', true);
+                        }
+                    }
+
+                    if (showScopeChoice || !showGoogleDepth) {
+                        $modal.find('[data-mon-queue-duration]').text(monQueueEstimateDuration(stats.pairs_all || 0, queueType));
+                    }
+                } else {
+                    renderLimitsSummary();
+                }
+
+                $confirmBtn.removeClass('disabled');
+                if (!$confirmBtn.data('orig-text')) {
+                    $confirmBtn.data('orig-text', $confirmBtn.text());
+                }
+
+                $confirmBtn.off('click.monQueue').on('click.monQueue', function () {
+                    refreshGoogleDepthLimits();
+
+                    let limits = 0;
+                    let scope = 'all';
+                    let pairs = 0;
+                    let pickedRegion = showRegionPicker ? String($regionSelect.val() || '') : (activeRegionIds[0] || null);
+                    let pickedRegions = showRegionsPicker ? activeRegionIds.slice() : (pickedRegion ? [pickedRegion] : regionIds.slice());
+
+                    if (showRegionsPicker && !pickedRegions.length) {
+                        toastr.error(@json(__('Monitoring parse select region')));
+                        return;
+                    }
+
+                    if (showRegionPicker && !pickedRegion) {
+                        toastr.error(@json(__('Monitoring parse select region single')));
+                        return;
+                    }
+
+                    if (mode === 'all') {
+                        if (showScopeChoice) {
+                            scope = $modal.find('input[name="queue_confirm_scope"]:checked').val() || 'all';
+                            limits = scope === 'missing' ? (stats.limits_missing || 0) : (stats.limits_all || 0);
+                            pairs = scope === 'missing' ? (stats.pairs_missing || 0) : (stats.pairs_all || 0);
+                        } else {
+                            scope = 'all';
+                            limits = stats.limits_all || 0;
+                            pairs = stats.pairs_all || 0;
+                        }
+                    } else {
+                        limits = stats.limits_all || 0;
+                        pairs = stats.pairs_all || stats.keywords || 0;
+                    }
+
+                    if (!limits) {
+                        toastr.error(@json(__('Monitoring occurrence nothing to update')));
+                        return;
+                    }
+
+                    $confirmBtn.prop('disabled', true).addClass('disabled');
+                    monQueueModalHide();
+                    onConfirm({
+                        scope: scope,
+                        limits: limits,
+                        pairs: pairs,
+                        google_depth: monHasGoogleRegions(pickedRegions) ? stats.google_depth : null,
+                        region: pickedRegion,
+                        regions: pickedRegions,
+                    });
+                });
+
+                renderLimitsSummary();
+                monQueueModalShow();
+            }
+
+            function monOccurrenceConfirmModal(options) {
+                monQueueConfirmModal($.extend({}, options, {
+                    queueType: 'occurrence',
+                    title: @json(__('Monitoring occurrence confirm title')),
+                    limitsHint: @json(__('Monitoring occurrence limits hint')),
+                    formatAllMeta: function (s) {
+                        return @json(__('Monitoring occurrence scope all meta'))
+                            .replace(':keywords', s.keywords)
+                            .replace(':regions', s.yandex_regions)
+                            .replace(':limits', s.limits_all);
+                    },
+                    formatMissingMeta: function (s) {
+                        return @json(__('Monitoring occurrence scope missing meta'))
+                            .replace(':pairs', s.pairs_missing)
+                            .replace(':limits', s.limits_missing);
+                    },
+                    formatSelectedSummary: function (s) {
+                        return @json(__('Monitoring occurrence selected summary'))
+                            .replace(':keywords', s.keywords);
+                    },
+                }));
+            }
+
+            function monPositionsConfirmModal(options) {
+                monQueueConfirmModal($.extend({}, options, {
+                    queueType: 'positions',
+                    showScopeChoice: false,
+                    title: options.title || @json(__('Monitoring position confirm title')),
+                    limitsHint: @json(__('Monitoring position limits hint')),
+                    formatAllMeta: function (s) {
+                        return @json(__('Monitoring position scope all meta'))
+                            .replace(':keywords', s.keywords)
+                            .replace(':regions', s.regions)
+                            .replace(':limits', s.limits_all)
+                            + (s.context ? ('<br><span class="text-secondary small">' + s.context + '</span>') : '');
+                    },
+                    formatSelectedSummary: function (s) {
+                        return @json(__('Monitoring position selected summary'))
+                            .replace(':keywords', s.keywords)
+                            .replace(':context', s.context || '');
+                    },
+                }));
+            }
+
+            function monOccurrencePostAll(scope, $btn) {
+                monOccurrenceBtnBusy($btn, true);
+
+                axios.post('/monitoring/occurrence', {
+                    id: PROJECT_ID,
+                    scope: scope,
+                }, { timeout: 45000 }).then(function (postResponse) {
+                    if (postResponse.data.status) {
+                        toastr.success(postResponse.data.msg + ' -' + postResponse.data.count);
+                    } else {
+                        toastr.error(postResponse.data.error || @json(__('Monitoring parse queue error')));
+                    }
+                }).catch(function (err) {
+                    toastr.error((err.response && err.response.data && err.response.data.error)
+                        || @json(__('Monitoring parse queue error')));
+                }).finally(function () {
+                    monOccurrenceBtnBusy($btn, false);
+                });
+            }
+
+            function monOccurrencePostKeys(arrKeys, region, $btn) {
+                monOccurrenceBtnBusy($btn, true);
+
+                axios.post('/monitoring/occurrence/keys', {
+                    projectId: PROJECT_ID,
+                    keys: arrKeys,
+                    region: region,
+                }, { timeout: 45000 }).then(function (response) {
+                    if (response.data.status) {
+                        toastr.success(response.data.msg + ' -' + response.data.count);
+                        $('#monitoringTable_wrapper input[type="checkbox"]:checked').prop('checked', false);
+                    } else {
+                        toastr.error(response.data.error || @json(__('Monitoring parse queue error')));
+                    }
+                }).catch(function (err) {
+                    toastr.error((err.response && err.response.data && err.response.data.error)
+                        || @json(__('Monitoring parse queue error')));
+                }).finally(function () {
+                    monOccurrenceBtnBusy($btn, false);
+                });
             }
 
             function chartDateRange() {
@@ -352,7 +883,7 @@
 
             function monitoringTableHasBodyRows() {
                 return $('#monitoringTable_wrapper').find(
-                    '.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr, #monitoringTable_wrapper tbody tr'
+                    '.dataTables_scrollBody tbody tr, #monitoringTable_wrapper tbody tr'
                 ).filter(function () {
                     return $(this).find('td').length > 0;
                 }).length > 0;
@@ -408,19 +939,20 @@
                             window.cabinetMonitoringShowChrome.onTableReady(api, { skipRelayout: true });
                         }
                     };
-                    if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.finalizeMonTableLayout) {
-                        window.cabinetMonitoringShowChrome.finalizeMonTableLayout(api);
-                        done();
-                    } else if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.relayoutKeywordsTable) {
-                        window.cabinetMonitoringShowChrome.relayoutKeywordsTable(done, {
-                            adjustColumns: true,
-                            rebuildFixedColumns: true,
-                        });
-                    } else {
-                        window.requestAnimationFrame(function () {
-                            window.requestAnimationFrame(done);
-                        });
+                    try {
+                        if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.finalizeMonTableLayout) {
+                            window.cabinetMonitoringShowChrome.finalizeMonTableLayout(api);
+                        } else if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.relayoutKeywordsTable) {
+                            window.cabinetMonitoringShowChrome.relayoutKeywordsTable(null, {
+                                adjustColumns: true,
+                            });
+                            done();
+                            return;
+                        }
+                    } catch (layoutErr) {
+                        console.error('monitoring table unveil layout failed', layoutErr);
                     }
+                    done();
                 };
 
                 unveil();
@@ -461,6 +993,8 @@
 
             function monColumnClassName(name) {
                 var map = {
+                    checkbox: 'cabinet-mon-col-checkbox',
+                    btn: 'cabinet-mon-col-btn',
                     query: 'cabinet-mon-col-query',
                     url: 'cabinet-mon-col-url',
                     group: 'cabinet-mon-col-group',
@@ -729,55 +1263,69 @@
                             });
 
                             container.find('.parse-positions').click(function () {
-                                let select = $('#searchengines');
+                                const $btn = $(this);
+                                if ($btn.data('busy')) {
+                                    return;
+                                }
 
-                                let params = [];
-                                select.find('option[value!=""]').map((i, item) => {
-                                    let region = $(item);
-                                    params.push({
-                                        val: region.val(),
-                                        text: region.text(),
-                                        checked: region.prop('selected')
-                                    });
-                                });
+                                const regionOpts = monRegionOptions(false);
+                                if (!regionOpts.length) {
+                                    toastr.error(@json(__('Monitoring parse select region')));
+                                    return;
+                                }
 
-                                $('.modal.general').modal('show').BootstrapModalFormTemplates({
+                                const keywordCount = MON_KEYWORD_COUNT || 0;
+                                const prechecked = regionOpts
+                                    .filter(function (r) { return r.selected; })
+                                    .map(function (r) { return String(r.val); });
+                                const singleRegion = regionOpts.length === 1;
+                                const initialIds = singleRegion
+                                    ? [String(regionOpts[0].val)]
+                                    : prechecked.slice();
+                                const defaultDepth = monDefaultGoogleDepth(
+                                    initialIds.length ? initialIds : regionOpts.map(function (r) { return r.val; })
+                                );
+                                const limits = initialIds.length
+                                    ? monPositionsJobCount(keywordCount, initialIds, defaultDepth)
+                                    : 0;
+
+                                monPositionsConfirmModal({
+                                    mode: 'all',
+                                    showRegionsPicker: !singleRegion,
+                                    regionOptions: regionOpts,
+                                    regionIds: initialIds,
+                                    initialCheckedRegions: initialIds,
+                                    showGoogleDepth: true,
+                                    defaultGoogleDepth: defaultDepth,
                                     title: @json(__('Monitoring position pick regions')),
-                                    fields: [
-                                        {
-                                            type: 'checkbox',
-                                            name: 'regions',
-                                            label: '',
-                                            params: params
-                                        },
-                                    ],
-                                    onAgree: function (m) {
-                                        if (m.data('monParseBusy')) {
-                                            return;
-                                        }
-
-                                        const formData = new FormData(m.find('form').get(0));
-                                        let regions = formData.getAll('regions');
-
+                                    stats: {
+                                        keywords: keywordCount,
+                                        regions: initialIds.length || regionOpts.length,
+                                        pairs_all: limits,
+                                        limits_all: limits,
+                                        limits_missing: 0,
+                                        pairs_missing: 0,
+                                    },
+                                    onConfirm: function (payload) {
+                                        const regions = payload.regions || [];
                                         if (!regions.length) {
                                             toastr.error(@json(__('Monitoring parse select region')));
                                             return;
                                         }
 
-                                        const limits = (MON_KEYWORD_COUNT || 0) * regions.length;
+                                        $btn.data('busy', true).prop('disabled', true).addClass('disabled');
+                                        const origHtml = $btn.html();
+                                        $btn.html('<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + @json(__('Monitoring parse queue enqueueing')));
 
-                                        if (!limits || !window.confirm(@json(__('Monitoring parse limits confirm')) + ' ' + limits)) {
-                                            return;
-                                        }
-
-                                        m.data('monParseBusy', true);
-                                        monModalSetBusy(m, true, @json(__('Monitoring parse queue enqueueing')));
-
-                                        axios.post('/monitoring/parse/positions/project', {
+                                        const postData = {
                                             projectId: PROJECT_ID,
                                             regions: regions,
-                                        }).then(function (response) {
-                                            m.modal('hide');
+                                        };
+                                        if (payload.google_depth) {
+                                            postData.google_depth = payload.google_depth;
+                                        }
+
+                                        axios.post('/monitoring/parse/positions/project', postData).then(function (response) {
                                             if (response.data.status) {
                                                 toastr.success(response.data.msg + ' -' + response.data.count);
                                             } else {
@@ -786,10 +1334,9 @@
                                         }).catch(function () {
                                             toastr.error(@json(__('Monitoring parse queue error')));
                                         }).finally(function () {
-                                            m.data('monParseBusy', false);
-                                            monModalSetBusy(m, false);
+                                            $btn.data('busy', false).prop('disabled', false).removeClass('disabled').html(origHtml);
                                         });
-                                    }
+                                    },
                                 });
                             });
 
@@ -799,41 +1346,18 @@
                                     return;
                                 }
 
-                                const YW_COUNT = 3;
-
-                                axios.get('/monitoring/' + PROJECT_ID + '/count').then(function (response) {
-                                    const yandexRegions = response.data.region_yandex || 0;
-                                    const queries = response.data.queries || 0;
-
-                                    if (!yandexRegions) {
-                                        toastr.error(@json(__('Monitoring occurrence yandex only')));
+                                axios.get('/monitoring/' + PROJECT_ID + '/occurrence/estimate').then(function (response) {
+                                    if (!response.data.status) {
+                                        toastr.error(response.data.error || @json(__('Monitoring parse queue error')));
                                         return;
                                     }
 
-                                    const limits = queries * yandexRegions * YW_COUNT;
-                                    const confirmMsg = @json(__('Monitoring parse limits confirm')) + ' ' + limits
-                                        + '\n' + @json(__('Monitoring occurrence limits hint'))
-                                        + '\n' + @json(__('Monitoring occurrence queue async hint'));
-
-                                    if (!limits || !window.confirm(confirmMsg)) {
-                                        return;
-                                    }
-
-                                    monOccurrenceBtnBusy($btn, true);
-
-                                    axios.post('/monitoring/occurrence', {
-                                        id: PROJECT_ID,
-                                    }, { timeout: 45000 }).then(function (postResponse) {
-                                        if (postResponse.data.status) {
-                                            toastr.success(postResponse.data.msg + ' -' + postResponse.data.count);
-                                        } else {
-                                            toastr.error(postResponse.data.error || @json(__('Monitoring parse queue error')));
-                                        }
-                                    }).catch(function (err) {
-                                        toastr.error((err.response && err.response.data && err.response.data.error)
-                                            || @json(__('Monitoring parse queue error')));
-                                    }).finally(function () {
-                                        monOccurrenceBtnBusy($btn, false);
+                                    monOccurrenceConfirmModal({
+                                        mode: 'all',
+                                        stats: response.data.stats,
+                                        onConfirm: function (result) {
+                                            monOccurrencePostAll(result.scope, $btn);
+                                        },
                                     });
                                 }).catch(function () {
                                     toastr.error(@json(__('Monitoring parse queue error')));
@@ -846,7 +1370,6 @@
                                     return;
                                 }
 
-                                const YW_COUNT = 3;
                                 const arrKeys = [];
                                 const seen = {};
                                 $('#monitoringTable_wrapper input[type="checkbox"]:checked').each(function () {
@@ -863,33 +1386,25 @@
                                 }
 
                                 monPickYandexRegion(function (region) {
-                                    const limits = arrKeys.length * YW_COUNT;
-                                    const confirmMsg = @json(__('Monitoring parse limits confirm')) + ' ' + limits
-                                        + '\n' + @json(__('Monitoring occurrence limits hint'))
-                                        + '\n' + @json(__('Monitoring occurrence queue async hint'));
-
-                                    if (!limits || !window.confirm(confirmMsg)) {
-                                        return;
-                                    }
-
-                                    monOccurrenceBtnBusy($btn, true);
-
-                                    axios.post('/monitoring/occurrence/keys', {
+                                    axios.post('/monitoring/occurrence/estimate/keys', {
                                         projectId: PROJECT_ID,
                                         keys: arrKeys,
                                         region: region,
-                                    }, { timeout: 45000 }).then(function (response) {
-                                        if (response.data.status) {
-                                            toastr.success(response.data.msg + ' -' + response.data.count);
-                                            $('#monitoringTable_wrapper input[type="checkbox"]:checked').prop('checked', false);
-                                        } else {
+                                    }).then(function (response) {
+                                        if (!response.data.status) {
                                             toastr.error(response.data.error || @json(__('Monitoring parse queue error')));
+                                            return;
                                         }
-                                    }).catch(function (err) {
-                                        toastr.error((err.response && err.response.data && err.response.data.error)
-                                            || @json(__('Monitoring parse queue error')));
-                                    }).finally(function () {
-                                        monOccurrenceBtnBusy($btn, false);
+
+                                        monOccurrenceConfirmModal({
+                                            mode: 'selected',
+                                            stats: response.data.stats,
+                                            onConfirm: function () {
+                                                monOccurrencePostKeys(arrKeys, region, $btn);
+                                            },
+                                        });
+                                    }).catch(function () {
+                                        toastr.error(@json(__('Monitoring parse queue error')));
                                     });
                                 });
                             });
@@ -915,31 +1430,78 @@
                                     return false;
                                 }
 
-                                monPickRegion(function (region) {
-                                    if (!window.confirm(@json(__('Monitoring parse limits confirm')) + ' ' + arrKeys.length)) {
-                                        return false;
-                                    }
+                                const regionOpts = monRegionOptions(false);
+                                if (!regionOpts.length) {
+                                    toastr.error(@json(__('Monitoring parse select region')));
+                                    return false;
+                                }
 
-                                    $btn.data('busy', true).prop('disabled', true).addClass('disabled');
-                                    const origHtml = $btn.html();
-                                    $btn.html('<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + @json(__('Monitoring parse queue enqueueing')));
+                                const currentRegion = $('#searchengines').val();
+                                let initialRegion = (currentRegion && String(currentRegion).length)
+                                    ? String(currentRegion)
+                                    : null;
+                                if (!initialRegion && regionOpts.length === 1) {
+                                    initialRegion = String(regionOpts[0].val);
+                                }
 
-                                    axios.post('/monitoring/parse/positions/project/keys', {
-                                        projectId: PROJECT_ID,
-                                        keys: arrKeys,
-                                        region: region,
-                                    }).then(function (response) {
-                                        if (response.data.status) {
-                                            toastr.success(response.data.msg + ' -' + response.data.count);
-                                            $('#monitoringTable_wrapper input[type="checkbox"]:checked').prop('checked', false);
-                                        } else {
-                                            toastr.error(response.data.error || @json(__('Monitoring parse queue error')));
+                                const needRegionPicker = !initialRegion && regionOpts.length > 1;
+                                const defaultDepth = initialRegion
+                                    ? monDefaultGoogleDepth([initialRegion])
+                                    : 10;
+                                const meta = initialRegion ? monRegionMetaById(initialRegion) : null;
+                                const limits = initialRegion
+                                    ? monPositionsJobCount(arrKeys.length, [initialRegion], defaultDepth)
+                                    : 0;
+
+                                monPositionsConfirmModal({
+                                    mode: 'selected',
+                                    showRegionPicker: needRegionPicker,
+                                    regionOptions: regionOpts,
+                                    initialRegion: initialRegion,
+                                    showGoogleDepth: true,
+                                    regionIds: initialRegion ? [initialRegion] : [],
+                                    defaultGoogleDepth: defaultDepth,
+                                    stats: {
+                                        keywords: arrKeys.length,
+                                        pairs_all: limits,
+                                        limits_all: limits,
+                                        context: initialRegion
+                                            ? ($('#searchengines option[value="' + initialRegion + '"]').text() || '')
+                                            : '',
+                                    },
+                                    onConfirm: function (payload) {
+                                        const region = payload.region || initialRegion;
+                                        if (!region) {
+                                            toastr.error(@json(__('Monitoring parse select region single')));
+                                            return;
                                         }
-                                    }).catch(function () {
-                                        toastr.error(@json(__('Monitoring parse queue error')));
-                                    }).finally(function () {
-                                        $btn.data('busy', false).prop('disabled', false).removeClass('disabled').html(origHtml);
-                                    });
+
+                                        $btn.data('busy', true).prop('disabled', true).addClass('disabled');
+                                        const origHtml = $btn.html();
+                                        $btn.html('<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>' + @json(__('Monitoring parse queue enqueueing')));
+
+                                        const postData = {
+                                            projectId: PROJECT_ID,
+                                            keys: arrKeys,
+                                            region: region,
+                                        };
+                                        if (payload.google_depth) {
+                                            postData.google_depth = payload.google_depth;
+                                        }
+
+                                        axios.post('/monitoring/parse/positions/project/keys', postData).then(function (response) {
+                                            if (response.data.status) {
+                                                toastr.success(response.data.msg + ' -' + response.data.count);
+                                                $('#monitoringTable_wrapper input[type="checkbox"]:checked').prop('checked', false);
+                                            } else {
+                                                toastr.error(response.data.error || @json(__('Monitoring parse queue error')));
+                                            }
+                                        }).catch(function () {
+                                            toastr.error(@json(__('Monitoring parse queue error')));
+                                        }).finally(function () {
+                                            $btn.data('busy', false).prop('disabled', false).removeClass('disabled').html(origHtml);
+                                        });
+                                    },
                                 });
                             });
 
@@ -2359,10 +2921,6 @@
                 chartFilterPeriod.trigger('change');
                 loadDistributionChart();
             }
-
-            $('#occurrence-update').click(function () {
-                $('.mailbox-controls .parse-occurrence-all').first().trigger('click');
-            });
         </script>
     @endslot
 

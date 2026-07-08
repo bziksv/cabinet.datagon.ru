@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Events\MonitoringProjectCreated;
+use App\Classes\Monitoring\MonitoringGoogleDepth;
+use App\Classes\Monitoring\MonitoringLocationLabel;
 use App\Classes\Monitoring\ProjectFaviconService;
 use App\Support\MonitoringPositionsSchedule;
 use App\User;
@@ -232,20 +234,47 @@ class MonitoringProjectCreatorController extends Controller
 
     private function getRegions(Request $request)
     {
-        $this->project->searchengines->transform(function ($item){
-            $item->name = $item->location->name;
+        $this->project->load(['searchengines.location']);
 
-            return $item;
-        });
-
-        return $this->project->searchengines;
+        return $this->project->searchengines->map(function ($item) {
+            return [
+                'id' => $item->id,
+                'engine' => $item->engine,
+                'lr' => $item->lr,
+                'google_depth' => (int) ($item->google_depth ?? MonitoringGoogleDepth::MIN),
+                'name' => MonitoringLocationLabel::displayName(
+                    (string) $item->engine,
+                    (string) $item->lr,
+                    $item->location ? (string) $item->location->name : null
+                ),
+                'time' => $item->time,
+                'weekdays' => $item->weekdays,
+                'monthday' => $item->monthday,
+                'day' => $item->day,
+            ];
+        })->values();
     }
 
     private function createRegion(Request $request)
     {
-        $this->project->searchengines()->firstOrCreate([
+        $attrs = [
             'engine' => $request->input('engine'),
             'lr' => $request->input('lr'),
+        ];
+
+        $values = [];
+        if ($request->input('engine') === 'google') {
+            $values['google_depth'] = MonitoringGoogleDepth::normalize((int) $request->input('google_depth', MonitoringGoogleDepth::MIN));
+        }
+
+        $engine = $this->project->searchengines()->updateOrCreate($attrs, $values);
+
+        return response()->json([
+            'ok' => true,
+            'id' => $engine->id,
+            'engine' => $engine->engine,
+            'lr' => $engine->lr,
+            'google_depth' => (int) ($engine->google_depth ?? MonitoringGoogleDepth::MIN),
         ]);
     }
 

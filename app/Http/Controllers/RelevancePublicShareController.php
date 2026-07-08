@@ -80,6 +80,8 @@ class RelevancePublicShareController extends Controller
             ]);
         }
 
+        $part = (string) $request->input('part', 'full');
+
         try {
             $history = RelevanceHistoryResult::where('project_id', '=', $historyRow->id)
                 ->latest('updated_at')
@@ -108,6 +110,7 @@ class RelevancePublicShareController extends Controller
             }
 
             $history = Relevance::uncompress($history);
+            $history = Relevance::historyDetailsPart($history, $part);
         } catch (Throwable $exception) {
             return response()->json([
                 'code' => 415,
@@ -115,11 +118,16 @@ class RelevancePublicShareController extends Controller
             ]);
         }
 
-        return response()->json([
+        $response = [
             'code' => 200,
             'history' => $history,
-            'config' => RelevanceAnalysisConfig::first(),
-        ]);
+        ];
+
+        if ($part === 'full' || $part === 'meta') {
+            $response['config'] = RelevanceAnalysisConfig::first();
+        }
+
+        return response()->json($response);
     }
 
     protected function resolveShare(string $token): RelevancePublicShare

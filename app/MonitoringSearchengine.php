@@ -9,6 +9,7 @@ class MonitoringSearchengine extends Model
     protected $fillable = [
         'engine',
         'lr',
+        'google_depth',
         'auto_update',
         'time',
         'weekdays',

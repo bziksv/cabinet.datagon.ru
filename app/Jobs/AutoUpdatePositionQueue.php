@@ -20,6 +20,9 @@ class AutoUpdatePositionQueue implements ShouldQueue
     protected $model;
     protected $engine;
 
+    /** @var int|null */
+    protected $googleDepthOverride;
+
     public $timeout = 0;
 
     public $tries = 3;
@@ -30,10 +33,11 @@ class AutoUpdatePositionQueue implements ShouldQueue
      *
      * @return void
      */
-    public function __construct(MonitoringKeyword $model, MonitoringSearchengine $engine)
+    public function __construct(MonitoringKeyword $model, MonitoringSearchengine $engine, ?int $googleDepthOverride = null)
     {
         $this->model = $model;
         $this->engine = $engine;
+        $this->googleDepthOverride = $googleDepthOverride;
     }
 
     public function getModel()
@@ -55,7 +59,7 @@ class AutoUpdatePositionQueue implements ShouldQueue
     public function handle()
     {
         $store = new PositionStore(true);
-        $store->saveByQuery($this->model, $this->engine);
+        $store->saveByQuery($this->model, $this->engine, $this->googleDepthOverride);
 
         MonitoringStat::create([
             'queue' => $this->job->getQueue(),

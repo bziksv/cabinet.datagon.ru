@@ -5,8 +5,9 @@
         <link rel="stylesheet" href="{{ asset('plugins/keyword-generator/css/style.css') }}"/>
         <link rel="stylesheet" href="{{ asset('plugins/jqcloud/css/jqcloud.css') }}"/>
         <link rel="stylesheet" href="{{ asset('plugins/common/css/datatable.css') }}"/>
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-min'])
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.css') }}"/>
-        <link rel="stylesheet" href="{{ asset('plugins/relevance-analysis/css/style.css') }}"/>
+        <link rel="stylesheet" href="{{ asset('plugins/relevance-analysis/css/style.css') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/css/style.css')) ?: time() }}"/>
         <style>
             i:hover {
                 opacity: 1 !important;
@@ -29,14 +30,6 @@
                 background: oldlace;
             }
 
-            .dataTables_length > label {
-                display: flex;
-            }
-
-            .dataTables_length > label > select {
-                margin: 0 5px;
-            }
-
             .row {
                 margin: 0 !important;
             }
@@ -44,6 +37,10 @@
             #historyTbody > tr > td:nth-child(3),
             #historyTbody > tr > td:nth-child(5) {
                 cursor: pointer;
+            }
+
+            #main_history_table_wrapper .dt-buttons {
+                display: none;
             }
         </style>
     @endslot
@@ -296,11 +293,12 @@
                         <div id="key-phrase">
 
                             <div class="form-group required">
-                                <label>{{ __('Top 10/20') }}</label>
+                                <label>{{ __('Top 10/20/30') }}</label>
                                 <select name="count" id="count"
                                         class="form-select rounded-0 count">
                                     <option value="10">10</option>
                                     <option value="20">20</option>
+                                    <option value="30">30</option>
                                 </select>
 
                             </div>
@@ -441,7 +439,7 @@
             <div class="tab-content">
                 <div class="tab-pane active" id="tab_1">
                     <table id="main_history_table"
-                           class="table table-bordered table-hover dtr-inline no-footer dataTable mb-3">
+                           class="table table-bordered table-striped table-hover dtr-inline no-footer dataTable mb-3">
                         <thead>
                         <tr>
                             <th class="table-header">{{ __('Project name') }}</th>
@@ -900,9 +898,9 @@
                             '       style="opacity: 0.6; cursor:pointer;"></i>' +
                             '</span>' +
                             '<div class="dropdown" style="display: inline">' +
-                            '    <i class="fa fa-cogs" id="dropdownMenuButton" data-bs-toggle="dropdown"' +
+                            '    <i class="fa fa-cogs" data-bs-toggle="dropdown"' +
                             '       aria-expanded="false" style="opacity: 0.6; cursor: pointer"></i>' +
-                            '    <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">' +
+                            '    <div class="dropdown-menu">' +
                             '                   <span class="dropdown-item project_name"' +
                             '  style="cursor:pointer;"' +
                             '  data-order="' + row.id + '">' +
@@ -988,16 +986,16 @@
                                 '    </div>' +
                                 '</div>'
                         } else {
-                            return '<div class="btn-group">' +
-                                '     <button class="btn btn-secondary" data-bs-target="#startThroughScan' + row.id + '"' +
+                            return '<div class="though-cell btn-group">' +
+                                '     <button type="button" class="btn btn-secondary" data-bs-target="#startThroughScan' + row.id + '"' +
                                 '             data-bs-toggle="modal"' +
-                                '             data-bs-placement="top" class="btn btn-secondary">' +
+                                '             data-bs-placement="top">' +
                                 '         {{ __('End-to-end analysis') }}' +
                                 '     </button>' +
-                                '     <button type="button" class="btn btn-secondary">' +
+                                '     <button type="button" class="btn btn-secondary though-help-btn">' +
                                 '     <span class="__helper-link ui_tooltip_w">' +
-                                '         <i class="fa fa-question-circle"></i>' +
-                                '         <span class="ui_tooltip __right">' +
+                                '         <i class="fa fa-question-circle" aria-hidden="true"></i>' +
+                                '         <span class="ui_tooltip __bottom __l">' +
                                 '             <span class="ui_tooltip_content">Для анализа используются результаты последнего сканирования каждой фразы и посадочной страницы</span>' +
                                 '         </span>' +
                                 '     </span>' +
@@ -1025,10 +1023,7 @@
                         aTargets: [1, 2, 6]
                     }
                 ],
-                dom: 'lBfrtip',
-                buttons: [
-                    'copy', 'csv', 'excel'
-                ],
+                dom: 'lfrtip',
                 language: {
                     paginate: {
                         "first": "«",
@@ -1416,18 +1411,16 @@
                     })
 
                     refreshMethods()
-                }
+                },
             });
 
             $('#main_history_table').css({
                 width: '100%',
             })
 
-            $('#main_history_table').wrap('<div style="width: 100%; overflow: auto"></div>')
+            $('#main_history_table').wrap('<div class="main-history-table-scroll"></div>')
 
             search(historyTable, true, true)
-
-            $(".dt-button").addClass('btn btn-secondary')
 
             $('.repeat-scan-unique-sites').on('click', function () {
                 $.ajax({

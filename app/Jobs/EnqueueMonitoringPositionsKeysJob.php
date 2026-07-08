@@ -25,17 +25,21 @@ class EnqueueMonitoringPositionsKeysJob implements ShouldQueue
     /** @var string */
     private $targetQueue;
 
+    /** @var int|null */
+    private $googleDepthOverride;
+
     public $timeout = 300;
 
     /**
      * @param int[] $keywordIds
      */
-    public function __construct(int $projectId, int $regionId, array $keywordIds, string $targetQueue = 'position_high')
+    public function __construct(int $projectId, int $regionId, array $keywordIds, string $targetQueue = 'position_high', ?int $googleDepthOverride = null)
     {
         $this->projectId = $projectId;
         $this->regionId = $regionId;
         $this->keywordIds = array_values(array_map('intval', $keywordIds));
         $this->targetQueue = $targetQueue;
+        $this->googleDepthOverride = $googleDepthOverride;
     }
 
     public function handle(): void
@@ -54,12 +58,14 @@ class EnqueueMonitoringPositionsKeysJob implements ShouldQueue
             return;
         }
 
+        $depthOverride = $engine->engine === 'google' ? $this->googleDepthOverride : null;
+
         $project->keywords()
             ->whereIn('id', $this->keywordIds)
             ->orderBy('id')
-            ->chunkById(100, function ($keywords) use ($engine) {
+            ->chunkById(100, function ($keywords) use ($engine, $depthOverride) {
                 foreach ($keywords as $keyword) {
-                    dispatch((new AutoUpdatePositionQueue($keyword, $engine))->onQueue($this->targetQueue));
+                    dispatch((new AutoUpdatePositionQueue($keyword, $engine, $depthOverride))->onQueue($this->targetQueue));
                 }
             });
     }

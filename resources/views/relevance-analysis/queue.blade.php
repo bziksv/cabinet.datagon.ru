@@ -86,11 +86,12 @@
                         </span>
 
                         <div class="form-group required pt-3">
-                            <label>{{ __('Top 10/20') }}</label>
+                            <label>{{ __('Top 10/20/30') }}</label>
                             {!! Form::select('count', array_unique([
                                     $config->count_sites => $config->count_sites,
                                     '10' => 10,
                                     '20' => 20,
+                                    '30' => 30,
                             ]), null, ['class' => 'form-select rounded-0 count']) !!}
                         </div>
 

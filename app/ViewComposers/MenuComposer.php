@@ -5,6 +5,7 @@ namespace App\ViewComposers;
 use App\MenuItemsPosition;
 use App\Services\MenuProjectRegistry;
 use App\Support\CabinetAdminMenu;
+use App\Support\CabinetSidebarMenu;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
@@ -18,11 +19,11 @@ class MenuComposer
         }
 
         if (cabinet_skip_heavy_web()) {
-            $stamp = MenuProjectRegistry::structureStamp();
-            $cached = session('cabinet_menu_modules_v5');
-            $cachedStamp = session('cabinet_menu_modules_v5_stamp');
+            $stamp = MenuProjectRegistry::structureStamp() . ':' . (CabinetSidebarMenu::hideLegacyMonitoring() ? 'n32' : 'full');
+            $cached = session('cabinet_menu_modules_v9');
+            $cachedStamp = session('cabinet_menu_modules_v9_stamp');
             if (is_array($cached) && $cachedStamp === $stamp && $this->cachedMenuHasItems($cached)) {
-                $view->with('modules', CabinetAdminMenu::filterModules($cached));
+                $view->with('modules', CabinetSidebarMenu::filterModules(CabinetAdminMenu::filterModules($cached)));
 
                 return;
             }
@@ -68,12 +69,12 @@ class MenuComposer
             }
         }
 
-        $modules = CabinetAdminMenu::filterModules(collect($modules)->toArray());
+        $modules = CabinetSidebarMenu::filterModules(CabinetAdminMenu::filterModules(collect($modules)->toArray()));
 
         if (cabinet_skip_heavy_web()) {
             session([
-                'cabinet_menu_modules_v5' => $modules,
-                'cabinet_menu_modules_v5_stamp' => MenuProjectRegistry::structureStamp(),
+                'cabinet_menu_modules_v9' => $modules,
+                'cabinet_menu_modules_v9_stamp' => MenuProjectRegistry::structureStamp() . ':' . (CabinetSidebarMenu::hideLegacyMonitoring() ? 'n32' : 'full'),
             ]);
         }
 

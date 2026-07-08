@@ -109,10 +109,5 @@
                 <i class="bi bi-currency-exchange" aria-hidden="true"></i>{{ __('Monitoring show keyword prices') }}
             </a>
         @endif
-        @can('update_occurrence_monitoring')
-            <button type="button" class="cabinet-mon-project-module-nav__item border-0 bg-transparent" id="occurrence-update">
-                <i class="bi bi-arrow-repeat" aria-hidden="true"></i>{{ __('Monitoring show update occurrence') }}
-            </button>
-        @endcan
     </nav>
 </header>

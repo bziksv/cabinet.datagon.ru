@@ -1,33 +1,136 @@
 function getSuccessMessage(message, time = 3000) {
-    $('.toast-top-right.success-message').show(300)
-    $('#toast-message').html(message)
-    setTimeout(() => {
-        $('.toast-top-right.success-message').hide(300)
+    var $toast = $('#unigram-copy-toast')
+    if (!$toast.length) {
+        $toast = $('.toast-top-right.success-message.unigram-copy-success').first()
+    }
+    if (!$toast.length) {
+        $toast = $('.toast-top-right.success-message').not('.lock-word, .lock-word-removed').first()
+    }
+    if (!$toast.length) {
+        return
+    }
+
+    var $message = $toast.find('.toast-message, .unigram-copy-success__text').first()
+    if (!$message.length) {
+        $message = $toast
+    }
+
+    $message.text(message)
+    clearTimeout(window.__unigramCopyToastTimer)
+    $toast.stop(true, true).addClass('is-visible').show(200)
+    window.__unigramCopyToastTimer = setTimeout(function () {
+        $toast.removeClass('is-visible').hide(200)
     }, time)
 }
 
-function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPassages = false) {
+function copyUnigramWord(text, successMessage) {
+    function done() {
+        getSuccessMessage(successMessage || 'Успешно скопированно')
+    }
+
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done).catch(function () {
+            fallbackCopyUnigramWord(text, done)
+        })
+        return
+    }
+
+    fallbackCopyUnigramWord(text, done)
+}
+
+function fallbackCopyUnigramWord(text, done) {
+    var area = document.createElement('textarea')
+    area.value = text
+    area.style.position = 'fixed'
+    area.style.left = '-9999px'
+    document.body.appendChild(area)
+    area.select()
+    try {
+        document.execCommand('copy')
+        done()
+    } catch (e) {}
+    document.body.removeChild(area)
+}
+
+function bindUnigramCopyHandler(successMessage) {
+    $(document)
+        .off('click.unigramCopy', '#unigram .copy-icon, #unigram .copy-text-in-buffer')
+        .on('click.unigramCopy', '#unigram .copy-icon, #unigram .copy-text-in-buffer', function (e) {
+            e.preventDefault()
+            e.stopPropagation()
+
+            var text = $(this).attr('data-target')
+            if (!text) {
+                text = $(this).closest('td').find('.unigram-word-text').text().trim()
+            }
+            if (!text) {
+                return
+            }
+
+            copyUnigramWord(text, successMessage)
+        })
+}
+
+function decorateUnigramWordCells() {
+    $('#unigram tbody td:nth-child(2)').each(function () {
+        var cell = $(this)
+        if (cell.find('.unigram-word-text').length) {
+            return
+        }
+
+        var lockBlock = cell.find('.lock-block').detach()
+        var wordText = cell.clone().children('.lock-block').remove().end().text().trim().replace(/\s+/g, ' ')
+
+        cell.empty().append(
+            $('<div class="unigram-word-cell"></div>').append(
+                $('<span class="unigram-word-text"></span>').text(wordText),
+                ' ',
+                $('<i class="fa fa-copy copy-icon" role="button" tabindex="0" title="Копировать"></i>')
+            )
+        )
+
+        if (lockBlock.length) {
+            cell.append(lockBlock)
+        }
+    })
+}
+
+function formatHybridMetric(number) {
+    let value = parseFloat(number)
+    if (isNaN(value) || value === 0) {
+        return '0'
+    }
+
+    if (value >= 0.01) {
+        return (Math.round(value * 10000) / 10000).toString()
+    }
+
+    return crop(value)
+}
+
+function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPassages = false, onReady = null) {
+    if (typeof searchPassages === 'function') {
+        onReady = searchPassages
+        searchPassages = false
+    }
+
     if (searchPassages) {
-        $('#unigram > thead > tr:nth-child(2) > th:nth-child(12)').after(
+        $('#unigram > thead > tr:nth-child(2) > th:nth-child(14)').after(
             "<th class='passages-elem'>Среднее кол-во повторений в пассажах</th>" +
             "<th class='passages-elem'>Количество повторений в пассажах</th>"
         )
 
-        $("#unigram > thead > tr:nth-child(1) > th:nth-child(12)").after(
+        $('#unigram > thead > tr:nth-child(1) > th:nth-child(14)').after(
             "<th class='passages-elem'>" +
             "    <div>" +
-            "        <input class='w-100' type='number' name='minAVGPassages' id='minAVGPassages'" +
-            "               placeholder='min'>" +
-            "        <input class='w-100' type='number' name='maxAVGPassages' id='maxAVGPassages'" +
-            "               placeholder='max'>" +
+            "        <input class='w-100' type='number' name='minAVGPassages' id='minAVGPassages' placeholder='min'>" +
+            "        <input class='w-100' type='number' name='maxAVGPassages' id='maxAVGPassages' placeholder='max'>" +
             "    </div>" +
             "</th>" +
             "<th class='passages-elem'>" +
             "    <div>" +
-            "        <input class='w-100' type='number' name='minPassages' id='minPassages'" +
-            "               placeholder='min'>" +
-            "        <input class='w-100' type='number' name='maxPassages' id='maxPassages'" +
-            "               placeholder='max'>" +
+            "        <input class='w-100' type='number' name='minPassages' id='minPassages' placeholder='min'>" +
+            "        <input class='w-100' type='number' name='maxPassages' id='maxPassages' placeholder='max'>" +
             "    </div>" +
             "</th>"
         )
@@ -40,261 +143,230 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
 
     $('.pb-3.unigram').show()
     let tBody = $('#unigramTBody')
-    let newRows = ''
+    let keys = Object.keys(unigramTable)
+    let rowIndex = 0
+    let batchSize = 50
+    let htmlParts = []
 
-    $.each(unigramTable, function (key, wordWorm) {
-        newRows += renderMainTr(key, wordWorm, searchPassages)
+    if ($.fn.DataTable.fnIsDataTable($('#unigram'))) {
+        $('#unigram').dataTable().fnDestroy()
+    }
+
+    tBody.empty()
+
+    function buildRows() {
+        let end = Math.min(rowIndex + batchSize, keys.length)
+        for (; rowIndex < end; rowIndex++) {
+            htmlParts.push(renderMainTr(keys[rowIndex], unigramTable[keys[rowIndex]], searchPassages))
+        }
+
+        if (rowIndex < keys.length) {
+            setTimeout(buildRows, 0)
+            return
+        }
+
+        tBody.html(htmlParts.join(''))
+        initUnigramDataTable(count, words, resultId, searchPassages, onReady)
+    }
+
+    buildRows()
+}
+
+function unigramExportButtons(words) {
+    return [
+        {extend: 'copy', text: words.copy || 'Копировать'},
+        {extend: 'csv', text: words.csv || 'CSV'},
+        {extend: 'excel', text: words.excel || 'Excel'},
+    ]
+}
+
+function syncUnigramHeaderSticky() {
+    var $filterRow = $('#unigram thead .unigram-thead__filters')
+    var $dividerRow = $('#unigram thead .unigram-thead__divider')
+    var $scroll = $('#unigram_wrapper .relevance-tlp-table-scroll')
+
+    if (!$filterRow.length || !$scroll.length) {
+        return
+    }
+
+    var filterHeight = $filterRow.outerHeight() || 0
+    var dividerHeight = $dividerRow.length ? ($dividerRow.outerHeight() || 0) : 0
+
+    $scroll.css('--unigram-filter-row-height', filterHeight + 'px')
+    $scroll.css('--unigram-titles-row-top', (filterHeight + dividerHeight) + 'px')
+}
+
+function initUnigramDataTable(count, words, resultId, searchPassages, onReady) {
+    var table = $('#unigram').DataTable({
+        deferRender: true,
+        order: [[2, 'desc']],
+        pageLength: count,
+        searching: true,
+        dom: 'lBfrtip',
+        orderCellsTop: false,
+        columnDefs: [
+            {orderable: false, targets: 0},
+        ],
+        buttons: unigramExportButtons(words),
+        language: {
+            paginate: {
+                first: '«',
+                last: '»',
+                next: '»',
+                previous: '«'
+            },
+        },
+        oLanguage: {
+            sSearch: words.search + ':',
+            sLengthMenu: words.show + ' _MENU_ ' + words.records,
+            sEmptyTable: words.noRecords,
+            sInfo: words.showing + ' ' + words.from + '  _START_ ' + words.to + ' _END_ ' + words.of + ' _TOTAL_ ' + words.entries,
+        },
+        drawCallback: function () {
+            decorateUnigramWordCells()
+            syncUnigramHeaderSticky()
+        },
+        initComplete: function () {
+            decorateUnigramWordCells()
+            syncUnigramHeaderSticky()
+            window.requestAnimationFrame(function () {
+                syncUnigramHeaderSticky()
+            })
+            setTimeout(syncUnigramHeaderSticky, 100)
+        }
     })
 
-    tBody.html(newRows)
+    bindUnigramCopyHandler(words.successCopied || words.copySuccess || 'Успешно скопированно')
 
-    $(document).ready(function () {
-        if ($.fn.DataTable.fnIsDataTable($('#unigram'))) {
-            $('#unigram').dataTable().fnDestroy()
+    $(window).on('resize.unigramTable', function () {
+        if ($.fn.DataTable.isDataTable('#unigram')) {
+            table.columns.adjust()
+            syncUnigramHeaderSticky()
+        }
+    })
+
+    $.each($('.dt-buttons'), function (key, value) {
+        if (key === 1) {
+            $(this).append(
+                "<a class='btn btn-secondary click_tracking' data-click='Child Words' href='/show-child-words/" + resultId + "' target='_blank'>" +
+                (words.childWords || 'Словоформы') +
+                "</a>"
+            )
+            if (resultId !== 0) {
+                $(this).append(
+                    "<a class='btn btn-secondary mr-1 click_tracking' data-click='Missing Words' href='/show-missing-words/" + resultId + "' target='_blank'>" +
+                    (words.missingWords || 'Упущенные слова') +
+                    "</a>"
+                )
+            }
+        }
+    })
+
+    bindUnigramFilters(table, searchPassages)
+    ensureUnigramTableScrollWrap()
+
+    if (typeof onReady === 'function') {
+        onReady()
+    }
+}
+
+function ensureUnigramTableScrollWrap() {
+    var $table = $('#unigram')
+    if (!$table.length || $table.parent().hasClass('relevance-tlp-table-scroll')) {
+        return
+    }
+
+    $table.wrap('<div class="relevance-tlp-table-scroll"></div>')
+}
+
+function bindUnigramFilters(table, searchPassages) {
+    function isUnigram(min, max, target, settings) {
+        if (settings.nTable.id !== 'unigram') {
+            return true
         }
 
-        var table = $('#unigram').DataTable({
-            "order": [[4, "desc"]],
-            "pageLength": count,
-            "searching": true,
-            dom: 'lBfrtip',
-            buttons: [
-                'copy', 'csv', 'excel'
-            ],
-            language: {
-                paginate: {
-                    "first": "«",
-                    "last": "»",
-                    "next": "»",
-                    "previous": "«"
-                },
-            },
-            "oLanguage": {
-                "sSearch": words.search + ":",
-                "sLengthMenu": words.show + " _MENU_ " + words.records,
-                "sEmptyTable": words.noRecords,
-                "sInfo": words.showing + " " + words.from + "  _START_ " + words.to + " _END_ " + words.of + " _TOTAL_ " + words.entries,
-            },
-            drawCallback: function () {
-                $('#unigram tbody td:nth-child(2)').each(function () {
-                    let cell = $(this);
-                    let clipboard = new ClipboardJS(cell[0], {
-                        text: function () {
-                            return cell.text().trim().replaceAll('  ', ' ');
-                        }
-                    });
+        return (isNaN(min) && isNaN(max)) ||
+            (isNaN(min) && target <= max) ||
+            (min <= target && isNaN(max)) ||
+            (min <= target && target <= max)
+    }
 
-                    cell.html('<div>' + cell.text() + ' <i class="fa fa-copy copy-icon"></i></div>');
-
-                    clipboard.on('success', function (e) {
-                        e.clearSelection();
-                        getSuccessMessage('Успешно скопированно')
-                    });
-                });
-            }
-        });
-
-        $.each($(".dt-buttons"), function (key, value) {
-            if (key === 1) {
-                $(this).append("<a class='btn btn-secondary click_tracking' data-click='Child Words' href='/show-child-words/" + resultId + "' target='_blank'>Child Words</a>");
-                if (resultId !== 0) {
-                    $(this).append("<a class='btn btn-secondary mr-1 click_tracking' data-click='Missing Words' href='/show-missing-words/" + resultId + "' target='_blank'>Missing Words</a>");
-                }
-            }
-        });
-
-        function isUnigram(min, max, target, settings) {
-            if (settings.nTable.id !== 'unigram') {
-                return true;
-            }
-
-            return (isNaN(min) && isNaN(max)) ||
-                (isNaN(min) && target <= max) ||
-                (min <= target && isNaN(max)) ||
-                (min <= target && target <= max);
-        }
-
+    function bindFilter(selectors, colIndex) {
         $.fn.dataTable.ext.search.push(function (settings, data) {
-            var maxTF = parseFloat($('#maxTF').val());
-            var minTF = parseFloat($('#minTF').val());
-            var TF = parseFloat(data[2]);
-            return isUnigram(minTF, maxTF, TF, settings)
-        });
-        $('#minTF, #maxTF').keyup(function () {
-            table.draw();
+            var min = parseFloat($(selectors.min).val())
+            var max = parseFloat($(selectors.max).val())
+            var value = parseFloat(data[colIndex])
+            return isUnigram(min, max, value, settings)
+        })
+
+        $(selectors.min + ', ' + selectors.max).off('keyup.unigramFilter').on('keyup.unigramFilter', function () {
+            table.draw()
             $.each($('[generated-child=true]'), function () {
                 $(this).attr('generated-child', false)
             })
-        });
+        })
+    }
 
-        $.fn.dataTable.ext.search.push(function (settings, data) {
-            var minIdf = parseFloat($('#minIdf').val());
-            var maxIdf = parseFloat($('#maxIdf').val());
-            var IDF = parseFloat(data[3]);
-            return isUnigram(minIdf, maxIdf, IDF, settings)
-        });
-        $('#minIdf, #maxIdf').keyup(function () {
-            table.draw();
-            $.each($('[generated-child=true]'), function () {
-                $(this).attr('generated-child', false)
-            })
-        });
+    bindFilter({min: '#minTfidfTop', max: '#maxTfidfTop'}, 2)
+    bindFilter({min: '#minTfidfSite', max: '#maxTfidfSite'}, 3)
+    bindFilter({min: '#minBm25Top', max: '#maxBm25Top'}, 4)
+    bindFilter({min: '#minBm25Site', max: '#maxBm25Site'}, 5)
+    bindFilter({min: '#minInter', max: '#maxInter'}, 6)
+    bindFilter({min: '#minReSpam', max: '#maxReSpam'}, 7)
+    bindFilter({min: '#minAVG', max: '#maxAVG'}, 8)
+    bindFilter({min: '#minAVGText', max: '#maxAVGText'}, 9)
+    bindFilter({min: '#minInYourPage', max: '#maxInYourPage'}, 10)
+    bindFilter({min: '#minTextIYP', max: '#maxTextIYP'}, 11)
+    bindFilter({min: '#minAVGLink', max: '#maxAVGLink'}, 12)
+    bindFilter({min: '#minLinkIYP', max: '#maxLinkIYP'}, 13)
 
-        $.fn.dataTable.ext.search.push(function (settings, data) {
-            var minInter = parseFloat($('#minInter').val());
-            var maxInter = parseFloat($('#maxInter').val());
-            var inter = parseFloat(data[5])
-            return isUnigram(minInter, maxInter, inter, settings)
-        });
-        $('#minInter, #maxInter').keyup(function () {
-            table.draw();
-            $.each($('[generated-child=true]'), function () {
-                $(this).attr('generated-child', false)
-            })
-        });
+    if (searchPassages) {
+        bindFilter({min: '#minAVGPassages', max: '#maxAVGPassages'}, 14)
+        bindFilter({min: '#minPassages', max: '#maxPassages'}, 15)
+    }
+}
 
-        $.fn.dataTable.ext.search.push(function (settings, data) {
-            var minReSpam = parseFloat($('#minReSpam').val());
-            var maxReSpam = parseFloat($('#maxReSpam').val());
-            var reSpam = parseFloat(data[6])
-            return isUnigram(minReSpam, maxReSpam, reSpam, settings)
-        });
-        $('#minReSpam, #maxReSpam').keyup(function () {
-            table.draw();
-            $.each($('[generated-child=true]'), function () {
-                $(this).attr('generated-child', false)
-            })
+function hybridMetrics(stats) {
+    return {
+        tfidfTop: formatHybridMetric(stats['tfidfTop'] ?? 0),
+        tfidfSite: formatHybridMetric(stats['tfidfSite'] ?? 0),
+        bm25Top: formatHybridMetric(stats['bm25Top'] ?? 0),
+        bm25Site: formatHybridMetric(stats['bm25Site'] ?? 0),
+        tfidfTopText: formatHybridMetric(stats['tfidfTopText'] ?? 0),
+        tfidfTopLink: formatHybridMetric(stats['tfidfTopLink'] ?? 0),
+        tfidfSiteText: formatHybridMetric(stats['tfidfSiteText'] ?? 0),
+        tfidfSiteLink: formatHybridMetric(stats['tfidfSiteLink'] ?? 0),
+    }
+}
 
-        });
+function hybridTfidfTip(metrics, kind) {
+    let labels = window.relevanceHybridLabels || {}
+    let textLabel = labels.text || 'текст'
+    let linkLabel = labels.links || 'ссылки'
 
-        $.fn.dataTable.ext.search.push(function (settings, data) {
-            var minAVG = parseFloat($('#minAVG').val());
-            var maxAVG = parseFloat($('#maxAVG').val());
-            var AVG = parseFloat(data[7])
-            return isUnigram(minAVG, maxAVG, AVG, settings)
-        });
-        $('#minAVG, #maxAVG').keyup(function () {
-            table.draw();
-            $.each($('[generated-child=true]'), function () {
-                $(this).attr('generated-child', false)
-            })
+    if (kind === 'top') {
+        return textLabel + ': ' + metrics.tfidfTopText + ', ' + linkLabel + ': ' + metrics.tfidfTopLink
+    }
 
-        });
+    return textLabel + ': ' + metrics.tfidfSiteText + ', ' + linkLabel + ': ' + metrics.tfidfSiteLink
+}
 
-        $.fn.dataTable.ext.search.push(function (settings, data) {
-            var minAVGText = parseFloat($('#minAVGText').val());
-            var maxAVGText = parseFloat($('#maxAVGText').val());
-            var count = parseFloat(data[8])
-            return isUnigram(minAVGText, maxAVGText, count, settings)
-        });
-        $('#minAVGText, #maxAVGText').keyup(function () {
-            table.draw();
-            $.each($('[generated-child=true]'), function () {
-                $(this).attr('generated-child', false)
-            })
+function hybridTipCell(value, order, tip, extraClass) {
+    let className = extraClass ? " class='" + extraClass + "'" : ''
+    let titleAttr = tip ? " title='" + String(tip).replace(/'/g, '&#39;') + "'" : ''
 
-        });
-
-        $.fn.dataTable.ext.search.push(function (settings, data) {
-            var minInYourPage = parseFloat($('#minInYourPage').val());
-            var maxInYourPage = parseFloat($('#maxInYourPage').val());
-            var count = parseFloat(data[9])
-            return isUnigram(minInYourPage, maxInYourPage, count, settings)
-        });
-        $('#minInYourPage, #maxInYourPage').keyup(function () {
-            table.draw();
-            $.each($('[generated-child=true]'), function () {
-                $(this).attr('generated-child', false)
-            })
-
-        });
-
-        $.fn.dataTable.ext.search.push(function (settings, data) {
-            var minTextIYP = parseFloat($('#minTextIYP').val());
-            var maxTextIYP = parseFloat($('#maxTextIYP').val());
-            var count = parseFloat(data[10])
-            return isUnigram(minTextIYP, maxTextIYP, count, settings)
-        });
-        $('#minTextIYP, #maxTextIYP').keyup(function () {
-            table.draw();
-            $.each($('[generated-child=true]'), function () {
-                $(this).attr('generated-child', false)
-            })
-
-        });
-
-        $.fn.dataTable.ext.search.push(function (settings, data) {
-            var minAVGLink = parseFloat($('#minAVGLink').val());
-            var maxAVGLink = parseFloat($('#maxAVGLink').val());
-            var count = parseFloat(data[11])
-            return isUnigram(minAVGLink, maxAVGLink, count, settings)
-        });
-        $('#minAVGLink, #maxAVGLink').keyup(function () {
-            table.draw();
-            $.each($('[generated-child=true]'), function () {
-                $(this).attr('generated-child', false)
-            })
-
-        });
-
-        $.fn.dataTable.ext.search.push(function (settings, data) {
-            var minLinkIYP = parseFloat($('#minLinkIYP').val());
-            var maxLinkIYP = parseFloat($('#maxLinkIYP').val());
-            var count = parseFloat(data[12])
-            return isUnigram(minLinkIYP, maxLinkIYP, count, settings)
-        });
-        $('#minLinkIYP, #maxLinkIYP').keyup(function () {
-            table.draw();
-            $.each($('[generated-child=true]'), function () {
-                $(this).attr('generated-child', false)
-            })
-
-        });
-
-        if (sessionStorage.getItem('searchPassages') === 'true') {
-            $.fn.dataTable.ext.search.push(function (settings, data) {
-                var minAVGPassages = parseFloat($('#minAVGPassages').val());
-                var maxAVGPassages = parseFloat($('#maxAVGPassages').val());
-                var count = parseFloat(data[13])
-                return isUnigram(minAVGPassages, maxAVGPassages, count, settings)
-            });
-            $('#minAVGPassages, #maxAVGPassages').keyup(function () {
-                table.draw();
-                $.each($('[generated-child=true]'), function () {
-                    $(this).attr('generated-child', false)
-                })
-
-            });
-
-            $.fn.dataTable.ext.search.push(function (settings, data) {
-                var minPassages = parseFloat($('#minPassages').val());
-                var maxPassages = parseFloat($('#maxPassages').val());
-                var count = parseFloat(data[14])
-                return isUnigram(minPassages, maxPassages, count, settings)
-            });
-            $('#minPassages, #maxPassages').keyup(function () {
-                table.draw();
-                $.each($('[generated-child=true]'), function () {
-                    $(this).attr('generated-child', false)
-                })
-
-            });
-        }
-
-    });
+    return "<td" + className + " data-order='" + order + "'" + titleAttr + ">" + value + "</td>"
 }
 
 function renderMainTr(key, wordWorm, searchPassages) {
-    let links = '';
+    let links = ''
     $.each(wordWorm['total']['occurrences'], function (elem, value) {
-        let url = new URL(elem);
+        let url = new URL(elem)
         links += "<a href='" + elem + "' target='_blank'>" + url.host + "</a>(" + value + ")<br>"
-    });
+    })
 
-    let className = wordWorm['total']['danger'] ? "bg-warning-elem" : ""
-    let tf = crop(wordWorm['total']['tf'])
-    let idf = crop(wordWorm['total']['idf'])
-    let score = crop(wordWorm['total']['score'] ?? wordWorm['total']['tf'])
+    let metrics = hybridMetrics(wordWorm['total'])
+    let className = wordWorm['total']['danger'] ? 'bg-warning-elem' : ''
     let numberOccurrences = crop(wordWorm['total']['numberOccurrences'])
     let reSpam = crop(wordWorm['total']['reSpam'])
     let avgInTotalCompetitors = wordWorm['total']['avgInTotalCompetitors']
@@ -305,25 +377,35 @@ function renderMainTr(key, wordWorm, searchPassages) {
     let repeatInLinkMainPage = wordWorm['total']['repeatInLinkMainPage']
     let repeatInPassagesMainPage = wordWorm['total']['repeatInPassagesMainPage'] === undefined ? 0 : wordWorm['total']['repeatInPassagesMainPage']
     let avgInPassages = wordWorm['total']['avgInPassages'] === undefined ? 0 : wordWorm['total']['avgInPassages']
-    let repeatInTextMainPageWarning = repeatInTextMainPage == 0 ? "class='bg-warning-elem'" : ""
-    let repeatInLinkMainPageWarning = repeatInLinkMainPage == 0 ? " class='bg-warning-elem'" : ""
-    let myPassagesWarning = repeatInPassagesMainPage == 0 ? "bg-warning-elem" : ""
-    let totalInMainPage = repeatInPassagesMainPage == 0 && repeatInLinkMainPage == 0 && repeatInTextMainPage == 0 ? " class='bg-warning-elem'" : ""
+    let repeatInTextMainPageWarning = repeatInTextMainPage == 0 ? "class='bg-warning-elem'" : ''
+    let repeatInLinkMainPageWarning = repeatInLinkMainPage == 0 ? " class='bg-warning-elem'" : ''
+    let myPassagesWarning = repeatInPassagesMainPage == 0 ? 'bg-warning-elem' : ''
+    let totalInMainPage = repeatInPassagesMainPage == 0 && repeatInLinkMainPage == 0 && repeatInTextMainPage == 0 ? " class='bg-warning-elem'" : ''
     let lockBlock =
         "    <span class='lock-block'>" +
         "        <i class='fa fa-solid fa-plus-square-o lock' data-target='" + key + "' onclick='addWordInIgnore($(this))'></i>" +
         "        <i class='fa fa-solid fa-minus-square-o unlock' data-target='" + key + "' style='display:none;' onclick='removeWordFromIgnored($(this))'></i>" +
-        "    </span>";
-
+        "    </span>"
 
     let newRow = "<tr class='render'>" +
         "   <td class='" + className + "' onclick='showWordWorms($(this))' data-target='" + key + "'>" +
         "      <i class='fa fa-plus'></i>" +
         "   </td>" +
         "   <td>" + key + lockBlock + "</td>" +
-        "   <td>" + tf + "</td>" +
-        "   <td>" + idf + "</td>" +
-        "   <td>" + score + "</td>" +
+        hybridTipCell(
+            metrics.tfidfTop,
+            wordWorm['total']['tfidfTop'] ?? 0,
+            hybridTfidfTip(metrics, 'top'),
+            ''
+        ) +
+        hybridTipCell(
+            metrics.tfidfSite,
+            wordWorm['total']['tfidfSite'] ?? 0,
+            hybridTfidfTip(metrics, 'site'),
+            ''
+        ) +
+        "   <td data-order='" + (wordWorm['total']['bm25Top'] ?? 0) + "'>" + metrics.bm25Top + "</td>" +
+        "   <td data-order='" + (wordWorm['total']['bm25Site'] ?? 0) + "'>" + metrics.bm25Site + "</td>" +
         "   <td data-order='" + numberOccurrences + "'>" + numberOccurrences + "" +
         "       <span class='__helper-link ui_tooltip_w'>" +
         "           <i class='fa fa-paperclip'></i>" +
@@ -342,10 +424,10 @@ function renderMainTr(key, wordWorm, searchPassages) {
 
     if (searchPassages) {
         newRow += "<td class='passages-elem'>" + avgInPassages + "</td>" +
-            "   <td class='passages-elem " + myPassagesWarning + "'>" + repeatInPassagesMainPage + "</td> " +
+            "   <td class='passages-elem " + myPassagesWarning + "'>" + repeatInPassagesMainPage + "</td>" +
             "</tr>"
     } else {
-        newRow += "</tr>";
+        newRow += "</tr>"
     }
 
     return newRow
@@ -353,16 +435,16 @@ function renderMainTr(key, wordWorm, searchPassages) {
 
 function renderChildTr(elem, key, word, stats) {
     if (word === 'total') {
-        return;
+        return
     }
-    let links = '';
+
+    let links = ''
     $.each(stats['occurrences'], function (elem, value) {
         let url = new URL(elem)
         links += "<a href='" + elem + "' target='_blank'>" + url.host + "</a>(" + value + ") <br>"
-    });
-    let tf = crop(stats['tf'])
-    let idf = crop(stats['idf'])
-    let score = crop(stats['score'] ?? stats['tf'])
+    })
+
+    let metrics = hybridMetrics(stats)
     let numberOccurrences = crop(stats['numberOccurrences'])
     let reSpam = stats['reSpam']
     let avgInText = stats['avgInText']
@@ -371,25 +453,28 @@ function renderChildTr(elem, key, word, stats) {
     let repeatInTextMainPage = stats['repeatInTextMainPage']
     let avgInLink = stats['avgInLink']
     let repeatInLinkMainPage = stats['repeatInLinkMainPage']
+    let textWarn = ''
+    let linkWarn = ''
+    let bgWarn = ''
+    let bgTotalWarn = ''
 
     if (repeatInTextMainPage == 0) {
-        var textWarn = "class='bg-warning-elem'"
-        var bgWarn = "class='bg-warning-elem'"
+        textWarn = "class='bg-warning-elem'"
+        bgWarn = "class='bg-warning-elem'"
     }
 
     if (repeatInLinkMainPage == 0) {
-        var linkWarn = "class='bg-warning-elem'"
-        var bgWarn = "class='bg-warning-elem'"
+        linkWarn = "class='bg-warning-elem'"
+        bgWarn = "class='bg-warning-elem'"
     }
 
     if (repeatInLinkMainPage == 0 && repeatInTextMainPage == 0) {
-        var bgTotalWarn = "class='bg-warning-elem'"
+        bgTotalWarn = "class='bg-warning-elem'"
     }
 
-    var avgPassages = stats['avgInPassages'] === undefined ? 0 : stats['avgInPassages'];
-
-    var repeatInPassagesMainPage = stats['repeatInPassagesMainPage'] === undefined ? 0 : stats['repeatInPassagesMainPage'];
-    var repeatInPassagesMainPageWarning = ''
+    let avgPassages = stats['avgInPassages'] === undefined ? 0 : stats['avgInPassages']
+    let repeatInPassagesMainPage = stats['repeatInPassagesMainPage'] === undefined ? 0 : stats['repeatInPassagesMainPage']
+    let repeatInPassagesMainPageWarning = ''
     if (stats['repeatInPassagesMainPage'] == undefined || stats['repeatInPassagesMainPage'] == 0) {
         repeatInPassagesMainPageWarning = 'bg-warning-elem'
     }
@@ -399,16 +484,27 @@ function renderChildTr(elem, key, word, stats) {
         "        <i class='fa fa-solid fa-plus-square-o lock' data-target='" + word + "' onclick='addWordInIgnore($(this))'></i>" +
         "        <i class='fa fa-solid fa-minus-square-o unlock' data-target='" + word + "' style='display:none;' onclick='removeWordFromIgnored($(this))'></i>" +
         "        <i class='fa fa-copy copy-text-in-buffer' data-target='" + word + "'></i>" +
-        "    </span>";
+        "    </span>"
 
     let newChildRow = "<tr style='background-color: #f4f6f9;' data-order='" + key + "' class='render child-table-row'>" +
         "   <td " + bgWarn + " onclick='hideWordWorms($(this))' data-target='" + key + "'>" +
         "   <i class='fa fa-minus'></i>" +
         "   </td>" +
         "   <td>" + word + lockBlock + "</td>" +
-        "   <td>" + tf + "</td>" +
-        "   <td>" + idf + "</td>" +
-        "   <td>" + score + "</td>" +
+        hybridTipCell(
+            metrics.tfidfTop,
+            stats['tfidfTop'] ?? 0,
+            hybridTfidfTip(metrics, 'top'),
+            ''
+        ) +
+        hybridTipCell(
+            metrics.tfidfSite,
+            stats['tfidfSite'] ?? 0,
+            hybridTfidfTip(metrics, 'site'),
+            ''
+        ) +
+        "   <td data-order='" + (stats['bm25Top'] ?? 0) + "'>" + metrics.bm25Top + "</td>" +
+        "   <td data-order='" + (stats['bm25Site'] ?? 0) + "'>" + metrics.bm25Site + "</td>" +
         "   <td>" + numberOccurrences + "" +
         "       <span class='__helper-link ui_tooltip_w'>" +
         "           <i class='fa fa-paperclip'></i>" +
@@ -428,26 +524,16 @@ function renderChildTr(elem, key, word, stats) {
     if (sessionStorage.getItem('searchPassages') === 'true') {
         newChildRow +=
             "   <td class='passages-elem'>" + avgPassages + "</td>" +
-            "   <td class='passages-elem " + repeatInPassagesMainPageWarning + "'>" + repeatInPassagesMainPage + "</td>"
-            + "  </tr>"
+            "   <td class='passages-elem " + repeatInPassagesMainPageWarning + "'>" + repeatInPassagesMainPage + "</td>" +
+            "</tr>"
     } else {
         newChildRow += "</tr>"
     }
 
-    elem.after(
-        newChildRow
-    )
+    elem.after(newChildRow)
 }
 
-$(document).on('click', '.copy-text-in-buffer', function () {
-    let textToCopy = $(this).attr('data-target');
-    let tempInput = $('<input>');
-    $('body').append(tempInput);
-    tempInput.val(textToCopy).select();
-    document.execCommand('copy');
-    tempInput.remove();
-    getSuccessMessage('Успешно скопированно')
-})
+$(document).off('click.unigramCopyLegacy', '.copy-text-in-buffer')
 
 function showWordWorms(elem) {
     if (elem.attr('generated-child') === 'true') {
@@ -476,7 +562,7 @@ function hideWordWorms(elem) {
 }
 
 $('th.sorting').click(() => {
-    $('.child-table-row').remove();
+    $('.child-table-row').remove()
     let objects = $('.show-children')
     $.each(objects, function () {
         $(this).attr('generated-child', false)
@@ -503,7 +589,7 @@ $('#unigram > thead > tr > th').click(() => {
     $.each($('[generated-child=true]'), function () {
         $(this).attr('generated-child', false)
     })
-});
+})
 
 $('#filters').click(() => {
     if ($('.pb-2.filters').is(':visible')) {
@@ -515,29 +601,31 @@ $('#filters').click(() => {
 
 function reverseObj(obj) {
     let newObj = {}
-    let reverseObj = Object.keys(obj).reverse();
+    let reverseObj = Object.keys(obj).reverse()
     reverseObj.forEach(function (i) {
-        newObj[i] = obj[i];
+        newObj[i] = obj[i]
     })
-    return newObj;
+    return newObj
 }
 
 function addWordInIgnore(elem) {
     if ($('#switchMyListWords').is(':checked') === false) {
-        $('#switchMyListWords').prop('checked', true);
-        $('.form-group.required.list-words.mt-1').show(300);
+        $('#switchMyListWords').prop('checked', true)
+        $('.form-group.required.list-words.mt-1').show(300)
     }
     let word = elem.attr('data-target')
     let textarea = $('.form-control.listWords')
-    let toastr = $('.toast-top-right.success-message.lock-word');
+    let toastr = $('.toast-top-right.success-message.lock-word')
     if (textarea.val().slice(-1) === "\n" || textarea.val().slice(-1) === '') {
         textarea.val(textarea.val() + word + "\n")
     } else {
         textarea.val(textarea.val() + "\n" + word + "\n")
     }
+    toastr.find('.toast').addClass('show')
     toastr.show(300)
     setTimeout(() => {
         toastr.hide(300)
+        toastr.find('.toast').removeClass('show')
     }, 3000)
     elem.hide()
     elem.parent().children().eq(1).show()
@@ -547,17 +635,19 @@ function removeWordFromIgnored(elem) {
     let word = elem.attr('data-target')
     let textarea = $('.form-control.listWords')
     let text = textarea.val()
-    let result = '';
+    let result = ''
     $.each(text.split("\n"), function (key, value) {
         if (value !== word) {
             result += value + "\n"
         }
-    });
+    })
     textarea.val(result.trim())
-    let toastr = $('.toast-top-right.success-message.lock-word-removed');
+    let toastr = $('.toast-top-right.success-message.lock-word-removed')
+    toastr.find('.toast').addClass('show')
     toastr.show(300)
     setTimeout(() => {
         toastr.hide(300)
+        toastr.find('.toast').removeClass('show')
     }, 3000)
     elem.hide()
     elem.parent().children().eq(0).show()

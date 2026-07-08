@@ -4,24 +4,56 @@
               href="{{ asset('plugins/keyword-generator/css/font-awesome-4.7.0/css/font-awesome.css') }}"/>
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/jqcloud/css/jqcloud.css') }}"/>
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/datatable.css') }}"/>
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-min'])
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/toastr/toastr.css') }}"/>
         <link rel="stylesheet" type="text/css"
               href="{{ asset('plugins/bootstrap4-duallistbox/bootstrap-duallistbox.min.css') }}"/>
+        <link rel="stylesheet" type="text/css"
+              href="{{ asset('plugins/relevance-analysis/css/style.css') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/css/style.css')) ?: time() }}"/>
         <style>
+            i:hover {
+                opacity: 1 !important;
+                transition: .3s;
+                cursor: pointer;
+            }
+
             .RelevanceAnalysis {
                 background: oldlace;
             }
 
-            .dataTables_length > label {
-                display: flex;
-            }
-
-            .dataTables_length > label > select {
-                margin: 0 5px;
-            }
-
             .row {
                 margin: 0 !important;
+            }
+
+            #my-projects-table {
+                width: 100% !important;
+            }
+
+            #my-projects-table th,
+            #my-projects-table td {
+                position: static;
+                vertical-align: top;
+            }
+
+            #my-projects-table th.table-header {
+                white-space: normal;
+                line-height: 1.25;
+            }
+
+            #my-projects-table td.sharing-table__actions {
+                width: 110px;
+                min-width: 110px;
+                white-space: nowrap;
+                text-align: center;
+                vertical-align: middle;
+            }
+
+            #my-projects-table .sharing-table__users > .table {
+                margin-bottom: 0;
+            }
+
+            #my-projects-table .sharing-table__users .expandable-body > td {
+                padding: 0;
             }
 
         </style>
@@ -87,13 +119,13 @@
                     </button>
 
                     <table id="my-projects-table"
-                           class="table table-bordered table-hover dataTable dtr-inline mb-3">
+                           class="table table-bordered table-striped table-hover dataTable dtr-inline mb-3">
                         <thead>
                         <tr>
                             <th>{{ __('Project name') }}</th>
                             <th class="table-header">{{ __('Tags') }}</th>
-                            <th>{{ __('Users who have access to the project') }}</th>
-                            <th></th>
+                            <th class="table-header">{{ __('Users who have access to the project') }}</th>
+                            <th class="table-header">{{ __('Actions') }}</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -110,8 +142,8 @@
                                         </div>
                                     @endforeach
                                 </td>
-                                <td>
-                                    <table class="table table-hover">
+                                <td class="sharing-table__users">
+                                    <table class="table table-hover mb-0">
                                         <tbody>
                                         <tr data-widget="expandable-table" aria-expanded="true">
                                             <td>
@@ -177,7 +209,7 @@
                                         </tbody>
                                     </table>
                                 </td>
-                                <td class="col-2">
+                                <td class="sharing-table__actions">
                                     <a href="{{ route('share.project.conf', $item->id) }}"
                                        class="btn btn-secondary">
                                         {{ __('More') }}
@@ -293,7 +325,16 @@
             };
 
             $(document).ready(function () {
-                $('#my-projects-table').DataTable({
+                let sharingTable = $('#my-projects-table').DataTable({
+                    autoWidth: false,
+                    pageLength: 10,
+                    dom: 'lfrtip',
+                    columnDefs: [
+                        { width: '20%', targets: 0 },
+                        { width: '18%', targets: 1 },
+                        { width: '52%', targets: 2 },
+                        { width: '10%', targets: 3, orderable: false },
+                    ],
                     language: {
                         paginate: {
                             "first": "«",
@@ -307,10 +348,22 @@
                         "sLengthMenu": words.show + " _MENU_ " + words.records,
                         "sEmptyTable": words.noRecords,
                         "sInfo": words.showing + " " + words.from + "  _START_ " + words.to + " _END_ " + words.of + " _TOTAL_ " + words.entries,
+                    },
+                    initComplete: function () {
+                        this.api().columns.adjust()
+                    },
+                    drawCallback: function () {
+                        this.api().columns.adjust()
                     }
-                });
+                })
 
-                $('#my-projects-table').wrap('<div style="width: 100%; overflow: auto"></div>')
+                $('#my-projects-table').wrap('<div class="main-history-table-scroll"></div>')
+
+                $(window).on('resize.relevanceSharingMy', function () {
+                    if ($.fn.DataTable.fnIsDataTable($('#my-projects-table'))) {
+                        $('#my-projects-table').DataTable().columns.adjust()
+                    }
+                })
 
                 $('select[name="duallistbox_access"]').bootstrapDualListbox({
                     selectedListLabel: '{{ __('Projects you want to give access to') }}',

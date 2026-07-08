@@ -41,6 +41,7 @@ function renderRecommendationsTable(recommendations, count, words) {
     }
 
     let table = $('#recommendations').DataTable({
+        deferRender: true,
         "order": [[2, "desc"]],
         "pageLength": count,
         "searching": true,

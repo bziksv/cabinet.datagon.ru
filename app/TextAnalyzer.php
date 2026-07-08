@@ -457,7 +457,7 @@ class TextAnalyzer extends Model
                 continue;
             }
             $quoted = preg_quote($entry, '/');
-            $text = preg_replace('/(?<=\s)' . $quoted . '(?=\s)/u', ' ', $text);
+            $text = preg_replace('/(?<=\s)' . $quoted . '(?=\s)/iu', ' ', $text);
             $text = preg_replace('/\s+/u', ' ', $text);
         }
 
@@ -465,8 +465,8 @@ class TextAnalyzer extends Model
     }
 
     /**
-     * @param array<int, array<string, mixed>> $phrases
-     * @return array<int, array<string, mixed>>
+     * @param array<int|string, array<string, mixed>> $phrases
+     * @return array<int|string, array<string, mixed>>
      */
     public static function filterExcludedFromPhrases(array $phrases, string $listWords): array
     {
@@ -475,30 +475,63 @@ class TextAnalyzer extends Model
             return $phrases;
         }
 
-        return array_values(array_filter($phrases, static function ($row) use ($exclude) {
-            $phrase = mb_strtolower(trim((string) ($row['phrase'] ?? '')), 'UTF-8');
-            if ($phrase === '') {
-                return false;
-            }
-
-            foreach ($exclude as $item) {
-                if ($item === '') {
-                    continue;
-                }
-                if (strpos($item, ' ') !== false) {
-                    if ($phrase === $item) {
-                        return false;
-                    }
-                    continue;
-                }
-                $tokens = preg_split('/\s+/u', $phrase, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-                if (in_array($item, $tokens, true)) {
+        if (self::isListArray($phrases)) {
+            return array_values(array_filter($phrases, static function ($row) use ($exclude) {
+                if (!is_array($row)) {
                     return false;
                 }
+
+                $phrase = mb_strtolower(trim((string) ($row['phrase'] ?? '')), 'UTF-8');
+
+                return $phrase !== '' && !self::phraseIsExcludedByList($phrase, $exclude);
+            }));
+        }
+
+        $filtered = [];
+        foreach ($phrases as $phraseKey => $row) {
+            if (!is_array($row)) {
+                continue;
             }
 
+            $phrase = mb_strtolower(trim((string) $phraseKey), 'UTF-8');
+            if ($phrase === '' || self::phraseIsExcludedByList($phrase, $exclude)) {
+                continue;
+            }
+
+            $filtered[$phraseKey] = $row;
+        }
+
+        return $filtered;
+    }
+
+    private static function phraseIsExcludedByList(string $phrase, array $exclude): bool
+    {
+        foreach ($exclude as $item) {
+            if ($item === '') {
+                continue;
+            }
+            if (strpos($item, ' ') !== false) {
+                if ($phrase === $item) {
+                    return true;
+                }
+                continue;
+            }
+            $tokens = preg_split('/\s+/u', $phrase, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            if (in_array($item, $tokens, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function isListArray(array $array): bool
+    {
+        if ($array === []) {
             return true;
-        }));
+        }
+
+        return array_keys($array) === range(0, count($array) - 1);
     }
 
     /**

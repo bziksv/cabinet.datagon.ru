@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Classes\Monitoring\MonitoringGoogleDepth;
 use App\Classes\Monitoring\MonitoringLocationLabel;
 use App\Classes\Monitoring\MonitoringProjectPageSummary;
 use App\Classes\Monitoring\Helper;
@@ -201,7 +202,9 @@ class MonitoringController extends Controller
             $user = $userAdmin;
         }
 
-        $jobCount = (int) $project->keywords()->count() * $engines->count();
+        $googleDepth = $this->normalizeGoogleDepthRequest($request);
+        $keywordCount = (int) $project->keywords()->count();
+        $jobCount = MonitoringGoogleDepth::countPositionJobs($keywordCount, $engines, $googleDepth);
         $queue = new PositionsDispatch($user['id'], 'position_high');
         $queue->reserveLimits($jobCount);
 
@@ -212,7 +215,8 @@ class MonitoringController extends Controller
         \App\Jobs\EnqueueMonitoringPositionsJob::dispatch(
             (int) $project->id,
             $engines->pluck('id')->all(),
-            'position_high'
+            'position_high',
+            $googleDepth
         );
 
         return $queue->notify();
@@ -243,7 +247,8 @@ class MonitoringController extends Controller
             $user = $userAdmin;
         }
 
-        $jobCount = count($keywordIds);
+        $googleDepth = $this->normalizeGoogleDepthRequest($request);
+        $jobCount = MonitoringGoogleDepth::countPositionJobs(count($keywordIds), collect([$engine]), $googleDepth);
         $queue = new PositionsDispatch($user['id'], 'position_high');
         $queue->reserveLimits($jobCount);
 
@@ -255,10 +260,23 @@ class MonitoringController extends Controller
             (int) $project->id,
             $regionId,
             $keywordIds,
-            'position_high'
+            'position_high',
+            $googleDepth
         );
 
         return $queue->notify();
+    }
+
+    /**
+     * @return int|null Normalized depth when client sent google_depth; null otherwise.
+     */
+    private function normalizeGoogleDepthRequest(Request $request): ?int
+    {
+        if (!$request->has('google_depth')) {
+            return null;
+        }
+
+        return MonitoringGoogleDepth::normalize((int) $request->input('google_depth'));
     }
 
     public function getProjects(Request $request)

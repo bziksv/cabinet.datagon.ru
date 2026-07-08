@@ -864,11 +864,28 @@ button.cabinet-btn-busy:disabled {
     width: 100%;
 }
 
-.cabinet-mon-project-page #monitoringTable td.cabinet-mon-col-query,
 .cabinet-mon-project-page .dataTables_scrollBody td.cabinet-mon-col-query,
 .cabinet-mon-project-page .DTFC_LeftBodyLiner td.cabinet-mon-col-query {
     text-align: left !important;
     white-space: normal;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .cabinet-mon-col-checkbox {
+    width: 46px;
+    min-width: 46px;
+    max-width: 46px;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .cabinet-mon-col-btn {
+    width: 62px;
+    min-width: 62px;
+    max-width: 62px;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .cabinet-mon-col-query {
+    width: 380px;
+    min-width: 380px;
+    max-width: 380px;
 }
 
 .cabinet-mon-project-page .cabinet-mon-query-cell {
@@ -949,8 +966,7 @@ button.cabinet-btn-busy:disabled {
     white-space: nowrap;
 }
 
-.cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-col-engine,
-.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper thead th.cabinet-mon-col-engine {
+.cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-col-engine {
     text-align: center !important;
 }
 
@@ -994,7 +1010,6 @@ button.cabinet-btn-busy:disabled {
     box-shadow: 6px 0 10px -6px rgba(15, 23, 42, 0.18);
 }
 
-/* FixedColumns держит LeftWrapper высотой 1px — overflow:hidden на нём обрезает клон */
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper,
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyWrapper {
     overflow: hidden !important;
@@ -1006,6 +1021,11 @@ button.cabinet-btn-busy:disabled {
 
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody td.cabinet-mon-col-query {
     box-shadow: inset -1px 0 0 #dee2e6;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollHeadInner table,
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody table {
+    margin-left: var(--mon-scroll-edge-nudge, 0);
 }
 
 .cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-scroll-edge-col {
@@ -1022,7 +1042,26 @@ button.cabinet-btn-busy:disabled {
     background: #fff;
 }
 
-/* В основной шапке/теле левые колонки скрыты — их показывает только DTFC-блок */
+.cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-scrollhead-left-hidden,
+.cabinet-mon-project-page .dataTables_scrollBody tbody td.cabinet-mon-scrollbody-left-hidden {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    border-left-width: 0 !important;
+    border-right-width: 0 !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    line-height: 0 !important;
+    font-size: 0 !important;
+}
+
+.cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-scrollhead-left-hidden > *,
+.cabinet-mon-project-page .dataTables_scrollBody tbody td.cabinet-mon-scrollbody-left-hidden > * {
+    display: none !important;
+}
+
 .cabinet-mon-project-page .dataTables_scrollHead thead th.cabinet-mon-scrollhead-left-hidden {
     visibility: hidden !important;
     color: transparent !important;
@@ -1098,9 +1137,18 @@ button.cabinet-btn-busy:disabled {
 
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner {
     overflow-x: hidden !important;
-    overflow-y: auto !important;
+    overflow-y: scroll !important;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    will-change: scroll-position;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody {
+    will-change: scroll-position;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner table {
+    will-change: auto;
 }
 
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner::-webkit-scrollbar {
@@ -1109,9 +1157,18 @@ button.cabinet-btn-busy:disabled {
     display: none;
 }
 
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody tr {
+    overflow: hidden;
+}
+
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody tr.is-row-hover td,
 .cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody tr.is-row-hover td {
     background-color: var(--bs-table-hover-bg, #f8fafc) !important;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody .table-hover > tbody > tr:hover > *,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner .table-hover > tbody > tr:hover > * {
+    background-color: inherit !important;
 }
 
 .cabinet-mon-project-page .dataTables_scrollBody tbody td,
@@ -1153,6 +1210,8 @@ button.cabinet-btn-busy:disabled {
 .cabinet-mon-project-page .dataTables_scrollHead table.dataTable,
 .cabinet-mon-project-page .dataTables_scrollBody table.dataTable {
     table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
 .cabinet-mon-project-page .dataTables_scrollHead thead th {
@@ -1178,6 +1237,7 @@ button.cabinet-btn-busy:disabled {
 .cabinet-mon-project-page .dataTables_scrollBody {
     overflow: auto !important;
     max-width: 100%;
+    position: relative;
 }
 
 .cabinet-mon-project-page .dataTables_scrollFoot {
@@ -4714,5 +4774,53 @@ button.cabinet-btn-busy:disabled {
         flex-direction: column;
         align-items: stretch;
     }
+}
+
+.cabinet-mon-queue-confirm-modal {
+    z-index: 1065;
+}
+
+.cabinet-mon-queue-confirm-modal__regions .form-check + .form-check {
+    margin-top: 0.5rem;
+}
+
+.cabinet-mon-queue-confirm-modal__option + .cabinet-mon-queue-confirm-modal__option {
+    margin-top: 0.75rem;
+}
+
+.cabinet-mon-queue-confirm-modal__option-title {
+    display: block;
+    font-weight: 600;
+}
+
+.cabinet-mon-queue-confirm-modal__option-meta {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color, #6c757d);
+}
+
+.cabinet-mon-queue-confirm-modal .form-check-input:disabled + .form-check-label {
+    opacity: 0.55;
+}
+
+.cabinet-mon-occurrence-modal__option + .cabinet-mon-occurrence-modal__option {
+    margin-top: 0.75rem;
+}
+
+.cabinet-mon-occurrence-modal__option-title {
+    display: block;
+    font-weight: 600;
+}
+
+.cabinet-mon-occurrence-modal__option-meta {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color, #6c757d);
+}
+
+.cabinet-mon-occurrence-modal .form-check-input:disabled + .form-check-label {
+    opacity: 0.55;
 }
 

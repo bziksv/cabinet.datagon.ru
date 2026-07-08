@@ -3,27 +3,36 @@
         <link rel="stylesheet" href="{{ asset('plugins/keyword-generator/css/font-awesome-4.7.0/css/font-awesome.css') }}"/>
         <link rel="stylesheet" href="{{ asset('plugins/jqcloud/css/jqcloud.css') }}"/>
         <link rel="stylesheet" href="{{ asset('plugins/common/css/datatable.css') }}"/>
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-min'])
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.css') }}"/>
+        <link rel="stylesheet" href="{{ asset('plugins/relevance-analysis/css/style.css') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/css/style.css')) ?: time() }}"/>
         <style>
-            td i:hover {
+            td i:hover,
+            i:hover {
                 opacity: 1 !important;
                 transition: .3s;
+                cursor: pointer;
             }
 
             .RelevanceAnalysis {
                 background: oldlace;
             }
 
-            .dataTables_length > label {
-                display: flex;
-            }
-
-            .dataTables_length > label > select {
-                margin: 0 5px;
-            }
-
             .row {
                 margin: 0 !important;
+            }
+
+            #main_history_table td.sharing-table__actions {
+                min-width: 160px;
+                white-space: nowrap;
+                text-align: center;
+                vertical-align: middle;
+            }
+
+            #main_history_table .access-project-note {
+                margin: 6px 0 0;
+                font-size: 12px;
+                color: #6c757d;
             }
         </style>
     @endslot
@@ -78,17 +87,17 @@
         <div class="card-body">
             <div class="tab-content">
                 <div class="tab-pane active" id="tab_1">
-                    <table id="main_history_table" class="table table-bordered table-hover dataTable dtr-inline mb-3">
+                    <table id="main_history_table" class="table table-bordered table-striped table-hover dataTable dtr-inline mb-3">
                         <thead>
                         <tr>
-                            <th class="table-header col-2">{{ __('Project name') }}</th>
-                            <th class="table-header col-2">{{ __('Owner') }}</th>
-                            <th class="table-header col-2">{{ __('Number of analyzed pages') }}</th>
-                            <th class="table-header col-2">{{ __('Number of saved scans') }}</th>
+                            <th class="table-header">{{ __('Project name') }}</th>
+                            <th class="table-header">{{ __('Owner') }}</th>
+                            <th class="table-header">{{ __('Number of analyzed pages') }}</th>
+                            <th class="table-header">{{ __('Number of saved scans') }}</th>
                             <th class="table-header">{{ __('Total score') }}</th>
                             <th class="table-header">{{ __('Avg position') }}</th>
                             <th class="table-header">{{ __('Last check') }}</th>
-                            <th></th>
+                            <th class="table-header">{{ __('Actions') }}</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -355,7 +364,7 @@
                                                 {{ __('Delete using filters') }}
                                             </span>
                                     </div>
-                                    <p>
+                                    <p class="access-project-note mb-0">
                                         @if($item->access == 1)
                                             Доступен только просмотр
                                         @elseif($item->access == 2)
@@ -370,19 +379,21 @@
                                         {{ $item->owner->last_name }}
                                     </span>
                                 </td>
-                                <td class="col-2">
-                                    {{ $item->project[0]->count_sites }}
-                                    <i class="fa fa-repeat" style="opacity: 0.6; cursor: pointer"
-                                       data-bs-target="#repeatUniqueScan{{ $item->item->id }}"
-                                       data-bs-toggle="modal" data-bs-placement="top"
-                                       title="{{ __('restart analyzed pages') }}"></i>
+                                <td>
+                                    <span class="count-sites-cell">
+                                        {{ $item->project[0]->count_sites }}
+                                        <i class="fa fa-repeat" style="opacity: 0.6; cursor: pointer"
+                                           data-bs-target="#repeatUniqueScan{{ $item->item->id }}"
+                                           data-bs-toggle="modal" data-bs-placement="top"
+                                           title="{{ __('restart analyzed pages') }}"></i>
+                                    </span>
                                 </td>
-                                <td class="col-2">{{ $item->project[0]->count_checks }}</td>
+                                <td>{{ $item->project[0]->count_checks }}</td>
                                 <td>{{ $item->project[0]->total_points }}</td>
                                 <td>{{ $item->project[0]->avg_position }}</td>
                                 <td>{{ $item->project[0]->last_check }}</td>
 
-                                <td>
+                                <td class="sharing-table__actions">
                                     <button class="btn btn-secondary remove-access" data-target="{{ $item->id }}">
                                         Отказаться от доступа
                                     </button>
@@ -424,11 +435,12 @@
                                                 </div>
 
                                                 <div class="form-group required">
-                                                    <label>{{ __('Top 10/20') }}</label>
+                                                    <label>{{ __('Top 10/20/30') }}</label>
                                                     <select name="count" id="count"
                                                             class="form-select rounded-0 count">
                                                         <option value="10">10</option>
                                                         <option value="20">20</option>
+                                                        <option value="30">30</option>
                                                     </select>
 
                                                 </div>
@@ -732,10 +744,12 @@
             };
 
             $(document).ready(function (){
-                $('#main_history_table').dataTable({
-                    "order": [[0, "desc"]],
-                    "pageLength": 10,
-                    "searching": true,
+                let accessProjectsTable = $('#main_history_table').DataTable({
+                    autoWidth: false,
+                    order: [[6, 'desc']],
+                    pageLength: 10,
+                    dom: 'lfrtip',
+                    searching: true,
                     language: {
                         paginate: {
                             "first": "«",
@@ -752,17 +766,37 @@
                         {
                             type: "num",
                             targets: [3, 4, 5]
-                        }
+                        },
+                        { width: '22%', targets: 0 },
+                        { width: '16%', targets: 1 },
+                        { width: '12%', targets: 2 },
+                        { width: '10%', targets: 3 },
+                        { width: '8%', targets: 4 },
+                        { width: '8%', targets: 5 },
+                        { width: '12%', targets: 6 },
+                        { width: '12%', targets: 7 },
                     ],
                     "oLanguage": {
                         "sSearch": "{{ __('Search') }}:",
                         "sLengthMenu": "{{ __('show') }} _MENU_ {{ __('records') }}",
                         "sEmptyTable": "{{ __('No records') }}",
                         "sInfo": "{{ __('Showing') }} {{ __('from') }} _START_ {{ __('to') }} _END_ {{ __('of') }} _TOTAL_ {{ __('entries') }}",
+                    },
+                    initComplete: function () {
+                        this.api().columns.adjust()
+                    },
+                    drawCallback: function () {
+                        this.api().columns.adjust()
                     }
-                });
+                })
 
-                $('#main_history_table').wrap('<div style="width: 100%; overflow: auto"></div>')
+                $('#main_history_table').wrap('<div class="main-history-table-scroll"></div>')
+
+                $(window).on('resize.relevanceAccessProjects', function () {
+                    if ($.fn.DataTable.fnIsDataTable($('#main_history_table'))) {
+                        $('#main_history_table').DataTable().columns.adjust()
+                    }
+                })
             })
 
             $(".dt-button").addClass('btn btn-secondary')

@@ -7,8 +7,10 @@
 
 Деплой и серверы — в маркетинг-репо:
 
-- **[cabinet-titlo-deploy.md](../datagon.ru/docs/cabinet-titlo-deploy.md)** — `cabinet.titlo.ru`, порт **3004**
+- **[cabinet-titlo-deploy.md](../titlo.ru/docs/cabinet-titlo-deploy.md)** — `cabinet.titlo.ru`, порт **3004**
 - [cabinet-servers.md](../datagon.ru/docs/cabinet-servers.md) · [cabinet-deploy.md](../datagon.ru/docs/cabinet-deploy.md) (legacy)
+
+**Prod deploy:** `./scripts/deploy-titlo.sh` (git pull + cache + **supervisor restart**)
 
 **Инфраструктура VPS (RAM/OOM):** [docs/infrastructure/s3-prime-ltd-memory.md](docs/infrastructure/s3-prime-ltd-memory.md)
 

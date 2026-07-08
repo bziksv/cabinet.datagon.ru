@@ -4,6 +4,8 @@ namespace App;
 
 use App\Classes\Xml\SimplifiedXmlFacade;
 use App\Jobs\Relevance\RemoveRelevanceProgress;
+use App\Support\HybridRelevanceMetrics;
+use App\Support\RelevancePhraseNgrams;
 use App\Support\TfidfMetrics;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -16,6 +18,14 @@ class Relevance
     public $countSymbols = 0;
 
     public $countNotIgnoredSites = 0;
+
+    public $countSitesForTextAvg = 0;
+
+    public $countWordsForTextAvg = 0;
+
+    public $countSymbolsForTextAvg = 0;
+
+    private const MIN_SYMBOLS_FOR_TEXT_AVG = 500;
 
     public $mainPageIsRelevance = false;
 
@@ -173,13 +183,16 @@ class Relevance
         $this->removeListWords();
         $this->getTextFromCompetitors();
         $this->separateAllText();
-        $this->preparePhrasesTable();
         $this->searchWordForms();
         $this->processingOfGeneralInformation();
+        $this->prepareAnalysedSitesTable();
         $this->prepareUnigramTable();
         $this->analyseRecommendations();
-        $this->prepareAnalysedSitesTable();
+        $this->preparePhrasesTable();
         $this->prepareClouds();
+        $this->applyTableTfidfToUnigramTable();
+        $this->applyHybridTfCloudsFromUnigramTable();
+        $this->applyHybridTfCompCloudsFromUnigramTable();
         $this->saveHistory($historyId);
 
         UsersJobs::where('user_id', '=', $this->params['user_id'])->decrement('count_jobs');
@@ -378,20 +391,33 @@ class Relevance
     public function calculateTextInfo()
     {
         foreach ($this->sites as $key => $site) {
-            $totalWords = TextAnalyzer::deleteEverythingExceptCharacters($site['defaultHtml']);
-            $countSymbols = Str::length($totalWords);
-            $countWords = count(explode(' ', $totalWords));
+            $text = trim(implode(' ', array_filter([
+                $site['html'] ?? '',
+                $site['hiddenText'] ?? '',
+                strip_tags($site['linkText'] ?? ''),
+            ])));
+            $countSymbols = Str::length($text);
+            $countWords = count(preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY));
+
+            $this->sites[$key]['countWords'] = max($countWords, 0);
+            $this->sites[$key]['countSymbols'] = max($countSymbols, 0);
 
             if ($this->sites[$key]['mainPage']) {
                 $this->countSymbolsInMyPage = $countSymbols;
                 $this->countWordsInMyPage = $countWords;
-            } else if (!$site['ignored']) {
+            } elseif (!$site['ignored']) {
                 $this->countNotIgnoredSites++;
                 $this->countSymbols += $countSymbols;
                 $this->countWords += $countWords;
-            }
 
-            $this->sites[$key]['countSymbols'] = max($countSymbols, 0);
+                if ($countSymbols >= self::MIN_SYMBOLS_FOR_TEXT_AVG) {
+                    $this->countSitesForTextAvg++;
+                    $this->countWordsForTextAvg += $countWords;
+                    $this->countSymbolsForTextAvg += $countSymbols;
+                } else {
+                    $this->sites[$key]['excludedFromTextAvg'] = true;
+                }
+            }
         }
     }
 
@@ -479,25 +505,155 @@ class Relevance
 
     public function removeListWords()
     {
-        if (filter_var($this->request['switchMyListWords'], FILTER_VALIDATE_BOOLEAN)) {
-            $listWords = str_replace(["\r\n", "\n\r"], "\n", $this->request['listWords']);
-            $this->ignoredWords = explode("\n", $listWords);
+        if (!self::shouldApplyExcludedWordsList($this->request)) {
+            return;
+        }
 
-            foreach ($this->ignoredWords as $key => $word) {
-                $this->ignoredWords[$key] = " $word ";
+        $listWords = (string) $this->request['listWords'];
+        $this->ignoredWords = TextAnalyzer::parseExcludeWordList($listWords);
+
+        foreach ($this->sites as $key => $page) {
+            $this->sites[$key]['html'] = TextAnalyzer::removeWords($listWords, $this->sites[$key]['html']);
+            $this->sites[$key]['linkText'] = TextAnalyzer::removeWords($listWords, $this->sites[$key]['linkText']);
+            $this->sites[$key]['hiddenText'] = TextAnalyzer::removeWords($listWords, $this->sites[$key]['hiddenText']);
+
+            if ($this->sites[$key]['mainPage']) {
+                $this->mainPage['html'] = $this->sites[$key]['html'];
+                $this->mainPage['linkText'] = $this->sites[$key]['linkText'];
+                $this->mainPage['hiddenText'] = $this->sites[$key]['hiddenText'];
             }
+        }
+    }
 
-            foreach ($this->sites as $key => $page) {
-                $this->sites[$key]['html'] = Relevance::mbStrReplace($this->ignoredWords, ' ', $this->sites[$key]['html']);
-                $this->sites[$key]['linkText'] = Relevance::mbStrReplace($this->ignoredWords, ' ', $this->sites[$key]['linkText']);
-                $this->sites[$key]['hiddenText'] = Relevance::mbStrReplace($this->ignoredWords, ' ', $this->sites[$key]['hiddenText']);
+    public static function shouldApplyExcludedWordsList($request): bool
+    {
+        if (!is_array($request)) {
+            return false;
+        }
 
-                if ($this->sites[$key]['mainPage']) {
-                    $this->mainPage['html'] = $this->sites[$key]['html'];
-                    $this->mainPage['linkText'] = $this->sites[$key]['linkText'];
-                    $this->mainPage['hiddenText'] = $this->sites[$key]['hiddenText'];
+        return filter_var($request['switchMyListWords'] ?? false, FILTER_VALIDATE_BOOLEAN)
+            && trim((string) ($request['listWords'] ?? '')) !== '';
+    }
+
+    public static function excludedWordsLookup($request): array
+    {
+        if (!self::shouldApplyExcludedWordsList($request)) {
+            return [];
+        }
+
+        return array_flip(TextAnalyzer::parseExcludeWordList((string) $request['listWords']));
+    }
+
+    public static function isExcludedLemma(string $word, array $excludeLookup): bool
+    {
+        if (!$excludeLookup) {
+            return false;
+        }
+
+        $lemma = mb_strtolower(trim($word), 'UTF-8');
+
+        return $lemma !== '' && isset($excludeLookup[$lemma]);
+    }
+
+    public static function filterCloudPayload($cloud, array $excludeLookup)
+    {
+        if (!is_array($cloud) || !$excludeLookup) {
+            return $cloud;
+        }
+
+        $filtered = [];
+        foreach ($cloud as $item) {
+            if (!is_array($item) || !isset($item['text'])) {
+                continue;
+            }
+            if (self::isExcludedLemma((string) $item['text'], $excludeLookup)) {
+                continue;
+            }
+            $filtered[] = $item;
+        }
+        $filtered['count'] = count($filtered);
+
+        return $filtered;
+    }
+
+    public static function filterStoredDetailsExcludedWords(array &$data, array $request): void
+    {
+        $excludeLookup = self::excludedWordsLookup($request);
+        if (!$excludeLookup) {
+            return;
+        }
+
+        foreach (['clouds_competitors', 'clouds_main_page'] as $section) {
+            if (empty($data[$section]) || !is_array($data[$section])) {
+                continue;
+            }
+            foreach ($data[$section] as $key => $cloud) {
+                $data[$section][$key] = self::filterCloudPayload($cloud, $excludeLookup);
+            }
+        }
+
+        if (!empty($data['tf_comp_clouds']) && is_array($data['tf_comp_clouds'])) {
+            foreach ($data['tf_comp_clouds'] as $site => $cloud) {
+                $data['tf_comp_clouds'][$site] = self::filterCloudPayload($cloud, $excludeLookup);
+            }
+        }
+
+        if (!empty($data['unigram_table']) && is_array($data['unigram_table'])) {
+            foreach ($data['unigram_table'] as $root => $wordForm) {
+                if (!is_array($wordForm)) {
+                    unset($data['unigram_table'][$root]);
+                    continue;
+                }
+
+                if (self::isExcludedLemma((string) $root, $excludeLookup)) {
+                    unset($data['unigram_table'][$root]);
+                    continue;
+                }
+
+                foreach ($wordForm as $word => $item) {
+                    if ($word === 'total') {
+                        continue;
+                    }
+                    if (self::isExcludedLemma((string) $word, $excludeLookup)) {
+                        unset($data['unigram_table'][$root][$word]);
+                    }
+                }
+
+                if (!array_diff(array_keys($data['unigram_table'][$root]), ['total'])) {
+                    unset($data['unigram_table'][$root]);
                 }
             }
+        }
+
+        if (!empty($data['phrases']) && is_array($data['phrases'])) {
+            $data['phrases'] = TextAnalyzer::filterExcludedFromPhrases(
+                $data['phrases'],
+                (string) ($request['listWords'] ?? '')
+            );
+        }
+    }
+
+    private function applyExcludedWordsToPreparedClouds(): void
+    {
+        $excludeLookup = self::excludedWordsLookup($this->request);
+        if (!$excludeLookup) {
+            return;
+        }
+
+        foreach (['totalTf', 'textTf', 'linkTf', 'text', 'links', 'textWithLinks'] as $key) {
+            if (isset($this->mainPage[$key])) {
+                $this->mainPage[$key] = self::filterCloudPayload($this->mainPage[$key], $excludeLookup);
+            }
+        }
+
+        foreach (['totalTf', 'textTf', 'linkTf', 'text', 'links', 'textAndLinks'] as $key) {
+            if (isset($this->competitorsCloud[$key])) {
+                $this->competitorsCloud[$key] = self::filterCloudPayload($this->competitorsCloud[$key], $excludeLookup);
+            }
+        }
+
+        foreach ($this->tfCompClouds as $site => $cloud) {
+            $this->tfCompClouds[$site] = self::filterCloudPayload($cloud, $excludeLookup);
         }
     }
 
@@ -518,7 +674,11 @@ class Relevance
         $array = explode(' ', $this->competitorsTextAndLinks);
         $array = array_count_values($array);
         arsort($array);
+        $excludeLookup = self::excludedWordsLookup($this->request);
         foreach ($array as $key => $item) {
+            if (self::isExcludedLemma((string) $key, $excludeLookup)) {
+                continue;
+            }
             if (!in_array($key, $this->ignoredWords)) {
                 $this->ignoredWords[] = $key;
 
@@ -559,6 +719,7 @@ class Relevance
                 $countSites++;
             }
         }
+        $documentCount = $this->competitorDocumentCount();
 
         $myText = $this->mainPage['html'] . ' ' . $this->mainPage['hiddenText'];
         $myText = explode(" ", $myText);
@@ -636,13 +797,15 @@ class Relevance
                 $repeatInPassagesMainPage = $myPassages[$word] ?? 0;
 
                 $tf = TfidfMetrics::termFrequency((float) $item, (float) $wordCount);
-                $idf = TfidfMetrics::inverseDocumentFrequency($countSites, $numberOccurrences);
+                $idf = TfidfMetrics::inverseDocumentFrequency($documentCount, max(1, $numberOccurrences));
                 $score = TfidfMetrics::score($tf, $idf);
 
                 $this->wordForms[$root][$word] = [
                     'tf' => $tf,
                     'idf' => $idf,
                     'score' => $score,
+                    'countTopText' => $numberTextOccurrences,
+                    'countTopLink' => $numberLinkOccurrences,
                     'numberOccurrences' => $numberOccurrences,
                     'reSpam' => $reSpam,
                     'avgInTotalCompetitors' => (int)ceil(($numberLinkOccurrences + $numberTextOccurrences) / $countSites),
@@ -665,7 +828,7 @@ class Relevance
 
         foreach ($this->wordForms as $key => $wordForm) {
             $tf = $reSpam = $repeatInPassages = $repeatInText = $repeatInLink = $avgInText = $avgInPassages = 0;
-            $avgInLink = $avgInTotalCompetitors = $totalRepeatMainPage = 0;
+            $avgInLink = $avgInTotalCompetitors = $totalRepeatMainPage = $countTopText = $countTopLink = 0;
             $occurrences = [];
             $danger = false;
 
@@ -677,6 +840,8 @@ class Relevance
                 $danger = $danger || $word['repeatInTextMainPage'] == 0 || $word['repeatInLinkMainPage'] == 0;
 
                 $tf += $word['tf'];
+                $countTopText += (int) ($word['countTopText'] ?? 0);
+                $countTopLink += (int) ($word['countTopLink'] ?? 0);
 
                 $avgInTotalCompetitors += $word['avgInTotalCompetitors'];
                 $totalRepeatMainPage += $word['totalRepeatMainPage'];
@@ -704,15 +869,23 @@ class Relevance
             }
             arsort($occurrences);
 
-            $documentCount = max(1, (int) $this->countNotIgnoredSites);
+            $documentCount = $this->competitorDocumentCount();
             $documentFrequency = max(1, count($occurrences));
             $idf = TfidfMetrics::inverseDocumentFrequency($documentCount, $documentFrequency);
-            $score = TfidfMetrics::score($tf, $idf);
+            $corpusWords = max(1, HybridRelevanceMetrics::countWordsInText(trim($this->competitorsTextAndLinks)));
+            $score = HybridRelevanceMetrics::hybridTfidfTop(
+                (float) array_sum($occurrences),
+                (float) $corpusWords,
+                $documentFrequency,
+                $documentCount
+            );
 
             $this->wordForms[$key]['total'] = [
                 'tf' => $tf,
                 'idf' => $idf,
                 'score' => $score,
+                'countTopText' => $countTopText,
+                'countTopLink' => $countTopLink,
                 'avgInTotalCompetitors' => (int)ceil($avgInTotalCompetitors),
                 'avgInText' => (int)ceil($avgInText),
                 'avgInLink' => (int)ceil($avgInLink),
@@ -736,6 +909,41 @@ class Relevance
         $this->wordForms = $collection->sortByDesc(function ($wordForm) {
             return $wordForm['total']['score'] ?? 0;
         })->toArray();
+
+        $this->filterWordFormsExcluded();
+    }
+
+    private function filterWordFormsExcluded(): void
+    {
+        $excludeLookup = self::excludedWordsLookup($this->request);
+        if (!$excludeLookup) {
+            return;
+        }
+
+        foreach ($this->wordForms as $root => $wordForm) {
+            if (!is_array($wordForm)) {
+                unset($this->wordForms[$root]);
+                continue;
+            }
+
+            if (self::isExcludedLemma((string) $root, $excludeLookup)) {
+                unset($this->wordForms[$root]);
+                continue;
+            }
+
+            foreach ($wordForm as $word => $item) {
+                if ($word === 'total') {
+                    continue;
+                }
+                if (self::isExcludedLemma((string) $word, $excludeLookup)) {
+                    unset($this->wordForms[$root][$word]);
+                }
+            }
+
+            if (!array_diff(array_keys($this->wordForms[$root]), ['total'])) {
+                unset($this->wordForms[$root]);
+            }
+        }
     }
 
   /**
@@ -799,6 +1007,423 @@ class Relevance
                 $this->separateText($page['html'] . ' ' . $page['linkText']),
                 $documentFrequencyMap
             );
+        }
+
+        $this->applyExcludedWordsToPreparedClouds();
+    }
+
+    /**
+     * TF-IDF облака — те же гибридные метрики, что в колонках TLP (не prepareTfCloud).
+     */
+    private function applyHybridTfCloudsFromUnigramTable(): void
+    {
+        self::applyHybridTfCloudsFromUnigramToPrepared(
+            $this->wordForms,
+            $this->competitorsCloud,
+            $this->mainPage
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $unigramTable
+     * @param array<string, mixed> $competitorsCloud
+     * @param array<string, mixed> $mainPageCloud
+     */
+    public static function applyHybridTfCloudsFromUnigramToPrepared(
+        array $unigramTable,
+        array &$competitorsCloud,
+        array &$mainPageCloud
+    ): void {
+        $competitorsCloud['totalTf'] = self::buildHybridTfCloudFromUnigram($unigramTable, 'tfidfTop');
+        $competitorsCloud['textTf'] = self::buildHybridTfCloudFromUnigram($unigramTable, 'tfidfTopText');
+        $competitorsCloud['linkTf'] = self::buildHybridTfCloudFromUnigram($unigramTable, 'tfidfTopLink');
+        $mainPageCloud['totalTf'] = self::buildHybridTfCloudFromUnigram($unigramTable, 'tfidfSite');
+        $mainPageCloud['textTf'] = self::buildHybridTfCloudFromUnigram($unigramTable, 'tfidfSiteText');
+        $mainPageCloud['linkTf'] = self::buildHybridTfCloudFromUnigram($unigramTable, 'tfidfSiteLink');
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    public static function applyHybridTfCloudsFromUnigram(array &$data): void
+    {
+        if (empty($data['unigram_table']) || !is_array($data['unigram_table'])) {
+            return;
+        }
+
+        if (!isset($data['clouds_competitors']) || !is_array($data['clouds_competitors'])) {
+            $data['clouds_competitors'] = [];
+        }
+        if (!isset($data['clouds_main_page']) || !is_array($data['clouds_main_page'])) {
+            $data['clouds_main_page'] = [];
+        }
+
+        self::applyHybridTfCloudsFromUnigramToPrepared(
+            $data['unigram_table'],
+            $data['clouds_competitors'],
+            $data['clouds_main_page']
+        );
+    }
+
+    /**
+     * Облака по каждому конкуренту — гибридный TF-IDF документа (как tfidfSite у нашей страницы).
+     *
+     * @param array<string, array<string, mixed>> $sites
+     * @param array<string, mixed> $unigramTable
+     * @param array<string, int|float> $corpusZones
+     */
+    public static function buildHybridTfCompCloudsFromSitesAndUnigram(
+        array $sites,
+        array $unigramTable,
+        array $corpusZones,
+        int $limit = 200
+    ): array {
+        $result = [];
+        $documentCount = max(1, (int) ($corpusZones['documentCount'] ?? $corpusZones['competitorSiteCount'] ?? 1));
+        $corpusWords = max(1.0, (float) ($corpusZones['competitorCorpusWords'] ?? 1));
+        $siteWordCounts = [];
+
+        foreach ($sites as $siteUrl => $site) {
+            if (!is_array($site) || !empty($site['ignored']) || !empty($site['mainPage'])) {
+                continue;
+            }
+
+            $siteWordCounts[$siteUrl] = self::siteWordCountForTfCloud($site);
+        }
+
+        foreach ($sites as $siteUrl => $site) {
+            if (!is_array($site) || !empty($site['ignored']) || !empty($site['mainPage'])) {
+                continue;
+            }
+
+            $siteWords = (float) ($siteWordCounts[$siteUrl] ?? 1);
+            $items = [];
+
+            foreach ($unigramTable as $root => $wordForm) {
+                if (!is_array($wordForm) || empty($wordForm['total']) || !is_array($wordForm['total'])) {
+                    continue;
+                }
+
+                $total = $wordForm['total'];
+                $occurrences = $total['occurrences'] ?? [];
+                if (empty($occurrences[$siteUrl])) {
+                    continue;
+                }
+
+                $siteRepeats = (float) $occurrences[$siteUrl];
+                $rawTopTotal = !empty($occurrences)
+                    ? (float) array_sum($occurrences)
+                    : max(1.0, (float) ($total['tf'] ?? 0) * $corpusWords);
+                $documentFrequency = max(1, (int) ($total['numberOccurrences'] ?? count($occurrences)));
+
+                $score = HybridRelevanceMetrics::hybridTfidfSite(
+                    $siteRepeats,
+                    max(1.0, $rawTopTotal),
+                    $siteWords,
+                    $corpusWords,
+                    $documentFrequency,
+                    $documentCount
+                );
+
+                if ($score <= 0) {
+                    continue;
+                }
+
+                $items[] = [
+                    'text' => (string) $root,
+                    'weight' => $score,
+                    'tfidfScore' => $score,
+                    'tf' => $siteWords > 0 ? round($siteRepeats / $siteWords, 7) : 0.0,
+                    'idf' => (float) ($total['idf'] ?? 0),
+                ];
+            }
+
+            usort($items, static function ($a, $b) {
+                return ($b['weight'] ?? 0) <=> ($a['weight'] ?? 0);
+            });
+
+            if (count($items) > $limit) {
+                $items = array_slice($items, 0, $limit);
+            }
+
+            $items['count'] = count($items);
+            $result[$siteUrl] = $items;
+        }
+
+        return $result;
+    }
+
+    public static function applyHybridTfCompCloudsFromUnigram(array &$data): void
+    {
+        if (empty($data['unigram_table']) || !is_array($data['unigram_table'])
+            || empty($data['sites']) || !is_array($data['sites'])) {
+            return;
+        }
+
+        $data['tf_comp_clouds'] = self::buildHybridTfCompCloudsFromSitesAndUnigram(
+            $data['sites'],
+            $data['unigram_table'],
+            HybridRelevanceMetrics::corpusZoneStatsFromData($data)
+        );
+    }
+
+    private function applyHybridTfCompCloudsFromUnigramTable(): void
+    {
+        $this->tfCompClouds = self::buildHybridTfCompCloudsFromSitesAndUnigram(
+            $this->sites,
+            $this->wordForms,
+            $this->hybridCorpusZoneStats()
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $unigramTable
+     */
+    public static function buildHybridTfCloudFromUnigram(array $unigramTable, string $scoreKey, int $limit = 200): array
+    {
+        $items = [];
+
+        foreach ($unigramTable as $root => $wordForm) {
+            if (!is_array($wordForm) || empty($wordForm['total']) || !is_array($wordForm['total'])) {
+                continue;
+            }
+
+            $total = $wordForm['total'];
+            if (!isset($total[$scoreKey])) {
+                continue;
+            }
+
+            $score = round((float) $total[$scoreKey], 7);
+            if ($score <= 0) {
+                continue;
+            }
+
+            $items[] = [
+                'text' => (string) $root,
+                'weight' => $score,
+                'tfidfScore' => $score,
+                'tf' => (float) ($total['tf'] ?? 0),
+                'idf' => (float) ($total['idf'] ?? 0),
+            ];
+        }
+
+        usort($items, static function ($a, $b) {
+            return ($b['weight'] ?? 0) <=> ($a['weight'] ?? 0);
+        });
+
+        if (count($items) > $limit) {
+            $items = array_slice($items, 0, $limit);
+        }
+
+        $items['count'] = count($items);
+
+        return $items;
+    }
+
+    private function applyTableTfidfToUnigramTable(): void
+    {
+        self::applyTableTfidfToUnigramWordForms($this->wordForms, $this->hybridCorpusZoneStats());
+    }
+
+    /**
+     * @param array<string, mixed> $wordForms
+     * @param array<string, int|float> $corpusZones
+     */
+    public static function applyTableTfidfToUnigramWordForms(array &$wordForms, array $corpusZones): void
+    {
+        foreach ($wordForms as &$wordForm) {
+            if (!is_array($wordForm)) {
+                continue;
+            }
+
+            foreach ($wordForm as $wordKey => &$word) {
+                if ($wordKey === 'total' || !is_array($word)) {
+                    continue;
+                }
+
+                HybridRelevanceMetrics::applyTableTfidfToWordStats($word, $corpusZones);
+                HybridRelevanceMetrics::applyTableBm25ToWordStats($word, $corpusZones);
+            }
+            unset($word);
+
+            if (!isset($wordForm['total']) || !is_array($wordForm['total'])) {
+                continue;
+            }
+
+            HybridRelevanceMetrics::applyTableTfidfToWordStats($wordForm['total'], $corpusZones);
+            HybridRelevanceMetrics::applyTableBm25ToWordStats($wordForm['total'], $corpusZones);
+        }
+        unset($wordForm);
+    }
+
+    /**
+     * TF-idf облака сортируем по Tf из униграммы (как в таблице TLP), а не по score из ссылок.
+     */
+    private function applyUnigramTfToPreparedTfClouds(): void
+    {
+        $lookup = self::buildUnigramTfLookup($this->wordForms);
+        if (!$lookup) {
+            return;
+        }
+
+        $tfKeys = ['totalTf', 'textTf', 'linkTf'];
+        foreach ($tfKeys as $key) {
+            if (isset($this->mainPage[$key])) {
+                $this->mainPage[$key] = self::remapTfCloudWithUnigramTf($this->mainPage[$key], $lookup);
+            }
+            if (isset($this->competitorsCloud[$key])) {
+                $this->competitorsCloud[$key] = self::remapTfCloudWithUnigramTf($this->competitorsCloud[$key], $lookup);
+            }
+        }
+
+        foreach ($this->tfCompClouds as $site => $cloud) {
+            $this->tfCompClouds[$site] = self::remapTfCloudWithUnigramTf($cloud, $lookup);
+        }
+    }
+
+    public static function buildUnigramTfLookup(array $unigramTable): array
+    {
+        $lookup = [];
+
+        foreach ($unigramTable as $root => $wordForm) {
+            if (!is_array($wordForm)) {
+                continue;
+            }
+
+            $rootKey = mb_strtolower((string) $root, 'UTF-8');
+            if (isset($wordForm['total']['tf'])) {
+                $lookup[$rootKey] = max($lookup[$rootKey] ?? 0, (float) $wordForm['total']['tf']);
+            }
+
+            foreach ($wordForm as $word => $data) {
+                if ($word === 'total' || !is_array($data) || !isset($data['tf'])) {
+                    continue;
+                }
+
+                $wordKey = mb_strtolower((string) $word, 'UTF-8');
+                $lookup[$wordKey] = max($lookup[$wordKey] ?? 0, (float) $data['tf']);
+            }
+        }
+
+        return $lookup;
+    }
+
+    public static function remapTfCloudWithUnigramTf($cloud, array $lookup)
+    {
+        if (!is_array($cloud) || !$lookup) {
+            return $cloud;
+        }
+
+        $items = [];
+        foreach ($cloud as $item) {
+            if (!is_array($item) || !isset($item['text'])) {
+                continue;
+            }
+
+            $key = mb_strtolower((string) $item['text'], 'UTF-8');
+            if (!isset($item['tfidfScore']) || $item['tfidfScore'] === '' || $item['tfidfScore'] === null) {
+                $item['tfidfScore'] = $item['html']['title'] ?? $item['weight'] ?? null;
+            }
+            if (isset($lookup[$key])) {
+                $item['weight'] = $lookup[$key];
+                $item['tf'] = $lookup[$key];
+            }
+
+            $items[] = $item;
+        }
+
+        usort($items, function ($a, $b) {
+            return ($b['weight'] ?? 0) <=> ($a['weight'] ?? 0);
+        });
+        $items['count'] = count($items);
+
+        return $items;
+    }
+
+    public static function ensureCloudTfidfScoresBeforeRemap(array &$data): void
+    {
+        foreach (['clouds_competitors', 'clouds_main_page'] as $section) {
+            if (empty($data[$section]) || !is_array($data[$section])) {
+                continue;
+            }
+
+            foreach (['totalTf', 'textTf', 'linkTf'] as $key) {
+                if (isset($data[$section][$key])) {
+                    $data[$section][$key] = self::ensureCloudItemsTfidfScore($data[$section][$key]);
+                }
+            }
+        }
+
+        if (!empty($data['tf_comp_clouds']) && is_array($data['tf_comp_clouds'])) {
+            foreach ($data['tf_comp_clouds'] as $site => $cloud) {
+                $data['tf_comp_clouds'][$site] = self::ensureCloudItemsTfidfScore($cloud);
+            }
+        }
+    }
+
+    /**
+     * Старые сохранённые облака: weight = TF×IDF, tfidfScore ещё нет.
+     *
+     * @param mixed $cloud
+     * @return mixed
+     */
+    public static function ensureCloudItemsTfidfScore($cloud)
+    {
+        if (!is_array($cloud)) {
+            return $cloud;
+        }
+
+        $items = [];
+        foreach ($cloud as $item) {
+            if (!is_array($item) || !isset($item['text'])) {
+                continue;
+            }
+
+            if (!isset($item['tfidfScore']) || $item['tfidfScore'] === '' || $item['tfidfScore'] === null) {
+                if (isset($item['html']['title']) && is_numeric($item['html']['title'])) {
+                    $item['tfidfScore'] = (float) $item['html']['title'];
+                } elseif (isset($item['tf'], $item['idf']) && is_numeric($item['tf']) && is_numeric($item['idf'])) {
+                    $item['tfidfScore'] = TfidfMetrics::score((float) $item['tf'], (float) $item['idf']);
+                } elseif (isset($item['weight']) && is_numeric($item['weight'])) {
+                    $item['tfidfScore'] = (float) $item['weight'];
+                }
+            }
+
+            $items[] = $item;
+        }
+
+        $items['count'] = count($items);
+
+        return $items;
+    }
+
+    public static function applyUnigramTfToStoredTfClouds(array &$data): void
+    {
+        if (empty($data['unigram_table']) || !is_array($data['unigram_table'])) {
+            return;
+        }
+
+        $lookup = self::buildUnigramTfLookup($data['unigram_table']);
+        if (!$lookup) {
+            return;
+        }
+
+        foreach (['clouds_competitors', 'clouds_main_page'] as $section) {
+            if (empty($data[$section]) || !is_array($data[$section])) {
+                continue;
+            }
+
+            foreach (['totalTf', 'textTf', 'linkTf'] as $key) {
+                if (isset($data[$section][$key])) {
+                    $data[$section][$key] = self::remapTfCloudWithUnigramTf($data[$section][$key], $lookup);
+                }
+            }
+        }
+
+        if (!empty($data['tf_comp_clouds']) && is_array($data['tf_comp_clouds'])) {
+            foreach ($data['tf_comp_clouds'] as $site => $cloud) {
+                $data['tf_comp_clouds'][$site] = self::remapTfCloudWithUnigramTf($cloud, $lookup);
+            }
         }
     }
 
@@ -932,7 +1557,11 @@ class Relevance
         $array = array_slice($array, 0, 199);
 
         $wordCount = max(1, count(explode(' ', $text)));
+        $excludeLookup = self::excludedWordsLookup($this->request);
         foreach ($array as $key => $item) {
+            if (self::isExcludedLemma((string) $key, $excludeLookup)) {
+                continue;
+            }
             $tf = TfidfMetrics::termFrequency((float) $item, (float) $wordCount);
             $documentFrequency = max(1, (int) ($documentFrequencyMap[$key] ?? 1));
             $idf = TfidfMetrics::inverseDocumentFrequency($documentCount, $documentFrequency);
@@ -940,6 +1569,7 @@ class Relevance
             $cloud[] = [
                 'text' => $key,
                 'weight' => $score,
+                'tfidfScore' => $score,
                 'tf' => $tf,
                 'idf' => $idf,
             ];
@@ -965,6 +1595,7 @@ class Relevance
             $wordForms[] = [
                 'text' => $item1['text'],
                 'weight' => $totalWeight,
+                'tfidfScore' => $totalWeight,
                 'html' => [
                     'title' => $totalWeight
                 ]
@@ -977,7 +1608,15 @@ class Relevance
         $wordForms['count'] = count($wordForms) - 1;
         $collection = collect($wordForms);
 
-        return $collection->sortByDesc('weight')->toArray();
+        $dense = [];
+        foreach ($collection->sortByDesc('weight')->values()->all() as $item) {
+            if (is_array($item) && isset($item['text'])) {
+                $dense[] = $item;
+            }
+        }
+        $dense['count'] = count($dense);
+
+        return $dense;
     }
 
     public function separateText($text): string
@@ -994,94 +1633,335 @@ class Relevance
 
     public function preparePhrasesTable()
     {
+        $this->phrases = self::buildPhrasesTableFromSites(
+            $this->sites,
+            $this->mainPage,
+            $this->hybridCorpusZoneStats(),
+            $this->wordForms ?: null
+        );
+        $this->phrases = TextAnalyzer::filterExcludedFromPhrases(
+            $this->phrases,
+            (string) ($this->request['listWords'] ?? '')
+        );
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $sites
+     * @param array<string, mixed> $mainPage
+     * @param array<string, int|float> $corpusZones
+     * @return array<string, array<string, mixed>>
+     */
+    public static function buildPhrasesTableFromSites(
+        array $sites,
+        array $mainPage,
+        array $corpusZones,
+        ?array $unigramTable = null
+    ): array {
+        RelevancePhraseNgrams::configureLemmaContext($unigramTable);
+
+        try {
+            return self::buildPhrasesTableFromSitesWithLemmaContext($sites, $mainPage, $corpusZones, $unigramTable);
+        } finally {
+            RelevancePhraseNgrams::resetLemmaContext();
+        }
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $sites
+     * @param array<string, mixed> $mainPage
+     * @param array<string, int|float> $corpusZones
+     * @return array<string, array<string, mixed>>
+     */
+    private static function buildPhrasesTableFromSitesWithLemmaContext(
+        array $sites,
+        array $mainPage,
+        array $corpusZones,
+        ?array $unigramTable = null
+    ): array {
         $result = [];
-        $phrases = $this->searchPhrases();
-        $totalCount = count($phrases);
+        $phraseCandidates = RelevancePhraseNgrams::candidatePhrases($sites);
+        $documentCount = max(1, (int) ($corpusZones['documentCount'] ?? self::competitorDocumentCountFromSites($sites)));
+        $totalCandidates = max(1, count($phraseCandidates));
 
-        foreach ($phrases as $phrase) {
-
-            if ($phrase === "") {
+        foreach ($phraseCandidates as $phrase) {
+            if ($phrase === '' || !RelevancePhraseNgrams::isValidUnigramPhrase($phrase)) {
                 continue;
             }
 
-            $reSpam = $numberTextOccurrences = $numberLinkOccurrences = $numberOccurrences = 0;
-            $occurrences = [];
-
-            foreach ($this->sites as $key => $page) {
-                if (!$page['ignored']) {
-
-                    $htmlCount = preg_match_all("/ ($phrase) /", ' ' . $page['html'] . ' ');
-                    if ($htmlCount > 0) {
-                        $numberTextOccurrences += $htmlCount;
-                    }
-
-                    $hiddenTextCount = preg_match_all("/ ($phrase) /", ' ' . $page['hiddenText'] . ' ');
-                    if ($hiddenTextCount > 0) {
-                        $numberTextOccurrences += $hiddenTextCount;
-                    }
-
-                    $linkTextCount = preg_match_all("/ ($phrase) /", ' ' . $page['linkText'] . ' ');
-                    if ($linkTextCount > 0) {
-                        $numberLinkOccurrences += $linkTextCount;
-                    }
-
-                    if ($linkTextCount > 0 || $hiddenTextCount > 0 || $htmlCount > 0) {
-                        $countRepeat = $linkTextCount + $hiddenTextCount + $htmlCount;
-                        $numberOccurrences++;
-                        $occurrences[$key] = $countRepeat;
-                        if ($reSpam < $countRepeat) {
-                            $reSpam = $countRepeat;
-                        }
-                    }
-                }
+            $row = self::phraseStatsRow($phrase, $sites, $mainPage, $documentCount, $totalCandidates);
+            if ($row === null) {
+                continue;
             }
 
-            if ($numberOccurrences > 0) {
-                $countOccurrences = $numberTextOccurrences + $numberLinkOccurrences;
-                $tf = TfidfMetrics::termFrequency((float) $countOccurrences, (float) max(1, $totalCount));
-                $documentCount = max(1, (int) $this->countNotIgnoredSites);
-                $idf = TfidfMetrics::inverseDocumentFrequency($documentCount, $numberOccurrences);
-                $score = TfidfMetrics::score($tf, $idf);
+            if ((int) ($row['numberOccurrences'] ?? 0) < 2) {
+                continue;
+            }
 
-                $repeatInTextMainPage = mb_substr_count(Relevance::concatenation([$this->mainPage['html'], $this->mainPage['hiddenText']]), "$phrase");
-                $repeatLinkInMainPage = mb_substr_count($this->mainPage['linkText'], "$phrase");
-                $countSites = max(1, (int) $this->countNotIgnoredSites);
-                arsort($occurrences);
+            HybridRelevanceMetrics::applyTableTfidfToWordStats($row, $corpusZones);
+            HybridRelevanceMetrics::applyTableBm25ToWordStats($row, $corpusZones);
+            $result[$phrase] = $row;
+        }
 
-                $result[$phrase] = [
-                    'tf' => $tf,
-                    'idf' => $idf,
-                    'score' => $score,
-                    'numberOccurrences' => $numberOccurrences,
-                    'reSpam' => $reSpam,
-                    'avgInTotalCompetitors' => (int)ceil(($numberLinkOccurrences + $numberTextOccurrences) / $countSites),
-                    'avgInLink' => (int)ceil($numberLinkOccurrences / $countSites),
-                    'avgInText' => (int)ceil($numberTextOccurrences / $countSites),
-                    'repeatInLinkMainPage' => $repeatLinkInMainPage,
-                    'repeatInTextMainPage' => $repeatInTextMainPage,
-                    'totalRepeatMainPage' => $repeatLinkInMainPage + $repeatInTextMainPage,
-                    'occurrences' => $occurrences
-                ];
+        $result = RelevancePhraseNgrams::filterQualityPhrases($result, $unigramTable);
+        $result = RelevancePhraseNgrams::deduplicatePermutedPhrases($result);
+        $result = RelevancePhraseNgrams::deduplicateOverlappingPhrases($result);
+
+        $collection = collect($result)->sortByDesc(static function (array $row, string $phrase) {
+            return [
+                (float) ($row['tfidfTop'] ?? $row['score'] ?? 0),
+                (float) ($row['bm25Top'] ?? 0),
+                RelevancePhraseNgrams::phraseLengthScore(RelevancePhraseNgrams::phraseTokens($phrase)),
+                (int) ($row['numberOccurrences'] ?? 0),
+            ];
+        });
+
+        return $collection->slice(0, 600)->toArray();
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $sites
+     * @param array<string, mixed> $mainPage
+     */
+    private static function phraseStatsRow(
+        string $phrase,
+        array $sites,
+        array $mainPage,
+        int $documentCount,
+        int $totalCandidates
+    ): ?array {
+        $reSpam = 0;
+        $numberTextOccurrences = 0;
+        $numberLinkOccurrences = 0;
+        $numberOccurrences = 0;
+        $occurrences = [];
+        $perSiteCounts = [];
+
+        foreach ($sites as $key => $page) {
+            if (!empty($page['ignored']) || !empty($page['mainPage'])) {
+                continue;
+            }
+
+            $htmlCount = RelevancePhraseNgrams::countLemmaPhraseOccurrences($phrase, $page['html'] ?? '');
+            $hiddenTextCount = RelevancePhraseNgrams::countLemmaPhraseOccurrences($phrase, $page['hiddenText'] ?? '');
+            $linkTextCount = RelevancePhraseNgrams::countLemmaPhraseOccurrences($phrase, $page['linkText'] ?? '');
+
+            if ($htmlCount > 0) {
+                $numberTextOccurrences += $htmlCount;
+            }
+            if ($hiddenTextCount > 0) {
+                $numberTextOccurrences += $hiddenTextCount;
+            }
+            if ($linkTextCount > 0) {
+                $numberLinkOccurrences += $linkTextCount;
+            }
+
+            if ($linkTextCount > 0 || $hiddenTextCount > 0 || $htmlCount > 0) {
+                $countRepeat = $linkTextCount + $hiddenTextCount + $htmlCount;
+                $numberOccurrences++;
+                $occurrences[$key] = $countRepeat;
+                $perSiteCounts[] = $countRepeat;
+                if ($reSpam < $countRepeat) {
+                    $reSpam = $countRepeat;
+                }
             }
         }
 
-        $collection = collect($result);
-        $collection = $collection->unique();
-        $collection = $collection->sortByDesc('score');
-        $this->phrases = $collection->slice(0, 600)->toArray();
+        if ($numberOccurrences <= 0) {
+            return null;
+        }
+
+        $countOccurrences = $numberTextOccurrences + $numberLinkOccurrences;
+        $tf = TfidfMetrics::termFrequency((float) $countOccurrences, (float) max(1, $totalCandidates));
+        $idf = TfidfMetrics::inverseDocumentFrequency($documentCount, $numberOccurrences);
+        $score = TfidfMetrics::score($tf, $idf);
+
+        $mainText = Relevance::concatenation([$mainPage['html'] ?? '', $mainPage['hiddenText'] ?? '']);
+        $repeatInTextMainPage = RelevancePhraseNgrams::countLemmaPhraseOccurrences($phrase, $mainText);
+        $repeatLinkInMainPage = RelevancePhraseNgrams::countLemmaPhraseOccurrences($phrase, $mainPage['linkText'] ?? '');
+        $countSites = max(1, $documentCount);
+        arsort($occurrences);
+
+        return [
+            'tf' => $tf,
+            'idf' => $idf,
+            'score' => $score,
+            'numberOccurrences' => $numberOccurrences,
+            'medianInCompetitors' => self::medianCount($perSiteCounts),
+            'reSpam' => $reSpam,
+            'avgInTotalCompetitors' => (int) ceil(($numberLinkOccurrences + $numberTextOccurrences) / $countSites),
+            'avgInLink' => (int) ceil($numberLinkOccurrences / $countSites),
+            'avgInText' => (int) ceil($numberTextOccurrences / $countSites),
+            'repeatInLinkMainPage' => $repeatLinkInMainPage,
+            'repeatInTextMainPage' => $repeatInTextMainPage,
+            'totalRepeatMainPage' => $repeatLinkInMainPage + $repeatInTextMainPage,
+            'occurrences' => $occurrences,
+        ];
+    }
+
+    /**
+     * @param list<int> $values
+     */
+    private static function medianCount(array $values): int
+    {
+        $values = array_values(array_filter($values, static function ($value) {
+            return (int) $value > 0;
+        }));
+        if ($values === []) {
+            return 0;
+        }
+
+        sort($values);
+        $count = count($values);
+        $middle = (int) floor($count / 2);
+
+        if ($count % 2 === 1) {
+            return (int) $values[$middle];
+        }
+
+        return (int) round(($values[$middle - 1] + $values[$middle]) / 2);
+    }
+
+    /**
+     * @param array<string, mixed> $site
+     */
+    private static function siteWordCountForTfCloud(array $site): int
+    {
+        $countWords = (int) ($site['countWords'] ?? 0);
+        if ($countWords > 0) {
+            return $countWords;
+        }
+
+        $siteText = self::concatenation([
+            $site['html'] ?? '',
+            $site['hiddenText'] ?? '',
+            $site['linkText'] ?? '',
+        ]);
+
+        return max(1, HybridRelevanceMetrics::countWordsInText($siteText));
+    }
+
+    public static function decodeStoredSiteHtml($raw): string
+    {
+        if (!is_string($raw) || $raw === '') {
+            return '';
+        }
+
+        $decoded = @gzuncompress(base64_decode($raw, true));
+        if (is_string($decoded) && $decoded !== '') {
+            return $decoded;
+        }
+
+        return $raw;
+    }
+
+    /**
+     * В истории saveResults() удаляет html/linkText/hiddenText, оставляя только defaultHtml.
+     * Для пересборки TLPs восстанавливаем текстовые зоны тем же пайплайном, что при анализе.
+     *
+     * @param array<string, array<string, mixed>> $sites
+     */
+    public static function hydrateStoredSitesTextZones(array &$sites, array $request = [], ?string $mainPageRawHtml = null): void
+    {
+        $searchPassages = filter_var($request['searchPassages'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        foreach ($sites as $key => &$site) {
+            if (!is_array($site) || !self::storedSiteNeedsTextHydration($site)) {
+                continue;
+            }
+
+            $rawHtml = '';
+            if (!empty($site['mainPage']) && is_string($mainPageRawHtml) && $mainPageRawHtml !== '') {
+                $rawHtml = $mainPageRawHtml;
+            } elseif (!empty($site['defaultHtml'])) {
+                $rawHtml = self::decodeStoredSiteHtml((string) $site['defaultHtml']);
+            }
+
+            if ($rawHtml === '') {
+                continue;
+            }
+
+            $zones = self::processStoredSiteTextZones($rawHtml, $request, $searchPassages);
+            $site['html'] = $zones['html'];
+            $site['linkText'] = $zones['linkText'];
+            $site['hiddenText'] = $zones['hiddenText'];
+            $site['passages'] = $zones['passages'];
+        }
+        unset($site);
+    }
+
+    /**
+     * @param array<string, mixed> $site
+     */
+    private static function storedSiteNeedsTextHydration(array $site): bool
+    {
+        return trim((string) ($site['html'] ?? '')) === ''
+            && trim((string) ($site['linkText'] ?? '')) === ''
+            && trim((string) ($site['hiddenText'] ?? '')) === ''
+            && (!empty($site['defaultHtml']) || !empty($site['mainPage']));
+    }
+
+    /**
+     * @return array{html:string,linkText:string,hiddenText:string,passages:string}
+     */
+    private static function processStoredSiteTextZones(string $rawHtml, array $request, bool $searchPassages): array
+    {
+        $html = $rawHtml;
+
+        if (($request['noIndex'] ?? '') === 'false') {
+            $html = TextAnalyzer::removeNoindexText($html);
+        }
+
+        $hiddenText = '';
+        if (($request['hiddenText'] ?? '') === 'true') {
+            $hiddenText = self::getHiddenText($html);
+        }
+
+        $sourceHtml = $html;
+        $linkText = TextAnalyzer::getLinkText($html);
+        $html = TextAnalyzer::deleteEverythingExceptCharacters(TextAnalyzer::clearHTMLFromLinks($html));
+
+        $passages = '';
+        if ($searchPassages) {
+            $passages = self::searchPassages($sourceHtml);
+            $passagesArray = explode(' ', $passages);
+            $htmlSpaced = ' ' . $html . ' ';
+            foreach ($passagesArray as $item) {
+                if ($item === '') {
+                    continue;
+                }
+                $search = ' ' . $item . ' ';
+                $pos = strpos($htmlSpaced, $search);
+                if ($pos !== false) {
+                    $htmlSpaced = substr_replace($htmlSpaced, ' ', $pos, strlen($search));
+                }
+            }
+            $html = trim($htmlSpaced);
+        }
+
+        if (($request['conjunctionsPrepositionsPronouns'] ?? '') === 'false') {
+            $html = TextAnalyzer::removeConjunctionsPrepositionsPronouns($html);
+            $linkText = TextAnalyzer::removeConjunctionsPrepositionsPronouns($linkText);
+            $hiddenText = TextAnalyzer::removeConjunctionsPrepositionsPronouns($hiddenText);
+        }
+
+        if (self::shouldApplyExcludedWordsList($request)) {
+            $listWords = (string) ($request['listWords'] ?? '');
+            $html = TextAnalyzer::removeWords($listWords, $html);
+            $linkText = TextAnalyzer::removeWords($listWords, $linkText);
+            $hiddenText = TextAnalyzer::removeWords($listWords, $hiddenText);
+        }
+
+        return [
+            'html' => trim($html),
+            'linkText' => trim($linkText),
+            'hiddenText' => trim($hiddenText),
+            'passages' => trim($passages),
+        ];
     }
 
     public function searchPhrases(): array
     {
-        $phrases = [];
-        $array = explode(' ', $this->competitorsTextAndLinks);
-
-        $grouped = array_chunk($array, 2);
-        foreach ($grouped as $two_words) {
-            $phrases[] = implode(' ', $two_words);
-        }
-
-        return array_unique($phrases);
+        return RelevancePhraseNgrams::candidatePhrases($this->sites);
     }
 
     public function calculateDensity()
@@ -1226,13 +2106,21 @@ class Relevance
         ]), 9));
 
         $result->avg = base64_encode(gzcompress(json_encode([
-            'countWords' => $this->countWords / $this->countNotIgnoredSites,
-            'countSymbols' => $this->countSymbols / $this->countNotIgnoredSites,
+            'countWords' => $this->countWordsForTextAvg / max(1, $this->countSitesForTextAvg),
+            'countSymbols' => $this->countSymbolsForTextAvg / max(1, $this->countSitesForTextAvg),
         ]), 9));
+
+        $corpusZones = $this->hybridCorpusZoneStats();
 
         $result->main_page = base64_encode(gzcompress(json_encode([
             'countWords' => $this->countWordsInMyPage,
             'countSymbols' => $this->countSymbolsInMyPage,
+            'competitorCorpusWords' => $corpusZones['competitorCorpusWords'],
+            'competitorTextWords' => $corpusZones['competitorTextWords'],
+            'competitorLinkWords' => $corpusZones['competitorLinkWords'],
+            'mainPageTextWords' => $corpusZones['mainPageTextWords'],
+            'mainPageLinkWords' => $corpusZones['mainPageLinkWords'],
+            'avgCompetitorDocWords' => $corpusZones['avgCompetitorDocWords'],
         ]), 9));
 
         $result->average_values = json_encode($this->avg);
@@ -1359,10 +2247,23 @@ class Relevance
 
     public static function uncompress($history)
     {
-        if (isset($history)) {
-            $history = json_decode($history, true);
+        if (!isset($history)) {
+            return null;
+        }
 
-            if (!$history['cleaning']) {
+        if (is_string($history)) {
+            $history = json_decode($history, true);
+        } elseif ($history instanceof \Illuminate\Database\Eloquent\Model) {
+            $history = $history->toArray();
+        } elseif (is_object($history)) {
+            $history = json_decode(json_encode($history), true);
+        }
+
+        if (!is_array($history)) {
+            return null;
+        }
+
+        if (!$history['cleaning']) {
                 $clouds_competitors = json_decode(gzuncompress(base64_decode($history['clouds_competitors'])), true);
                 $clouds_main_page = json_decode(gzuncompress(base64_decode($history['clouds_main_page'])), true);
                 $avg = json_decode(gzuncompress(base64_decode($history['avg'])), true);
@@ -1414,7 +2315,335 @@ class Relevance
 
             $data['average_values'] = json_decode($history['average_values'], true);
 
+            if (empty($data['cleaning'])) {
+                self::recalculateStoredTfidf($data);
+                self::ensureCloudTfidfScoresBeforeRemap($data);
+            }
+
+            $historyRequest = null;
+            $historyRow = null;
+            if (!empty($history['project_id'])) {
+                $historyRow = RelevanceHistory::find($history['project_id']);
+                if ($historyRow && !empty($historyRow->request)) {
+                    $historyRequest = json_decode($historyRow->request, true);
+                }
+            }
+            if (is_array($historyRequest)) {
+                self::filterStoredDetailsExcludedWords($data, $historyRequest);
+            }
+
+            if (empty($data['cleaning']) && !empty($data['sites']) && is_array($data['sites'])) {
+                $storedPhrases = $data['phrases'] ?? null;
+                $shouldRebuildPhrases = self::shouldRebuildStoredPhrases($storedPhrases);
+
+                if ($shouldRebuildPhrases) {
+                    $sitesForPhrases = $data['sites'];
+                    $mainPageRawHtml = null;
+                    if ($historyRow && !empty($historyRow->html_main_page)) {
+                        $mainPageRawHtml = self::decodeStoredSiteHtml((string) $historyRow->html_main_page);
+                    }
+                    if (is_array($historyRequest)) {
+                        self::hydrateStoredSitesTextZones($sitesForPhrases, $historyRequest, $mainPageRawHtml);
+                    } else {
+                        self::hydrateStoredSitesTextZones($sitesForPhrases, [], $mainPageRawHtml);
+                    }
+
+                    $mainPageSite = self::mainPageFromSites($sitesForPhrases);
+                    $corpusZones = HybridRelevanceMetrics::corpusZoneStatsFromData($data);
+                    $data['phrases'] = self::buildPhrasesTableFromSites(
+                        $sitesForPhrases,
+                        $mainPageSite,
+                        $corpusZones,
+                        $data['unigram_table'] ?? null
+                    );
+                    if (is_array($historyRequest)) {
+                        $data['phrases'] = TextAnalyzer::filterExcludedFromPhrases(
+                            $data['phrases'],
+                            (string) ($historyRequest['listWords'] ?? '')
+                        );
+                    }
+                } else {
+                    self::enrichPhrasesHybridMetrics($data);
+                }
+            } elseif (!empty($data['phrases']) && is_array($data['phrases'])) {
+                self::enrichPhrasesHybridMetrics($data);
+            }
+
+            if (empty($data['cleaning'])) {
+                self::enrichUnigramHybridMetrics($data);
+                self::applyHybridTfCloudsFromUnigram($data);
+                self::applyHybridTfCompCloudsFromUnigram($data);
+                if (is_array($historyRequest)) {
+                    $excludeLookup = self::excludedWordsLookup($historyRequest);
+                    if ($excludeLookup && !empty($data['tf_comp_clouds']) && is_array($data['tf_comp_clouds'])) {
+                        foreach ($data['tf_comp_clouds'] as $site => $cloud) {
+                            $data['tf_comp_clouds'][$site] = self::filterCloudPayload($cloud, $excludeLookup);
+                        }
+                    }
+                }
+            }
+
             return $data;
+    }
+
+    public static function enrichPhrasesHybridMetrics(array &$data): void
+    {
+        if (empty($data['phrases']) || !is_array($data['phrases'])) {
+            return;
+        }
+
+        RelevancePhraseNgrams::configureLemmaContext($data['unigram_table'] ?? null);
+
+        try {
+            self::enrichPhrasesHybridMetricsWithLemmaContext($data);
+        } finally {
+            RelevancePhraseNgrams::resetLemmaContext();
+        }
+    }
+
+    private static function enrichPhrasesHybridMetricsWithLemmaContext(array &$data): void
+    {
+        $corpusZones = HybridRelevanceMetrics::corpusZoneStatsFromData($data);
+
+        foreach ($data['phrases'] as &$phrase) {
+            if (!is_array($phrase)) {
+                continue;
+            }
+
+            HybridRelevanceMetrics::applyTableTfidfToWordStats($phrase, $corpusZones);
+            HybridRelevanceMetrics::applyTableBm25ToWordStats($phrase, $corpusZones);
+        }
+        unset($phrase);
+
+        $data['phrases'] = RelevancePhraseNgrams::filterQualityPhrases(
+            $data['phrases'],
+            $data['unigram_table'] ?? null
+        );
+        $data['phrases'] = RelevancePhraseNgrams::deduplicatePermutedPhrases($data['phrases']);
+        $data['phrases'] = RelevancePhraseNgrams::deduplicateOverlappingPhrases($data['phrases']);
+
+        $data['phrases'] = collect($data['phrases'])
+            ->sortByDesc(static function (array $row, string $phrase) {
+                return [
+                    (float) ($row['tfidfTop'] ?? $row['score'] ?? 0),
+                    (float) ($row['bm25Top'] ?? 0),
+                    RelevancePhraseNgrams::phraseLengthScore(RelevancePhraseNgrams::phraseTokens($phrase)),
+                    (int) ($row['numberOccurrences'] ?? 0),
+                ];
+            })
+            ->take(600)
+            ->all();
+    }
+
+    /**
+     * @param array<string, array<string, mixed>>|null $phrases
+     */
+    public static function shouldRebuildStoredPhrases(?array $phrases): bool
+    {
+        if (!is_array($phrases) || $phrases === []) {
+            return true;
+        }
+
+        if (count($phrases) > 600) {
+            return true;
+        }
+
+        $singleSite = 0;
+        $total = 0;
+        foreach ($phrases as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $total++;
+            if ((int) ($row['numberOccurrences'] ?? 0) < 2) {
+                $singleSite++;
+            }
+        }
+
+        if ($total > 0 && $singleSite > (int) floor($total / 2)) {
+            return true;
+        }
+
+        foreach ($phrases as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            return !isset($row['tfidfTop']);
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $sites
+     * @return array<string, mixed>
+     */
+    public static function mainPageFromSites(array $sites): array
+    {
+        foreach ($sites as $page) {
+            if (!empty($page['mainPage']) && is_array($page)) {
+                return $page;
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Пересчёт IDF/score для сохранённых результатов (fix: countNotIgnoredSites был 0 при первичном расчёте).
+     */
+    public static function recalculateStoredTfidf(array &$data): void
+    {
+        if (empty($data['sites']) || !is_array($data['sites'])) {
+            return;
+        }
+
+        $documentCount = self::competitorDocumentCountFromSites($data['sites']);
+
+        if (!empty($data['unigram_table']) && is_array($data['unigram_table'])) {
+            foreach ($data['unigram_table'] as &$wordForm) {
+                foreach ($wordForm as $wordKey => &$word) {
+                    if ($wordKey === 'total' || !is_array($word)) {
+                        continue;
+                    }
+
+                    $documentFrequency = max(1, (int) ($word['numberOccurrences'] ?? 1));
+                    $tf = (float) ($word['tf'] ?? 0);
+                    $word['idf'] = TfidfMetrics::inverseDocumentFrequency($documentCount, $documentFrequency);
+                    $word['score'] = TfidfMetrics::score($tf, $word['idf']);
+                }
+                unset($word);
+
+                if (!isset($wordForm['total']) || !is_array($wordForm['total'])) {
+                    continue;
+                }
+
+                $documentFrequency = max(1, (int) count($wordForm['total']['occurrences'] ?? []));
+                $tf = (float) ($wordForm['total']['tf'] ?? 0);
+                $wordForm['total']['numberOccurrences'] = $documentFrequency;
+                $wordForm['total']['idf'] = TfidfMetrics::inverseDocumentFrequency($documentCount, $documentFrequency);
+                $wordForm['total']['score'] = TfidfMetrics::score($tf, $wordForm['total']['idf']);
+            }
+            unset($wordForm);
+        }
+
+        if (!empty($data['phrases']) && is_array($data['phrases'])) {
+            foreach ($data['phrases'] as &$phrase) {
+                if (!is_array($phrase)) {
+                    continue;
+                }
+
+                $documentFrequency = max(1, (int) ($phrase['numberOccurrences'] ?? 1));
+                $tf = (float) ($phrase['tf'] ?? 0);
+                $phrase['idf'] = TfidfMetrics::inverseDocumentFrequency($documentCount, $documentFrequency);
+                $phrase['score'] = TfidfMetrics::score($tf, $phrase['idf']);
+            }
+            unset($phrase);
+        }
+    }
+
+    public static function enrichUnigramHybridMetrics(array &$data): void
+    {
+        if (empty($data['unigram_table']) || !is_array($data['unigram_table'])) {
+            return;
+        }
+
+        $corpusZones = HybridRelevanceMetrics::corpusZoneStatsFromData($data);
+
+        foreach ($data['unigram_table'] as &$wordForm) {
+            foreach ($wordForm as $wordKey => &$word) {
+                if ($wordKey === 'total' || !is_array($word)) {
+                    continue;
+                }
+
+                HybridRelevanceMetrics::applyTableTfidfToWordStats($word, $corpusZones);
+                HybridRelevanceMetrics::applyTableBm25ToWordStats($word, $corpusZones);
+            }
+            unset($word);
+
+            if (!isset($wordForm['total']) || !is_array($wordForm['total'])) {
+                continue;
+            }
+
+            HybridRelevanceMetrics::applyTableTfidfToWordStats($wordForm['total'], $corpusZones);
+            HybridRelevanceMetrics::applyTableBm25ToWordStats($wordForm['total'], $corpusZones);
+        }
+        unset($wordForm);
+    }
+
+    private function hybridCorpusStats(): array
+    {
+        return $this->hybridCorpusZoneStats();
+    }
+
+    private function hybridCorpusZoneStats(): array
+    {
+        $mainPageText = trim(($this->mainPage['html'] ?? '') . ' ' . ($this->mainPage['hiddenText'] ?? ''));
+        $mainPageLink = trim(strip_tags($this->mainPage['linkText'] ?? ''));
+
+        return [
+            'mainPageWords' => max(1, (int) $this->countWordsInMyPage),
+            'mainPageTextWords' => max(1, HybridRelevanceMetrics::countWordsInText($mainPageText)),
+            'mainPageLinkWords' => max(1, HybridRelevanceMetrics::countWordsInText($mainPageLink)),
+            'competitorCorpusWords' => max(1, HybridRelevanceMetrics::countWordsInText(trim($this->competitorsTextAndLinks))),
+            'competitorTextWords' => max(1, HybridRelevanceMetrics::countWordsInText(trim($this->competitorsText ?? ''))),
+            'competitorLinkWords' => max(1, HybridRelevanceMetrics::countWordsInText(trim($this->competitorsLinks ?? ''))),
+            'avgCompetitorDocWords' => $this->countWords / max(1, $this->competitorDocumentCount()),
+            'documentCount' => $this->competitorDocumentCount(),
+            'competitorSiteCount' => max(1, $this->competitorDocumentCount()),
+        ];
+    }
+
+    public static function competitorDocumentCountFromSites(array $sites): int
+    {
+        $count = 0;
+        foreach ($sites as $site) {
+            if (!empty($site['ignored']) || !empty($site['mainPage'])) {
+                continue;
+            }
+            $count++;
+        }
+
+        return max(1, $count);
+    }
+
+    private function competitorDocumentCount(): int
+    {
+        return self::competitorDocumentCountFromSites($this->sites);
+    }
+
+    /**
+     * Части ответа /get-details-history — чтобы не парсить 3+ MB JSON одним куском в браузере.
+     */
+    public static function historyDetailsPart(array $data, string $part): array
+    {
+        switch ($part) {
+            case 'meta':
+                return [
+                    'history_id' => $data['history_id'] ?? null,
+                    'cleaning' => $data['cleaning'] ?? false,
+                    'avg' => $data['avg'] ?? null,
+                    'main_page' => $data['main_page'] ?? null,
+                    'recommendations' => $data['recommendations'] ?? [],
+                    'average_values' => $data['average_values'] ?? null,
+                    'avg_coverage_percent' => $data['avg_coverage_percent'] ?? null,
+                ];
+            case 'sites':
+                return [
+                    'sites' => $data['sites'] ?? [],
+                ];
+            case 'tables':
+                return [
+                    'unigram_table' => $data['unigram_table'] ?? [],
+                    'phrases' => $data['phrases'] ?? [],
+                    'clouds_competitors' => $data['clouds_competitors'] ?? null,
+                    'clouds_main_page' => $data['clouds_main_page'] ?? null,
+                    'tf_comp_clouds' => $data['tf_comp_clouds'] ?? null,
+                ];
+            default:
+                return $data;
         }
     }
 

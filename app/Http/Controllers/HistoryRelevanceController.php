@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 use Throwable;
@@ -249,6 +250,10 @@ class HistoryRelevanceController extends Controller
 
     public function getDetailsInfo(Request $request): JsonResponse
     {
+        $part = (string) $request->input('part', 'full');
+        $projectId = (int) $request->input('id');
+        $started = microtime(true);
+
         try {
             $history = RelevanceHistoryResult::where('project_id', '=', $request->id)->latest('updated_at')->first();
 
@@ -280,19 +285,41 @@ class HistoryRelevanceController extends Controller
                 $history = RelevanceHistoryResult::where('project_id', '=', $request->id)->latest('updated_at')->first();
             }
             $history = Relevance::uncompress($history);
+            $history = Relevance::historyDetailsPart($history, $part);
 
         } catch (Throwable $exception) {
+            Log::warning('relevance.details.failed', [
+                'part' => $part,
+                'project_id' => $projectId,
+                'ms' => (int) round((microtime(true) - $started) * 1000),
+                'error' => $exception->getMessage(),
+            ]);
+
             return response()->json([
                 'code' => 415,
                 'message' => __('The data was lost')
             ]);
         }
 
-        return response()->json([
+        $response = [
             'code' => 200,
             'history' => $history,
-            'config' => RelevanceAnalysisConfig::first(),
+        ];
+
+        if ($part === 'full' || $part === 'meta') {
+            $response['config'] = RelevanceAnalysisConfig::first();
+        }
+
+        $encoded = json_encode($response);
+        Log::info('relevance.details', [
+            'part' => $part,
+            'project_id' => $projectId,
+            'ms' => (int) round((microtime(true) - $started) * 1000),
+            'bytes' => is_string($encoded) ? strlen($encoded) : null,
+            'history_keys' => isset($history) && is_array($history) ? array_keys($history) : null,
         ]);
+
+        return response()->json($response);
     }
 
     public function editComment(Request $request): JsonResponse

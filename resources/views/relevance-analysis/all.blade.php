@@ -43,6 +43,10 @@
             .row {
                 margin: 0 !important;
             }
+
+            #statistics_table td:first-child {
+                width: 75%;
+            }
         </style>
     @endslot
 
@@ -101,61 +105,61 @@
                                    class="table table-bordered table-hover dataTable dtr-inline mb-5">
                                 <tbody>
                                 <tr>
-                                    <td class="col-10">
+                                    <td>
                                         <b>{{ __('Number of checks for the current day') }}</b>
                                     </td>
                                     <td> {{ $statistics['toDay']['count_checks'] ?? 0 }} </td>
                                 </tr>
                                 <tr>
-                                    <td class="col-10">
+                                    <td>
                                         <b>{{ __('Number of checks for the current month') }}</b>
                                     </td>
                                     <td> {{ $statistics['month']}} </td>
                                 </tr>
                                 <tr>
-                                    <td class="col-10">
+                                    <td>
                                         <b>{{ __('Number of errors for the current day') }}</b>
                                     </td>
                                     <td> {{ $statistics['toDay']['count_fails'] ?? 0 }} </td>
                                 </tr>
                                 <tr>
-                                    <td class="col-10">
+                                    <td>
                                         <b>{{ __('Number of projects') }}</b>
                                     </td>
                                     <td> {{ $statistics['countProjects']}} </td>
                                 </tr>
                                 <tr>
-                                    <td class="col-10">
+                                    <td>
                                         <b>{{ __('Number of saved scan results') }}</b>
                                     </td>
                                     <td> {{ $statistics['countSavedResults']}} </td>
                                 </tr>
                                 <tr>
-                                    <td class="col-10">
+                                    <td>
                                         <b>{{ __('Number of unique landing pages') }}</b>
                                     </td>
                                     <td> {{ $statistics['pages'] }} </td>
                                 </tr>
                                 <tr>
-                                    <td class="col-10">
+                                    <td>
                                         <b>{{ __('Number of unique landing domains') }}</b>
                                     </td>
                                     <td> {{ $statistics['domains'] }} </td>
                                 </tr>
                                 <tr>
-                                    <td class="col-10">
+                                    <td>
                                         <b>{{ __('Total number of unique analyzed domains') }}</b>
                                     </td>
                                     <td> {{ $statistics['allDomains'] }} </td>
                                 </tr>
                                 <tr>
-                                    <td class="col-10">
+                                    <td>
                                         <b>{{ __('Total number of unique analyzed sites') }}</b>
                                     </td>
                                     <td> {{ $statistics['allPages'] }} </td>
                                 </tr>
                                 <tr>
-                                    <td class="col-10">
+                                    <td>
                                         <b>{{ __('Number of tasks in the queue') }}</b>
                                     </td>
                                     <td id="countJobs"> {{ $statistics['countJobs'] }} </td>
@@ -332,11 +336,12 @@
                                             <div id="key-phrase">
 
                                                 <div class="form-group required">
-                                                    <label>{{ __('Top 10/20') }}</label>
+                                                    <label>{{ __('Top 10/20/30') }}</label>
                                                     <select name="count" id="count"
                                                             class="form-select rounded-0 count">
                                                         <option value="10">10</option>
                                                         <option value="20">20</option>
+                                                        <option value="30">30</option>
                                                     </select>
 
                                                 </div>
@@ -633,6 +638,8 @@
                     pageLength: 10,
                     processing: true,
                     serverSide: true,
+                    scrollX: true,
+                    autoWidth: false,
                     ajax: "{{ route('get.all.relevance.projects') }}",
                     columns: columns,
                     order: [[8, 'desc']],
@@ -644,7 +651,16 @@
                         {
                             type: "num",
                             targets: [3, 4, 5]
-                        }
+                        },
+                        { width: '14%', targets: 0 },
+                        { width: '10%', targets: 1 },
+                        { width: '14%', targets: 2 },
+                        { width: '8%', targets: 3 },
+                        { width: '8%', targets: 4 },
+                        { width: '7%', targets: 5 },
+                        { width: '7%', targets: 6 },
+                        { width: '18%', targets: 7 },
+                        { width: '14%', targets: 8 },
                     ],
                     language: {
                         paginate: {
@@ -660,7 +676,11 @@
                         "sEmptyTable": words.noRecords,
                         "sInfo": words.showing + " " + words.from + "  _START_ " + words.to + " _END_ " + words.of + " _TOTAL_ " + words.entries,
                     },
+                    initComplete: function () {
+                        this.api().columns.adjust()
+                    },
                     drawCallback: function () {
+                        this.api().columns.adjust()
                         let api = this.api();
                         let currentPageData = api.rows({page: 'current'}).data();
                         let newModals = ''
@@ -1335,6 +1355,12 @@
                 });
             });
 
+            $(window).on('resize.relevanceAllProjects', function () {
+                if ($.fn.DataTable.fnIsDataTable($('#users_projects'))) {
+                    $('#users_projects').DataTable().columns.adjust()
+                }
+            })
+
             function getRegionName(id) {
                 switch (id) {
                     case '1' :
@@ -1537,11 +1563,13 @@
                 {
                     name: 'count_sites',
                     data: function (row) {
-                        return '<span class="count-sites-' + row.id + '">' + row.count_sites + '</span>' +
+                        return '<span class="count-sites-cell">' +
+                            '<span class="count-sites-' + row.id + '">' + row.count_sites + '</span>' +
                             '<i class="fa fa-repeat" style="opacity: 0.6; cursor: pointer"' +
                             '   data-bs-target="#repeatUniqueScan' + row.id + '"' +
                             '   data-bs-toggle="modal" data-bs-placement="top"' +
-                            '   title="{{ __('restart analyzed pages') }}"></i>'
+                            '   title="{{ __('restart analyzed pages') }}"></i>' +
+                            '</span>'
                     },
 
                 },
@@ -1570,10 +1598,10 @@
                                 '    </div>' +
                                 '</div>'
                         } else {
-                            return '<div class="btn-group">' +
-                                '     <button class="btn btn-secondary" data-bs-target="#startThroughScan' + row.id + '"' +
+                            return '<div class="though-cell btn-group">' +
+                                '     <button type="button" class="btn btn-secondary" data-bs-target="#startThroughScan' + row.id + '"' +
                                 '             data-bs-toggle="modal"' +
-                                '             data-bs-placement="top" class="btn btn-secondary">' +
+                                '             data-bs-placement="top">' +
                                 '         {{ __('End-to-end analysis') }}' +
                                 '     </button>' +
                                 '     <button type="button" class="btn btn-secondary">' +

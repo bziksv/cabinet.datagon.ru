@@ -418,6 +418,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/monitoring/offset-positions', 'MonitoringOffsetPositions@offset')->name('offset.positions');
 
     // Monitoring keywords occurrence
+    Route::get('/monitoring/{id}/occurrence/estimate', 'MonitoringOccurrenceController@estimate');
+    Route::post('/monitoring/occurrence/estimate/keys', 'MonitoringOccurrenceController@estimateKeys');
     Route::post('/monitoring/occurrence', 'MonitoringOccurrenceController@update');
     Route::post('/monitoring/occurrence/keys', 'MonitoringOccurrenceController@updateKeys');
 

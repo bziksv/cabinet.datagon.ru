@@ -86,8 +86,9 @@ abstract class Positions
 
             $positions = $results['response']['results']['grouping']['group'];
 
-            if ($this->save)
-                $this->store($positions);
+            if ($this->save) {
+                $this->storePositions($positions);
+            }
 
             $position = array_filter($positions, function ($var) use ($site) {
                 $domain = parse_url($var['doc']['url']);
@@ -106,10 +107,11 @@ abstract class Positions
             throw new ErrorXmlPositionResponseException($results['response']['error']);
     }
 
-    private function store($positions)
+    protected function storePositions(array $positions, int $positionOffset = 0)
     {
-        if (!count($positions))
+        if (!count($positions)) {
             return null;
+        }
 
         $create = [];
 
@@ -122,18 +124,19 @@ abstract class Positions
             $url = $position['doc']['url'] ?? null;
             $title = $position['doc']['title'] ?? null;
             $passages = $position['doc']['passages'] ?? null;
-            if (isset($passages['passage']))
+            if (isset($passages['passage'])) {
                 $snippet = (is_array($passages['passage'])) ? implode(', ', $passages['passage']) : $passages['passage'];
-            else
+            } else {
                 $snippet = null;
+            }
 
-            $index = $index + 1;
+            $rank = $positionOffset + $index + 1;
 
-            $create[$index] = [
+            $create[$rank] = [
                 'source' => $source,
                 'lr' => $lr,
                 'url' => $url,
-                'position' => $index,
+                'position' => $rank,
                 'title' => $title,
                 'snippet' => $snippet,
                 'query' => $query,
@@ -145,7 +148,7 @@ abstract class Positions
         SearchIndex::insert($create);
     }
 
-    private function domainFilter($domain)
+    protected function domainFilter($domain)
     {
         return str_replace(['www.'], '', strtolower($domain));
     }

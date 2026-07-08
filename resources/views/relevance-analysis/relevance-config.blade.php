@@ -81,6 +81,7 @@
                                                     $config->count_sites => $config->count_sites,
                                                     '10' => 10,
                                                     '20' => 20,
+                                                    '30' => 30,
                                                     ]), null, ['class' => 'form-select rounded-0']) !!}
                                         </div>
 

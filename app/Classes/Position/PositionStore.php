@@ -4,9 +4,11 @@
 namespace App\Classes\Position;
 
 
+use App\Classes\Monitoring\MonitoringGoogleDepth;
 use App\Classes\Position\Engine\Google;
 use App\Classes\Position\Engine\Yandex;
 use App\MonitoringKeyword;
+use App\MonitoringSearchengine;
 use Illuminate\Support\Arr;
 
 class PositionStore
@@ -18,7 +20,7 @@ class PositionStore
         $this->save = $saveAllResultIndexes;
     }
 
-    public function saveByQuery(MonitoringKeyword $model, $engine = null)
+    public function saveByQuery(MonitoringKeyword $model, $engine = null, ?int $googleDepthOverride = null)
     {
         $query = $model->query;
         $project = $model->project;
@@ -27,11 +29,11 @@ class PositionStore
 
         foreach ($engines as $engine){
 
-            $response = $this->getEngine($engine->engine, [
+            $response = $this->getEngine($engine, [
                 'domain' => $project->url,
                 'query' => $query,
                 'lr' => $engine->lr,
-            ])->handle();
+            ], $googleDepthOverride)->handle();
 
             $this->save($model, [
                 'monitoring_searchengine_id' => $engine->id,
@@ -48,18 +50,19 @@ class PositionStore
         $model->positions()->create($params);
     }
 
-    private function getEngine($name, $params = [])
+    private function getEngine(MonitoringSearchengine $engine, $params = [], ?int $googleDepthOverride = null)
     {
-        if (!Arr::has($params, ['domain', 'query', 'lr']))
+        if (!Arr::has($params, ['domain', 'query', 'lr'])) {
             throw new \ErrorException('Params domain, query and lr is required.');
+        }
 
-        switch ($name) {
-            case "yandex":
+        switch ($engine->engine) {
+            case 'yandex':
                 return new Yandex($params['domain'], $params['query'], $params['lr'], $this->save);
-                break;
-            case "google":
-                return new Google($params['domain'], $params['query'], $params['lr'], $this->save);
-                break;
+            case 'google':
+                $depth = $googleDepthOverride ?? $engine->google_depth ?? MonitoringGoogleDepth::MIN;
+                return (new Google($params['domain'], $params['query'], $params['lr'], $this->save))
+                    ->setGoogleDepth((int) $depth);
             default:
                 throw new \ErrorException('Search engine not exist.');
         }

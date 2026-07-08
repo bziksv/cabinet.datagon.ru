@@ -14,6 +14,72 @@
     let projectId = null;
     let projectSaving = false;
     let projectSavedSnapshot = null;
+    let pendingRegionSaves = [];
+    let regionsStepLoading = false;
+    let skipRegionsStepValidation = false;
+
+    function trackRegionSave(promise) {
+        pendingRegionSaves.push(promise);
+        return promise.finally(function () {
+            pendingRegionSaves = pendingRegionSaves.filter(function (item) {
+                return item !== promise;
+            });
+        });
+    }
+
+    function flushPendingRegionSaves() {
+        if (!pendingRegionSaves.length) {
+            return Promise.resolve();
+        }
+        return Promise.all(pendingRegionSaves);
+    }
+
+    function selectedRegionValues($select) {
+        const val = $select.val();
+        if (Array.isArray(val)) {
+            return val;
+        }
+        if (val === null || val === undefined || val === '') {
+            return [];
+        }
+        return [val];
+    }
+
+    function hasSelectedRegions() {
+        let found = false;
+        $(REGIONS_CLASS).each(function () {
+            if (selectedRegionValues($(this)).length > 0) {
+                found = true;
+            }
+        });
+        return found;
+    }
+
+    function persistSelectedRegions(id) {
+        const jobs = [];
+        $(REGIONS_CLASS).each(function () {
+            const $select = $(this);
+            const engine = $select.data('search');
+            selectedRegionValues($select).forEach(function (lr) {
+                jobs.push(
+                    window.axios.post(cfg.urls.regions, {
+                        action: 'create',
+                        id: id,
+                        engine: engine,
+                        lr: lr,
+                        google_depth:
+                            engine === 'google'
+                                ? parseInt($('#cabinet-mon-create-google-depth').val(), 10) || 10
+                                : undefined,
+                    })
+                );
+            });
+        });
+        if (!jobs.length) {
+            return Promise.reject(new Error(cfg.i18n.needRegions || 'Выберите хотя бы один регион'));
+        }
+        return Promise.all(jobs);
+    }
 
     function setWizardBusy(busy) {
         const $next = $('.cabinet-mon-create__btn-next');
@@ -154,7 +220,10 @@
         setContent: function (data) {
             const template = $('<div />');
             $.each(data, function (i, item) {
-                const label = item.name + ' [' + item.lr + ']';
+                let label = item.name + ' [' + item.lr + ']';
+                if (item.engine === 'google' && item.google_depth) {
+                    label += ' — ТОП-' + item.google_depth;
+                }
                 const inputData = {
                     id: item.id,
                     val: {
@@ -397,28 +466,68 @@
             return true;
         },
         regions: function (event) {
+            if (skipRegionsStepValidation) {
+                skipRegionsStepValidation = false;
+                return true;
+            }
             const id = getProjectId();
             if (!id) {
                 event.preventDefault();
                 showError(cfg.i18n.needProject || 'Сначала сохраните проект');
                 return false;
             }
-            if (!$(REGIONS_CLASS).find('option').length) {
+            if (!hasSelectedRegions()) {
                 event.preventDefault();
                 showError(cfg.i18n.needRegions || 'Выберите хотя бы один регион');
                 return false;
             }
-            window.axios
-                .post(cfg.urls.regions, { action: 'get', id: id })
+            if (regionsStepLoading) {
+                event.preventDefault();
+                return false;
+            }
+
+            event.preventDefault();
+            regionsStepLoading = true;
+            setWizardBusy(true);
+
+            flushPendingRegionSaves()
+                .then(function () {
+                    return persistSelectedRegions(id);
+                })
+                .then(function () {
+                    return window.axios.post(cfg.urls.regions, { action: 'get', id: id });
+                })
                 .then(function (response) {
                     const data = { google: [], yandex: [] };
-                    $.each(response.data, function (i, item) {
-                        data[item.engine].push(item);
+                    $.each(response.data || [], function (i, item) {
+                        if (data[item.engine]) {
+                            data[item.engine].push(item);
+                        }
                     });
+                    if (!data.google.length && !data.yandex.length) {
+                        throw new Error(cfg.i18n.needRegions || 'Выберите хотя бы один регион');
+                    }
                     Modes.setData(data).render();
                     $('#mode-scan').trigger('change');
+                    regionsStepLoading = false;
+                    setWizardBusy(false);
+                    if (stepper) {
+                        skipRegionsStepValidation = true;
+                        stepper.next();
+                    }
+                })
+                .catch(function (err) {
+                    regionsStepLoading = false;
+                    setWizardBusy(false);
+                    const msg =
+                        (err.response && err.response.data && err.response.data.message) ||
+                        err.message ||
+                        cfg.i18n.regionLoadError ||
+                        'Не удалось сохранить регионы';
+                    showError(msg);
                 });
-            return true;
+
+            return false;
         },
         scan: function () {
             if (cfg.onFreeTariff) {
@@ -695,17 +804,38 @@
 
         $(REGIONS_CLASS).on('select2:select', function (e) {
             const id = getProjectId();
+            const $select = $(this);
+            const data = e.params.data;
             if (!id) {
                 showError(cfg.i18n.needProject || 'Сначала сохраните проект');
+                const current = selectedRegionValues($select);
+                $select.val(current.filter(function (val) {
+                    return String(val) !== String(data.id);
+                })).trigger('change');
                 return;
             }
-            const data = e.params.data;
-            window.axios.post(cfg.urls.regions, {
-                action: 'create',
-                id: id,
-                engine: data.source,
-                lr: data.id,
-            });
+            trackRegionSave(
+                window.axios.post(cfg.urls.regions, {
+                    action: 'create',
+                    id: id,
+                    engine: data.source || $select.data('search'),
+                    lr: data.id,
+                    google_depth: (data.source || $select.data('search')) === 'google'
+                        ? parseInt($('#cabinet-mon-create-google-depth').val(), 10) || 10
+                        : undefined,
+                }).catch(function (err) {
+                    const current = selectedRegionValues($select);
+                    $select.val(current.filter(function (val) {
+                        return String(val) !== String(data.id);
+                    })).trigger('change');
+                    const msg =
+                        (err.response && err.response.data && err.response.data.message) ||
+                        cfg.i18n.regionLoadError ||
+                        'Не удалось добавить регион';
+                    showError(msg);
+                    throw err;
+                })
+            );
         });
 
         $(REGIONS_CLASS).on('select2:unselect', function (e) {
@@ -714,12 +844,22 @@
                 return;
             }
             const data = e.params.data;
-            window.axios.post(cfg.urls.regions, {
-                action: 'remove',
-                id: id,
-                engine: data.source || $(e.params.data.element).parent().data('search'),
-                lr: data.id,
-            });
+            const $select = $(this);
+            trackRegionSave(
+                window.axios.post(cfg.urls.regions, {
+                    action: 'remove',
+                    id: id,
+                    engine: data.source || $select.data('search'),
+                    lr: data.id,
+                }).catch(function (err) {
+                    const msg =
+                        (err.response && err.response.data && err.response.data.message) ||
+                        cfg.i18n.regionLoadError ||
+                        'Не удалось удалить регион';
+                    showError(msg);
+                    throw err;
+                })
+            );
             $(data.element).remove();
         });
     }

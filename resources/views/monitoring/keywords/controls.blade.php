@@ -73,11 +73,11 @@
                 <span class="cabinet-mon-keywords-toolbar__action-group-label">{{ __('Monitoring toolbar label occurrence') }}</span>
                 <div class="btn-group occurrence-controls" role="group" aria-label="{{ __('Monitoring toolbar label occurrence') }}">
                     @can('update_occurrence_monitoring')
-                        <button type="button" class="btn btn-default btn-sm parse-occurrence-all tooltip-on" title="{{ __('Monitoring occurrence all keys') }}">
-                            <i class="fas fa-chart-line"></i>
-                        </button>
                         <button type="button" class="btn btn-default btn-sm parse-occurrence-keys tooltip-on" title="{{ __('Monitoring occurrence selected keys') }}">
                             <i class="fas fa-chart-bar"></i>
+                        </button>
+                        <button type="button" class="btn btn-default btn-sm parse-occurrence-all tooltip-on" title="{{ __('Monitoring occurrence all keys') }}">
+                            <i class="fas fa-chart-line"></i>
                         </button>
                     @endcan
                 </div>

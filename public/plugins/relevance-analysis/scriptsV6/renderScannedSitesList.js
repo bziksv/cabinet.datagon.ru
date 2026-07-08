@@ -50,19 +50,19 @@ function renderScannedSitesList(words, sites, avgCoveragePercent, count, hide, b
         }
 
         if (value['danger']) {
-            warning = "<td class='bg-warning'>" +
+            warning = "<td class='scanned-sites-result bg-warning'>" +
                 " <span data-scroll='#ignoredDomains' class='scroll-to-ignored-list pointer'>" + words.notGetData + "</span>"
                 + ignorBlock +
                 "</td>";
         } else {
-            warning = "<td>" +
-                " <span data-scroll='#ignoredDomains' class='scroll-to-ignored-list pointer'> "
+            warning = "<td class='scanned-sites-result'>" +
+                " <span data-scroll='#ignoredDomains' class='scroll-to-ignored-list pointer scanned-sites-result__text'> "
                 + words.successAnalyse +
                 " </span>"
                 + ignorBlock
 
             if (id !== null) {
-                warning += "<a class='btn btn-sm btn-success' href='/relevance/show-detail-html/" + encodeURIComponent(value['site'].replace(/\//g, 'splittedSlashe')) + "/" + id + "/" + search + "' target='_blank'>Просмотр html</a>"
+                warning += "<a class='btn btn-sm btn-success scanned-sites-result__btn' href='/relevance/show-detail-html/" + encodeURIComponent(value['site'].replace(/\//g, 'splittedSlashe')) + "/" + id + "/" + search + "' target='_blank'>Просмотр html</a>"
             }
 
             warning += "</td>"
@@ -84,33 +84,33 @@ function renderScannedSitesList(words, sites, avgCoveragePercent, count, hide, b
         var position
 
         if (!value['position']) {
-            position = "<td data-order='100'>" + words.notTop + "</td>"
+            position = "<td class='scanned-sites-pos' data-order='100'>" + words.notTop + "</td>"
 
         } else {
-            position = "<td data-order='" + value['position'] + "'> " + value['position'] + " </td>"
+            position = "<td class='scanned-sites-pos' data-order='" + value['position'] + "'> " + value['position'] + " </td>"
         }
 
         rows += "<tr class='render" + ignorClass + "'>"
         rows += position
-        rows += "<td data-target='" + iterator + "' style='max-width: 450px;' class='" + className + "'>"
-        rows += "<span class='analyzed-site' id='site-" + value['position'] + "'>" + value['site'] + "</span>"
+        rows += "<td data-target='" + iterator + "' class='scanned-sites-domain " + className + "'>"
+        rows += "<span class='analyzed-site scanned-sites-domain__url' id='site-" + value['position'] + "' title='" + value['site'].replace(/'/g, '&#39;') + "'>" + value['site'] + "</span>"
         rows += noTop + btnGroup
         rows += "</td>"
         if (color) {
-            rows += "<td style='background-color:" + getColor(value.mainPoints, avg.points) + "' data-target='" + value['mainPoints'] + "'>" + value['mainPoints'] + " </td>"
-            rows += "<td style='background-color:" + getColor(value.coverage, avg.coverage) + "' data-target='" + value['coverage'] + "'>" + value['coverage'] + "% </td>"
-            rows += "<td style='background-color:" + getColor(value.coverageTf, avg.coverageTf) + "' data-target='" + value['coverageTf'] + "'>" + value['coverageTf'] + "% </td>"
-            rows += "<td style='background-color:" + getColor(value.width, avg.width) + "' data-target='" + value.width + "'>" + value.width + "</td>"
-            rows += "<td style='background-color:" + getColor(value.density.densityMainPercent, avg.densityPercent) + "' data-target='" + value['density']['densityMainPercent'] + "'>" + value['density']['densityMainPercent'] + "</td>"
+            rows += "<td class='scanned-sites-metric' style='background-color:" + getColor(value.mainPoints, avg.points) + "' data-target='" + value['mainPoints'] + "'>" + value['mainPoints'] + " </td>"
+            rows += "<td class='scanned-sites-metric' style='background-color:" + getColor(value.coverage, avg.coverage) + "' data-target='" + value['coverage'] + "'>" + value['coverage'] + "% </td>"
+            rows += "<td class='scanned-sites-metric' style='background-color:" + getColor(value.coverageTf, avg.coverageTf) + "' data-target='" + value['coverageTf'] + "'>" + value['coverageTf'] + "% </td>"
+            rows += "<td class='scanned-sites-metric' style='background-color:" + getColor(value.width, avg.width) + "' data-target='" + value.width + "'>" + value.width + "</td>"
+            rows += "<td class='scanned-sites-metric' style='background-color:" + getColor(value.density.densityMainPercent, avg.densityPercent) + "' data-target='" + value['density']['densityMainPercent'] + "'>" + value['density']['densityMainPercent'] + "</td>"
         } else {
-            rows += "<td data-target='" + value['mainPoints'] + "'>" + value['mainPoints'] + " </td>"
-            rows += "<td data-target='" + value['coverage'] + "'>" + value['coverage'] + "% </td>"
-            rows += "<td data-target='" + value['coverageTf'] + "'>" + value['coverageTf'] + "% </td>"
-            rows += "<td data-target='" + value.width + "'>" + value.width + "</td>"
-            rows += "<td data-target='" + value['density']['densityMainPercent'] + "'>" + value['density']['densityMainPercent'] + "</td>"
+            rows += "<td class='scanned-sites-metric' data-target='" + value['mainPoints'] + "'>" + value['mainPoints'] + " </td>"
+            rows += "<td class='scanned-sites-metric' data-target='" + value['coverage'] + "'>" + value['coverage'] + "% </td>"
+            rows += "<td class='scanned-sites-metric' data-target='" + value['coverageTf'] + "'>" + value['coverageTf'] + "% </td>"
+            rows += "<td class='scanned-sites-metric' data-target='" + value.width + "'>" + value.width + "</td>"
+            rows += "<td class='scanned-sites-metric' data-target='" + value['density']['densityMainPercent'] + "'>" + value['density']['densityMainPercent'] + "</td>"
         }
 
-        rows += "<td data-target='" + value['countSymbols'] + "'>" + value['countSymbols'] + "</td>"
+        rows += "<td class='scanned-sites-metric scanned-sites-chars' data-target='" + value['countSymbols'] + "'>" + value['countSymbols'] + "</td>"
         rows += warning
         rows += "</tr>"
 
@@ -119,32 +119,47 @@ function renderScannedSitesList(words, sites, avgCoveragePercent, count, hide, b
 
     $('#scanned-sites-tbody').html(rows)
 
-    $(document).ready(function () {
-        if ($.fn.DataTable.isDataTable('#scanned-sites')) {
-            $("#scanned-sites").dataTable().fnDestroy();
-        }
+    if ($.fn.DataTable.isDataTable('#scanned-sites')) {
+        $("#scanned-sites").dataTable().fnDestroy();
+    }
 
-        $('#scanned-sites').DataTable({
-            "order": [[0, "asc"]],
-            "pageLength": count,
-            "searching": true,
-            aoColumnDefs: [{
-                bSortable: false, aTargets: [8]
-            }],
-            dom: 'lBfrtip',
-            buttons: ['copy', 'csv', 'excel'],
-            language: {
-                paginate: {
-                    "first": "«", "last": "»", "next": "»", "previous": "«"
-                },
+    $('#scanned-sites').DataTable({
+        deferRender: true,
+        order: [[0, 'asc']],
+        pageLength: count,
+        searching: true,
+        orderCellsTop: false,
+        aoColumnDefs: [{
+            bSortable: false, aTargets: [8]
+        }],
+        dom: 'lBfrtip',
+        buttons: ['copy', 'csv', 'excel'],
+        language: {
+            paginate: {
+                first: '«', last: '»', next: '»', previous: '«'
             },
-            "oLanguage": {
-                "sSearch": words.search + ":",
-                "sLengthMenu": words.show + " _MENU_ " + words.records,
-                "sEmptyTable": words.noRecords,
-                "sInfo": words.showing + " " + words.from + "  _START_ " + words.to + " _END_ " + words.of + " _TOTAL_ " + words.entries,
-            }
-        });
+        },
+        oLanguage: {
+            sSearch: words.search + ':',
+            sLengthMenu: words.show + ' _MENU_ ' + words.records,
+            sEmptyTable: words.noRecords,
+            sInfo: words.showing + ' ' + words.from + '  _START_ ' + words.to + ' _END_ ' + words.of + ' _TOTAL_ ' + words.entries,
+        },
+        drawCallback: function () {
+            syncScannedSitesHeaderSticky()
+        },
+        initComplete: function () {
+            ensureScannedSitesTableScrollWrap()
+            renderScannedSitesRecommendationsRow(avg, words)
+            syncScannedSitesHeaderSticky()
+            window.requestAnimationFrame(function () {
+                syncScannedSitesHeaderSticky()
+            })
+            setTimeout(syncScannedSitesHeaderSticky, 100)
+        }
+    });
+
+    ensureScannedSitesTableScrollWrap()
 
         // $(document).on('click', '.show-detail-html', function () {
         //     let id = $(this).attr('data-id')
@@ -152,7 +167,6 @@ function renderScannedSitesList(words, sites, avgCoveragePercent, count, hide, b
         //
         //     window.location.href = '/relevance/show-detail-html/' + url + '/' + id
         // })
-    });
 
     setTimeout(() => {
         $('#scanned-sites_length').before("    <div class='d-flex'>" + "        <div class='__helper-link ui_tooltip_w'>" + "            <div class='custom-control custom-switch custom-switch-off-danger custom-switch-on-success'>" + "                <input type='checkbox'" + "                       class='custom-control-input'" + "                       id='showOrHideIgnoredSites'" + "                       name='noIndex'>" + "                <label class='custom-control-label' for='showOrHideIgnoredSites'></label>" + "            </div>" + "        </div>" + "        <p>" + words.hideDomains + "</p>" + "    </div>")
@@ -188,7 +202,10 @@ function renderScannedSitesList(words, sites, avgCoveragePercent, count, hide, b
         })
 
         if (avg !== null) {
-            $('#scanned-sites-row').after('<tr class="render">' + '    <th>-</th>' + '    <th>' + words.recommendations + '</th>' + '    <th>' + Number(avg.points).toFixed(2) + '</th>' + '    <th>' + Number(avg.coverage).toFixed(2) + '</th>' + '    <th>' + Number(avg.coverageTf).toFixed(2) + '</th>' + '    <th>' + Number(avg.width).toFixed(2) + '</th>' + '    <th>' + Number(avg.densityPercent).toFixed(2) + '</th>' + '    <th>' + Number(avg.countSymbols).toFixed(0) + '</th>' + '    <th>-</th>' + '</tr>')
+            renderScannedSitesRecommendationsRow(avg, words)
+        } else {
+            $('#scanned-sites-recommendations-row').remove()
+            syncScannedSitesHeaderSticky()
         }
 
     }, 2000)
@@ -290,4 +307,63 @@ function renderScannedSitesList(words, sites, avgCoveragePercent, count, hide, b
             });
         });
     }
+}
+
+function renderScannedSitesRecommendationsRow(avg, words) {
+    if (avg === null) {
+        $('#scanned-sites-recommendations-row').remove()
+        return
+    }
+
+    var $thead = $('#scanned-sites thead.scanned-sites-thead')
+    if (!$thead.length) {
+        return
+    }
+
+    var $recRow = $('#scanned-sites-recommendations-row')
+    if (!$recRow.length) {
+        $recRow = $('<tr class="scanned-sites-thead__recommendations" id="scanned-sites-recommendations-row"></tr>')
+        $thead.append($recRow)
+    }
+
+    $recRow.html(
+        '<th class="scanned-sites-th-pos">-</th>' +
+        '<th class="scanned-sites-th-domain">' + words.recommendations + '</th>' +
+        '<th class="scanned-sites-th-metric">' + Number(avg.points).toFixed(2) + '</th>' +
+        '<th class="scanned-sites-th-metric">' + Number(avg.coverage).toFixed(2) + '</th>' +
+        '<th class="scanned-sites-th-metric">' + Number(avg.coverageTf).toFixed(2) + '</th>' +
+        '<th class="scanned-sites-th-metric">' + Number(avg.width).toFixed(2) + '</th>' +
+        '<th class="scanned-sites-th-metric">' + Number(avg.densityPercent).toFixed(2) + '</th>' +
+        '<th class="scanned-sites-th-narrow">' + Number(avg.countSymbols).toFixed(0) + '</th>' +
+        '<th class="scanned-sites-th-result">-</th>'
+    )
+    syncScannedSitesHeaderSticky()
+}
+
+function ensureScannedSitesTableScrollWrap() {
+    var $table = $('#scanned-sites')
+    if (!$table.length || $table.parent().hasClass('relevance-tlp-table-scroll')) {
+        return
+    }
+
+    $table.wrap('<div class="relevance-tlp-table-scroll"></div>')
+}
+
+function syncScannedSitesHeaderSticky() {
+    var $titlesRow = $('#scanned-sites thead .scanned-sites-thead__titles')
+    var $recommendationsRow = $('#scanned-sites thead .scanned-sites-thead__recommendations')
+    var $scroll = $('#scanned-sites_wrapper .relevance-tlp-table-scroll')
+
+    if (!$titlesRow.length || !$scroll.length) {
+        return
+    }
+
+    var titlesHeight = $titlesRow.outerHeight() || 0
+    var recommendationsHeight = $recommendationsRow.length
+        ? ($recommendationsRow.outerHeight() || 0)
+        : 0
+
+    $scroll.css('--scanned-sites-titles-row-height', titlesHeight + 'px')
+    $scroll.css('--scanned-sites-recommendations-row-top', titlesHeight + 'px')
+    $scroll.css('--scanned-sites-body-row-top', (titlesHeight + recommendationsHeight) + 'px')
 }

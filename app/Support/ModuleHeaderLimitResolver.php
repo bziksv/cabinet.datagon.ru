@@ -47,6 +47,7 @@ class ModuleHeaderLimitResolver
         ['prefix' => 'utm-marks', 'code' => 'UTM'],
         ['prefix' => 'roi-calculator', 'code' => 'ROI'],
         ['prefix' => 'http-headers', 'code' => 'HttpHeaders'],
+        ['prefix' => 'index-check', 'code' => 'IndexCheck'],
     ];
 
     /** @var list<array{prefix: string, code: string}> */

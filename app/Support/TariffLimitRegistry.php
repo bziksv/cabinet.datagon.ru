@@ -139,6 +139,12 @@ class TariffLimitRegistry
                 'enforcement' => self::ENFORCEMENT_DISPLAY_ONLY,
             ],
             [
+                'code' => 'IndexCheck',
+                'module' => __('Index check'),
+                'hint' => __('Monthly index checks (2 units per URL per search engine).'),
+                'enforcement' => self::ENFORCEMENT_STRICT,
+            ],
+            [
                 'code' => 'GeneratorWords',
                 'module' => __('Keyword generator'),
                 'hint' => __('Shown on tariff page only; usage is not blocked in code.'),

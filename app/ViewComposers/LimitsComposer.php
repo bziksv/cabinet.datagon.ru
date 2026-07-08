@@ -210,6 +210,12 @@ class LimitsComposer
                     'position' => 21
                 ];
 
+            case 'IndexCheck':
+                return [
+                    'count' => \App\Support\IndexCheckLimits::usedForUser($user),
+                    'position' => 23,
+                ];
+
             case 'GeneratorWords':
                 return [
                     'count' => __('Restrictions are not tracked'),
@@ -270,6 +276,9 @@ class LimitsComposer
 
             case 'HttpHeaders':
                 return 15;
+
+            case 'IndexCheck':
+                return 24;
 
             case 'TextLength':
                 return 16;

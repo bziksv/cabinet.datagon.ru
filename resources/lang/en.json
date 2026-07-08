@@ -64,6 +64,7 @@
   "Mail notify site broken line": "Site :url sent an incorrect response",
   "Mail notify site broken status": "Status code: :code",
   "Mail notify site broken state unexpected": "State: unexpected response code",
+  "Mail notify site broken state": "State: :state",
   "Mail notify site broken uptime": "Uptime: :percent%",
   "Mail notify site repaired subject": "Domain restored notification",
   "Mail notify site repaired line": "Site :url is back online",

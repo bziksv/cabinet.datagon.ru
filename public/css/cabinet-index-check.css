@@ -1,0 +1,133 @@
+.cabinet-ic-page {
+    padding: 0 1rem 1.5rem;
+}
+
+.cabinet-ic-lead {
+    border: 1px solid #dee2e6;
+    border-radius: 0.75rem;
+    background: #f8fafc;
+}
+
+.cabinet-ic-lead__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.75rem;
+    background: #e7f1ff;
+    color: #0d6efd;
+    font-size: 1.25rem;
+}
+
+.cabinet-ic-step-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-right: 0.5rem;
+    border-radius: 999px;
+    background: #0d6efd;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.cabinet-ic-step-title {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0;
+}
+
+.cabinet-ic-panel .form-control,
+.cabinet-ic-panel .form-select {
+    font-size: 0.95rem;
+}
+
+.cabinet-ic-url-editor {
+    position: relative;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    background: var(--bs-body-bg);
+    overflow: hidden;
+}
+
+.cabinet-ic-url-highlight,
+.cabinet-ic-url-textarea {
+    margin: 0;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.cabinet-ic-url-highlight {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    border: 0;
+    color: transparent;
+    background: var(--bs-body-bg);
+}
+
+.cabinet-ic-url-highlight mark.cabinet-ic-url-dup {
+    color: transparent;
+    background: #fff3cd;
+    padding: 0;
+}
+
+.cabinet-ic-url-textarea {
+    position: relative;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    min-height: 12rem;
+    border: 0;
+    background: transparent;
+    resize: vertical;
+    box-shadow: none;
+}
+
+.cabinet-ic-url-textarea:focus {
+    box-shadow: none;
+}
+
+.cabinet-ic-url-textarea:disabled {
+    background: transparent;
+}
+
+.cabinet-ic-url-stats strong.text-warning {
+    font-weight: 600;
+}
+
+.cabinet-ic-results-table th {
+    white-space: nowrap;
+    font-size: 0.875rem;
+}
+
+.cabinet-ic-results-table td {
+    vertical-align: middle;
+}
+
+.cabinet-ic-confirm-modal__list li + li {
+    margin-top: 0.35rem;
+}
+
+.cabinet-ic-results-toolbar {
+    row-gap: 0.75rem;
+}
+
+.cabinet-ic-results-search {
+    width: 100%;
+    max-width: 20rem;
+}
+
+@media (max-width: 767.98px) {
+    .cabinet-ic-results-search {
+        max-width: none;
+    }
+}

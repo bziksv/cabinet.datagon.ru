@@ -25,11 +25,13 @@ requireComponent.keys().forEach(function (fileName) {
 
 import RemoveDuplicates from './components/pages/RemoveDuplicates';
 import ResponseHttpCode from './components/pages/ResponseHttpCode';
+import IndexCheckBulk from './components/pages/IndexCheckBulk';
 import MetaTags from './components/meta-tags/Index';
 import MetaTagsHistory from './components/meta-tags/History';
 
 Vue.component('remove-duplicates', RemoveDuplicates);
 Vue.component('response-http-code', ResponseHttpCode);
+Vue.component('index-check-bulk', IndexCheckBulk);
 Vue.component('meta-tags', MetaTags);
 Vue.component('meta-tags-history', MetaTagsHistory);
 

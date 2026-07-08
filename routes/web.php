@@ -204,6 +204,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('http-headers/settings', "PagesController@httpHeadersSettings")->name('pages.headers.settings')->middleware(['role:Super Admin|admin']);
     Route::get('http-headers/{url?}', "PagesController@httpHeaders")->name('pages.headers')->middleware('permission:Http headers');
 
+    Route::get('index-check', 'IndexCheckController@index')->name('pages.index-check')->middleware('permission:Index check');
+
     Route::post('/generate-password', 'PasswordGeneratorController@createPassword')->name('generate.password');
     Route::get('/password-generator', 'PasswordGeneratorController@index')->name('pages.password');
     Route::post('/edit-password-comment', 'PasswordGeneratorController@editComment')->name('edit.password.comment');

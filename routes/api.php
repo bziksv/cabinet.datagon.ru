@@ -66,3 +66,4 @@ Route::post('demo/proverka-meta-tegov-online/run', 'Api\\Demo\\MetaTagsDemoContr
 Route::post('demo/otslezhivanie-sroka-registratsii-domenov/run', 'Api\\Demo\\DomainInformationDemoController@run');
 Route::post('demo/otslezhivanie-ssylok/run', 'Api\\Demo\\BacklinkDemoController@run');
 Route::post('demo/http-headers/run', 'Api\\Demo\\HttpHeadersDemoController@run');
+Route::post('demo/proverka-indeksacii/run', 'Api\\Demo\\IndexCheckDemoController@run');

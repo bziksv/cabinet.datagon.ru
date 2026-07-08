@@ -28,6 +28,7 @@ class ManageAccessCatalog
         'Duplicates',
         'Html editor',
         'Http headers',
+        'Index check',
         'Keyword generator',
         'List comparison',
         'Password generator',

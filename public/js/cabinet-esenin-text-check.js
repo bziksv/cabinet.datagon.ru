@@ -1796,6 +1796,17 @@
         }, 600));
     }
 
+    if (sessionsWrapEl) {
+        sessionsWrapEl.addEventListener('show.bs.dropdown', function () {
+            refreshSessionsMenu();
+        });
+        sessionsWrapEl.addEventListener('click', function (event) {
+            if (event.target.closest('[data-esenin-sessions-toggle]')) {
+                refreshSessionsMenu();
+            }
+        }, true);
+    }
+
     initEditor();
     initPublicShare();
     updateCharCount();

@@ -10,12 +10,6 @@
         <link rel="stylesheet" href="{{ asset('plugins/relevance-analysis/css/style.css') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/css/style.css')) ?: time() }}">
 
         <style>
-            #tab_1 > div.d-flex.flex-column > div:nth-child(3) > button.btn.btn-secondary.col-2 > span > span > span,
-            #tab_1 > div.d-flex.flex-column > div:nth-child(2) > button.btn.btn-secondary.col-2 > span > span > span,
-            #tab_1 > div.d-flex.flex-column > div:nth-child(1) > button.btn.btn-secondary.col-2 > span > span > span {
-                width: 400px;
-            }
-
             .first-action::after {
                 display: inline;
                 content: "{{ __('Go to the landing page') }}";
@@ -353,17 +347,17 @@
                         </div>
                     </div>
 
-                    <div class="d-flex flex-column">
-                        <div class="btn-group col-lg-3 col-md-5 mb-2">
-                            <button class="btn btn-secondary click_tracking" data-click="Full analysis"
+                    <div class="relevance-analyse-actions d-flex flex-column">
+                        <div class="btn-group mb-2">
+                            <button class="btn btn-secondary click_tracking relevance-analyse-actions__main" data-click="Full analysis"
                                     id="full-analyse" data-name="Full analysis">
                                 {{ __('Full analysis') }}
                             </button>
-                            <button type="button" class="btn btn-secondary col-2">
-                                <span class="__helper-link ui_tooltip_w">
+                            <button type="button" class="btn btn-secondary relevance-analyse-actions__help" tabindex="-1" aria-hidden="true">
+                                <span class="__helper-link ui_tooltip_w" tabindex="0" role="button" aria-label="{{ __('Help') }}">
                                     <i class="fa fa-question-circle"></i>
-                                    <span class="ui_tooltip __right">
-                                        <span class="ui_tooltip_content">
+                                    <span class="ui_tooltip __left">
+                                        <span class="ui_tooltip_content relevance-analyse-actions__tooltip">
                                             {{ __('A survey of the xml service will be conducted in order to get the relevant top sites of competitors. The landing page will also be parsed.') }} <br>
                                             {{ __('Based on all the data received, an analysis will be performed.') }} <br>
                                         </span>
@@ -371,35 +365,34 @@
                                 </span>
                             </button>
                         </div>
-                        <div class="btn-group col-lg-3 col-md-5 mb-2">
-                            <button type="button" class="btn btn-secondary click_tracking"
+                        <div class="btn-group mb-2">
+                            <button type="button" class="btn btn-secondary click_tracking relevance-analyse-actions__main"
                                     data-click="Repeated analysis of competitor sites"
                                     id="repeat-relevance-analyse" disabled>
                                 {{ __('Repeated analysis of competitor sites') }}
                             </button>
-                            <button type="button" class="btn btn-secondary col-2">
-                                <span class="__helper-link ui_tooltip_w">
+                            <button type="button" class="btn btn-secondary relevance-analyse-actions__help" tabindex="-1" aria-hidden="true">
+                                <span class="__helper-link ui_tooltip_w" tabindex="0" role="button" aria-label="{{ __('Help') }}">
                                     <i class="fa fa-question-circle"></i>
-                                    <span class="ui_tooltip __right">
-                                        <span class="ui_tooltip_content">
+                                    <span class="ui_tooltip __left">
+                                        <span class="ui_tooltip_content relevance-analyse-actions__tooltip">
                                             {{ __('Updating the content of competitors that was received as a result of the last request') }}
                                         </span>
                                     </span>
                                 </span>
                             </button>
                         </div>
-                        <div class="btn-group col-lg-3 col-md-5 mb-2">
-                            <button class="btn btn-secondary click_tracking"
+                        <div class="btn-group mb-2">
+                            <button class="btn btn-secondary click_tracking relevance-analyse-actions__main"
                                     data-click="Repeated analysis of the landing page"
                                     id="repeat-main-page-analyse" disabled>
                                 {{ __('Repeated analysis of the landing page') }}
                             </button>
-                            <button type="button" class="btn btn-secondary col-2">
-                                <span class="__helper-link ui_tooltip_w">
+                            <button type="button" class="btn btn-secondary relevance-analyse-actions__help" tabindex="-1" aria-hidden="true">
+                                <span class="__helper-link ui_tooltip_w" tabindex="0" role="button" aria-label="{{ __('Help') }}">
                                     <i class="fa fa-question-circle"></i>
-                                    <span class="ui_tooltip __right">
-                                        <span
-                                            class="ui_tooltip_content">{{ __('We re-poll the landing page and take data from competitors websites that were received as a result of the last request') }}</span>
+                                    <span class="ui_tooltip __left">
+                                        <span class="ui_tooltip_content relevance-analyse-actions__tooltip">{{ __('We re-poll the landing page and take data from competitors websites that were received as a result of the last request') }}</span>
                                     </span>
                                 </span>
                             </button>
@@ -1065,8 +1058,12 @@
 
                 if (percent < 40) {
                     $('#progress-bar-state').html("{{ __('Parsing sites..') }}")
-                } else {
+                } else if (percent < 82) {
                     $('#progress-bar-state').html("{{ __('Processing of received data..') }}")
+                } else if (percent < 88) {
+                    $('#progress-bar-state').html("{{ __('Building word and phrase tables..') }}")
+                } else {
+                    $('#progress-bar-state').html("{{ __('Preparing clouds and saving results..') }}")
                 }
             }
 

@@ -185,10 +185,13 @@ class Relevance
         $this->separateAllText();
         $this->searchWordForms();
         $this->processingOfGeneralInformation();
+        RelevanceProgress::editProgress(82, $this->request);
         $this->prepareAnalysedSitesTable();
         $this->prepareUnigramTable();
+        RelevanceProgress::editProgress(85, $this->request);
         $this->analyseRecommendations();
         $this->preparePhrasesTable();
+        RelevanceProgress::editProgress(88, $this->request);
         $this->prepareClouds();
         $this->applyTableTfidfToUnigramTable();
         $this->applyHybridTfCloudsFromUnigramTable();
@@ -714,11 +717,23 @@ class Relevance
     {
         RelevanceProgress::editProgress(80, $this->request);
         $countSites = 0;
-        foreach ($this->sites as $site) {
+        $topLimit = max(1, (int) ($this->request['count'] ?? 20));
+        $siteWordMaps = [];
+
+        foreach ($this->sites as $key => $site) {
             if (!$site['ignored']) {
                 $countSites++;
             }
+
+            $siteWordMaps[$key] = [
+                'html' => self::wordFrequencyMap($site['html'] ?? ''),
+                'hiddenText' => self::wordFrequencyMap($site['hiddenText'] ?? ''),
+                'linkText' => self::wordFrequencyMap($site['linkText'] ?? ''),
+                'passages' => self::wordFrequencyMap($site['passages'] ?? ''),
+            ];
         }
+
+        $countSites = max(1, $countSites);
         $documentCount = $this->competitorDocumentCount();
 
         $myText = $this->mainPage['html'] . ' ' . $this->mainPage['hiddenText'];
@@ -733,7 +748,6 @@ class Relevance
         $myPassages = explode(" ", $myPassages);
         $myPassages = array_count_values($myPassages);
 
-//        $test = false;
         $wordCount = count(explode(' ', $this->competitorsTextAndLinks));
 
         foreach ($this->wordForms as $root => $wordForm) {
@@ -743,40 +757,28 @@ class Relevance
                 $inc = 1;
 
                 foreach ($this->sites as $key => $page) {
-//                    if ($this->sites[$key]['mainPage'] && $test === false) {
-//                        Log::debug('info', $this->sites[$key]);
-//                        $test = true;
-//                    }
+                    if (!$page['ignored'] && $topLimit >= $inc) {
+                        $bags = $siteWordMaps[$key];
+                        $htmlCount = (int) ($bags['html'][$word] ?? 0);
+                        $hiddenTextCount = (int) ($bags['hiddenText'][$word] ?? 0);
+                        $linkTextCount = (int) ($bags['linkText'][$word] ?? 0);
+                        $passagesCount = (int) ($bags['passages'][$word] ?? 0);
 
-                    if (!$page['ignored'] && $this->request['count'] >= $inc)
-                    {
-                        $htmlCount = substr_count(' ' . $this->sites[$key]['html'] . ' ', " $word ");
                         if ($htmlCount > 0) {
                             $numberTextOccurrences += $htmlCount;
                         }
 
-                        $hiddenTextCount = substr_count(' ' . $this->sites[$key]['hiddenText'] . ' ', " $word ");
                         if ($hiddenTextCount > 0) {
                             $numberTextOccurrences += $hiddenTextCount;
                         }
 
-                        $linkTextCount = substr_count(' ' . $this->sites[$key]['linkText'] . ' ', " $word ");
                         if ($linkTextCount > 0) {
                             $numberLinkOccurrences += $linkTextCount;
                         }
 
-                        $passagesCount = substr_count(' ' . $this->sites[$key]['passages'] . ' ', " $word ");
                         if ($passagesCount > 0) {
                             $numberPassageOccurrences += $passagesCount;
                         }
-//
-//                        if (stripos($word, 'труб') !== false && $this->sites[$key]['mainPage']) {
-//                            Log::debug($word, [
-//                                'html' => $htmlCount,
-//                                'hiddenText' => $hiddenTextCount,
-//                                'linkText' => $linkTextCount,
-//                            ]);
-//                        }
 
                         if ($htmlCount > 0 || $hiddenTextCount > 0 || $linkTextCount > 0) {
                             $countRepeat = $htmlCount + $hiddenTextCount + $linkTextCount;
@@ -820,6 +822,26 @@ class Relevance
                 ];
             }
         }
+    }
+
+    /**
+     * Частоты токенов (как substr_count по пробелам, но один раз на зону).
+     *
+     * @return array<string, int>
+     */
+    public static function wordFrequencyMap(string $text): array
+    {
+        $text = trim($text);
+        if ($text === '') {
+            return [];
+        }
+
+        $parts = preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY);
+        if (!is_array($parts) || $parts === []) {
+            return [];
+        }
+
+        return array_count_values($parts);
     }
 
     public function prepareUnigramTable()

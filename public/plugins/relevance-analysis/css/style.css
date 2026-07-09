@@ -248,8 +248,98 @@ a.paginate_button.current {
     text-align: center;
 }
 
-#app > div > div > div.card-body > div.d-flex.flex-column > div > button.btn.btn-secondary.col-2 > span > i {
+#app > div > div > div.card-body > div.relevance-analyse-actions .relevance-analyse-actions__help > span > i {
     color: #fffdfd !important;
+}
+
+/* Кнопки «Полный / повторный анализ» — одна ширина, подсказки снизу */
+.relevance-analyse-actions {
+    width: 100%;
+    max-width: 22rem;
+    overflow: visible;
+    position: relative;
+    z-index: 2;
+}
+
+.relevance-analyse-actions .btn-group {
+    width: 100%;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow: visible;
+}
+
+.relevance-analyse-actions .relevance-analyse-actions__main {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: normal;
+    text-align: left;
+    line-height: 1.25;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+}
+
+.relevance-analyse-actions .relevance-analyse-actions__help {
+    flex: 0 0 2.25rem;
+    width: 2.25rem;
+    max-width: 2.25rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+}
+
+.relevance-analyse-actions .ui_tooltip_w {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    cursor: help;
+}
+
+.relevance-analyse-actions .ui_tooltip {
+    z-index: 1080;
+}
+
+.relevance-analyse-actions .ui_tooltip.__left {
+    left: auto;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 0 11px 0 0;
+}
+
+.relevance-analyse-actions .ui_tooltip.__left .ui_tooltip_content {
+    right: auto;
+}
+.relevance-analyse-actions .ui_tooltip_content,
+.relevance-analyse-actions__tooltip {
+    width: min(22rem, calc(100vw - 2rem));
+    max-width: 22rem;
+    text-align: left;
+}
+
+.relevance-analyse-actions .ui_tooltip_w:hover > .ui_tooltip,
+.relevance-analyse-actions .ui_tooltip_w:focus-within > .ui_tooltip {
+    display: block;
+}
+
+#tab_1 {
+    overflow: visible;
+}
+
+#tab_1 .switch .ui_tooltip_w {
+    overflow: visible;
+}
+
+#tab_1 .switch .ui_tooltip {
+    z-index: 1080;
+}
+
+#tab_1 .switch .ui_tooltip_w:hover > .ui_tooltip,
+#tab_1 .switch .ui_tooltip_w:focus-within > .ui_tooltip {
+    display: block;
 }
 
 th {

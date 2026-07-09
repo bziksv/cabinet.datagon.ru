@@ -13,6 +13,9 @@ class RunRelevanceAnalyseQueue implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    /** @var int Без лимита — полный анализ может занимать несколько минут. */
+    public $timeout = 0;
+
     public $relevance;
 
     /**
@@ -32,6 +35,18 @@ class RunRelevanceAnalyseQueue implements ShouldQueue
      */
     public function handle()
     {
-        $this->relevance->analysis();
+        try {
+            $this->relevance->analysis();
+        } catch (\Throwable $exception) {
+            $this->relevance->saveError($exception);
+            throw $exception;
+        }
+    }
+
+    public function failed(\Throwable $exception): void
+    {
+        if ($this->relevance) {
+            $this->relevance->saveError($exception);
+        }
     }
 }

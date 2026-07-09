@@ -15,6 +15,9 @@ final class RelevancePhraseNgrams
 
     private const MIN_SITE_COVERAGE = 2;
 
+    /** Ограничение кандидатов TLP — иначе полный анализ «зависает» на 80%. */
+    private const MAX_CANDIDATE_PHRASES = 2500;
+
     /** @var array<string, string> */
     private static $lemmaMap = [];
 
@@ -150,6 +153,20 @@ final class RelevancePhraseNgrams
         foreach ($aggregated as $phrase => $siteCoverage) {
             if ($siteCoverage >= self::MIN_SITE_COVERAGE) {
                 $phrases[] = $phrase;
+            }
+        }
+
+        if (count($phrases) > self::MAX_CANDIDATE_PHRASES) {
+            arsort($aggregated);
+            $phrases = [];
+            foreach ($aggregated as $phrase => $siteCoverage) {
+                if ($siteCoverage < self::MIN_SITE_COVERAGE) {
+                    continue;
+                }
+                $phrases[] = $phrase;
+                if (count($phrases) >= self::MAX_CANDIDATE_PHRASES) {
+                    break;
+                }
             }
         }
 

@@ -216,6 +216,12 @@ class LimitsComposer
                     'position' => 4,
                 ];
 
+            case 'EseninTextCheck':
+                return [
+                    'count' => \App\Support\EseninTextCheckLimits::usedForUser($user),
+                    'position' => 4,
+                ];
+
             case 'GeneratorWords':
                 return [
                     'count' => __('Restrictions are not tracked'),
@@ -275,6 +281,9 @@ class LimitsComposer
                 return 14;
 
             case 'IndexCheck':
+                return 4;
+
+            case 'EseninTextCheck':
                 return 4;
 
             case 'HttpHeaders':

@@ -16,7 +16,7 @@ use App\Classes\Cron\ProcessTriggerCampaigns;
 use App\Classes\Cron\RelevancePublicSharesDelete;
 use App\Classes\Cron\RelevanceCleaningResults;
 use App\Classes\Cron\SiteMonitoringPublicSharesDelete;
-use App\Classes\Cron\TextAnalyzerPublicSharesDelete;
+use App\Classes\Cron\EseninTextCheckPublicSharesDelete;
 use App\Classes\Cron\QueueDailyStatsRollup;
 use App\Classes\Cron\QueueStatsSampler;
 use App\Classes\Cron\UserStatisticsStore;
@@ -56,6 +56,7 @@ class Kernel extends ConsoleKernel
         $schedule->call(new HttpHeadersDelete())->cron('0 0 * * *');
         $schedule->call(new RelevancePublicSharesDelete())->cron('0 0 * * *');
         $schedule->call(new TextAnalyzerPublicSharesDelete())->cron('0 0 * * *');
+        $schedule->call(new EseninTextCheckPublicSharesDelete())->cron('0 0 * * *');
         $schedule->call(new HtmlEditorPublicSharesDelete())->cron('0 0 * * *');
         $schedule->call(new SiteMonitoringPublicSharesDelete())->cron('0 0 * * *');
         $schedule->call(new MonitoringPublicSharesDelete())->cron('0 0 * * *');

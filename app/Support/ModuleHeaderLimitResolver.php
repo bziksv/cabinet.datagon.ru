@@ -48,6 +48,7 @@ class ModuleHeaderLimitResolver
         ['prefix' => 'roi-calculator', 'code' => 'ROI'],
         ['prefix' => 'http-headers', 'code' => 'HttpHeaders'],
         ['prefix' => 'index-check', 'code' => 'IndexCheck'],
+        ['prefix' => 'esenin-text-check', 'code' => 'EseninTextCheck'],
     ];
 
     /** @var list<array{prefix: string, code: string}> */
@@ -76,6 +77,7 @@ class ModuleHeaderLimitResolver
         ['prefix' => 'pages.utm', 'code' => 'UTM'],
         ['prefix' => 'pages.roi', 'code' => 'ROI'],
         ['prefix' => 'pages.headers', 'code' => 'HttpHeaders'],
+        ['prefix' => 'pages.esenin', 'code' => 'EseninTextCheck'],
     ];
 
     public static function resolve(?Request $request = null): ?string

@@ -176,6 +176,7 @@ return [
         'site_monitoring_' => ['title' => 'Мониторинг сайтов', 'uri' => '/site-monitoring'],
         'http_header' => ['title' => 'HTTP-заголовки', 'uri' => '/http-headers'],
         'index_check_usage' => ['title' => 'Проверка индексации (лимиты)', 'uri' => '/index-check'],
+        'esenin_text_check_usages' => ['title' => 'Проверка текста Есенин (лимиты)', 'uri' => '/esenin-text-check'],
         'link_tracking' => ['title' => 'Отслеживание ссылок', 'uri' => '/backlink'],
         'click_tracking' => ['title' => 'Отслеживание ссылок', 'uri' => '/backlink'],
         'generator_password' => ['title' => 'Генератор паролей', 'uri' => '/password-generator'],

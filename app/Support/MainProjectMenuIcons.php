@@ -50,6 +50,8 @@ class MainProjectMenuIcons
         11 => '<i class="fas fa-server"></i>',
         // Проверка индексации
         40 => '<i class="fas fa-magnifying-glass-chart"></i>',
+        // Проверка текста Есенин
+        41 => '<i class="fas fa-spell-check"></i>',
         // UTM-метки
         9 => '<i class="fas fa-tags"></i>',
         // Генератор паролей

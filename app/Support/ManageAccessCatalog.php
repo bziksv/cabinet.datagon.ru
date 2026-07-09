@@ -29,6 +29,7 @@ class ManageAccessCatalog
         'Html editor',
         'Http headers',
         'Index check',
+        'Esenin text check',
         'Keyword generator',
         'List comparison',
         'Password generator',

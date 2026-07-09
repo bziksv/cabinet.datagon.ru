@@ -11,6 +11,7 @@
         'TextAnalyzer',
         'CompetitorAnalysisPhrases',
         'IndexCheck',
+        'EseninTextCheck',
         'Clusters',
         'domainMonitoringProject',
         'monitoring',

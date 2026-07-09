@@ -67,3 +67,4 @@ Route::post('demo/otslezhivanie-sroka-registratsii-domenov/run', 'Api\\Demo\\Dom
 Route::post('demo/otslezhivanie-ssylok/run', 'Api\\Demo\\BacklinkDemoController@run');
 Route::post('demo/http-headers/run', 'Api\\Demo\\HttpHeadersDemoController@run');
 Route::post('demo/proverka-indeksacii/run', 'Api\\Demo\\IndexCheckDemoController@run');
+Route::post('demo/proverka-teksta-esenin/run', 'Api\\Demo\\EseninTextCheckDemoController@run');

@@ -59,7 +59,7 @@ class BrokenDomainNotification extends Notification implements EmailPreferenceAw
             ->line(__('Mail notify auto disclaimer'))
             ->line(__('Mail notify site broken line', ['url' => $this->project->link]))
             ->line(__('Mail notify site broken status', ['code' => $this->project->code]))
-            ->line(__('Mail notify site broken state unexpected'))
+            ->line(__('Mail notify site broken state', ['state' => __($this->project->status)]))
             ->line(__('Mail notify site broken uptime', ['percent' => $this->project->uptime_percent]))
             ->action(__('Mail notify check projects'), route('site.monitoring'))
             ->line(__('Mail notify thanks service')),

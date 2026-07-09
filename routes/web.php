@@ -42,6 +42,7 @@ Route::get('public/share/html-editor/{token}', 'HtmlEditorPublicShareController@
 Route::get('public/share/site-monitoring/{token}', 'SiteMonitoringPublicShareController@show')->name('site.monitoring.public.share.view');
 Route::get('public/share/domain-information/{token}', 'DomainInformationPublicShareController@show')->name('domain.information.public.share.view');
 Route::get('public/share/monitoring-v2/{token}', 'MonitoringPublicShareController@show')->name('monitoring.public.share.view');
+Route::get('public/share/esenin-text-check/{token}', 'EseninTextCheckPublicShareController@show')->name('esenin.text.check.public.share.view');
 Route::post('/balance-add/result', 'BalanceAddController@result')->name('balance.add.result');
 Route::get('/email/open/trigger/{token}.png', 'TriggerCampaignEmailOpenController@pixel')->name('email.trigger.open');
 Route::get('/personal-data/ru', 'AccessController@getRuPersonalData');
@@ -205,6 +206,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('http-headers/{url?}', "PagesController@httpHeaders")->name('pages.headers')->middleware('permission:Http headers');
 
     Route::get('index-check', 'IndexCheckController@index')->name('pages.index-check')->middleware('permission:Index check');
+
+    Route::match(['get', 'post'], 'esenin-text-check', 'EseninTextCheckController@index')->name('pages.esenin-text-check')->middleware('permission:Esenin text check');
+    Route::post('esenin-text-check/save', 'EseninTextCheckController@save')->name('pages.esenin-text-check.save')->middleware('permission:Esenin text check');
+    Route::get('esenin-text-check/sessions/{session}', 'EseninTextCheckController@showSession')->name('pages.esenin-text-check.session')->middleware('permission:Esenin text check');
+    Route::get('esenin-text-check/sessions/{session}/versions/{version}', 'EseninTextCheckController@loadVersion')->name('pages.esenin-text-check.version')->middleware('permission:Esenin text check');
+    Route::post('esenin-text-check/public-share', 'EseninTextCheckController@createPublicShare')->name('pages.esenin-text-check.public.share.create')->middleware('permission:Esenin text check');
+    Route::post('esenin-text-check/public-share/revoke', 'EseninTextCheckController@revokePublicShare')->name('pages.esenin-text-check.public.share.revoke')->middleware('permission:Esenin text check');
 
     Route::post('/generate-password', 'PasswordGeneratorController@createPassword')->name('generate.password');
     Route::get('/password-generator', 'PasswordGeneratorController@index')->name('pages.password');

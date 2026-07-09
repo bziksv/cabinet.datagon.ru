@@ -145,6 +145,12 @@ class TariffLimitRegistry
                 'enforcement' => self::ENFORCEMENT_STRICT,
             ],
             [
+                'code' => 'EseninTextCheck',
+                'module' => __('Esenin text check'),
+                'hint' => __('Monthly Baden-Baden text checks via local engine: 1 text or page = 1 unit.'),
+                'enforcement' => self::ENFORCEMENT_STRICT,
+            ],
+            [
                 'code' => 'GeneratorWords',
                 'module' => __('Keyword generator'),
                 'hint' => __('Shown on tariff page only; usage is not blocked in code.'),

@@ -1686,14 +1686,19 @@
         }
 
         root.classList.add('is-loading');
+        var submitBtnOriginal = submitBtn ? submitBtn.innerHTML : '';
         if (submitBtn) {
             submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Проверяем…';
         }
 
         function finishRequest() {
             root.classList.remove('is-loading');
             if (submitBtn) {
                 submitBtn.disabled = false;
+                if (submitBtnOriginal) {
+                    submitBtn.innerHTML = submitBtnOriginal;
+                }
             }
         }
 

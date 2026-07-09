@@ -655,35 +655,51 @@ final class EseninAnalyzer
         }, config('esenin-generic-words', [])));
 
         $wordCounts = EseninTextParser::wordCounts($plain);
+        $formalityWords = self::topFormalityWords($wordCounts, $genericLookup, 40);
 
+        foreach ($formalityWords as $row) {
+            $marks = array_merge($marks, self::markWordOccurrences(
+                $plain,
+                $row['word'],
+                'formality',
+                $row['kind'] === 'stop'
+                    ? 'Стоп-слово — разбавьте текст конкретикой'
+                    : 'Общее («пустое») слово — замените на конкретику',
+                $row['kind'] === 'stop' ? 'stop' : 'generic'
+            ));
+        }
+
+        return $marks;
+    }
+
+    /**
+     * @param array<string, int> $wordCounts
+     * @param array<string, int> $genericLookup
+     * @return array<int, array{word: string, kind: string, count: int}>
+     */
+    private static function topFormalityWords(array $wordCounts, array $genericLookup, int $limit = 40): array
+    {
+        $rows = [];
         foreach ($wordCounts as $word => $count) {
             if ($count <= 0) {
                 continue;
             }
 
             if (TextAnalyzerStopWords::isPhraseStopWord($word)) {
-                $marks = array_merge($marks, self::markWordOccurrences(
-                    $plain,
-                    $word,
-                    'formality',
-                    'Стоп-слово — разбавьте текст конкретикой',
-                    'stop'
-                ));
+                $rows[] = ['word' => $word, 'kind' => 'stop', 'count' => $count];
                 continue;
             }
 
             if (isset($genericLookup[$word])) {
-                $marks = array_merge($marks, self::markWordOccurrences(
-                    $plain,
-                    $word,
-                    'formality',
-                    'Общее («пустое») слово — замените на конкретику',
-                    'generic'
-                ));
+                $rows[] = ['word' => $word, 'kind' => 'generic', 'count' => $count];
             }
         }
 
-        return $marks;
+        usort($rows, static function ($a, $b) {
+            return ($b['count'] <=> $a['count']) ?: (mb_strlen($b['word']) <=> mb_strlen($a['word']));
+        });
+
+        return array_slice($rows, 0, max(1, $limit));
     }
 
     private static function frequencyWordHint(string $word, int $count, int $totalWords, string $reason): string

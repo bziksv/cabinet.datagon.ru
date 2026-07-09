@@ -89,6 +89,7 @@
     var suppressHighlightSync = false;
     var sessionsAvailable = config.sessionsAvailable !== false;
     var publicShareAvailable = config.publicShareAvailable !== false;
+    var analyzerVersion = Number(config.analyzerVersion || 1);
     var shareLabels = config.shareLabels || {};
 
     var activeSource = 'text';
@@ -182,6 +183,14 @@
         if (kind) {
             autosaveStatusEl.classList.add('text-' + kind);
         }
+    }
+
+    function isResultOutdated(result) {
+        if (!result) {
+            return false;
+        }
+        var saved = Number(result.analyzer_version || 0);
+        return saved > 0 && saved < analyzerVersion;
     }
 
     function updateStaleBanner() {
@@ -323,7 +332,7 @@
 
             if (data.active_version.result) {
                 renderResult(data.active_version.result);
-                resultsStale = false;
+                resultsStale = isResultOutdated(data.active_version.result);
                 updateStaleBanner();
             }
         }
@@ -557,25 +566,13 @@
 
     function tryResumeSessionFromUrl() {
         var match = window.location.search.match(/(?:\?|&)session=(\d+)/);
-        if (match) {
-            var id = parseInt(match[1], 10);
-            if (id) {
-                loadSession(id, true);
-                return;
-            }
-        }
-
-        if (!sessionsAvailable) {
+        if (!match) {
             return;
         }
 
-        try {
-            var stored = window.localStorage.getItem(SESSION_STORAGE_KEY);
-            if (stored) {
-                loadSession(parseInt(stored, 10), true);
-            }
-        } catch (e) {
-            /* ignore */
+        var id = parseInt(match[1], 10);
+        if (id) {
+            loadSession(id, true);
         }
     }
 
@@ -1717,6 +1714,8 @@
             var message = 'Не удалось выполнить проверку';
             if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
                 message = xhr.responseJSON.message;
+            } else if (xhr && xhr.response && xhr.response.data && xhr.response.data.message) {
+                message = xhr.response.data.message;
             } else if (xhr && xhr.responseText) {
                 try {
                     var parsed = JSON.parse(xhr.responseText);
@@ -1726,17 +1725,19 @@
                 } catch (e) {
                     /* ignore */
                 }
+            } else if (xhr && xhr.message) {
+                message = xhr.message;
             }
             showError(message);
         }
 
         if (typeof window.axios !== 'undefined') {
-            window.axios.post('/esenin-text-check?ajax=1', payload)
-                .then(function (response) {
-                    handleResponse(response.data);
+            postJson('/esenin-text-check?ajax=1', payload)
+                .then(function (data) {
+                    handleResponse(data);
                 })
                 .catch(function (error) {
-                    handleFailure(error.response);
+                    handleFailure(error && error.response ? error.response : error);
                 })
                 .finally(finishRequest);
             return;

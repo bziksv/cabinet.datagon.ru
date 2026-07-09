@@ -81,6 +81,7 @@ final class EseninAnalyzer
             'marks' => $marks,
             'highlighted_html' => $highlights[$activeBlock],
             'highlights' => $highlights,
+            'analyzer_version' => (int) config('cabinet-esenin-text-check.analyzer_version', 1),
             'stats' => [
                 'chars' => mb_strlen($plain, 'UTF-8'),
                 'chars_no_spaces' => $charCount,
@@ -652,6 +653,8 @@ final class EseninAnalyzer
         $genericLookup = array_flip(array_map(static function ($word) {
             return mb_strtolower($word, 'UTF-8');
         }, config('esenin-generic-words', [])));
+
+        $wordCounts = EseninTextParser::wordCounts($plain);
 
         foreach ($wordCounts as $word => $count) {
             if ($count <= 0) {

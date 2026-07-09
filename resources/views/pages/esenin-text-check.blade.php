@@ -167,6 +167,7 @@
         'autosaveDebounceMs' => $autosaveDebounceMs,
         'sessionsAvailable' => $sessionsAvailable,
         'publicShareAvailable' => $publicShareAvailable,
+        'analyzerVersion' => (int) config('cabinet-esenin-text-check.analyzer_version', 1),
         'urls' => [
             'save' => route('pages.esenin-text-check.save'),
             'session' => url('/esenin-text-check/sessions'),

@@ -248,14 +248,37 @@ a.paginate_button.current {
     text-align: center;
 }
 
-#app > div > div > div.card-body > div.relevance-analyse-actions .relevance-analyse-actions__help > span > i {
-    color: #fffdfd !important;
+.relevance-analyse-actions .relevance-analyse-actions__help {
+    flex: 0 0 2.5rem;
+    width: 2.5rem;
+    max-width: 2.5rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+    background-color: #495057;
+    border-color: #495057;
+    color: #fff;
 }
 
-/* Кнопки «Полный / повторный анализ» — одна ширина, подсказки снизу */
+.relevance-analyse-actions .relevance-analyse-actions__help:hover,
+.relevance-analyse-actions .relevance-analyse-actions__help:focus {
+    background-color: #343a40;
+    border-color: #343a40;
+    color: #fff;
+}
+
+.relevance-analyse-actions .relevance-analyse-actions__help .fa-question-circle {
+    color: #fff !important;
+    opacity: 1 !important;
+    font-size: 1.05rem;
+}
+
+/* Кнопки «Полный / повторный анализ» — одна ширина, подсказки слева */
 .relevance-analyse-actions {
     width: 100%;
-    max-width: 22rem;
+    max-width: 26rem;
     overflow: visible;
     position: relative;
     z-index: 2;
@@ -278,16 +301,6 @@ a.paginate_button.current {
     padding-bottom: 0.45rem;
 }
 
-.relevance-analyse-actions .relevance-analyse-actions__help {
-    flex: 0 0 2.25rem;
-    width: 2.25rem;
-    max-width: 2.25rem;
-    padding: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    overflow: visible;
-}
 
 .relevance-analyse-actions .ui_tooltip_w {
     display: inline-flex;

@@ -207,7 +207,7 @@
     }
 
     function renderProvidersBar(result) {
-        if (!providersBarEl || !result) {
+        if (!config.showProvidersBar || !providersBarEl || !result) {
             return;
         }
 

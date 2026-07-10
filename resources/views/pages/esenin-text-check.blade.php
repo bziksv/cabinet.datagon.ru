@@ -105,7 +105,9 @@
                 {{ __('Esenin text check stale banner') }}
             </div>
 
+            @if(\App\User::isUserAdmin())
             <div class="alert alert-info py-2 px-3 small mb-3 d-none" data-esenin-providers-bar role="status"></div>
+            @endif
 
             <div class="cabinet-esenin-results-editor card shadow-sm mb-3 d-none" data-esenin-editor-host-results>
                 <div class="card-body">
@@ -183,6 +185,7 @@
         'sessionsAvailable' => $sessionsAvailable,
         'publicShareAvailable' => $publicShareAvailable,
         'analyzerVersion' => \App\Support\EseninTextCheckSettingsRegistry::moduleInt('analyzer_version', 1),
+        'showProvidersBar' => \App\User::isUserAdmin(),
         'urls' => [
             'save' => route('pages.esenin-text-check.save'),
             'session' => url('/esenin-text-check/sessions'),

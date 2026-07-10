@@ -17,6 +17,7 @@ use App\Classes\Cron\RelevancePublicSharesDelete;
 use App\Classes\Cron\RelevanceCleaningResults;
 use App\Classes\Cron\SiteMonitoringPublicSharesDelete;
 use App\Classes\Cron\EseninTextCheckPublicSharesDelete;
+use App\Classes\Cron\TextAnalyzerPublicSharesDelete;
 use App\Classes\Cron\QueueDailyStatsRollup;
 use App\Classes\Cron\QueueStatsSampler;
 use App\Classes\Cron\UserStatisticsStore;

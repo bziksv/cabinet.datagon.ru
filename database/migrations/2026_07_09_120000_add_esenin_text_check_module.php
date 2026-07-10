@@ -11,9 +11,9 @@ class AddEseninTextCheckModule extends Migration
 
     private const TARIFF_LIMITS = [
         'Free' => 5,
-        'Optimal' => 200,
-        'Ultimate' => 500,
-        'Maximum' => 1000,
+        'Optimal' => 100,
+        'Ultimate' => 300,
+        'Maximum' => 700,
     ];
 
     public function up(): void

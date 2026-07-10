@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => '1.2.0',
+    'version' => '1.3.0',
     /** Версия логики подсветки/метрик; при смене старые сохранённые отчёты просят перепроверку. */
     'analyzer_version' => 4,
 
@@ -27,7 +27,7 @@ return [
     'demo' => [
         'module' => 'proverka-teksta-esenin',
         'landing_url' => 'https://titlo.ru/proverka-teksta-esenin/',
-        'max_runs_per_day' => 3,
+        'max_runs_per_day' => 2,
         'max_chars' => 5000,
         'min_chars' => 100,
         'full_max_chars' => 20000,

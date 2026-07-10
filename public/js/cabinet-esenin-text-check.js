@@ -73,7 +73,6 @@
     var autosaveStatusEl = root.querySelector('[data-esenin-autosave-status]');
     var staleBannerEl = root.querySelector('[data-esenin-stale-banner]');
     var providersBarEl = root.querySelector('[data-esenin-providers-bar]');
-    var recheckBtn = root.querySelector('[data-esenin-recheck]');
     var sharePanelEl = root.querySelector('[data-esenin-public-share]');
     var shareUrlEl = root.querySelector('[data-esenin-share-url]');
     var shareCopyEl = root.querySelector('[data-esenin-share-copy]');
@@ -106,6 +105,9 @@
     var syncingFromSource = false;
     var syncingEditors = false;
     var syncToVisualTimer = null;
+    var submitLabelDefault = labelFromAttr(submitBtn, 'data-label-default', 'Проверить');
+    var submitLabelRecheck = labelFromAttr(submitBtn, 'data-label-recheck', 'Проверить снова');
+    var checkInFlight = 0;
 
     function debounce(fn, ms) {
         var timer;
@@ -201,8 +203,32 @@
         if (staleBannerEl) {
             staleBannerEl.classList.toggle('d-none', !resultsStale || !lastResult);
         }
-        if (recheckBtn) {
-            recheckBtn.classList.toggle('d-none', !lastResult);
+        updateSubmitButtonLabel();
+    }
+
+    function updateSubmitButtonLabel() {
+        if (!submitBtn || checkInFlight > 0) {
+            return;
+        }
+        submitBtn.textContent = lastResult ? submitLabelRecheck : submitLabelDefault;
+    }
+
+    function setCheckLoading(loading) {
+        if (!submitBtn) {
+            return;
+        }
+
+        if (loading) {
+            checkInFlight += 1;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Проверяем…';
+            return;
+        }
+
+        checkInFlight = Math.max(0, checkInFlight - 1);
+        if (checkInFlight === 0) {
+            submitBtn.disabled = false;
+            updateSubmitButtonLabel();
         }
     }
 
@@ -1784,20 +1810,11 @@
         }
 
         root.classList.add('is-loading');
-        var submitBtnOriginal = submitBtn ? submitBtn.innerHTML : '';
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Проверяем…';
-        }
+        setCheckLoading(true);
 
         function finishRequest() {
             root.classList.remove('is-loading');
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                if (submitBtnOriginal) {
-                    submitBtn.innerHTML = submitBtnOriginal;
-                }
-            }
+            setCheckLoading(false);
         }
 
         function handleResponse(data) {
@@ -1888,10 +1905,6 @@
         highlightEl.addEventListener('focus', updateCkeditorFloatVisibility);
     }
 
-    if (recheckBtn) {
-        recheckBtn.addEventListener('click', runCheck);
-    }
-
     if (taskNameEl) {
         taskNameEl.addEventListener('input', debounce(function () {
             if (sessionId) {
@@ -1914,6 +1927,7 @@
     initEditor();
     initPublicShare();
     updateCharCount();
+    updateSubmitButtonLabel();
     updateCkeditorFloatVisibility();
     refreshSessionsMenu();
 

@@ -80,7 +80,11 @@
                 <p class="small text-secondary mb-0">{{ __('Esenin text check cost hint', ['cost' => $costPerCheck]) }}</p>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-outline-secondary" data-esenin-clear>{{ __('Clear') }}</button>
-                    <button type="button" class="btn btn-primary" data-esenin-submit>{{ __('Esenin text check submit') }}</button>
+                    <button type="button"
+                            class="btn btn-primary"
+                            data-esenin-submit
+                            data-label-default="{{ __('Esenin text check submit') }}"
+                            data-label-recheck="{{ __('Esenin text check recheck') }}">{{ __('Esenin text check submit') }}</button>
                 </div>
             </div>
         </div>
@@ -93,9 +97,6 @@
                             <span class="small text-secondary d-none" data-esenin-session-label>{{ __('Esenin text check versions label') }}:</span>
                             <div class="cabinet-esenin-version-tabs d-none" data-esenin-version-tabs role="tablist" aria-label="{{ __('Esenin text check versions label') }}"></div>
                             <span class="small text-muted ms-auto ms-md-0" data-esenin-autosave-status aria-live="polite"></span>
-                        </div>
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            <button type="button" class="btn btn-sm btn-primary d-none" data-esenin-recheck>{{ __('Esenin text check recheck') }}</button>
                         </div>
                     </div>
                 </div>

@@ -8,6 +8,8 @@
     @endslot
 
     <div class="cabinet-esenin-page">
+        @include('esenin-text-check.partials.module-nav', ['active' => 'module'])
+
         <div class="cabinet-esenin-lead px-4 py-3 mb-3">
             <div class="d-flex gap-3 align-items-start">
                 <span class="cabinet-esenin-lead__icon" aria-hidden="true">
@@ -61,7 +63,9 @@
 
             <div class="cabinet-esenin-panel" data-esenin-panel="text">
                 <label class="form-label fw-semibold mb-2">{{ __('Esenin text check text label') }}</label>
-                @include('pages.partials.esenin-text-editor', ['maxChars' => $maxChars])
+                <div data-esenin-editor-host-input>
+                    @include('pages.partials.esenin-text-editor', ['maxChars' => $maxChars])
+                </div>
             </div>
 
             <div class="cabinet-esenin-panel d-none" data-esenin-panel="url">
@@ -101,11 +105,21 @@
                 {{ __('Esenin text check stale banner') }}
             </div>
 
+            <div class="alert alert-info py-2 px-3 small mb-3 d-none" data-esenin-providers-bar role="status"></div>
+
             <div class="row g-3">
                 <div class="col-lg-2">
                     <div class="cabinet-esenin-score-nav" data-esenin-score-nav></div>
                 </div>
                 <div class="col-lg-7">
+                    <div class="cabinet-esenin-results-editor card shadow-sm mb-3 d-none" data-esenin-editor-host-results>
+                        <div class="card-body">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                                <h6 class="fw-semibold mb-0">{{ __('Esenin text check editor view split') }}</h6>
+                                <span class="small text-secondary">{{ __('Esenin text check results editor hint') }}</span>
+                            </div>
+                        </div>
+                    </div>
                     <div class="cabinet-esenin-text-view card shadow-sm">
                         <div class="card-body">
                             <div class="cabinet-esenin-text-view__wrap">
@@ -167,7 +181,7 @@
         'autosaveDebounceMs' => $autosaveDebounceMs,
         'sessionsAvailable' => $sessionsAvailable,
         'publicShareAvailable' => $publicShareAvailable,
-        'analyzerVersion' => (int) config('cabinet-esenin-text-check.analyzer_version', 1),
+        'analyzerVersion' => \App\Support\EseninTextCheckSettingsRegistry::moduleInt('analyzer_version', 1),
         'urls' => [
             'save' => route('pages.esenin-text-check.save'),
             'session' => url('/esenin-text-check/sessions'),

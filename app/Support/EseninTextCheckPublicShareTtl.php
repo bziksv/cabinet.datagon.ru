@@ -14,7 +14,7 @@ class EseninTextCheckPublicShareTtl
      */
     public static function allowedDays(): array
     {
-        $options = config('cabinet-esenin-text-check.public_share_ttl_days', [30, 90, 180, 365, 0]);
+        $options = EseninTextCheckSettingsRegistry::publicShareTtlDays();
 
         if (!is_array($options)) {
             return [30, 90, 180, 365, self::UNLIMITED];

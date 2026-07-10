@@ -8,6 +8,7 @@ use App\Services\EseninTextCheckSessionService;
 use App\Support\Esenin\EseninAnalyzer;
 use App\Support\EseninTextCheckLimits;
 use App\Support\EseninTextCheckPublicShareTtl;
+use App\Support\EseninTextCheckSettingsRegistry;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,10 +34,10 @@ class EseninTextCheckController extends Controller
         $limit = EseninTextCheckLimits::limitForUser();
         $remaining = EseninTextCheckLimits::remainingForUser();
         $costPerCheck = EseninTextCheckLimits::checkCost();
-        $maxChars = (int) config('cabinet-esenin-text-check.max_chars', 20000);
+        $maxChars = EseninTextCheckSettingsRegistry::moduleInt('max_chars', 20000);
         $modes = EseninTextCheckService::MODES;
         $maxVersions = EseninTextCheckSessionService::maxVersionsPerSession();
-        $autosaveDebounceMs = (int) config('cabinet-esenin-text-check.limits.autosave_debounce_ms', 2500);
+        $autosaveDebounceMs = EseninTextCheckSettingsRegistry::moduleInt('autosave_debounce_ms', 2500);
         $sessionsAvailable = EseninTextCheckSessionService::tablesReady();
         $publicShareAvailable = EseninTextCheckPublicShare::tableAvailable();
         $shareTtlOptions = EseninTextCheckPublicShareTtl::labelsForUi();
@@ -143,7 +144,7 @@ class EseninTextCheckController extends Controller
     private function ajaxCheck(Request $request): JsonResponse
     {
         $source = (string) $request->input('source', 'text');
-        $mode = (string) $request->input('mode', config('cabinet-esenin-text-check.default_mode', 'risk'));
+        $mode = (string) $request->input('mode', EseninTextCheckSettingsRegistry::moduleString('default_mode', 'risk'));
         $cost = EseninTextCheckLimits::checkCost();
 
         if (! EseninTextCheckLimits::canSpend($cost)) {
@@ -175,13 +176,13 @@ class EseninTextCheckController extends Controller
                 $checkedText = EseninAnalyzer::extractTextFromUrl($url, trim($tbclass));
                 $result = EseninTextCheckService::checkText($checkedText, [
                     'mode' => $mode,
-                    'more' => true,
+                    'url' => $url,
+                    'tbclass' => trim($tbclass),
                 ]);
             } else {
                 $checkedText = (string) $request->input('text', '');
                 $result = EseninTextCheckService::checkText($checkedText, [
                     'mode' => $mode,
-                    'more' => true,
                 ]);
             }
         } catch (\InvalidArgumentException $e) {

@@ -3,6 +3,8 @@
 namespace App\Support\Esenin;
 
 use App\Classes\SimpleHtmlDom\HtmlDocument;
+use App\Support\Esenin\Providers\EseninExternalAnalyzer;
+use App\Support\EseninTextCheckSettingsRegistry;
 use App\Support\TextAnalyzerStopWords;
 use App\TextAnalyzer;
 
@@ -18,9 +20,10 @@ final class EseninAnalyzer
     ];
 
     /**
+     * @param array<string, mixed> $options
      * @return array<string, mixed>
      */
-    public static function analyze(string $text, string $mode = 'risk'): array
+    public static function analyze(string $text, string $mode = 'risk', array $options = []): array
     {
         $plain = self::normalizePlainText($text);
         if ($plain === '') {
@@ -65,12 +68,17 @@ final class EseninAnalyzer
             $params = self::flattenScoredParams($blocks);
         }
 
+        $sourceHtml = EseninHtmlHighlighter::isHtml($text) ? $text : '';
         $highlights = [];
         foreach (array_merge(['risk'], array_keys(self::BLOCK_LABELS)) as $blockKey) {
-            $highlights[$blockKey] = self::renderHighlightedHtml($plain, $marks, $blockKey);
+            if ($sourceHtml !== '') {
+                $highlights[$blockKey] = EseninHtmlHighlighter::apply($sourceHtml, $plain, $marks, $blockKey);
+            } else {
+                $highlights[$blockKey] = self::renderHighlightedPlainHtml($plain, $marks, $blockKey);
+            }
         }
 
-        return [
+        return EseninExternalAnalyzer::enrich($plain, $words, [
             'risk' => $totalRisk,
             'level' => self::levelFromScore($totalRisk),
             'details' => $details,
@@ -81,13 +89,18 @@ final class EseninAnalyzer
             'marks' => $marks,
             'highlighted_html' => $highlights[$activeBlock],
             'highlights' => $highlights,
-            'analyzer_version' => (int) config('cabinet-esenin-text-check.analyzer_version', 1),
+            'analyzer_version' => EseninTextCheckSettingsRegistry::moduleInt('analyzer_version', 1),
             'stats' => [
                 'chars' => mb_strlen($plain, 'UTF-8'),
                 'chars_no_spaces' => $charCount,
                 'words' => $totalWords,
             ],
-        ];
+        ], [
+            'source_html' => $sourceHtml,
+            'url' => $options['url'] ?? null,
+            'tbclass' => $options['tbclass'] ?? null,
+            'active_block' => $activeBlock,
+        ]);
     }
 
     public static function extractTextFromUrl(string $url, string $selector = ''): string
@@ -344,7 +357,10 @@ final class EseninAnalyzer
      */
     private static function matchStyleDictionary(string $plain): array
     {
-        $entries = config('esenin-style-dictionary.entries', []);
+        $entries = array_merge(
+            config('esenin-style-dictionary.entries', []),
+            EseninStyleLearning::promotedEntries()
+        );
         usort($entries, static function ($a, $b) {
             return mb_strlen($b['phrase']) <=> mb_strlen($a['phrase']);
         });
@@ -788,48 +804,16 @@ final class EseninAnalyzer
     /**
      * @param array<int, array<string, mixed>> $marks
      */
-    private static function renderHighlightedHtml(string $plain, array $marks, string $block): string
+    public static function renderHighlightedPlainHtml(string $plain, array $marks, string $block): string
     {
         if ($marks === []) {
             return nl2br(htmlspecialchars($plain, ENT_QUOTES, 'UTF-8'));
         }
 
-        $filtered = array_values(array_filter($marks, static function ($mark) use ($block) {
-            if ($block === 'risk') {
-                return true;
-            }
-
-            return ($mark['block'] ?? '') === $block;
-        }));
-
-        usort($filtered, static function ($a, $b) {
-            return ($a['offset'] <=> $b['offset']) ?: ($b['length'] <=> $a['length']);
-        });
-
-        $occupied = [];
-        $accepted = [];
-        foreach ($filtered as $mark) {
-            $start = (int) $mark['offset'];
-            $end = $start + (int) $mark['length'];
-            $overlap = false;
-            for ($i = $start; $i < $end; $i++) {
-                if (! empty($occupied[$i])) {
-                    $overlap = true;
-                    break;
-                }
-            }
-            if ($overlap) {
-                continue;
-            }
-            for ($i = $start; $i < $end; $i++) {
-                $occupied[$i] = true;
-            }
-            $accepted[] = $mark;
+        $accepted = EseninMarkAcceptor::accept($marks, $block);
+        if ($accepted === []) {
+            return nl2br(htmlspecialchars($plain, ENT_QUOTES, 'UTF-8'));
         }
-
-        usort($accepted, static function ($a, $b) {
-            return $b['offset'] <=> $a['offset'];
-        });
 
         $html = $plain;
         foreach ($accepted as $mark) {

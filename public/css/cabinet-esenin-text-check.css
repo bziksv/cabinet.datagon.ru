@@ -2,6 +2,18 @@
     --esenin-accent: #6f42c1;
 }
 
+.cabinet-esenin-nav-card > .card-header {
+    background: transparent;
+}
+
+.cabinet-esenin-module-nav .nav-link {
+    font-size: 0.875rem;
+}
+
+.cabinet-esenin-module-nav .nav-link.active {
+    background-color: var(--esenin-accent);
+}
+
 .cabinet-esenin-lead {
     background: linear-gradient(135deg, rgba(111, 66, 193, 0.08), rgba(13, 110, 253, 0.05));
     border: 1px solid rgba(111, 66, 193, 0.15);
@@ -186,6 +198,47 @@
     max-width: 48rem;
     margin-left: auto;
     margin-right: auto;
+}
+
+.cabinet-esenin-input--has-results [data-esenin-panel="text"] {
+    display: none;
+}
+
+.cabinet-esenin-results-editor .cabinet-esenin-editor {
+    margin-top: 0.25rem;
+}
+
+.cabinet-esenin-text-view__content h1,
+.cabinet-esenin-text-view__content h2,
+.cabinet-esenin-text-view__content h3,
+.cabinet-esenin-text-view__content h4,
+.cabinet-esenin-text-view__content h5,
+.cabinet-esenin-text-view__content h6 {
+    font-weight: 600;
+    line-height: 1.3;
+    margin-bottom: 0.75rem;
+}
+
+.cabinet-esenin-text-view__content h1 {
+    font-size: 1.5rem;
+}
+
+.cabinet-esenin-text-view__content h2 {
+    font-size: 1.3rem;
+}
+
+.cabinet-esenin-text-view__content h3 {
+    font-size: 1.15rem;
+}
+
+.cabinet-esenin-text-view__content ul,
+.cabinet-esenin-text-view__content ol {
+    margin-bottom: 0.75rem;
+    padding-left: 1.35rem;
+}
+
+.cabinet-esenin-text-view__content strong {
+    font-weight: 600;
 }
 
 .cabinet-esenin-text-view__content {

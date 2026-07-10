@@ -4,6 +4,7 @@ namespace App\Services\Demo;
 
 use App\Services\EseninTextCheckService;
 use App\Support\Esenin\EseninAnalyzer;
+use App\Support\EseninTextCheckSettingsRegistry;
 use App\Support\TextAnalyzerPdfBranding;
 
 class EseninTextCheckDemoService
@@ -15,7 +16,7 @@ class EseninTextCheckDemoService
      */
     public static function config(): array
     {
-        return config('cabinet-esenin-text-check.demo', []);
+        return EseninTextCheckSettingsRegistry::demoConfig();
     }
 
     /**
@@ -72,7 +73,7 @@ class EseninTextCheckDemoService
             );
         }
         if ($plainLength > $maxChars) {
-            $full = (int) ($cfg['full_max_chars'] ?? config('cabinet-esenin-text-check.max_chars', 20000));
+            $full = (int) ($cfg['full_max_chars'] ?? EseninTextCheckSettingsRegistry::moduleInt('max_chars', 20000));
 
             return self::fail(
                 422,
@@ -130,7 +131,7 @@ class EseninTextCheckDemoService
                 'max_runs_per_day' => $maxRuns,
                 'max_chars' => (int) ($cfg['max_chars'] ?? 5000),
                 'min_chars' => (int) ($cfg['min_chars'] ?? 100),
-                'full_max_chars' => (int) ($cfg['full_max_chars'] ?? config('cabinet-esenin-text-check.max_chars', 20000)),
+                'full_max_chars' => (int) ($cfg['full_max_chars'] ?? EseninTextCheckSettingsRegistry::moduleInt('max_chars', 20000)),
                 'cost_per_check' => EseninTextCheckService::costPerCheck(),
             ],
             'result' => $result,

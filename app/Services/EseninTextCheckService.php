@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Support\Esenin\EseninAnalyzer;
+use App\Support\EseninTextCheckSettingsRegistry;
 
 class EseninTextCheckService
 {
@@ -27,7 +28,7 @@ class EseninTextCheckService
             throw new \InvalidArgumentException('Текст для проверки не указан');
         }
 
-        $maxChars = (int) config('cabinet-esenin-text-check.max_chars', 20000);
+        $maxChars = EseninTextCheckSettingsRegistry::moduleInt('max_chars', 20000);
         $plainLength = EseninAnalyzer::plainTextLength($text);
         if ($plainLength > $maxChars) {
             throw new \InvalidArgumentException(sprintf(
@@ -36,9 +37,12 @@ class EseninTextCheckService
             ));
         }
 
-        $mode = self::normalizeMode((string) ($options['mode'] ?? config('cabinet-esenin-text-check.default_mode', 'risk')));
+        $mode = self::normalizeMode((string) ($options['mode'] ?? EseninTextCheckSettingsRegistry::moduleString('default_mode', 'risk')));
 
-        return EseninAnalyzer::analyze($text, $mode);
+        return EseninAnalyzer::analyze($text, $mode, [
+            'url' => $options['url'] ?? null,
+            'tbclass' => $options['tbclass'] ?? null,
+        ]);
     }
 
     /**
@@ -65,7 +69,10 @@ class EseninTextCheckService
             throw new \InvalidArgumentException('Не удалось выделить текст на странице');
         }
 
-        return self::checkText($text, $options);
+        return self::checkText($text, array_merge($options, [
+            'url' => $url,
+            'tbclass' => trim((string) ($options['tbclass'] ?? '')),
+        ]));
     }
 
     public static function levelClass(?int $score): string
@@ -100,6 +107,6 @@ class EseninTextCheckService
 
     public static function costPerCheck(): int
     {
-        return max(1, (int) config('cabinet-esenin-text-check.cost_per_check', 1));
+        return max(1, EseninTextCheckSettingsRegistry::moduleInt('cost_per_check', 1));
     }
 }

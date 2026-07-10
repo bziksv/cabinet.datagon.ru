@@ -29,6 +29,9 @@
 
     var maxChars = config.maxChars || 20000;
     var editorRoot = root.querySelector('[data-esenin-editor]');
+    var editorHostInput = root.querySelector('[data-esenin-editor-host-input]');
+    var editorHostResults = root.querySelector('[data-esenin-editor-host-results]');
+    var inputWrap = root.querySelector('[data-esenin-input]');
     var textEl = root.querySelector('#cabinet-esenin-text');
     var plainEl = root.querySelector('#cabinet-esenin-plain');
     var htmlSourceEl = root.querySelector('[data-esenin-html-source]');
@@ -69,6 +72,7 @@
     var hintsBodyEl = root.querySelector('[data-esenin-hints-body]');
     var autosaveStatusEl = root.querySelector('[data-esenin-autosave-status]');
     var staleBannerEl = root.querySelector('[data-esenin-stale-banner]');
+    var providersBarEl = root.querySelector('[data-esenin-providers-bar]');
     var recheckBtn = root.querySelector('[data-esenin-recheck]');
     var sharePanelEl = root.querySelector('[data-esenin-public-share]');
     var shareUrlEl = root.querySelector('[data-esenin-share-url]');
@@ -200,6 +204,51 @@
         if (recheckBtn) {
             recheckBtn.classList.toggle('d-none', !lastResult);
         }
+    }
+
+    function renderProvidersBar(result) {
+        if (!providersBarEl || !result) {
+            return;
+        }
+
+        var providers = result.providers || {};
+        var parts = [];
+        var lt = providers.languagetool || {};
+        var tg = providers.turgenev || {};
+        var oc = providers.opencorpora || {};
+        var learn = providers.learning || {};
+
+        if (lt.ok) {
+            parts.push('LanguageTool: ' + (lt.matches || 0) + ' замеч.');
+        } else if (lt.error && lt.error !== 'skipped' && lt.error !== 'disabled') {
+            parts.push('LanguageTool: недоступен');
+        }
+
+        if (tg.ok) {
+            parts.push('Тургенев: риск ' + (tg.risk != null ? tg.risk : '—'));
+            if (tg.report_url) {
+                parts.push('<a href="' + escapeHtml(tg.report_url) + '" target="_blank" rel="noopener">полный отчёт</a>');
+            }
+        } else if (tg.error && tg.error !== 'skipped' && tg.error !== 'disabled') {
+            parts.push('Тургенев: ' + escapeHtml(String(tg.error)));
+        }
+
+        if (oc.ok && oc.unknown) {
+            parts.push('OpenCorpora: ' + oc.unknown + ' не в словаре');
+        }
+
+        if (learn.recorded) {
+            parts.push('в словарь-кандидаты: +' + learn.recorded);
+        }
+
+        if (parts.length === 0) {
+            providersBarEl.classList.add('d-none');
+            providersBarEl.innerHTML = '';
+            return;
+        }
+
+        providersBarEl.classList.remove('d-none');
+        providersBarEl.innerHTML = parts.join(' · ');
     }
 
     function markResultsStale() {
@@ -1481,9 +1530,51 @@
         }
     }
 
+    function refreshEditorLayout() {
+        refreshCodeMirrors();
+        if (ckEditor && typeof ckEditor.resize === 'function') {
+            setTimeout(function () {
+                ckEditor.resize('100%', 280);
+            }, 60);
+        }
+    }
+
+    function relocateEditor(toResults) {
+        if (!editorRoot) {
+            return;
+        }
+
+        var targetBody = toResults && editorHostResults
+            ? editorHostResults.querySelector('.card-body')
+            : null;
+        var targetHost = toResults
+            ? (targetBody || editorHostResults || editorHostInput)
+            : (editorHostInput || root);
+
+        if (!targetHost || editorRoot.parentElement === targetHost) {
+            if (editorHostResults) {
+                editorHostResults.classList.toggle('d-none', !toResults);
+            }
+            if (inputWrap) {
+                inputWrap.classList.toggle('cabinet-esenin-input--has-results', !!toResults);
+            }
+            return;
+        }
+
+        targetHost.appendChild(editorRoot);
+
+        if (editorHostResults) {
+            editorHostResults.classList.toggle('d-none', !toResults);
+        }
+        if (inputWrap) {
+            inputWrap.classList.toggle('cabinet-esenin-input--has-results', !!toResults);
+        }
+
+        refreshEditorLayout();
+    }
+
     function updateCkeditorFloatVisibility() {
-        var hide = !!(resultsWrap && !resultsWrap.classList.contains('d-none'));
-        document.body.classList.toggle('esenin-hide-ck-float', hide);
+        document.body.classList.remove('esenin-hide-ck-float');
     }
 
     function clearResults() {
@@ -1518,6 +1609,11 @@
         }
         updateSharePanel(null);
         updateStaleBanner();
+        if (providersBarEl) {
+            providersBarEl.classList.add('d-none');
+            providersBarEl.innerHTML = '';
+        }
+        relocateEditor(false);
         updateCkeditorFloatVisibility();
     }
 
@@ -1648,7 +1744,9 @@
         }
 
         renderBlock('risk');
+        renderProvidersBar(result);
         updateSharePanel(share || { available: publicShareAvailable, stale: false });
+        relocateEditor(true);
         updateCkeditorFloatVisibility();
     }
 

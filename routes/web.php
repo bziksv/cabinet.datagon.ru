@@ -207,6 +207,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('index-check', 'IndexCheckController@index')->name('pages.index-check')->middleware('permission:Index check');
 
+    Route::match(['get', 'post'], 'esenin-text-check/settings', 'EseninTextCheckAdminController@settings')->name('pages.esenin-text-check.settings')->middleware(['role:Super Admin|admin']);
     Route::match(['get', 'post'], 'esenin-text-check', 'EseninTextCheckController@index')->name('pages.esenin-text-check')->middleware('permission:Esenin text check');
     Route::post('esenin-text-check/save', 'EseninTextCheckController@save')->name('pages.esenin-text-check.save')->middleware('permission:Esenin text check');
     Route::get('esenin-text-check/sessions', 'EseninTextCheckController@listSessions')->name('pages.esenin-text-check.sessions')->middleware('permission:Esenin text check');

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\EseninTextCheckSession;
 use App\EseninTextCheckVersion;
+use App\Support\EseninTextCheckSettingsRegistry;
 use Illuminate\Support\Facades\Schema;
 
 class EseninTextCheckSessionService
@@ -16,12 +17,12 @@ class EseninTextCheckSessionService
 
     public static function maxVersionsPerSession(): int
     {
-        return max(1, (int) config('cabinet-esenin-text-check.limits.max_versions_per_session', 3));
+        return max(1, EseninTextCheckSettingsRegistry::moduleInt('max_versions_per_session', 3));
     }
 
     public static function maxSavedSessions(): int
     {
-        return max(1, (int) config('cabinet-esenin-text-check.limits.max_saved_sessions', 50));
+        return max(1, EseninTextCheckSettingsRegistry::moduleInt('max_saved_sessions', 50));
     }
 
     public static function findSessionForUser(int $sessionId, int $userId): ?EseninTextCheckSession

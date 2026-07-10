@@ -294,6 +294,11 @@ body.esenin-hide-ck-float > .cke_float {
     margin-top: 0.5rem;
 }
 
+.cabinet-esenin-results-editor .card-body {
+    padding-bottom: 0.75rem;
+}
+
+.cabinet-esenin-results-grid,
 .cabinet-esenin-results .row {
     align-items: flex-start;
 }

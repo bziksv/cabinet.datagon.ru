@@ -107,19 +107,20 @@
 
             <div class="alert alert-info py-2 px-3 small mb-3 d-none" data-esenin-providers-bar role="status"></div>
 
-            <div class="row g-3">
+            <div class="cabinet-esenin-results-editor card shadow-sm mb-3 d-none" data-esenin-editor-host-results>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                        <h6 class="fw-semibold mb-0">{{ __('Esenin text check editor view split') }}</h6>
+                        <span class="small text-secondary">{{ __('Esenin text check results editor hint') }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 cabinet-esenin-results-grid">
                 <div class="col-lg-2">
                     <div class="cabinet-esenin-score-nav" data-esenin-score-nav></div>
                 </div>
                 <div class="col-lg-7">
-                    <div class="cabinet-esenin-results-editor card shadow-sm mb-3 d-none" data-esenin-editor-host-results>
-                        <div class="card-body">
-                            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
-                                <h6 class="fw-semibold mb-0">{{ __('Esenin text check editor view split') }}</h6>
-                                <span class="small text-secondary">{{ __('Esenin text check results editor hint') }}</span>
-                            </div>
-                        </div>
-                    </div>
                     <div class="cabinet-esenin-text-view card shadow-sm">
                         <div class="card-body">
                             <div class="cabinet-esenin-text-view__wrap">

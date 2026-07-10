@@ -98,6 +98,12 @@ final class EseninPlainIndexMap
             return false;
         }
 
+        for ($i = $start; $i < $end; $i++) {
+            if (! isset($map[$i]) || ! is_array($map[$i])) {
+                return false;
+            }
+        }
+
         foreach (array_reverse($segments) as $segment) {
             self::wrapTextNodeSegment($dom, $segment, $mark);
         }

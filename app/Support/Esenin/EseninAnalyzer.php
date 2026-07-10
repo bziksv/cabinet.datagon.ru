@@ -25,7 +25,7 @@ final class EseninAnalyzer
      */
     public static function analyze(string $text, string $mode = 'risk', array $options = []): array
     {
-        $plain = self::normalizePlainText($text);
+        $plain = self::extractPlainText($text);
         if ($plain === '') {
             throw new \InvalidArgumentException('Текст для проверки не указан');
         }
@@ -148,7 +148,19 @@ final class EseninAnalyzer
 
     public static function plainTextLength(string $text): int
     {
-        return mb_strlen(self::normalizePlainText($text), 'UTF-8');
+        return mb_strlen(self::extractPlainText($text), 'UTF-8');
+    }
+
+    public static function extractPlainText(string $text): string
+    {
+        if (EseninHtmlHighlighter::isHtml($text)) {
+            $indexed = EseninPlainIndexMap::fromHtml($text);
+            if (($indexed['plain'] ?? '') !== '') {
+                return (string) $indexed['plain'];
+            }
+        }
+
+        return self::normalizePlainText($text);
     }
 
     /**

@@ -34,10 +34,21 @@ final class EseninHtmlHighlighter
         }
 
         foreach ($accepted as $mark) {
-            $start = (int) $mark['offset'];
-            $length = (int) $mark['length'];
             $index = EseninPlainIndexMap::fromDom($root);
-            EseninPlainIndexMap::wrapPlainRange($dom, $root, $plain, $start, $length, $mark, $index['map']);
+            $domPlain = (string) ($index['plain'] ?? '');
+            if ($domPlain === '') {
+                continue;
+            }
+
+            EseninPlainIndexMap::wrapPlainRange(
+                $dom,
+                $root,
+                $domPlain,
+                (int) $mark['offset'],
+                (int) $mark['length'],
+                $mark,
+                $index['map']
+            );
         }
 
         return self::innerHtml($root);

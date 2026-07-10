@@ -3,26 +3,13 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
-class SeedEseninTextCheckModuleNews extends Migration
+class FixEseninTextCheckModuleNewsContent extends Migration
 {
     private const AUTHOR_ID = 4;
 
     private const PUBLISHED_AT = '2026-07-10 22:00:00';
 
-    public function up(): void
-    {
-        $exists = DB::table('news')
-            ->where('user_id', self::AUTHOR_ID)
-            ->where('created_at', self::PUBLISHED_AT)
-            ->exists();
-
-        if ($exists) {
-            return;
-        }
-
-        DB::table('news')->insert([
-            'user_id' => self::AUTHOR_ID,
-            'content' => <<<'HTML'
+    private const CONTENT = <<<'HTML'
 <p>Доброго дня!</p>
 <p><strong>Запустили модуль «Проверка текста Есенин»</strong> — локальная оценка SEO-риска в духе «Баден-Баден»: повторы, стилистика, запросы, водность и удобочитаемость. Кратко, что внутри:</p>
 <ul>
@@ -35,19 +22,21 @@ class SeedEseninTextCheckModuleNews extends Migration
 <p>Модуль в меню кабинета: <strong><a href="https://cabinet.titlo.ru/esenin-text-check">cabinet.titlo.ru/esenin-text-check</a></strong>. На сайте — описание и демо без регистрации (2 проверки в сутки): <strong><a href="https://titlo.ru/proverka-teksta-esenin/">titlo.ru/proverka-teksta-esenin</a></strong>.</p>
 <p>Версия модуля в кабинете: <strong>1.3.0</strong>. Если интерфейс выглядит по-старому — обновите страницу с полной перезагрузкой (<strong>Ctrl+Shift+R</strong> / <strong>Cmd+Shift+R</strong>).</p>
 <p>При обнаружении ошибок просим писать в <a href="/support">службу поддержки</a>. Идеи по улучшению — в <a href="/ideas">раздел идей</a>.</p>
-HTML,
-            'files' => null,
-            'number_of_likes' => 0,
-            'created_at' => self::PUBLISHED_AT,
-            'updated_at' => self::PUBLISHED_AT,
-        ]);
-    }
+HTML;
 
-    public function down(): void
+    public function up(): void
     {
         DB::table('news')
             ->where('user_id', self::AUTHOR_ID)
             ->where('created_at', self::PUBLISHED_AT)
-            ->delete();
+            ->update([
+                'content' => self::CONTENT,
+                'updated_at' => self::PUBLISHED_AT,
+            ]);
+    }
+
+    public function down(): void
+    {
+        // intentionally empty — не возвращаем удалённый пункт про внутренние интеграции
     }
 }

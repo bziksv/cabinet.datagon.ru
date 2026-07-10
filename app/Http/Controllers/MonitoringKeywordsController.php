@@ -95,6 +95,9 @@ class MonitoringKeywordsController extends Controller
 
     public function showDataTable(Request $request, $id)
     {
+        @set_time_limit(120);
+        @ini_set('memory_limit', '512M');
+
         apply_team_permissions($id);
 
         $this->setProjectID($id);

@@ -52,8 +52,11 @@ class DomainMonitoring extends Model
      */
     protected function applyStatisticsResetState(): void
     {
+        $now = Carbon::now();
         $this->up_time = 0;
         $this->uptime_percent = 100;
+        $this->uptime_since = $now;
+        $this->last_check = $now;
         $this->time_last_breakdown = null;
         $this->total_time_last_breakdown = null;
         $this->broken = false;
@@ -66,11 +69,15 @@ class DomainMonitoring extends Model
      */
     public static function resetStatisticsForUser(int $userId): int
     {
+        $now = Carbon::now();
+
         return static::query()
             ->where('user_id', $userId)
             ->update([
                 'up_time' => 0,
                 'uptime_percent' => 100,
+                'uptime_since' => $now,
+                'last_check' => $now,
                 'time_last_breakdown' => null,
                 'total_time_last_breakdown' => null,
                 'broken' => false,
@@ -79,26 +86,45 @@ class DomainMonitoring extends Model
             ]);
     }
 
+    public static function uptimeTrackingSince($project): Carbon
+    {
+        if (!empty($project->uptime_since)) {
+            return new Carbon($project->uptime_since);
+        }
+
+        return new Carbon($project->created_at);
+    }
+
     public static function calculateUpTime($project)
     {
-        $created = new Carbon($project->created_at);
-        $lastCheck = new Carbon($project->last_check);
-        $totalTime = $created->diffInSeconds(Carbon::now());
+        $trackingSince = self::uptimeTrackingSince($project);
+        $totalTime = max(1, $trackingSince->diffInSeconds(Carbon::now()));
+
         if ($project->last_check === null) {
             if ($project->broken) {
                 return $project->uptime_percent = 0;
-            } else {
-                $project->up_time = $totalTime;
-                return $project->uptime_percent = 100;
             }
-        }
-        if ($project->broken) {
-            return $project->uptime_percent = $project->up_time / ($totalTime / 100);
+
+            $project->up_time = $totalTime;
+
+            return $project->uptime_percent = 100;
         }
 
-        $project->up_time += $lastCheck->diffInSeconds(Carbon::now());
-        $project->uptime_percent = $project->up_time / ($totalTime / 100);
-        $project->save();
+        if ($project->broken) {
+            return $project->uptime_percent = self::uptimePercentFromSeconds((int) $project->up_time, $totalTime);
+        }
+
+        $lastCheck = new Carbon($project->last_check);
+        $project->up_time += max(0, $lastCheck->diffInSeconds(Carbon::now()));
+        $project->uptime_percent = self::uptimePercentFromSeconds((int) $project->up_time, $totalTime);
+        if ($project->exists) {
+            $project->save();
+        }
+    }
+
+    private static function uptimePercentFromSeconds(int $upSeconds, int $totalSeconds): float
+    {
+        return min(100.0, ($upSeconds / ($totalSeconds / 100)));
     }
 
     public static function calculateTotalTimeLastBreakdown($project, $oldState)

@@ -395,6 +395,62 @@
         applyScrollTableFcInset(jQuery(api.table().container()));
     }
 
+    function cleanupFcLeftBlock(api) {
+        if (!api || !window.jQuery) {
+            return;
+        }
+        var $wrapper = jQuery(api.table().container());
+        var $leftHead = $wrapper.find('.DTFC_LeftHeadWrapper');
+        var $leftBody = $wrapper.find('.DTFC_LeftBodyLiner');
+        if (!$leftHead.length || !$leftBody.length) {
+            return;
+        }
+
+        var leftCount = monFixedLeftCount(api);
+        var leftWidths = buildFixedLeftColgroup(api, leftCount);
+        var cellCss = {};
+        leftWidths.forEach(function (px, i) {
+            cellCss[i] = { width: px, minWidth: px, maxWidth: px };
+        });
+
+        var resetCss = {
+            width: '',
+            minWidth: '',
+            maxWidth: '',
+            paddingLeft: '',
+            paddingRight: '',
+            borderLeftWidth: '',
+            borderRightWidth: '',
+            visibility: '',
+            color: '',
+            background: '',
+            backgroundColor: '',
+            overflow: '',
+            lineHeight: '',
+            fontSize: '',
+        };
+
+        $leftHead.find('thead th').removeClass(
+            'cabinet-mon-scrollhead-left-hidden cabinet-mon-scrollbody-left-hidden cabinet-mon-scroll-edge-col'
+        ).each(function (i) {
+            jQuery(this).css(resetCss);
+            if (cellCss[i]) {
+                jQuery(this).css(cellCss[i]);
+            }
+        });
+
+        $leftBody.find('tbody tr').each(function () {
+            jQuery(this).children('td').each(function (i) {
+                jQuery(this)
+                    .removeClass('cabinet-mon-scrollhead-left-hidden cabinet-mon-scrollbody-left-hidden cabinet-mon-scroll-edge-col')
+                    .css(resetCss);
+                if (cellCss[i]) {
+                    jQuery(this).css(cellCss[i]);
+                }
+            });
+        });
+    }
+
     function hideMainTableLeftColumns(api, leftCount) {
         if (!api || !window.jQuery) {
             return;
@@ -413,26 +469,40 @@
             }
         }
 
-        $wrapper.find('.dataTables_scrollHead thead th').removeClass(
-            'cabinet-mon-scrollhead-left-hidden cabinet-mon-scroll-edge-col'
-        );
+        var $scrollHeadTh = scrollHeadCells($wrapper);
+        $scrollHeadTh.removeClass('cabinet-mon-scrollhead-left-hidden cabinet-mon-scroll-edge-col');
         $wrapper.find('.dataTables_scrollBody tbody td').removeClass(
             'cabinet-mon-scrollbody-left-hidden cabinet-mon-scroll-edge-col'
         );
 
-        api.columns().every(function () {
-            var idx = this.index();
-            var $header = jQuery(this.header());
-            var $cells = jQuery(this.nodes());
+        if (!settings) {
+            cleanupFcLeftBlock(api);
+            return;
+        }
+
+        settings.aoColumns.forEach(function (col, idx) {
+            if (!col.bVisible) {
+                return;
+            }
+            var domIdx = visibleColumnDomIndex(settings, idx);
+            if (domIdx < 0) {
+                return;
+            }
             if (idx < leftCount) {
-                $header.addClass('cabinet-mon-scrollhead-left-hidden');
-                $cells.addClass('cabinet-mon-scrollbody-left-hidden');
+                $scrollHeadTh.eq(domIdx).addClass('cabinet-mon-scrollhead-left-hidden');
+                $wrapper.find('.dataTables_scrollBody tbody tr').each(function () {
+                    jQuery(this).children('td').eq(domIdx).addClass('cabinet-mon-scrollbody-left-hidden');
+                });
             }
             if (idx === edgeIdx) {
-                $header.addClass('cabinet-mon-scroll-edge-col');
-                $cells.addClass('cabinet-mon-scroll-edge-col');
+                $scrollHeadTh.eq(domIdx).addClass('cabinet-mon-scroll-edge-col');
+                $wrapper.find('.dataTables_scrollBody tbody tr').each(function () {
+                    jQuery(this).children('td').eq(domIdx).addClass('cabinet-mon-scroll-edge-col');
+                });
             }
         });
+
+        cleanupFcLeftBlock(api);
     }
 
     function syncMainTableLeftHiddenWidths($wrapper, leftCount, settings, api) {
@@ -458,7 +528,8 @@
         $wrapper.find('.dataTables_scrollHead table, .dataTables_scrollBody table').each(function () {
             applyColgroupWidths(jQuery(this), colWidths);
         });
-        $wrapper.find('.cabinet-mon-scrollhead-left-hidden, .cabinet-mon-scrollbody-left-hidden').css(zeroCss);
+        $wrapper.find('.dataTables_scrollHead .cabinet-mon-scrollhead-left-hidden, .dataTables_scrollBody .cabinet-mon-scrollbody-left-hidden').css(zeroCss);
+        cleanupFcLeftBlock(api);
     }
 
     function applyScrollTableFcInset($wrapper) {
@@ -694,8 +765,6 @@
         $wrapper.data('monScrollWired', true);
     }
 
-    var MON_TABLE_ROW_HOVER_BG = '#e9ecef';
-
     function monTableRowPairKey($tr) {
         var val = $tr.find('input[type="checkbox"]').first().val();
         if (val !== undefined && val !== '') {
@@ -711,20 +780,7 @@
         });
     }
 
-    function paintMonTableRowHover($rows, active) {
-        $rows.find('td').each(function () {
-            if (active) {
-                this.style.setProperty('background-color', MON_TABLE_ROW_HOVER_BG, 'important');
-            } else {
-                this.style.removeProperty('background-color');
-            }
-        });
-    }
-
     function clearMonTableRowHover($wrapper) {
-        $wrapper.find('tr.is-row-hover').each(function () {
-            paintMonTableRowHover(jQuery(this), false);
-        });
         $wrapper.find('tr.is-row-hover').removeClass('is-row-hover');
     }
 
@@ -736,10 +792,8 @@
         if (active) {
             clearMonTableRowHover($wrapper);
             $paired.addClass('is-row-hover');
-            paintMonTableRowHover($paired, true);
         } else {
             $paired.removeClass('is-row-hover');
-            paintMonTableRowHover($paired, false);
         }
     }
 
@@ -812,6 +866,67 @@
         enforceMonColumnWidths(api);
     }
 
+    function ensureMonTableAjaxReady(api) {
+        if (!api || !window.jQuery) {
+            return;
+        }
+        var settings = api.settings()[0];
+        if (settings) {
+            settings.bAjaxDataGet = true;
+        }
+    }
+
+    function monTableRenderedRowCount(api) {
+        if (!api || !window.jQuery) {
+            return 0;
+        }
+        return jQuery(api.table().container()).find('.dataTables_scrollBody tbody tr').length;
+    }
+
+    function clearMonTableDetachedRowNodes(api) {
+        if (!api) {
+            return;
+        }
+        var settings = api.settings()[0];
+        if (!settings || !settings.aoData) {
+            return;
+        }
+        settings.aoData.forEach(function (row) {
+            row.nTr = null;
+        });
+    }
+
+    function repairMonTableRenderedRows(api) {
+        if (!api || !window.jQuery) {
+            return false;
+        }
+        var settings = api.settings()[0];
+        if (!settings || !settings.aoData || !settings.aoData.length) {
+            return false;
+        }
+        if (monTableRenderedRowCount(api) > 0) {
+            return false;
+        }
+
+        if (settings.bDrawing) {
+            if (!monTableRepairQueued) {
+                monTableRepairQueued = true;
+                requestAnimationFrame(function () {
+                    monTableRepairQueued = false;
+                    repairMonTableRenderedRows(api);
+                });
+            }
+            return false;
+        }
+
+        clearMonTableDetachedRowNodes(api);
+        settings.bAjaxDataGet = false;
+        settings.bDrawing = false;
+        api.draw(false);
+        settings.bAjaxDataGet = true;
+        return true;
+    }
+
     function finalizeMonTableLayout(api, options) {
         options = options || {};
         if (!api) {
@@ -831,27 +946,42 @@
             syncColumnVisibilityFromSettings(api);
             api.columns.adjust();
             clearMonTableRowInlineHeights(api);
-            destroyFixedColumns(api);
-            enforceMonColumnWidths(api);
-            ensureFixedColumns(api);
-            if (typeof api.fixedColumns === 'function') {
-                api.fixedColumns().relayout();
+            var settings = api.settings()[0];
+            if (options.rebuildFixedColumns) {
+                destroyFixedColumns(api);
+                ensureFixedColumns(api);
+            } else if (settings && settings._oFixedColumns) {
+                if (typeof api.fixedColumns === 'function') {
+                    api.fixedColumns().relayout();
+                }
+            } else {
+                ensureFixedColumns(api);
             }
-            applyVisibleColumnWidths(api);
-            syncFixedLeftBlock(api);
-            syncMonTableRowHeights(api);
+            enforceMonColumnWidths(api);
+            if (settings && settings._oFixedColumns) {
+                applyVisibleColumnWidths(api);
+                syncFixedLeftBlock(api);
+                syncMonTableRowHeights(api);
+            }
             wireMonTableRowHover(api);
+            repairMonTableRenderedRows(api);
+            if (options.markInitialDone !== false) {
+                monTableInitialLayoutDone = true;
+            }
             requestAnimationFrame(function () {
                 syncMonTableRowHeights(api);
                 remeasureMainTableLeftHiddenWidths(api);
                 requestAnimationFrame(function () {
                     relayoutMonTableFcLayout(api);
+                    repairMonTableRenderedRows(api);
+                    ensureMonTableAjaxReady(api);
+                    if (typeof options.onComplete === 'function') {
+                        options.onComplete();
+                    }
                 });
             });
-            if (options.markInitialDone !== false) {
-                monTableInitialLayoutDone = true;
-            }
         } finally {
+            ensureMonTableAjaxReady(api);
             if (lockedHere) {
                 monTableLayoutLocked = false;
             }
@@ -886,6 +1016,7 @@
     }
 
     var monTableInitialLayoutDone = false;
+    var monTableRepairQueued = false;
 
     function tableScrollHeight(api) {
         if (root.getAttribute('data-view') !== 'keywords') {
@@ -936,21 +1067,32 @@
         });
     }
 
-    function afterMonTableDraw(api) {
-        if (!api || monColumnTogglePending || monTableLayoutLocked || !monTableInitialLayoutDone) {
+    function afterMonTableDraw(api, done) {
+        if (!api) {
+            if (typeof done === 'function') {
+                done();
+            }
             return;
         }
-        wireMonTableRowHover(api);
+        ensureMonTableAjaxReady(api);
+        if (!monTableInitialLayoutDone) {
+            if (typeof done === 'function') {
+                done();
+            }
+            return;
+        }
         requestAnimationFrame(function () {
             if (monColumnTogglePending || monTableLayoutLocked) {
+                if (typeof done === 'function') {
+                    done();
+                }
                 return;
             }
-            enforceMonColumnWidths(api);
-            syncMonTableRowHeights(api);
-            remeasureMainTableLeftHiddenWidths(api);
-            requestAnimationFrame(function () {
-                relayoutMonTableFcLayout(api);
-            });
+            relayoutMonTableFcLayout(api);
+            repairMonTableRenderedRows(api);
+            if (typeof done === 'function') {
+                done();
+            }
         });
     }
 
@@ -1036,11 +1178,8 @@
                 });
             }
 
-            api.one('draw.dt.monColToggle', function () {
-                runFinalize();
-            });
-
-            api.columns.adjust().draw(false);
+            api.columns.adjust();
+            runFinalize();
 
             setTimeout(function () {
                 if (monColumnTogglePending) {
@@ -1342,6 +1481,8 @@
         relayoutAfterColumnToggle: relayoutAfterColumnToggle,
         queueColumnVisibilityRelayout: queueColumnVisibilityRelayout,
         applyVisibleColumnWidths: applyVisibleColumnWidths,
+        ensureMonTableAjaxReady: ensureMonTableAjaxReady,
+        repairMonTableRenderedRows: repairMonTableRenderedRows,
         finalizeMonTableLayout: finalizeMonTableLayout,
         fitMonTableScrollArea: fitMonTableScrollArea,
         enforceMonColumnWidths: enforceMonColumnWidths,
@@ -1361,8 +1502,17 @@
             options = options || {};
             window.__cabinetMonKeywordsTableApi = api;
             if (!monTableInitialLayoutDone) {
+                var waitForRows = function (attempts) {
+                    if (monTableRenderedRowCount(api) > 0 || attempts <= 0) {
+                        finalizeMonTableLayout(api);
+                        return;
+                    }
+                    requestAnimationFrame(function () {
+                        waitForRows(attempts - 1);
+                    });
+                };
                 requestAnimationFrame(function () {
-                    finalizeMonTableLayout(api);
+                    waitForRows(120);
                 });
             }
             if (options.skipRelayout) {

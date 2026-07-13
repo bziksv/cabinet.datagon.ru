@@ -9,7 +9,7 @@
         <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/datatables-fixedcolumns/css/fixedColumns.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc26' }}">
+        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc37' }}">
     @endslot
 
     <div class="cabinet-mon-project-page" id="cabinet-mon-project-root" data-view="keywords">
@@ -49,7 +49,7 @@
                 <div class="cabinet-mon-project-table-panel__loader" id="cabinetMonShowTableLoader">
                     @include('monitoring.partials.show.loader', ['label' => __('Monitoring show table loading')])
                 </div>
-                <table class="table table-hover table-bordered text-center w-100 mb-0" id="monitoringTable"></table>
+                <table class="table table-bordered text-center w-100 mb-0" id="monitoringTable"></table>
             </div>
         </div>
     </div>
@@ -123,6 +123,37 @@
                 },
             };
         </script>
+        <script>
+            (function () {
+                if (typeof axios === 'undefined') {
+                    return;
+                }
+                var payload = {
+                    draw: 1,
+                    start: 0,
+                    length: parseInt(@json($length), 10) || 100,
+                    search: { value: '' },
+                    columns: [],
+                    region_id: @json($monChartRegion ? (string) $monChartRegion->id : ''),
+                    dates_range: @json(request('dates')),
+                    mode_range: @json(request('mode')),
+                };
+                var groupId = @json(request('group') ? (string) request('group') : '');
+                if (groupId) {
+                    payload.columns.push({
+                        data: 'group',
+                        name: 'group',
+                        searchable: true,
+                        orderable: true,
+                        search: { value: groupId },
+                    });
+                }
+                window.__monTableEarlyPrefetch = axios.post(
+                    '/monitoring/' + @json((int) $project->id) + '/table',
+                    payload
+                );
+            })();
+        </script>
         <script src="{{ asset('js/cabinet-monitoring-chart-scales.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-chart-scales.js')) ?: time() }}"></script>
         @include('monitoring.partials.smart-search-script')
         <script src="{{ asset('js/cabinet-monitoring-show-charts.js') }}?v={{ @filemtime(public_path('js/cabinet-monitoring-show-charts.js')) ?: time() }}"></script>
@@ -135,7 +166,7 @@
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables-fixedcolumns/js/dataTables.fixedColumns.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables-fixedcolumns/js/fixedColumns.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time()) . '-fc26' }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time()) . '-fc37' }}"></script>
         <!-- Select2 -->
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script src="{{ asset('js/cabinet-select2-defaults.js') }}?v={{ @filemtime(public_path('js/cabinet-select2-defaults.js')) ?: time() }}"></script>
@@ -879,7 +910,10 @@
             }
 
             let table = $('#monitoringTable');
-            var monTableBoot = { controlsReady: false, revealed: false };
+            var monTableBoot = {
+                controlsReady: !!(document.getElementById('cabinetMonTableControlsTpl') && document.getElementById('cabinetMonTableControlsTpl').innerHTML.trim()),
+                revealed: false,
+            };
 
             function monitoringTableHasBodyRows() {
                 return $('#monitoringTable_wrapper').find(
@@ -918,44 +952,48 @@
             }
 
             function tryRevealMonitoringTable(api) {
-                if (monTableBoot.revealed || !monTableBoot.controlsReady || !api) {
+                if (monTableBoot.revealed || !api) {
                     return;
                 }
                 monitoringTableHideProcessing();
                 var info = api.page.info();
-                if (info.recordsTotal > 0 && !monitoringTableHasLoadedData(api)) {
+                if (info.recordsTotal > 0 && !monitoringTableHasBodyRows()) {
+                    if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.repairMonTableRenderedRows) {
+                        window.cabinetMonitoringShowChrome.repairMonTableRenderedRows(api);
+                    }
                     return;
                 }
 
                 monTableBoot.revealed = true;
+                monitoringTableHideProcessing();
+                $('#cabinet-mon-show-table-host').removeClass('is-table-booting');
+                $('#cabinetMonShowTableLoader').remove();
 
-                var unveil = function () {
+                requestAnimationFrame(function () {
                     api.columns.adjust();
-                    var done = function () {
-                        monitoringTableHideProcessing();
-                        $('#cabinet-mon-show-table-host').removeClass('is-table-booting');
-                        $('#cabinetMonShowTableLoader').remove();
+                    var finishReady = function () {
                         if (window.cabinetMonitoringShowChrome) {
                             window.cabinetMonitoringShowChrome.onTableReady(api, { skipRelayout: true });
                         }
                     };
                     try {
                         if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.finalizeMonTableLayout) {
-                            window.cabinetMonitoringShowChrome.finalizeMonTableLayout(api);
-                        } else if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.relayoutKeywordsTable) {
-                            window.cabinetMonitoringShowChrome.relayoutKeywordsTable(null, {
+                            window.cabinetMonitoringShowChrome.finalizeMonTableLayout(api, {
+                                onComplete: finishReady,
+                            });
+                            return;
+                        }
+                        if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.relayoutKeywordsTable) {
+                            window.cabinetMonitoringShowChrome.relayoutKeywordsTable(finishReady, {
                                 adjustColumns: true,
                             });
-                            done();
                             return;
                         }
                     } catch (layoutErr) {
                         console.error('monitoring table unveil layout failed', layoutErr);
                     }
-                    done();
-                };
-
-                unveil();
+                    finishReady();
+                });
             }
 
             function cabinetMonShowTableLoadError() {
@@ -1100,7 +1138,7 @@
                 "timeOut": "5000"
             };
 
-            axios.post('/monitoring/' + PROJECT_ID + '/table', monTableBootstrapPayload()).then(function (response) {
+            (window.__monTableEarlyPrefetch || axios.post('/monitoring/' + PROJECT_ID + '/table', monTableBootstrapPayload())).then(function (response) {
                 monTablePrefetch = response.data;
 
                 let tableRegions = response.data.region || [];
@@ -1152,6 +1190,8 @@
                 try {
                 dTable = table.DataTable({
                     dom: '<"card-header d-flex align-items-center"<"card-title"><"float-right"l>><"card-body p-0"<"mailbox-controls">rt><"card-footer clearfix"p><"clear">',
+                    stripeClasses: [],
+                    orderClasses: false,
                     scrollX: true,
                     scrollY: '1020px',
                     scrollCollapse: false,
@@ -1163,7 +1203,7 @@
                         { orderable: false, targets: '_all' },
                     ]),
                     lengthMenu: LENGTH_MENU,
-                    pageLength: PAGE_LENGTH,
+                    pageLength: parseInt(PAGE_LENGTH, 10) || 100,
                     pagingType: "simple_numbers",
                     language: {
                         lengthMenu: "_MENU_",
@@ -1547,8 +1587,6 @@
 
                                 if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.queueColumnVisibilityRelayout) {
                                     window.cabinetMonitoringShowChrome.queueColumnVisibilityRelayout(api);
-                                } else {
-                                    api.draw(false);
                                 }
                             }
 
@@ -1587,10 +1625,7 @@
                                 if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.queueColumnVisibilityRelayout) {
                                     window.cabinetMonitoringShowChrome.queueColumnVisibilityRelayout(api);
                                 } else if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.relayoutAfterColumnToggle) {
-                                    api.draw(false);
                                     window.cabinetMonitoringShowChrome.relayoutAfterColumnToggle(api);
-                                } else {
-                                    api.draw(false);
                                 }
                             });
 
@@ -1732,41 +1767,45 @@
                     drawCallback: function () {
                         let api = this.api();
                         monitoringTableHideProcessing();
-                        if (!monTableBoot.revealed && monTableBoot.controlsReady) {
+                        if (!monTableBoot.revealed) {
                             tryRevealMonitoringTable(api);
                         }
-                        let data = api.data();
-                        let $bodyRows = $('#monitoringTable_wrapper .dataTables_scrollBody tbody tr');
 
-                        if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.clearMonTableRowHover) {
-                            window.cabinetMonitoringShowChrome.clearMonTableRowHover();
-                        }
+                        var applyDrawDecorations = function () {
+                            let data = api.data();
+                            let $bodyRows = $('#monitoringTable_wrapper .dataTables_scrollBody tbody tr');
 
-                        $bodyRows.each(function (i, item) {
-                            let target = 0;
-                            if ('target' in data[i]) {
-                                target = $('<div />').html(data[i].target).text();
+                            if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.clearMonTableRowHover) {
+                                window.cabinetMonitoringShowChrome.clearMonTableRowHover();
                             }
-                            let positions = $(item).find('td span[data-position]');
 
-                            $(item).find('td').removeClass('cabinet-mon-pos-hit cabinet-mon-pos-near');
-
-                            $.each(positions, function (i, item) {
-                                let current = $(item).data('position');
-                                let nextTo = $(positions[i + 1]).data('position');
-                                let $cell = $(item).closest('td');
-
-                                if (target >= current) {
-                                    $cell.addClass('cabinet-mon-pos-hit');
-                                } else if (target >= nextTo) {
-                                    $cell.addClass('cabinet-mon-pos-near');
+                            $bodyRows.each(function (i, item) {
+                                let target = 0;
+                                if ('target' in data[i]) {
+                                    target = $('<div />').html(data[i].target).text();
                                 }
+                                let positions = $(item).find('td span[data-position]');
+
+                                $(item).find('td').removeClass('cabinet-mon-pos-hit cabinet-mon-pos-near');
+
+                                $.each(positions, function (i, item) {
+                                    let current = $(item).data('position');
+                                    let nextTo = $(positions[i + 1]).data('position');
+                                    let $cell = $(item).closest('td');
+
+                                    if (target >= current) {
+                                        $cell.addClass('cabinet-mon-pos-hit');
+                                    } else if (target >= nextTo) {
+                                        $cell.addClass('cabinet-mon-pos-near');
+                                    }
+                                });
                             });
-                        });
 
-                        $('.pagination').addClass('pagination-sm');
+                            $('.pagination').addClass('pagination-sm');
+                            cabinetMonWirePopovers(table[0]);
+                        };
 
-                        cabinetMonWirePopovers(table[0]);
+                        requestAnimationFrame(applyDrawDecorations);
 
                         if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.afterMonTableDraw) {
                             try {
@@ -1775,6 +1814,12 @@
                                 console.error('monitoring table layout failed', drawLayoutErr);
                             }
                         }
+
+                        requestAnimationFrame(function () {
+                            if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.ensureMonTableAjaxReady) {
+                                window.cabinetMonitoringShowChrome.ensureMonTableAjaxReady(api);
+                            }
+                        });
                     },
                 });
                 } catch (tableInitErr) {

@@ -1161,23 +1161,66 @@ button.cabinet-btn-busy:disabled {
     overflow: hidden;
 }
 
+.cabinet-mon-project-page #monitoringTable_wrapper {
+    --mon-table-row-hover-bg: #e9ecef;
+}
+
+/* DataTables display/stripe/hover/sorting — иначе рваная зебра и разный hover по колонкам */
+.cabinet-mon-project-page #monitoringTable_wrapper table.dataTable.display tbody tr,
+.cabinet-mon-project-page #monitoringTable_wrapper table.dataTable.stripe tbody tr.odd,
+.cabinet-mon-project-page #monitoringTable_wrapper table.dataTable.display tbody tr.odd,
+.cabinet-mon-project-page #monitoringTable_wrapper table.dataTable.display tbody tr.even,
+.cabinet-mon-project-page #monitoringTable_wrapper table.dataTable.hover tbody tr:hover,
+.cabinet-mon-project-page #monitoringTable_wrapper table.dataTable.display tbody tr:hover,
+.cabinet-mon-project-page #monitoringTable_wrapper table.dataTable.order-column tbody tr > .sorting_1,
+.cabinet-mon-project-page #monitoringTable_wrapper table.dataTable.order-column tbody tr > .sorting_2,
+.cabinet-mon-project-page #monitoringTable_wrapper table.dataTable.order-column tbody tr > .sorting_3,
+.cabinet-mon-project-page #monitoringTable_wrapper table.dataTable.display tbody tr > .sorting_1,
+.cabinet-mon-project-page #monitoringTable_wrapper table.dataTable.display tbody tr > .sorting_2,
+.cabinet-mon-project-page #monitoringTable_wrapper table.dataTable.display tbody tr > .sorting_3,
+.cabinet-mon-project-page #monitoringTable_wrapper table.dataTable.display tbody tr.odd > .sorting_1,
+.cabinet-mon-project-page #monitoringTable_wrapper table.dataTable.display tbody tr.even > .sorting_1 {
+    background-color: transparent !important;
+}
+
+/* Базовый фон строки — белый везде (FC + scroll), без рваной полосы */
+.cabinet-mon-project-page #monitoringTable_wrapper table.DTFC_Cloned tbody tr {
+    background-color: transparent !important;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody tr > td,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody tr > td {
+    position: relative;
+    background-color: #fff !important;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner td.cabinet-mon-scrollbody-left-hidden,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper th.cabinet-mon-scrollhead-left-hidden {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+    visibility: visible !important;
+    color: inherit !important;
+    background: #fff !important;
+    overflow: visible !important;
+    line-height: inherit !important;
+    font-size: inherit !important;
+}
+
 .cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody td.cabinet-mon-pos-hit {
-    background-color: #99e4b9;
+    background-color: #99e4b9 !important;
 }
 
 .cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody td.cabinet-mon-pos-near {
-    background-color: #fbe1df;
+    background-color: #fbe1df !important;
 }
 
-/* FC-клон: плагин красит tr в white — hover перебиваем в JS (setProperty important) и CSS */
-.cabinet-mon-project-page #monitoringTable_wrapper table.DTFC_Cloned tbody tr.is-row-hover,
-.cabinet-mon-project-page #monitoringTable_wrapper table.DTFC_Cloned tbody tr.is-row-hover > th,
-.cabinet-mon-project-page #monitoringTable_wrapper table.DTFC_Cloned tbody tr.is-row-hover > td,
-.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody tr.is-row-hover > td,
-.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody tr.is-row-hover > td,
-.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody tr.is-row-hover > td.cabinet-mon-pos-hit,
-.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody tr.is-row-hover > td.cabinet-mon-pos-near {
-    background-color: #e9ecef !important;
+/* Hover: один цвет на всю строку, включая зелёные/розовые позиции */
+.cabinet-mon-project-page #monitoringTable_wrapper tr.is-row-hover > td {
+    background-color: var(--mon-table-row-hover-bg) !important;
+    background-image: none !important;
 }
 
 .cabinet-mon-project-page #monitoringTable_wrapper table.table-hover > tbody > tr:hover > td,

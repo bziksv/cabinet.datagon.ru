@@ -694,24 +694,16 @@
         $wrapper.data('monScrollWired', true);
     }
 
-    function syncMonTableRowHoverIds(api) {
-        if (!api || !window.jQuery) {
-            return;
-        }
-        var $wrapper = jQuery(api.table().container());
+    function setMonTableRowHover($wrapper, rowIndex, active) {
         var $mainRows = $wrapper.find('.dataTables_scrollBody tbody tr');
         var $fcRows = $wrapper.find('.DTFC_LeftBodyLiner tbody tr');
-        $mainRows.each(function (i) {
-            var id = String(i);
-            this.setAttribute('data-mon-row', id);
-            if ($fcRows[i]) {
-                $fcRows[i].setAttribute('data-mon-row', id);
-            }
-        });
-    }
-
-    function monTableRowsByHoverId($wrapper, rowId) {
-        return $wrapper.find('tr[data-mon-row="' + rowId + '"]');
+        var $rows = $mainRows.eq(rowIndex).add($fcRows.eq(rowIndex));
+        if (active) {
+            $wrapper.find('tr.is-row-hover').removeClass('is-row-hover');
+            $rows.addClass('is-row-hover');
+        } else {
+            $rows.removeClass('is-row-hover');
+        }
     }
 
     function wireMonTableRowHover(api) {
@@ -719,26 +711,17 @@
             return;
         }
         var $wrapper = jQuery(api.table().container());
-        syncMonTableRowHoverIds(api);
         $wrapper.off('.monRowHover');
         $wrapper.on('mouseenter.monRowHover', '.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr', function () {
-            var rowId = this.getAttribute('data-mon-row');
-            if (rowId === null) {
-                return;
-            }
-            $wrapper.find('tr.is-row-hover').removeClass('is-row-hover');
-            monTableRowsByHoverId($wrapper, rowId).addClass('is-row-hover');
+            setMonTableRowHover($wrapper, jQuery(this).index(), true);
         });
         $wrapper.on('mouseleave.monRowHover', '.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr', function (e) {
-            var rowId = this.getAttribute('data-mon-row');
-            if (rowId === null) {
-                return;
-            }
+            var rowIndex = jQuery(this).index();
             var $relatedRow = jQuery(e.relatedTarget).closest('.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr');
-            if ($relatedRow.length && $relatedRow.attr('data-mon-row') === rowId) {
+            if ($relatedRow.length && $relatedRow.index() === rowIndex) {
                 return;
             }
-            monTableRowsByHoverId($wrapper, rowId).removeClass('is-row-hover');
+            setMonTableRowHover($wrapper, rowIndex, false);
         });
     }
 

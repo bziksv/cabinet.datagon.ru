@@ -1169,13 +1169,18 @@ button.cabinet-btn-busy:disabled {
     background-color: #fbe1df;
 }
 
+/* FC-клон: плагин красит tr в white — перебиваем только через is-row-hover */
+.cabinet-mon-project-page #monitoringTable_wrapper table.DTFC_Cloned tbody tr.is-row-hover,
+.cabinet-mon-project-page #monitoringTable_wrapper table.DTFC_Cloned tbody tr.is-row-hover > th,
+.cabinet-mon-project-page #monitoringTable_wrapper table.DTFC_Cloned tbody tr.is-row-hover > td,
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody tr.is-row-hover > td,
 .cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody tr.is-row-hover > td {
     background-color: #e9ecef !important;
 }
 
-.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody .table-hover > tbody > tr:hover > *,
-.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner .table-hover > tbody > tr:hover > * {
+.cabinet-mon-project-page #monitoringTable_wrapper table.table-hover > tbody > tr:hover > td,
+.cabinet-mon-project-page #monitoringTable_wrapper table.table-hover > tbody > tr:hover > th,
+.cabinet-mon-project-page #monitoringTable_wrapper table.table-hover > tbody > tr:hover {
     background-color: transparent !important;
 }
 

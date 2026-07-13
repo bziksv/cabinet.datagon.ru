@@ -9,7 +9,7 @@
         <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/datatables-fixedcolumns/css/fixedColumns.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc23' }}">
+        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc24' }}">
     @endslot
 
     <div class="cabinet-mon-project-page" id="cabinet-mon-project-root" data-view="keywords">
@@ -135,7 +135,7 @@
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables-fixedcolumns/js/dataTables.fixedColumns.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables-fixedcolumns/js/fixedColumns.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time()) . '-fc23' }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time()) . '-fc24' }}"></script>
         <!-- Select2 -->
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script src="{{ asset('js/cabinet-select2-defaults.js') }}?v={{ @filemtime(public_path('js/cabinet-select2-defaults.js')) ?: time() }}"></script>
@@ -1745,15 +1745,17 @@
                             }
                             let positions = $(item).find('td span[data-position]');
 
+                            $(item).find('td').removeClass('cabinet-mon-pos-hit cabinet-mon-pos-near');
+
                             $.each(positions, function (i, item) {
                                 let current = $(item).data('position');
                                 let nextTo = $(positions[i + 1]).data('position');
+                                let $cell = $(item).closest('td');
 
-                                if (target >= current)
-                                    $(item).closest('td').css('background-color', '#99e4b9');
-                                else {
-                                    if (target >= nextTo)
-                                        $(item).closest('td').css('background-color', '#fbe1df');
+                                if (target >= current) {
+                                    $cell.addClass('cabinet-mon-pos-hit');
+                                } else if (target >= nextTo) {
+                                    $cell.addClass('cabinet-mon-pos-near');
                                 }
                             });
                         });

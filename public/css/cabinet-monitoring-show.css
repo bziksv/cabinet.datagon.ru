@@ -1161,14 +1161,22 @@ button.cabinet-btn-busy:disabled {
     overflow: hidden;
 }
 
-.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody tr.is-row-hover td,
-.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody tr.is-row-hover td {
-    background-color: #f1f5f9 !important;
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody td.cabinet-mon-pos-hit {
+    background-color: #99e4b9;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody td.cabinet-mon-pos-near {
+    background-color: #fbe1df;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody tr.is-row-hover > td,
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody tr.is-row-hover > td {
+    background-color: #e9ecef !important;
 }
 
 .cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody .table-hover > tbody > tr:hover > *,
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner .table-hover > tbody > tr:hover > * {
-    background-color: inherit !important;
+    background-color: transparent !important;
 }
 
 .cabinet-mon-project-page .dataTables_scrollBody tbody td,

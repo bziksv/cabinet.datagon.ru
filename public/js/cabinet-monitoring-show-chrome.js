@@ -694,18 +694,24 @@
         $wrapper.data('monScrollWired', true);
     }
 
-    function monTableRowKey($tr) {
-        var $cb = $tr.find('input[type="checkbox"]').first();
-        if ($cb.length) {
-            return String($cb.val());
+    function syncMonTableRowHoverIds(api) {
+        if (!api || !window.jQuery) {
+            return;
         }
-        return 'idx:' + $tr.index();
+        var $wrapper = jQuery(api.table().container());
+        var $mainRows = $wrapper.find('.dataTables_scrollBody tbody tr');
+        var $fcRows = $wrapper.find('.DTFC_LeftBodyLiner tbody tr');
+        $mainRows.each(function (i) {
+            var id = String(i);
+            this.setAttribute('data-mon-row', id);
+            if ($fcRows[i]) {
+                $fcRows[i].setAttribute('data-mon-row', id);
+            }
+        });
     }
 
-    function monTableRowsByKey($wrapper, key) {
-        return $wrapper.find('.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr').filter(function () {
-            return monTableRowKey(jQuery(this)) === key;
-        });
+    function monTableRowsByHoverId($wrapper, rowId) {
+        return $wrapper.find('tr[data-mon-row="' + rowId + '"]');
     }
 
     function wireMonTableRowHover(api) {
@@ -713,19 +719,26 @@
             return;
         }
         var $wrapper = jQuery(api.table().container());
+        syncMonTableRowHoverIds(api);
         $wrapper.off('.monRowHover');
         $wrapper.on('mouseenter.monRowHover', '.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr', function () {
-            var key = monTableRowKey(jQuery(this));
-            $wrapper.find('.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr').removeClass('is-row-hover');
-            monTableRowsByKey($wrapper, key).addClass('is-row-hover');
-        });
-        $wrapper.on('mouseleave.monRowHover', '.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr', function (e) {
-            var key = monTableRowKey(jQuery(this));
-            var $relatedRow = jQuery(e.relatedTarget).closest('.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr');
-            if ($relatedRow.length && monTableRowKey($relatedRow) === key) {
+            var rowId = this.getAttribute('data-mon-row');
+            if (rowId === null) {
                 return;
             }
-            monTableRowsByKey($wrapper, key).removeClass('is-row-hover');
+            $wrapper.find('tr.is-row-hover').removeClass('is-row-hover');
+            monTableRowsByHoverId($wrapper, rowId).addClass('is-row-hover');
+        });
+        $wrapper.on('mouseleave.monRowHover', '.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr', function (e) {
+            var rowId = this.getAttribute('data-mon-row');
+            if (rowId === null) {
+                return;
+            }
+            var $relatedRow = jQuery(e.relatedTarget).closest('.dataTables_scrollBody tbody tr, .DTFC_LeftBodyLiner tbody tr');
+            if ($relatedRow.length && $relatedRow.attr('data-mon-row') === rowId) {
+                return;
+            }
+            monTableRowsByHoverId($wrapper, rowId).removeClass('is-row-hover');
         });
     }
 

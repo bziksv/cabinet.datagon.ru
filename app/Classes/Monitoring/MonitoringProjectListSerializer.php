@@ -78,7 +78,8 @@ class MonitoringProjectListSerializer
         $toRefresh = [];
 
         foreach ($projects as $project) {
-            if ($force || $this->snapshotIsEmpty($snapshots->get($project->id))) {
+            $snap = $snapshots->get($project->id);
+            if ($force || $this->snapshotNeedsRefresh($snap)) {
                 $toRefresh[] = $project;
             }
         }
@@ -339,6 +340,19 @@ class MonitoringProjectListSerializer
             && $snap->middle === null;
     }
 
+    private function snapshotNeedsRefresh(?MonitoringDataTableColumnsProject $snap): bool
+    {
+        if ($this->snapshotIsEmpty($snap)) {
+            return true;
+        }
+
+        if (!$snap->updated_at) {
+            return true;
+        }
+
+        return $snap->updated_at->lt(now()->subHours(24));
+    }
+
     /**
      * @param \Illuminate\Support\Collection<int, MonitoringProject> $projects
      * @param \Illuminate\Support\Collection<int, MonitoringDataTableColumnsProject> $snapshots
@@ -347,7 +361,7 @@ class MonitoringProjectListSerializer
     {
         $pending = 0;
         foreach ($projects as $project) {
-            if ($this->snapshotIsEmpty($snapshots->get($project->id))) {
+            if ($this->snapshotNeedsRefresh($snapshots->get($project->id))) {
                 $pending++;
             }
         }

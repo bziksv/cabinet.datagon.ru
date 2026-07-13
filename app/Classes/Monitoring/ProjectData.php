@@ -39,8 +39,6 @@ class ProjectData
     {
         $this->percentCalc();
         $this->masteredCalc();
-        $this->usersColumn();
-        $this->dropdownMenu();
 
         $this->result['words'] = $this->queries->count();
     }
@@ -92,19 +90,5 @@ class ProjectData
             ['monitoring_project_id' => $this->project['id']],
             $data
         );
-    }
-
-    private function dropdownMenu()
-    {
-        $this->result['dropdown_menu'] = "";
-
-        $this->result['dropdown_menu'] = view('monitoring.partials.dropdown-menu', ['project' => $this->project])->render();
-    }
-
-    private function usersColumn()
-    {
-        $this->result['users_column'] = "";
-
-        $this->result['users_column'] = view('monitoring.partials.users-column', ['project' => $this->project])->render();
     }
 }

@@ -37,7 +37,7 @@
                     <div class="row">
                         <div class="col-12">
                             <button type="submit" class="btn btn-primary btn-block"
-                                    onclick="ym(89500732,'reachGoal','verifikacija_po_majlu_1628'); _tmr.push({ type: 'reachGoal', id: 3340935, goal: 'Verifikacija170523'});">
+                                    onclick="ym(54591493,'reachGoal','verifikacija_po_majlu_1628'); ym(89500732,'reachGoal','verifikacija_po_majlu_1628'); _tmr.push({ type: 'reachGoal', id: 3340935, goal: 'Verifikacija170523'});">
                                 {{ __('Send') }}
                             </button>
                         </div>

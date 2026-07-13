@@ -713,6 +713,43 @@
             var generatedText = false
             var generatedCompetitorCoverage = false
             var progressPollToken = 0
+            var relevanceTableTemplates = {}
+
+            function cacheRelevanceTableTemplates() {
+                var tables = [
+                    {selector: '#unigram', parent: '.pb-3.unigram'},
+                    {selector: '#phrases', parent: '.phrases'},
+                    {selector: '#scanned-sites', parent: '.sites'},
+                    {selector: '#recommendations', parent: '.pb-3.recommendations'},
+                ]
+
+                tables.forEach(function (table) {
+                    var $table = $(table.selector)
+                    if ($table.length && !relevanceTableTemplates[table.selector]) {
+                        relevanceTableTemplates[table.selector] = {
+                            parent: table.parent,
+                            html: $table.prop('outerHTML'),
+                        }
+                    }
+                })
+            }
+
+            function ensureRelevanceAnalysisTables() {
+                Object.keys(relevanceTableTemplates).forEach(function (selector) {
+                    if ($(selector).length) {
+                        return
+                    }
+
+                    var template = relevanceTableTemplates[selector]
+                    if (!template) {
+                        return
+                    }
+
+                    $(template.parent).append(template.html)
+                })
+            }
+
+            cacheRelevanceTableTemplates()
 
             function destroyRelevanceDataTable(selector) {
                 var $el = $(selector)
@@ -720,12 +757,18 @@
                     return
                 }
                 if ($.fn.DataTable && $.fn.DataTable.isDataTable($el)) {
-                    $el.DataTable().clear().destroy(true)
-                    return
-                }
-                if ($.fn.DataTable.fnIsDataTable && $.fn.DataTable.fnIsDataTable($el)) {
+                    $el.DataTable().clear().destroy(false)
+                } else if ($.fn.DataTable.fnIsDataTable && $.fn.DataTable.fnIsDataTable($el)) {
                     $el.dataTable().fnDestroy()
                 }
+
+                var $wrap = $el.parent('.relevance-tlp-table-scroll')
+                if ($wrap.length) {
+                    $el.unwrap()
+                }
+
+                $el.find('tbody').empty()
+                $('#unigram_wrapper, #phrases_wrapper, #scanned-sites_wrapper, #recommendations_wrapper').remove()
             }
 
             function endProgress() {
@@ -976,6 +1019,7 @@
                 // Отдаём управление браузеру — иначе синхронный рендер 1000+ строк блокирует вкладку.
                 setTimeout(function () {
                     try {
+                        ensureRelevanceAnalysisTables()
                         sessionStorage.setItem('hideDomains', result.hide_ignored_domains)
                         renderTextTable(result.avg, result.main_page)
                         renderRecommendationsTable(result.recommendations, 50, localization)

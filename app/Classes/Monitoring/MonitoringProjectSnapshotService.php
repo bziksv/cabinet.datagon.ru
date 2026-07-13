@@ -23,6 +23,12 @@ class MonitoringProjectSnapshotService
             $pd->save();
             $this->forgetListCacheForProjectUsers($project);
             MonitoringChildRowsService::forgetProjectCache((int) $project->id);
+        } catch (\Throwable $e) {
+            Log::warning('monitoring snapshot refresh failed', [
+                'project_id' => $project->id,
+                'message' => $e->getMessage(),
+            ]);
+            throw $e;
         } finally {
             apply_global_team_permissions();
         }

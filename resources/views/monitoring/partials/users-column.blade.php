@@ -11,7 +11,7 @@
                 <img class="table-avatar img-circle img-bordered-sm" src="{{ $user->image }}">
             @endif
 
-            @if(auth()->user()->can('delete_user_from_project_monitoring') && $user->id !== auth()->id())
+            @if(auth()->user() && auth()->user()->can('delete_user_from_project_monitoring') && $user->id !== auth()->id())
                 <span class="badge badge-secondary navbar-badge detach-user" data-id="{{ $user->id }}" data-project="{{ $project->id }}" style="cursor: pointer; top: -5px; right: 0px; font-size: x-small;">
                     <i class="fas fa-times"></i>
                 </span>

@@ -18,7 +18,7 @@
     </div>
 
     <form action="#" id="counting-metrics-block" class="visually-hidden" onsubmit="return false;">
-        <input id="counting-metrics" type="submit" onclick="ym(89500732,'reachGoal','success_payment_1231'); return true;" value="Заказать"/>
+        <input id="counting-metrics" type="submit" onclick="ym(54591493,'reachGoal','success_payment_1231'); ym(89500732,'reachGoal','success_payment_1231'); return true;" value="Заказать"/>
     </form>
 </div>
 
@@ -36,6 +36,12 @@
         k = e.createElement(t), a = e.getElementsByTagName(t)[0], k.async = 1, k.src = r, a.parentNode.insertBefore(k, a);
     })(window, document, 'script', 'https://mc.yandex.ru/metrika/tag.js', 'ym');
 
+    ym(54591493, 'init', {
+        clickmap: true,
+        trackLinks: true,
+        accurateTrackBounce: true,
+        webvisor: true,
+    });
     ym(89500732, 'init', {
         clickmap: true,
         trackLinks: true,
@@ -44,5 +50,8 @@
     });
 </script>
 <noscript>
-    <div><img src="https://mc.yandex.ru/watch/89500732" style="position:absolute; left:-9999px;" alt=""/></div>
+    <div>
+        <img src="https://mc.yandex.ru/watch/54591493" style="position:absolute; left:-9999px;" alt=""/>
+        <img src="https://mc.yandex.ru/watch/89500732" style="position:absolute; left:-9999px;" alt=""/>
+    </div>
 </noscript>

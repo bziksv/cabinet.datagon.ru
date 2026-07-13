@@ -27,26 +27,28 @@ class MonitoringPosition extends Model
 
     public function scopeDateRange($query, array $dates = null)
     {
-        $start = Carbon::now()->subMonth();
-        $end = Carbon::now();
+        $start = Carbon::now()->subMonth()->startOfDay();
+        $end = Carbon::now()->endOfDay();
 
-        if($dates){
-
-            $start = Carbon::create($dates[0]);
-            $end = Carbon::create($dates[1]);
+        if ($dates) {
+            $start = Carbon::parse($dates[0])->startOfDay();
+            $end = Carbon::parse($dates[1])->endOfDay();
         }
 
-        return $query->where(DB::raw('DATE(created_at)'), '>=', $start)
-            ->where(DB::raw('DATE(created_at)'), '<=', $end);
+        // Без DATE(created_at): иначе индекс не используется и /monitoring/{id}/table сканирует всю таблицу.
+        return $query->where('created_at', '>=', $start)
+            ->where('created_at', '<=', $end);
     }
 
     public function scopeDateFind($query, array $dates = null)
     {
-        $start = Carbon::create($dates[0]);
-        $end = Carbon::create($dates[1]);
+        $start = Carbon::parse($dates[0])->startOfDay();
+        $end = Carbon::parse($dates[1])->endOfDay();
 
-        return $query->where(DB::raw('DATE(created_at)'), '=', $start)
-            ->orWhere(DB::raw('DATE(created_at)'), '=', $end);
+        return $query->where(function ($q) use ($start, $end) {
+            $q->whereBetween('created_at', [$start, $start->copy()->endOfDay()])
+                ->orWhereBetween('created_at', [$end->copy()->startOfDay(), $end]);
+        });
     }
 
     public function scopeWhereEngine($query, int $id)

@@ -96,7 +96,7 @@ class MonitoringKeywordsController extends Controller
     public function showDataTable(Request $request, $id)
     {
         @set_time_limit(120);
-        @ini_set('memory_limit', '512M');
+        @ini_set('memory_limit', '768M');
 
         apply_team_permissions($id);
 
@@ -422,21 +422,47 @@ class MonitoringKeywordsController extends Controller
                 default:
                     $mode = $this->mode;
                     if ($mode === "dates" || $mode === "main") {
-                        if (isset($collectionPositions[$i]))
-                            $row->put($i, view('monitoring.partials.show.position_with_date', ['model' => $collectionPositions[$i]])->render());
-                        else
+                        if (isset($collectionPositions[$i])) {
+                            $row->put($i, $this->renderPositionWithDateCell($collectionPositions[$i]));
+                        } else {
                             $row->put($i, '-');
-
+                        }
                     } else {
                         if (isset($collectionPositions[$i])) {
-                            $row->put($i, view('monitoring.partials.show.position', ['model' => $collectionPositions[$i]])->render());
-                        } else
+                            $row->put($i, $this->renderPositionCell($collectionPositions[$i]));
+                        } else {
                             $row->put($i, '-');
+                        }
                     }
             }
         }
 
         return $row;
+    }
+
+    private function renderPositionCell($model): string
+    {
+        $position = (int) $model->position;
+        $html = '<span data-position="' . $position . '">' . $position;
+        if (!empty($model->diffPosition)) {
+            $diff = (int) $model->diffPosition;
+            $html .= '<sup class="text-sm">' . ($diff > 0 ? '+' : '') . $diff . '</sup>';
+        }
+
+        return $html . '</span>';
+    }
+
+    private function renderPositionWithDateCell($model): string
+    {
+        $position = (int) $model->position;
+        $html = '<span data-position="' . $position . '" style="display: block;">' . $position;
+        if (!empty($model->diffPosition)) {
+            $diff = (int) $model->diffPosition;
+            $html .= '<sup class="text-sm">' . ($diff > 0 ? '+' : '') . $diff . '</sup>';
+        }
+        $html .= '</span><div class="badge badge-info">' . e($model->date) . '</div>';
+
+        return $html;
     }
 
     private function getLatestPositions()
@@ -654,19 +680,25 @@ class MonitoringKeywordsController extends Controller
         $ids = $this->queries->pluck('id');
         $region = $this->regions->first();
 
-        $model = MonitoringPosition::select('monitoring_keyword_id', 'url', 'created_at')
+        if ($ids->isEmpty() || !$region) {
+            return;
+        }
+
+        // DISTINCT в SQL: иначе грузим всю историю позиций (сотни тысяч строк) ради unique('url') в PHP.
+        $rows = MonitoringPosition::query()
+            ->select('monitoring_keyword_id', 'url', DB::raw('MAX(created_at) as created_at'))
             ->where('monitoring_searchengine_id', $region['id'])
             ->whereNotNull('url')
-            ->whereIn('monitoring_keyword_id', $ids)->orderBy('created_at', 'desc')->get();
+            ->where('url', '!=', '')
+            ->whereIn('monitoring_keyword_id', $ids)
+            ->groupBy('monitoring_keyword_id', 'url')
+            ->orderByDesc('created_at')
+            ->get();
 
-        $urls = $model->groupBy('monitoring_keyword_id');
+        $urls = $rows->groupBy('monitoring_keyword_id');
 
         $this->queries->transform(function ($item) use ($urls) {
-
-            $item->urls = collect([]);
-
-            if (isset($urls[$item->id]))
-                $item->urls = $urls[$item->id]->unique('url');
+            $item->urls = $urls->get($item->id, collect([]));
 
             return $item;
         });
@@ -677,6 +709,16 @@ class MonitoringKeywordsController extends Controller
         $regionIds = $this->regions->pluck('id')->filter();
 
         $this->queries->load(['positions' => function ($query) use ($regionIds, $dates) {
+            $query->select([
+                'id',
+                'monitoring_keyword_id',
+                'monitoring_searchengine_id',
+                'position',
+                'url',
+                'target',
+                'created_at',
+            ]);
+
             if ($regionIds->isNotEmpty()) {
                 $query->whereIn('monitoring_searchengine_id', $regionIds);
             }

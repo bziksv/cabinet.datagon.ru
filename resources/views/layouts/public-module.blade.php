@@ -56,5 +56,6 @@
 </footer>
 @include('layouts.partials.lte4-scripts')
 @yield('js')
+@include('layouts.partials.yandex-metrika')
 </body>
 </html>

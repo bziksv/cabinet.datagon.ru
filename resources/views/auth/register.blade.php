@@ -118,7 +118,7 @@
                                 <i class="fas fa-user-plus"></i> {{ __('Register') }}
                             </button>
                             <button type="button" class="btn btn-primary btn-block" id="sendFormButton"
-                                    onclick="ym(89500732, 'reachGoal', 'novaja_registracija_1231')"
+                                    onclick="ym(54591493, 'reachGoal', 'novaja_registracija_1231'); ym(89500732, 'reachGoal', 'novaja_registracija_1231')"
                                     style="display: none">
                                 <i class="fas fa-user-plus"></i> {{ __('Register') }}
                             </button>

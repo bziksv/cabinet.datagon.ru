@@ -890,7 +890,7 @@
     }
 
     function afterMonTableDraw(api) {
-        if (!api || monColumnTogglePending || monTableLayoutLocked) {
+        if (!api || monColumnTogglePending || monTableLayoutLocked || !monTableInitialLayoutDone) {
             return;
         }
         requestAnimationFrame(function () {

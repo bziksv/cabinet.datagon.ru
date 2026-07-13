@@ -247,6 +247,21 @@
             });
     }
 
+    function resetMonTableBodyScroll(api) {
+        if (!api || !window.jQuery) {
+            return;
+        }
+        var $wrapper = jQuery(api.table().container());
+        var $scrollBody = $wrapper.find('.dataTables_scrollBody');
+        if ($scrollBody.length) {
+            $scrollBody.scrollTop(0);
+        }
+        var $leftLiner = $wrapper.find('.DTFC_LeftBodyLiner');
+        if ($leftLiner.length) {
+            $leftLiner.scrollTop(0);
+        }
+    }
+
     function syncMonTableRowHeights(api) {
         if (!api || !window.jQuery) {
             return;
@@ -259,6 +274,9 @@
         var $mainRows = $wrapper.find('.dataTables_scrollBody tbody tr');
         var $fcRows = $wrapper.find('.DTFC_LeftBodyLiner tbody tr');
         if (!$mainRows.length || !$fcRows.length) {
+            return;
+        }
+        if ($mainRows.length !== $fcRows.length) {
             return;
         }
         $mainRows.each(function (i) {
@@ -1081,6 +1099,13 @@
             }
             return;
         }
+        resetMonTableBodyScroll(api);
+        if (runMonTablePendingRelayout(api)) {
+            if (typeof done === 'function') {
+                done();
+            }
+            return;
+        }
         requestAnimationFrame(function () {
             if (monColumnTogglePending || monTableLayoutLocked) {
                 if (typeof done === 'function') {
@@ -1191,6 +1216,34 @@
 
     function relayoutAfterColumnToggle(api) {
         queueColumnVisibilityRelayout(api);
+    }
+
+    function wireMonTableDataRefresh(api) {
+        if (!api || api._monTableDataRefreshWired) {
+            return;
+        }
+        api._monTableDataRefreshWired = true;
+        api.on('length.dt', function () {
+            api._monTablePendingRelayout = true;
+            clearMonTableRowInlineHeights(api);
+            resetMonTableBodyScroll(api);
+        });
+        api.on('page.dt', function () {
+            resetMonTableBodyScroll(api);
+        });
+    }
+
+    function runMonTablePendingRelayout(api) {
+        if (!api || !api._monTablePendingRelayout) {
+            return false;
+        }
+        api._monTablePendingRelayout = false;
+        finalizeMonTableLayout(api, {
+            force: true,
+            markInitialDone: false,
+            rebuildFixedColumns: true,
+        });
+        return true;
     }
 
     function scheduleRelayoutKeywordsTable(options) {
@@ -1484,6 +1537,9 @@
         ensureMonTableAjaxReady: ensureMonTableAjaxReady,
         repairMonTableRenderedRows: repairMonTableRenderedRows,
         finalizeMonTableLayout: finalizeMonTableLayout,
+        resetMonTableBodyScroll: resetMonTableBodyScroll,
+        wireMonTableDataRefresh: wireMonTableDataRefresh,
+        runMonTablePendingRelayout: runMonTablePendingRelayout,
         fitMonTableScrollArea: fitMonTableScrollArea,
         enforceMonColumnWidths: enforceMonColumnWidths,
         ensureFixedColumns: ensureFixedColumns,
@@ -1501,6 +1557,7 @@
         onTableReady: function (api, options) {
             options = options || {};
             window.__cabinetMonKeywordsTableApi = api;
+            wireMonTableDataRefresh(api);
             if (!monTableInitialLayoutDone) {
                 var waitForRows = function (attempts) {
                     if (monTableRenderedRowCount(api) > 0 || attempts <= 0) {

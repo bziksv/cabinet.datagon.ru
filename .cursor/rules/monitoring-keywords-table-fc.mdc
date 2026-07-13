@@ -1,0 +1,41 @@
+---
+description: Эталон FixedColumns для таблицы ключевых слов мониторинга (#monitoringTable). Читать перед правками layout/scroll/hover.
+globs: public/js/cabinet-monitoring-show-chrome.js,public/css/cabinet-monitoring-show.css,resources/views/monitoring/show.blade.php
+alwaysApply: false
+---
+
+# Monitoring keywords table — FixedColumns (baseline fc47)
+
+Полная документация: `docs/frontend/monitoring-keywords-fixed-columns.md`
+
+## Жёсткие правила
+
+1. **FixedColumns + scrollX** — не CSS sticky для левых колонок.
+2. Скрытые left-колонки в scroll-body: **width 0** + CSS `> * { display: none }` — иначе строки 200px+.
+3. Щель «Запрос|URL»: **`applyScrollTableFcInset`** (положительный `margin-left` ≈ ширина FC), пересчёт в rAF и на `visualViewport` (zoom 80%).
+4. FC colgroup: **`buildFcCloneColgroup`** — только left N колонок; **`restoreFcLeftColgroup`** после width ops / relayout.
+5. FC head margin: **`resetFcCloneTableMargin`** — `margin-left: 0` на FC tables (иначе «Запрос» пропадает).
+6. Horizontal scroll header: **`fitMonTableScrollHeadInner`** — headInner width = scrollBody.clientWidth; barGap = offsetWidth - clientWidth. **Без** macOS fallback barGap=15 и **без** scrollbar-gutter (fc48 откат).
+7. Вертикальный scroll: **`wireMonTableScrollSync`** + **`muteFcVerticalScrollHandlers`** после каждого FC relayout. Не transform на `<table>`.
+8. Hover: **`wireMonTableRowHover`** + **`paintMonTableRowHover`** (inline `#e9ecef !important`); index-based pairing FC + main.
+9. Scroll nav: **`#cabinetMonScrollNav`** / **`wireCabinetMonScrollNav`** — не удалять.
+10. Layout pipeline: **`finalizeMonTableLayout`** → enforce widths → `syncFixedLeftBlock` → hover → double rAF relayout. **Не вызывать `api.columns.adjust()`**.
+11. Empty tbody repair: **`repairMonTableRenderedRows`** в draw/finalize pipeline.
+12. Минимальный diff — не рефакторить соседний код. Cache-bust **`-fc47`** (увеличивать при изменениях).
+
+## Запрещено (регрессии)
+
+- `api.columns.adjust()` на FC-таблице
+- `buildFcCloneColgroup` с ширинами всех visible columns
+- fc48: `barGap = 15`, `scrollbar-gutter: stable`, двойной scrollLeft retry
+- Только CSS hover без `paintMonTableRowHover`
+
+## Перед коммитом проверить
+
+- `/monitoring/{id}#keywords` — gap ≈ 0, row ~42px, FC colgroup [46,62,380]
+- «Запрос» виден; FC table marginLeft = 0
+- Докрутка вправо — заголовки aligned с колонками
+- Hover — серая полоска на всей строке
+- Sort, page 2, 50→100 rows — stable 5+ sec
+- Fast scroll — no desync; zoom 80% — no gap
+- Scroll nav ↑↓ работает

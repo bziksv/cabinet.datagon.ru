@@ -9,7 +9,7 @@
         <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/daterangepicker/daterangepicker.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/datatables-fixedcolumns/css/fixedColumns.bootstrap4.min.css') }}">
-        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc39' }}">
+        <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-show.css') }}?v={{ (@filemtime(public_path('css/cabinet-monitoring-show.css')) ?: time()) . '-fc47' }}">
     @endslot
 
     <div class="cabinet-mon-project-page" id="cabinet-mon-project-root" data-view="keywords">
@@ -52,6 +52,15 @@
                 <table class="table table-bordered text-center w-100 mb-0" id="monitoringTable"></table>
             </div>
         </div>
+
+        <nav class="cabinet-mon-scroll-nav" id="cabinetMonScrollNav" aria-label="Прокрутка страницы">
+            <button type="button" class="cabinet-mon-scroll-nav__btn" data-mon-scroll="up" title="Прокрутить страницу вверх" aria-label="Прокрутить страницу вверх">
+                <i class="fas fa-chevron-up" aria-hidden="true"></i>
+            </button>
+            <button type="button" class="cabinet-mon-scroll-nav__btn" data-mon-scroll="down" title="Прокрутить страницу вниз" aria-label="Прокрутить страницу вниз">
+                <i class="fas fa-chevron-down" aria-hidden="true"></i>
+            </button>
+        </nav>
     </div>
 
     @include('monitoring.keywords.modal.main')
@@ -166,7 +175,7 @@
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables-fixedcolumns/js/dataTables.fixedColumns.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables-fixedcolumns/js/fixedColumns.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time()) . '-fc39' }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time()) . '-fc47' }}"></script>
         <!-- Select2 -->
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script src="{{ asset('js/cabinet-select2-defaults.js') }}?v={{ @filemtime(public_path('js/cabinet-select2-defaults.js')) ?: time() }}"></script>
@@ -970,7 +979,6 @@
                 $('#cabinetMonShowTableLoader').remove();
 
                 requestAnimationFrame(function () {
-                    api.columns.adjust();
                     var finishReady = function () {
                         if (window.cabinetMonitoringShowChrome) {
                             window.cabinetMonitoringShowChrome.onTableReady(api, { skipRelayout: true });
@@ -1829,6 +1837,10 @@
                             && window.cabinetMonitoringShowChrome.runMonTablePendingRelayout
                         ) {
                             window.cabinetMonitoringShowChrome.runMonTablePendingRelayout(api);
+                        }
+
+                        if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.wireMonTableRowHover) {
+                            window.cabinetMonitoringShowChrome.wireMonTableRowHover(api);
                         }
 
                         requestAnimationFrame(function () {

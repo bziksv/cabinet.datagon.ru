@@ -1008,11 +1008,19 @@ button.cabinet-btn-busy:disabled {
     z-index: 12;
     overflow: visible !important;
     box-shadow: 6px 0 10px -6px rgba(15, 23, 42, 0.18);
+    height: auto !important;
 }
 
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper,
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyWrapper {
     overflow: hidden !important;
+}
+
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner {
+    width: var(--mon-fc-left-width, 488px) !important;
+    max-width: var(--mon-fc-left-width, 488px) !important;
+    padding-right: 0 !important;
+    box-sizing: border-box !important;
 }
 
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper thead th.cabinet-mon-col-query {
@@ -1103,6 +1111,8 @@ button.cabinet-btn-busy:disabled {
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner table {
     table-layout: fixed;
     margin-bottom: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
 }
 
 .cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftHeadWrapper thead th,
@@ -1217,8 +1227,11 @@ button.cabinet-btn-busy:disabled {
     background-color: #fbe1df !important;
 }
 
-/* Hover: один цвет на всю строку, включая зелёные/розовые позиции */
-.cabinet-mon-project-page #monitoringTable_wrapper tr.is-row-hover > td {
+/* Hover: серая полоса на всю строку (FC + scroll), перебивает белый фон и зелёные/розовые позиции */
+.cabinet-mon-project-page #monitoringTable_wrapper .dataTables_scrollBody tbody tr.is-row-hover > td,
+.cabinet-mon-project-page #monitoringTable_wrapper .DTFC_LeftBodyLiner tbody tr.is-row-hover > td,
+.cabinet-mon-project-page #monitoringTable_wrapper tr.is-row-hover > td.cabinet-mon-pos-hit,
+.cabinet-mon-project-page #monitoringTable_wrapper tr.is-row-hover > td.cabinet-mon-pos-near {
     background-color: var(--mon-table-row-hover-bg) !important;
     background-image: none !important;
 }
@@ -1262,7 +1275,9 @@ button.cabinet-btn-busy:disabled {
 }
 
 .cabinet-mon-project-page .dataTables_scrollHeadInner {
-    box-sizing: content-box;
+    box-sizing: content-box !important;
+    overflow: hidden !important;
+    max-width: 100%;
 }
 
 .cabinet-mon-project-page .dataTables_scrollHead table.dataTable,
@@ -4880,5 +4895,85 @@ button.cabinet-btn-busy:disabled {
 
 .cabinet-mon-occurrence-modal .form-check-input:disabled + .form-check-label {
     opacity: 0.55;
+}
+
+/* Плавающая навигация по странице (когда колёсико перехватывает таблица) */
+.cabinet-mon-scroll-nav {
+    position: fixed;
+    right: 1.25rem;
+    bottom: 1.25rem;
+    z-index: 1080;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    pointer-events: none;
+}
+
+.cabinet-mon-project-page[data-view='overview'] .cabinet-mon-scroll-nav {
+    display: none;
+}
+
+.cabinet-mon-scroll-nav__btn {
+    pointer-events: auto;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 1px solid rgba(98, 125, 152, 0.28);
+    border-radius: 999px;
+    background: linear-gradient(165deg, #ffffff 0%, #eef2f7 100%);
+    color: var(--mon-proj-accent, #627d98);
+    box-shadow:
+        0 10px 24px rgba(15, 23, 42, 0.14),
+        0 2px 6px rgba(15, 23, 42, 0.08);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+        transform 0.16s ease,
+        box-shadow 0.16s ease,
+        background-color 0.16s ease,
+        color 0.16s ease,
+        opacity 0.16s ease;
+}
+
+.cabinet-mon-scroll-nav__btn i {
+    font-size: 0.95rem;
+}
+
+.cabinet-mon-scroll-nav__btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background: var(--mon-proj-accent, #627d98);
+    border-color: var(--mon-proj-accent, #627d98);
+    color: #fff;
+    box-shadow:
+        0 14px 28px rgba(15, 23, 42, 0.18),
+        0 4px 10px rgba(15, 23, 42, 0.1);
+}
+
+.cabinet-mon-scroll-nav__btn:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow:
+        0 6px 14px rgba(15, 23, 42, 0.14),
+        0 2px 4px rgba(15, 23, 42, 0.08);
+}
+
+.cabinet-mon-scroll-nav__btn:disabled {
+    opacity: 0.42;
+    cursor: default;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+}
+
+@media (max-width: 767.98px) {
+    .cabinet-mon-scroll-nav {
+        right: 0.85rem;
+        bottom: 0.85rem;
+    }
+
+    .cabinet-mon-scroll-nav__btn {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
 }
 

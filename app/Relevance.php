@@ -85,6 +85,9 @@ class Relevance
 
     public $scanHash;
 
+    /** @var array<string, int|float>|null */
+    private $storedCompetitorCorpusZones = null;
+
     public function __construct($request, $userId, bool $queue = false)
     {
         $this->queue = $queue;
@@ -203,6 +206,343 @@ class Relevance
         RemoveRelevanceProgress::dispatch($this->scanHash)
             ->onQueue('default')
             ->delay(now()->addSeconds(100));
+    }
+
+    /**
+     * Быстрое обновление только посадочной: конкуренты и TLP берутся из сохранённого результата.
+     */
+    public function analysisMainPageRefresh($historyId = false): void
+    {
+        $storedResult = RelevanceHistoryResult::where('project_id', '=', (int) $historyId)->first();
+        if ($storedResult === null) {
+            $this->analysis($historyId);
+
+            return;
+        }
+
+        RelevanceProgress::editProgress(10, $this->request);
+        $this->hydrateFromStoredResult($storedResult);
+
+        RelevanceProgress::editProgress(20, $this->request);
+        $this->getMainPageHtml();
+        $this->syncMainPageIntoSites();
+        $this->prepareMainPageTextPipeline();
+
+        RelevanceProgress::editProgress(60, $this->request);
+        $this->refreshMainPageCountsInWordForms();
+        $this->prepareUnigramTable();
+
+        RelevanceProgress::editProgress(75, $this->request);
+        $this->refreshMainPageCountsInPhrases();
+        $this->refreshMainPageSiteAnalytics();
+        $this->analyseRecommendations();
+
+        RelevanceProgress::editProgress(88, $this->request);
+        $this->prepareMainPageClouds();
+        $this->applyTableTfidfToUnigramTable();
+        $this->applyHybridTfCloudsFromUnigramTable();
+        $this->applyHybridTfCompCloudsFromUnigramTable();
+        $this->saveHistory($historyId);
+
+        UsersJobs::where('user_id', '=', $this->params['user_id'])->decrement('count_jobs');
+
+        RemoveRelevanceProgress::dispatch($this->scanHash)
+            ->onQueue('default')
+            ->delay(now()->addSeconds(100));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function decodeCompressedJsonField(?string $value): array
+    {
+        if (!is_string($value) || $value === '') {
+            return [];
+        }
+
+        $raw = @gzuncompress(base64_decode($value, true));
+        if (!is_string($raw) || $raw === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function hydrateFromStoredResult(RelevanceHistoryResult $storedResult): void
+    {
+        $this->wordForms = self::decodeCompressedJsonField($storedResult->unigram_table);
+        $this->wordForms = self::recanonicalizeStoredWordForms($this->wordForms);
+        $this->phrases = self::decodeCompressedJsonField($storedResult->phrases);
+        $this->recommendations = self::decodeCompressedJsonField($storedResult->recommendations);
+        $this->sites = self::decodeCompressedJsonField($storedResult->sites);
+        $this->tfCompClouds = self::decodeCompressedJsonField($storedResult->tf_comp_clouds);
+
+        $avg = $storedResult->average_values;
+        $this->avg = is_string($avg) ? (json_decode($avg, true) ?: []) : [];
+
+        $mainPageMeta = self::decodeCompressedJsonField($storedResult->main_page);
+        $this->countWordsInMyPage = (int) ($mainPageMeta['countWords'] ?? 0);
+        $this->countSymbolsInMyPage = (int) ($mainPageMeta['countSymbols'] ?? 0);
+        $this->storedCompetitorCorpusZones = [
+            'competitorCorpusWords' => max(1, (int) ($mainPageMeta['competitorCorpusWords'] ?? 1)),
+            'competitorTextWords' => max(1, (int) ($mainPageMeta['competitorTextWords'] ?? 1)),
+            'competitorLinkWords' => max(1, (int) ($mainPageMeta['competitorLinkWords'] ?? 1)),
+            'avgCompetitorDocWords' => max(1.0, (float) ($mainPageMeta['avgCompetitorDocWords'] ?? 1)),
+            'documentCount' => max(1, self::competitorDocumentCountFromSites($this->sites)),
+            'competitorSiteCount' => max(1, self::competitorDocumentCountFromSites($this->sites)),
+        ];
+
+        $cloudsComp = self::decodeCompressedJsonField($storedResult->clouds_competitors);
+        $this->competitorsCloud = [
+            'totalTf' => json_decode($cloudsComp['totalTf'] ?? '[]', true) ?: [],
+            'textTf' => json_decode($cloudsComp['textTf'] ?? '[]', true) ?: [],
+            'linkTf' => json_decode($cloudsComp['linkTf'] ?? '[]', true) ?: [],
+        ];
+        $this->competitorsTextAndLinksCloud = json_decode($cloudsComp['textAndLinks'] ?? '[]', true) ?: [];
+        $this->competitorsLinksCloud = json_decode($cloudsComp['links'] ?? '[]', true) ?: [];
+        $this->competitorsTextCloud = json_decode($cloudsComp['text'] ?? '[]', true) ?: [];
+
+        $this->competitorsLinks = '';
+        $this->competitorsText = '';
+        foreach ($this->sites as $page) {
+            if (!empty($page['ignored']) || !empty($page['mainPage'])) {
+                continue;
+            }
+
+            $this->competitorsLinks .= ' ' . ($page['linkText'] ?? '') . ' ';
+            $this->competitorsText .= ' ' . ($page['hiddenText'] ?? '') . ' ' . ($page['html'] ?? '') . ' ';
+        }
+        $this->competitorsTextAndLinks = ' ' . $this->competitorsLinks . ' ' . $this->competitorsText . ' ';
+    }
+
+    private function syncMainPageIntoSites(): void
+    {
+        $mainKey = $this->findMainPageSiteKey();
+        if ($mainKey === null) {
+            return;
+        }
+
+        $rawHtml = (string) ($this->params['html_main_page'] ?? '');
+        $this->sites[$mainKey]['defaultHtml'] = $rawHtml;
+        $this->sites[$mainKey]['html'] = $rawHtml;
+        $this->sites[$mainKey]['danger'] = $rawHtml === '';
+    }
+
+    private function prepareMainPageTextPipeline(): void
+    {
+        RelevanceProgress::editProgress(30, $this->request);
+        $mainKey = $this->findMainPageSiteKey();
+        if ($mainKey === null) {
+            return;
+        }
+
+        if (isset($this->request['noIndex']) && $this->request['noIndex'] == 'false') {
+            $this->sites[$mainKey]['html'] = TextAnalyzer::removeNoindexText($this->sites[$mainKey]['html']);
+        }
+
+        if (isset($this->request['hiddenText']) && $this->request['hiddenText'] == 'true') {
+            $this->sites[$mainKey]['hiddenText'] = self::getHiddenText($this->sites[$mainKey]['html']);
+        } else {
+            $this->sites[$mainKey]['hiddenText'] = '';
+        }
+
+        $this->separateMainPageLinksFromText($mainKey);
+
+        if (($this->request['conjunctionsPrepositionsPronouns'] ?? '') == 'false') {
+            foreach (['html', 'linkText', 'hiddenText'] as $zone) {
+                $this->sites[$mainKey][$zone] = TextAnalyzer::removeConjunctionsPrepositionsPronouns($this->sites[$mainKey][$zone] ?? '');
+            }
+        }
+
+        if (self::shouldApplyExcludedWordsList($this->request)) {
+            $listWords = (string) $this->request['listWords'];
+            foreach (['html', 'linkText', 'hiddenText'] as $zone) {
+                $this->sites[$mainKey][$zone] = TextAnalyzer::removeWords($listWords, $this->sites[$mainKey][$zone] ?? '');
+            }
+        }
+
+        $this->mainPage['html'] = $this->separateText($this->sites[$mainKey]['html'] ?? '');
+        $this->mainPage['linkText'] = $this->separateText($this->sites[$mainKey]['linkText'] ?? '');
+        $this->mainPage['hiddenText'] = $this->separateText($this->sites[$mainKey]['hiddenText'] ?? '');
+        $this->mainPage['passages'] = $this->separateText($this->sites[$mainKey]['passages'] ?? '');
+
+        $this->sites[$mainKey]['html'] = $this->mainPage['html'];
+        $this->sites[$mainKey]['linkText'] = $this->mainPage['linkText'];
+        $this->sites[$mainKey]['hiddenText'] = $this->mainPage['hiddenText'];
+        $this->sites[$mainKey]['passages'] = $this->mainPage['passages'];
+    }
+
+    private function separateMainPageLinksFromText(string $mainKey): void
+    {
+        $html = $this->sites[$mainKey]['html'] ?? '';
+        $this->sites[$mainKey]['linkText'] = TextAnalyzer::getLinkText($html);
+        $this->sites[$mainKey]['html'] = TextAnalyzer::deleteEverythingExceptCharacters(
+            TextAnalyzer::clearHTMLFromLinks($html)
+        );
+
+        if ($this->request['searchPassages']) {
+            $this->sites[$mainKey]['passages'] = self::searchPassages($this->sites[$mainKey]['defaultHtml'] ?? '');
+
+            $passagesArray = explode(' ', $this->sites[$mainKey]['passages']);
+            $processedHtml = ' ' . $this->sites[$mainKey]['html'] . ' ';
+            foreach ($passagesArray as $item) {
+                $search = " $item ";
+                $pos = strpos($processedHtml, $search);
+                if ($pos !== false) {
+                    $processedHtml = substr_replace($processedHtml, ' ', $pos, strlen($search));
+                }
+            }
+
+            $this->sites[$mainKey]['html'] = trim($processedHtml);
+        } else {
+            $this->sites[$mainKey]['passages'] = '';
+        }
+    }
+
+    private function refreshMainPageCountsInWordForms(): void
+    {
+        $myText = self::wordFrequencyMap(trim(($this->mainPage['html'] ?? '') . ' ' . ($this->mainPage['hiddenText'] ?? '')));
+        $myLink = self::wordFrequencyMap(strip_tags($this->mainPage['linkText'] ?? ''));
+        $myPassages = self::wordFrequencyMap(strip_tags($this->mainPage['passages'] ?? ''));
+
+        foreach ($this->wordForms as $root => &$wordForm) {
+            unset($wordForm['total']);
+
+            foreach ($wordForm as $word => &$form) {
+                if (!is_string($word) || !is_array($form)) {
+                    continue;
+                }
+
+                $repeatInTextMainPage = (int) ($myText[$word] ?? 0);
+                $repeatLinkInMainPage = (int) ($myLink[$word] ?? 0);
+                $repeatInPassagesMainPage = (int) ($myPassages[$word] ?? 0);
+
+                $form['repeatInTextMainPage'] = $repeatInTextMainPage;
+                $form['repeatInLinkMainPage'] = $repeatLinkInMainPage;
+                $form['repeatInPassagesMainPage'] = $repeatInPassagesMainPage;
+                $form['totalRepeatMainPage'] = $repeatInTextMainPage + $repeatLinkInMainPage;
+            }
+            unset($form);
+        }
+        unset($wordForm);
+    }
+
+    private function refreshMainPageCountsInPhrases(): void
+    {
+        if (!is_array($this->phrases) || $this->phrases === []) {
+            return;
+        }
+
+        RelevancePhraseNgrams::configureLemmaContext($this->wordForms);
+
+        try {
+            $mainText = self::concatenation([$this->mainPage['html'] ?? '', $this->mainPage['hiddenText'] ?? '']);
+            $corpusZones = $this->hybridCorpusZoneStats();
+
+            foreach ($this->phrases as $phrase => &$row) {
+                if (!is_string($phrase) || !is_array($row)) {
+                    continue;
+                }
+
+                $repeatInTextMainPage = RelevancePhraseNgrams::countLemmaPhraseOccurrences($phrase, $mainText);
+                $repeatLinkInMainPage = RelevancePhraseNgrams::countLemmaPhraseOccurrences(
+                    $phrase,
+                    $this->mainPage['linkText'] ?? ''
+                );
+
+                $row['repeatInTextMainPage'] = $repeatInTextMainPage;
+                $row['repeatInLinkMainPage'] = $repeatLinkInMainPage;
+                $row['totalRepeatMainPage'] = $repeatInTextMainPage + $repeatLinkInMainPage;
+
+                HybridRelevanceMetrics::applyTableTfidfToWordStats($row, $corpusZones);
+                HybridRelevanceMetrics::applyTableBm25ToWordStats($row, $corpusZones);
+            }
+            unset($row);
+        } finally {
+            RelevancePhraseNgrams::resetLemmaContext();
+        }
+    }
+
+    private function refreshMainPageSiteAnalytics(): void
+    {
+        $mainKey = $this->findMainPageSiteKey();
+        if ($mainKey === null) {
+            return;
+        }
+
+        $page = $this->sites[$mainKey];
+        $allText = self::concatenation([$page['html'] ?? '', $page['linkText'] ?? '', $page['hiddenText'] ?? '']);
+        $coverageObject = ($page['html'] ?? '') . ' ' . ($page['linkText'] ?? '') . ' ' . ($page['hiddenText'] ?? '');
+
+        $totalTf = 0.0;
+        foreach ($this->wordForms as $wordForm) {
+            $totalTf += (float) ($wordForm['total']['tf'] ?? 0);
+        }
+
+        $coverage = $this->calculateCoverage($coverageObject);
+        $this->sites[$mainKey]['coverage'] = round($coverage['text'] / 10, 2);
+        $this->sites[$mainKey]['coverageTf'] = $totalTf > 0
+            ? round($coverage['tf'] / ($totalTf / 100), 2)
+            : 0.0;
+        $this->sites[$mainKey]['density'] = $this->calculateDensityPoints($allText);
+
+        $text = trim(implode(' ', array_filter([
+            $page['html'] ?? '',
+            $page['hiddenText'] ?? '',
+            strip_tags($page['linkText'] ?? ''),
+        ])));
+        $this->sites[$mainKey]['countSymbols'] = Str::length($text);
+        $this->sites[$mainKey]['countWords'] = count(preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY));
+        $this->countSymbolsInMyPage = $this->sites[$mainKey]['countSymbols'];
+        $this->countWordsInMyPage = $this->sites[$mainKey]['countWords'];
+
+        $this->calculateWidthPoints();
+        $this->calculateTotalPoints();
+        $this->calculateAvg();
+    }
+
+    private function prepareMainPageClouds(): void
+    {
+        $documentFrequencyMap = $this->buildDocumentFrequencyMap();
+        $mainPage = self::concatenation([
+            $this->mainPage['html'],
+            $this->mainPage['hiddenText'],
+            $this->mainPage['linkText'],
+        ]);
+        $textMainPage = self::concatenation([
+            $this->mainPage['html'],
+            $this->mainPage['hiddenText'],
+        ]);
+
+        $this->mainPage['totalTf'] = $this->prepareTfCloud($mainPage, $documentFrequencyMap);
+        $this->mainPage['textTf'] = $this->prepareTfCloud($textMainPage, $documentFrequencyMap);
+        $this->mainPage['linkTf'] = $this->prepareTfCloud($this->mainPage['linkText'], $documentFrequencyMap);
+        $this->mainPage['textWithLinks'] = TextAnalyzer::prepareCloud($mainPage);
+        $this->mainPage['text'] = TextAnalyzer::prepareCloud($textMainPage);
+        $this->mainPage['links'] = TextAnalyzer::prepareCloud($this->mainPage['linkText']);
+
+        $mainKey = $this->findMainPageSiteKey();
+        if ($mainKey !== null) {
+            $this->tfCompClouds[$mainKey] = $this->prepareTfCloud(
+                $this->separateText(($this->sites[$mainKey]['html'] ?? '') . ' ' . ($this->sites[$mainKey]['linkText'] ?? '')),
+                $documentFrequencyMap
+            );
+        }
+
+        $this->applyExcludedWordsToPreparedClouds();
+    }
+
+    private function findMainPageSiteKey(): ?string
+    {
+        foreach ($this->sites as $key => $site) {
+            if (!empty($site['mainPage'])) {
+                return (string) $key;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -700,6 +1040,57 @@ class Relevance
 
                 $canonical = $resolvedRoots[$surface] ?? (string) $root;
                 $merged[$canonical][$surface] = ($merged[$canonical][$surface] ?? 0) + (int) $count;
+            }
+        }
+
+        return $merged;
+    }
+
+    /**
+     * Перегруппировка сохранённого unigram_table (актуальные правила лемматизации).
+     *
+     * @param array<string, array<string, mixed>> $wordForms
+     * @return array<string, array<string, mixed>>
+     */
+    private static function recanonicalizeStoredWordForms(array $wordForms): array
+    {
+        if ($wordForms === []) {
+            return [];
+        }
+
+        $m = new Morphy();
+        $candidates = [];
+
+        foreach ($wordForms as $wordForm) {
+            if (!is_array($wordForm)) {
+                continue;
+            }
+
+            foreach ($wordForm as $surface => $data) {
+                if ($surface === 'total' || !is_string($surface)) {
+                    continue;
+                }
+
+                $forms = $m->baseForms($surface);
+                $candidates[$surface] = $forms !== [] ? $forms : [mb_strtolower($surface, 'UTF-8')];
+            }
+        }
+
+        $resolvedRoots = $m->resolveRootsFromCandidates($candidates);
+        $merged = [];
+
+        foreach ($wordForms as $root => $wordForm) {
+            if (!is_array($wordForm)) {
+                continue;
+            }
+
+            foreach ($wordForm as $surface => $data) {
+                if ($surface === 'total' || !is_array($data)) {
+                    continue;
+                }
+
+                $canonical = $resolvedRoots[$surface] ?? mb_strtolower((string) $root, 'UTF-8');
+                $merged[$canonical][$surface] = $data;
             }
         }
 
@@ -2655,17 +3046,24 @@ class Relevance
         $mainPageText = trim(($this->mainPage['html'] ?? '') . ' ' . ($this->mainPage['hiddenText'] ?? ''));
         $mainPageLink = trim(strip_tags($this->mainPage['linkText'] ?? ''));
 
-        return [
+        $mainZones = [
             'mainPageWords' => max(1, (int) $this->countWordsInMyPage),
             'mainPageTextWords' => max(1, HybridRelevanceMetrics::countWordsInText($mainPageText)),
             'mainPageLinkWords' => max(1, HybridRelevanceMetrics::countWordsInText($mainPageLink)),
+        ];
+
+        if (is_array($this->storedCompetitorCorpusZones)) {
+            return array_merge($this->storedCompetitorCorpusZones, $mainZones);
+        }
+
+        return array_merge($mainZones, [
             'competitorCorpusWords' => max(1, HybridRelevanceMetrics::countWordsInText(trim($this->competitorsTextAndLinks))),
             'competitorTextWords' => max(1, HybridRelevanceMetrics::countWordsInText(trim($this->competitorsText ?? ''))),
             'competitorLinkWords' => max(1, HybridRelevanceMetrics::countWordsInText(trim($this->competitorsLinks ?? ''))),
             'avgCompetitorDocWords' => $this->countWords / max(1, $this->competitorDocumentCount()),
             'documentCount' => $this->competitorDocumentCount(),
             'competitorSiteCount' => max(1, $this->competitorDocumentCount()),
-        ];
+        ]);
     }
 
     public static function competitorDocumentCountFromSites(array $sites): int

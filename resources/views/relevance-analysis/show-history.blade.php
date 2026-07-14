@@ -1099,10 +1099,6 @@
                     showRepeatQueueOutcome(resultHtml, 'success');
                     showSuccessToast(resultHtml, false);
 
-                    window.setTimeout(function () {
-                        window.location.href = '/show-history/' + completedId;
-                    }, 1200);
-
                     return;
                 }
 

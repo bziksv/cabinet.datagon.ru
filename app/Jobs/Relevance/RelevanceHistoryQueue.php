@@ -56,11 +56,9 @@ class RelevanceHistoryQueue implements ShouldQueue
             }
 
         } elseif ($this->type == 'mainPage') {
-            $info = RelevanceHistory::where('id', '=', $this->request['id'])->first();
+            $this->relevance->analysisMainPageRefresh($this->historyId);
 
-            $this->relevance->getMainPageHtml();
-            $this->relevance->setSites($info->sites);
-
+            return;
         } elseif ($this->type == 'competitors') {
             $info = RelevanceHistory::where('id', '=', $this->request['id'])->first();
 

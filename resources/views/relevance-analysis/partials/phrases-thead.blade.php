@@ -58,7 +58,7 @@
         {{ __('Phrase') }}
         <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('Phrases (2-4 words) that occur on competitors websites, including all word forms.') }}</span>
             </span>
         </span>

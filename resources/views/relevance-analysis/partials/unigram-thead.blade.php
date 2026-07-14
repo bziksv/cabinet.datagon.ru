@@ -84,7 +84,7 @@
         {{ __('Words') }}
         <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('Words and their word forms that are present on competitors websites.') }}</span>
             </span>
         </span>

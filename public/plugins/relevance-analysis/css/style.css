@@ -154,6 +154,48 @@ a.paginate_button.current {
     max-width: 9rem;
 }
 
+#unigram > thead.unigram-thead .unigram-th-words,
+#phrases > thead.phrases-thead .phrases-th-words {
+    overflow: visible;
+}
+
+#unigram_wrapper .relevance-tlp-table-scroll .unigram-th-words .ui_tooltip_w,
+#phrases_wrapper .relevance-tlp-table-scroll .phrases-th-words .ui_tooltip_w {
+    position: relative;
+    overflow: visible;
+}
+
+#unigram_wrapper .relevance-tlp-table-scroll thead tr.unigram-thead__titles th .ui_tooltip,
+#phrases_wrapper .relevance-tlp-table-scroll thead tr.phrases-thead__titles th .ui_tooltip {
+    z-index: 30;
+}
+
+#unigram_wrapper .relevance-tlp-table-scroll .relevance-tlp-col-tip,
+#phrases_wrapper .relevance-tlp-table-scroll .relevance-tlp-col-tip {
+    left: 0;
+    right: auto;
+    top: 100%;
+    bottom: auto;
+    padding: 11px 0 0;
+    transform: none;
+    width: min(320px, calc(100vw - 2rem));
+    max-width: min(320px, calc(100vw - 2rem));
+    z-index: 40;
+}
+
+#unigram_wrapper .relevance-tlp-table-scroll .relevance-tlp-col-tip .ui_tooltip_content,
+#phrases_wrapper .relevance-tlp-table-scroll .relevance-tlp-col-tip .ui_tooltip_content {
+    white-space: normal;
+}
+
+#unigram_wrapper .relevance-tlp-table-scroll .relevance-tlp-col-tip .ui_tooltip_content:before,
+#unigram_wrapper .relevance-tlp-table-scroll .relevance-tlp-col-tip .ui_tooltip_content:after,
+#phrases_wrapper .relevance-tlp-table-scroll .relevance-tlp-col-tip .ui_tooltip_content:before,
+#phrases_wrapper .relevance-tlp-table-scroll .relevance-tlp-col-tip .ui_tooltip_content:after {
+    left: 10px;
+    transform: none;
+}
+
 #unigram > thead.unigram-thead .unigram-th-metric {
     width: 5.75rem;
     min-width: 5.75rem;

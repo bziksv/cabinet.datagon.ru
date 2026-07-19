@@ -1239,7 +1239,20 @@
                             return;
                         }
                         monTableFetch(data).then(function (resp) {
-                            callback(resp.data);
+                            var payload = resp.data || {};
+                            // Подставляем missing col_* — иначе DataTables tn/4 при смене страницы.
+                            if (Array.isArray(payload.data) && columns.length) {
+                                payload.data = payload.data.map(function (row) {
+                                    row = row || {};
+                                    columns.forEach(function (col) {
+                                        if (col && col.data != null && row[col.data] === undefined) {
+                                            row[col.data] = '-';
+                                        }
+                                    });
+                                    return row;
+                                });
+                            }
+                            callback(payload);
                         }).catch(function (err) {
                             console.error('monitoring table fetch failed', err);
                             monitoringTableHideProcessing();

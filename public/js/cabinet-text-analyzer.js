@@ -859,21 +859,410 @@
         }, true);
     }
 
+    function syncUniquenessUi(forceOn) {
+        var $sw = $('#switchCheckUniqueness');
+        var on = forceOn === true ? true : $sw.is(':checked');
+        if (forceOn === true && !$sw.is(':checked')) {
+            $sw.prop('checked', true);
+            on = true;
+        }
+        $('#cabinet-ta-uniqueness-panel').toggleClass('d-none', !on);
+        scheduleCostEstimate();
+    }
+
+    var costEstimateTimer = null;
+
+    function pluralLimit(n, $box) {
+        var abs = Math.abs(n) % 100;
+        var last = abs % 10;
+        var one = ($box && $box.attr('data-unit-one')) || 'лимит';
+        var few = ($box && $box.attr('data-unit-few')) || 'лимита';
+        var many = ($box && $box.attr('data-unit-many')) || 'лимитов';
+        if (abs > 10 && abs < 20) {
+            return many;
+        }
+        if (last === 1) {
+            return one;
+        }
+        if (last >= 2 && last <= 4) {
+            return few;
+        }
+        return many;
+    }
+
+    function currentFormMode() {
+        if ($('#cabinet-ta-mode-batch').hasClass('active')) {
+            return 'batch';
+        }
+        if ($('#cabinet-ta-mode-url').hasClass('active')) {
+            return 'url';
+        }
+        return 'text';
+    }
+
+    function scheduleCostEstimate() {
+        if (costEstimateTimer) {
+            window.clearTimeout(costEstimateTimer);
+        }
+        costEstimateTimer = window.setTimeout(updateCostEstimate, 280);
+    }
+
+    function updateCostEstimate() {
+        var card = document.getElementById('cabinetTaFormCard');
+        var $box = $('#cabinet-ta-cost-summary');
+        if (!card || !$box.length) {
+            return;
+        }
+        var estimateUrl = card.getAttribute('data-estimate-url');
+        if (!estimateUrl) {
+            return;
+        }
+        var mode = currentFormMode();
+        var uniqOn = $('#switchCheckUniqueness').is(':checked');
+        var eseninOn = $('#switchCheckEsenin').is(':checked');
+        var compareOn = $('#switchCompareCompetitor').is(':checked');
+        var batchCount = 0;
+        if (mode === 'batch') {
+            var max = parseInt(card.getAttribute('data-batch-max') || '20', 10) || 20;
+            batchCount = parseBatchItems($('#cabinet-ta-batch-input').val(), max).length;
+        }
+        if (!uniqOn && !eseninOn && mode !== 'batch') {
+            // всё равно показываем списание анализатора, если включены доп. проверки или пакет
+        }
+        var show = uniqOn || eseninOn || mode === 'batch' || compareOn;
+        $box.toggleClass('d-none', !show && mode === 'text' && !uniqOn && !eseninOn);
+        if (!show && !compareOn) {
+            $box.addClass('d-none');
+        }
+
+        var text = '';
+        if (mode === 'text') {
+            text = (getAnalyzerTextForEstimate() || '').trim();
+        }
+
+        $.ajax({
+            type: 'POST',
+            url: estimateUrl,
+            data: {
+                _token: card.getAttribute('data-csrf'),
+                type: mode === 'url' || mode === 'batch' ? 'url' : 'text',
+                text: text,
+                checkUniqueness: uniqOn ? 1 : 0,
+                checkEsenin: eseninOn ? 1 : 0,
+                compareCompetitor: compareOn ? 1 : 0,
+                batch_count: batchCount,
+            },
+            dataType: 'json',
+        }).done(function (data) {
+            if (!data || !data.ok) {
+                return;
+            }
+            var uniqCost = data.uniqueness || 0;
+            var eseninCost = data.esenin || 0;
+            var analyzerCost = data.analyzer || 0;
+            $('#cabinet-ta-uniq-cost-value').text(
+                uniqOn ? (String(uniqCost) + ' ' + pluralLimit(uniqCost, $box)) : '—'
+            );
+            $('#cabinet-ta-uniq-cost-hint').text(
+                uniqOn
+                    ? ((data.uniqueness_approx ? ($box.attr('data-approx') + '. ') : '') + ($box.attr('data-probe-hint') || ''))
+                    : ''
+            );
+            if (eseninOn) {
+                $('#cabinet-ta-esenin-cost-value').text(String(eseninCost) + ' ' + pluralLimit(eseninCost, $box));
+            }
+            var lines = [];
+            lines.push($box.attr('data-label-analyzer') + ': <strong>' + analyzerCost + '</strong> ' + pluralLimit(analyzerCost, $box));
+            if (uniqOn) {
+                lines.push($box.attr('data-label-uniqueness') + ': <strong>' + uniqCost + '</strong> ' + pluralLimit(uniqCost, $box)
+                    + (data.uniqueness_approx ? ' <span class="text-muted">(' + $box.attr('data-approx') + ')</span>' : ''));
+            }
+            if (eseninOn) {
+                lines.push($box.attr('data-label-esenin') + ': <strong>' + eseninCost + '</strong> ' + pluralLimit(eseninCost, $box));
+            }
+            var totalNote = [];
+            if (analyzerCost) {
+                totalNote.push('анализ ' + analyzerCost);
+            }
+            if (uniqCost) {
+                totalNote.push('уник. ' + uniqCost);
+            }
+            if (eseninCost) {
+                totalNote.push('есенин ' + eseninCost);
+            }
+            $('#cabinet-ta-cost-summary-list').html(lines.map(function (l) {
+                return '<li>' + l + '</li>';
+            }).join(''));
+            if (uniqOn || eseninOn || compareOn || mode === 'batch') {
+                $box.removeClass('d-none');
+            }
+        });
+    }
+
+    function fillExcludeFromUrl() {
+        var url = ($('#cabinet-ta-url').val() || '').trim();
+        var $ex = $('#cabinet-ta-exclude-domain');
+        if (!$ex.length) {
+            return;
+        }
+        // В режиме URL подставляем полный адрес страницы для прямой сверки
+        if (currentFormMode() === 'url' && url && !$ex.val()) {
+            $ex.val(url.match(/^https?:\/\//i) ? url : ('https://' + url));
+        }
+    }
+
+    function parseBatchItems(raw, max) {
+        var text = String(raw || '').replace(/\r\n/g, '\n').trim();
+        if (!text) {
+            return [];
+        }
+        var blocks = text.indexOf('\n---\n') !== -1
+            ? text.split(/\n---\n/)
+            : text.split('\n');
+        var items = [];
+        blocks.forEach(function (block) {
+            block = String(block || '').trim();
+            if (!block) {
+                return;
+            }
+            var firstLine = block.split('\n')[0].trim();
+            var looksUrl = /^https?:\/\//i.test(firstLine) || (/^[a-z0-9.-]+\.[a-z]{2,}/i.test(firstLine) && block.indexOf(' ') === -1);
+            if (looksUrl && block.indexOf('\n') === -1) {
+                items.push({ type: 'url', url: firstLine, label: firstLine });
+            } else if (looksUrl && block.split('\n').every(function (l) {
+                l = l.trim();
+                return !l || /^https?:\/\//i.test(l) || /^[a-z0-9.-]+\.[a-z]{2,}(\/|$)/i.test(l);
+            })) {
+                block.split('\n').forEach(function (line) {
+                    line = line.trim();
+                    if (line) {
+                        items.push({ type: 'url', url: line, label: line });
+                    }
+                });
+            } else {
+                items.push({
+                    type: 'text',
+                    textarea: block,
+                    label: block.slice(0, 80) + (block.length > 80 ? '…' : ''),
+                });
+            }
+        });
+        return items.slice(0, max || 20);
+    }
+
+    function runBatch() {
+        var card = document.getElementById('cabinetTaFormCard');
+        if (!card) {
+            return;
+        }
+        var max = parseInt(card.getAttribute('data-batch-max') || '20', 10) || 20;
+        var items = parseBatchItems($('#cabinet-ta-batch-input').val(), max);
+        var $status = $('#cabinet-ta-form-status');
+        var $prog = $('#cabinet-ta-batch-progress');
+        var $progText = $('#cabinet-ta-batch-progress-text');
+        var $wrap = $('#cabinet-ta-batch-results-wrap');
+        var $tbody = $('#cabinet-ta-batch-results tbody');
+        if (!items.length) {
+            $status.text('Добавьте URL или тексты для пакетной проверки').addClass('text-danger');
+            return;
+        }
+        syncUniquenessUi(true);
+        $tbody.empty();
+        $wrap.removeClass('d-none');
+        $prog.removeClass('d-none');
+        $('#cabinet-ta-progress').removeClass('d-none');
+        $status.removeClass('text-danger').text('');
+        $('#cabinet-ta-batch-run').prop('disabled', true);
+
+        var idx = 0;
+        function next() {
+            if (idx >= items.length) {
+                $progText.text('Готово: ' + items.length);
+                $('#cabinet-ta-progress-title').text('Пакет готов');
+                $('#cabinet-ta-progress-sub').text('Обработано: ' + items.length);
+                $('#cabinet-ta-batch-run').prop('disabled', false);
+                return;
+            }
+            var item = items[idx];
+            $progText.text('Проверка ' + (idx + 1) + ' / ' + items.length + '…');
+            $('#cabinet-ta-progress-title').text('Пакетная проверка…');
+            $('#cabinet-ta-progress-sub').text('Элемент ' + (idx + 1) + ' из ' + items.length);
+            var body = {
+                _token: card.getAttribute('data-csrf'),
+                type: item.type,
+                url: item.url || '',
+                textarea: item.textarea || '',
+                label: item.label || '',
+                checkUniqueness: $('#switchCheckUniqueness').is(':checked') ? 1 : 0,
+                saveUniqueness: $('#cabinet-ta-save-uniqueness').is(':checked') ? 1 : 0,
+                checkEsenin: $('#switchCheckEsenin').is(':checked') ? 1 : 0,
+                excludeOwnDomain: $('#cabinet-ta-exclude-domain').val() || '',
+                noIndex: $('#switchNoindex').is(':checked') ? 1 : 0,
+                hiddenText: $('#switchAltAndTitle').is(':checked') ? 1 : 0,
+                conjunctionsPrepositionsPronouns: $('#switchConjunctionsPrepositionsPronouns').is(':checked') ? 1 : 0,
+                removeWords: $('#removeWords').is(':checked') ? 1 : 0,
+                listWords: $('#listWords').val() || '',
+            };
+            $.ajax({
+                type: 'POST',
+                url: card.getAttribute('data-batch-url'),
+                data: body,
+                dataType: 'json',
+            }).done(function (data) {
+                var tr = $('<tr></tr>');
+                tr.append($('<td></td>').text((data && data.label) || item.label || '—'));
+                var g = (data && data.general) || {};
+                tr.append($('<td></td>').text(g.countWordsAll != null ? g.countWordsAll : '—'));
+                tr.append($('<td></td>').text(g.countStopWords != null ? g.countStopWords : '—'));
+                var pct = data && data.uniqueness_pct != null ? data.uniqueness_pct + '%' : (data && data.message) || '—';
+                tr.append($('<td></td>').text(pct));
+                var $btn = $('<button type="button" class="btn btn-xs btn-outline-primary">Детали</button>');
+                if (data && data.uniqueness && !data.uniqueness.error) {
+                    $btn.on('click', function () {
+                        renderUniquenessPanel(data.uniqueness);
+                        var el = document.getElementById('cabinet-ta-uniq-history-panel');
+                        if (el) {
+                            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    });
+                } else {
+                    $btn.prop('disabled', true);
+                }
+                tr.append($('<td></td>').append($btn));
+                $tbody.append(tr);
+            }).fail(function (xhr) {
+                var msg = (xhr.responseJSON && xhr.responseJSON.message) || 'Ошибка';
+                var tr = $('<tr></tr>');
+                tr.append($('<td></td>').text(item.label || '—'));
+                tr.append($('<td colspan="3"></td>').text(msg));
+                tr.append($('<td></td>'));
+                $tbody.append(tr);
+            }).always(function () {
+                idx += 1;
+                next();
+            });
+        }
+        next();
+    }
+
+    function renderUniquenessPanel(u) {
+        var $panel = $('#cabinet-ta-uniq-history-panel');
+        if (!$panel.length || !u) {
+            return;
+        }
+        $panel.removeClass('d-none').empty();
+        var pct = u.uniqueness_pct != null ? u.uniqueness_pct + '%' : '—';
+        if (u.no_significant_matches) {
+            pct = 'н/д';
+        }
+        var html = '<div class="card shadow-sm mb-3 cabinet-ta-uniqueness cabinet-ta-esenin-like"><div class="card-header py-2"><h3 class="card-title h6 mb-0">Уникальность: '
+            + pct
+            + '</h3></div><div class="card-body">';
+        if (u.error) {
+            html += '<div class="alert alert-warning mb-0">' + (u.message || 'Ошибка') + '</div>';
+        } else {
+            html += '<div class="row g-3">';
+            html += '<div class="col-lg-8"><div class="cabinet-esenin-text-view card shadow-sm mb-0"><div class="card-body">';
+            html += '<div class="cabinet-esenin-legend small text-secondary mb-3">Цветом отмечены неуникальные фрагменты.</div>';
+            html += '<div class="cabinet-esenin-text-view__content cabinet-esenin-text-view__content--readonly">';
+            if (u.highlighted_html) {
+                html += u.highlighted_html;
+            } else if (u.text) {
+                html += escapeHtml(u.text).replace(/\n/g, '<br>');
+            } else {
+                html += '<span class="text-muted">Текст проверки не сохранён в этой записи. Перепроверьте текст, чтобы увидеть подсветку.</span>';
+            }
+            html += '</div></div></div></div>';
+            html += '<div class="col-lg-4"><h6 class="fw-semibold mb-2">Источники</h6>';
+            html += '<ul class="list-unstyled mb-0">';
+            (u.sources || []).forEach(function (s) {
+                html += '<li class="mb-2 pb-2 border-bottom"><div class="small fw-semibold">'
+                    + (s.overlap_pct != null ? s.overlap_pct : 0) + '%</div>';
+                if (s.url) {
+                    html += '<a class="small text-break" href="' + s.url + '" target="_blank" rel="noopener">' + s.url + '</a>';
+                }
+                html += '</li>';
+            });
+            html += '</ul></div></div>';
+        }
+        html += '</div></div>';
+        $panel.html(html);
+        initMarkTips($panel.get(0));
+    }
+
+    function escapeHtml(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function initUniquenessHistory() {
+        var card = document.getElementById('cabinetTaFormCard');
+        if (!card) {
+            return;
+        }
+        var base = card.getAttribute('data-history-url');
+        var csrf = card.getAttribute('data-csrf');
+        $(document).on('click', '.cabinet-ta-uniq-history-open', function () {
+            var id = $(this).closest('tr').attr('data-id');
+            if (!id) {
+                return;
+            }
+            $.getJSON(base + '/' + id).done(function (data) {
+                if (data && data.ok && data.item) {
+                    renderUniquenessPanel(data.item.results || {});
+                    var el = document.getElementById('cabinet-ta-uniq-history-panel');
+                    if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }
+            });
+        });
+        $(document).on('click', '.cabinet-ta-uniq-history-del', function () {
+            var $tr = $(this).closest('tr');
+            var id = $tr.attr('data-id');
+            if (!id || !window.confirm('Удалить сохранённую проверку?')) {
+                return;
+            }
+            $.ajax({
+                type: 'DELETE',
+                url: base + '/' + id,
+                headers: { 'X-CSRF-TOKEN': csrf },
+            }).done(function () {
+                $tr.remove();
+            });
+        });
+    }
+
     function initForm(cfg) {
         if (cfg.isPublicView) {
             return;
         }
 
         function setMode(mode) {
-            $('#cabinet-ta-type').val(mode);
+            var isBatch = mode === 'batch';
+            $('#cabinet-ta-type').val(isBatch ? 'url' : mode);
             $('#cabinet-ta-mode-text').toggleClass('active', mode === 'text');
             $('#cabinet-ta-mode-url').toggleClass('active', mode === 'url');
+            $('#cabinet-ta-mode-batch').toggleClass('active', isBatch);
             $('#cabinet-ta-panel-text').toggleClass('d-none', mode !== 'text');
             $('#cabinet-ta-panel-url').toggleClass('d-none', mode !== 'url');
+            $('#cabinet-ta-panel-batch').toggleClass('d-none', !isBatch);
+            $('#cabinet-ta-submit').toggleClass('d-none', isBatch);
+            $('#cabinet-ta-batch-run').toggleClass('d-none', !isBatch);
+            $('#switchCompareCompetitor').closest('.cabinet-ta-switch-row').toggleClass('d-none', isBatch);
+            $('#cabinet-ta-competitor-url').toggleClass('d-none', isBatch || !$('#switchCompareCompetitor').is(':checked'));
+            if (isBatch) {
+                syncUniquenessUi(true);
+            }
+            scheduleCostEstimate();
         }
 
         $('#cabinet-ta-mode-text').on('click', function () { setMode('text'); });
         $('#cabinet-ta-mode-url').on('click', function () { setMode('url'); });
+        $('#cabinet-ta-mode-batch').on('click', function () { setMode('batch'); });
 
         $('#removeWords').on('change', function () {
             setExcludeWordsEnabled($(this).is(':checked'));
@@ -883,7 +1272,61 @@
             var on = $(this).is(':checked');
             $('#cabinet-ta-competitor-url').toggleClass('d-none', !on);
             $('#cabinet-ta-competitor-url-input').prop('required', on);
+            scheduleCostEstimate();
         });
+
+        $('#switchCheckUniqueness').on('change', function () {
+            syncUniquenessUi();
+        });
+        $('#switchCheckEsenin').on('change', function () {
+            $('#cabinet-ta-esenin-panel').toggleClass('d-none', !$(this).is(':checked'));
+            scheduleCostEstimate();
+        });
+        $('#cabinet-ta-url').on('change blur', fillExcludeFromUrl);
+        $('#cabinet-ta-textarea').on('input', scheduleCostEstimate);
+        $('#cabinet-ta-batch-input').on('input', scheduleCostEstimate);
+        $('#cabinet-ta-batch-run').on('click', runBatch);
+        $('#cabinet-ta-form').on('submit', function () {
+            if ($('#switchCheckUniqueness').is(':checked')) {
+                fillExcludeFromUrl();
+            }
+            var $prog = $('#cabinet-ta-progress');
+            var $btn = $('#cabinet-ta-submit');
+            var uniqOn = $('#switchCheckUniqueness').is(':checked');
+            var eseninOn = $('#switchCheckEsenin').is(':checked');
+            var title = 'Анализ текста…';
+            var sub = 'Собираем статистику, подождите';
+            if (uniqOn && eseninOn) {
+                title = 'Анализ + уникальность + Есенин…';
+                sub = 'Это может занять минуту и больше';
+            } else if (uniqOn) {
+                title = 'Анализ и проверка уникальности…';
+                sub = 'Ищем совпадения фрагментов, подождите';
+            } else if (eseninOn) {
+                title = 'Анализ и проверка Есенин…';
+                sub = 'Считаем риск и метрики, подождите';
+            }
+            $('#cabinet-ta-progress-title').text(title);
+            $('#cabinet-ta-progress-sub').text(sub);
+            $prog.removeClass('d-none');
+            $btn.prop('disabled', true).addClass('disabled');
+            $('#cabinet-ta-form-status').removeClass('text-danger').text('Идёт проверка…');
+            if ($('#cabinet-ta-progress-bar').length) {
+                var w = 28;
+                window.clearInterval(window._cabinetTaProgressTimer);
+                window._cabinetTaProgressTimer = window.setInterval(function () {
+                    w = Math.min(92, w + Math.random() * 4);
+                    $('#cabinet-ta-progress-bar').css('width', w + '%').attr('aria-valuenow', String(Math.round(w)));
+                }, 700);
+            }
+        });
+
+        syncUniquenessUi();
+        scheduleCostEstimate();
+        initUniquenessHistory();
+        initVisualTextEditor();
+        initCombinedUniqEseninPanel();
+        initMarkTips(document.querySelector('.cabinet-text-analyzer-page'));
 
         if (cfg.initialUrl && !cfg.hasResponse) {
             setMode('url');
@@ -891,6 +1334,301 @@
                 $('#cabinet-ta-submit').trigger('click');
             }, 600);
         }
+    }
+
+    function initVisualTextEditor() {
+        var ta = document.getElementById('cabinet-ta-textarea');
+        if (!ta) {
+            return;
+        }
+
+        function syncEstimate() {
+            scheduleCostEstimate();
+        }
+
+        if (typeof window.jQuery === 'undefined' || !window.jQuery.fn.ckeditor || typeof window.CKEDITOR === 'undefined') {
+            $(ta).on('input', syncEstimate);
+            return;
+        }
+
+        window.jQuery(ta).ckeditor({
+            language: 'ru',
+            height: 320,
+            toolbar: [
+                { name: 'basicstyles', items: ['Bold', 'Italic', 'Underline', 'Strike'] },
+                { name: 'paragraph', items: ['NumberedList', 'BulletedList', '-', 'Outdent', 'Indent'] },
+                { name: 'links', items: ['Link', 'Unlink'] },
+                { name: 'insert', items: ['Table', 'HorizontalRule'] },
+                { name: 'styles', items: ['Format'] },
+            ],
+        });
+
+        var editor = window.CKEDITOR.instances['cabinet-ta-textarea'];
+        if (!editor) {
+            $(ta).on('input', syncEstimate);
+            return;
+        }
+
+        editor.on('change', syncEstimate);
+        editor.on('paste', function () {
+            setTimeout(syncEstimate, 0);
+        });
+
+        $('#cabinet-ta-form').on('submit', function () {
+            if (editor && editor.updateElement) {
+                editor.updateElement();
+            }
+        });
+
+        window.cabinetTaCkEditor = editor;
+    }
+
+    function getAnalyzerTextForEstimate() {
+        if (window.cabinetTaCkEditor && window.cabinetTaCkEditor.getData) {
+            return window.cabinetTaCkEditor.getData() || '';
+        }
+        return ($('#cabinet-ta-textarea').val() || '');
+    }
+
+    function initCombinedUniqEseninPanel() {
+        var root = document.querySelector('[data-cabinet-ta-combined]');
+        if (!root) {
+            return;
+        }
+
+        var uniqData = parseJsonScript('cabinet-ta-uniq-highlight');
+        var eseninHighlights = parseJsonScript('cabinet-ta-esenin-highlights') || {};
+        var eseninMeta = parseJsonScript('cabinet-ta-esenin-meta') || {};
+        var highlightEl = root.querySelector('[data-combined-highlight]');
+        var legendEl = root.querySelector('[data-combined-legend]');
+        var footerEl = root.querySelector('[data-combined-footer]');
+        var titleEl = root.querySelector('[data-combined-side-title]');
+        var sideUniq = root.querySelector('[data-combined-side="uniqueness"]');
+        var sideEsenin = root.querySelector('[data-combined-side="esenin"]');
+        var buttons = root.querySelectorAll('[data-combined-tab]');
+        var dirty = false;
+
+        function plainFromEditable() {
+            if (!highlightEl) {
+                return '';
+            }
+            var clone = highlightEl.cloneNode(true);
+            clone.querySelectorAll('mark').forEach(function (mark) {
+                var icon = mark.querySelector('.esenin-mark__icon');
+                if (icon) {
+                    icon.remove();
+                }
+                mark.replaceWith(document.createTextNode(mark.textContent || ''));
+            });
+            var blocks = [];
+            Array.prototype.forEach.call(clone.childNodes, function (node) {
+                if (node.nodeType === 3) {
+                    var t = (node.textContent || '').replace(/\u00a0/g, ' ').trim();
+                    if (t) {
+                        blocks.push(t);
+                    }
+                    return;
+                }
+                if (node.nodeType !== 1) {
+                    return;
+                }
+                var tag = (node.tagName || '').toLowerCase();
+                if (tag === 'br') {
+                    return;
+                }
+                var inner = node.cloneNode(true);
+                inner.querySelectorAll('br').forEach(function (br) {
+                    br.replaceWith(document.createTextNode(' '));
+                });
+                var txt = (inner.innerText || inner.textContent || '').replace(/\u00a0/g, ' ').replace(/\n+/g, ' ').trim();
+                if (txt) {
+                    blocks.push(txt);
+                }
+            });
+            if (blocks.length) {
+                return blocks.join('\n\n').trim();
+            }
+            return (clone.innerText || clone.textContent || '').replace(/\u00a0/g, ' ').trim();
+        }
+
+        function syncTextarea() {
+            if (!highlightEl) {
+                return;
+            }
+            // Сохраняем HTML из редактора результатов (с возможными правками)
+            var html = highlightEl.innerHTML || '';
+            // убрать иконки ! из mark перед сохранением в форму
+            var tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            tmp.querySelectorAll('.esenin-mark__icon').forEach(function (el) {
+                el.remove();
+            });
+            // снять подсветку mark, оставить содержимое + структуру
+            tmp.querySelectorAll('mark').forEach(function (mark) {
+                var frag = document.createDocumentFragment();
+                while (mark.firstChild) {
+                    frag.appendChild(mark.firstChild);
+                }
+                mark.replaceWith(frag);
+            });
+            var cleanHtml = tmp.innerHTML || '';
+            var $ta = $('#cabinet-ta-textarea');
+            if ($ta.length) {
+                $ta.val(cleanHtml);
+            }
+            if (window.cabinetTaCkEditor && window.cabinetTaCkEditor.setData) {
+                window.cabinetTaCkEditor.setData(cleanHtml);
+            }
+        }
+
+        function setTab(tab) {
+            buttons.forEach(function (b) {
+                var on = b.getAttribute('data-combined-tab') === tab;
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+
+            var isUniq = tab === 'uniqueness';
+            if (sideUniq) {
+                sideUniq.classList.toggle('d-none', !isUniq);
+            }
+            if (sideEsenin) {
+                sideEsenin.classList.toggle('d-none', isUniq);
+            }
+
+            if (titleEl) {
+                if (isUniq) {
+                    titleEl.textContent = 'Уникальность';
+                } else {
+                    var activeBtn = root.querySelector('[data-combined-tab="' + tab + '"] .cabinet-esenin-score-btn__title');
+                    titleEl.textContent = activeBtn ? activeBtn.textContent : tab;
+                }
+            }
+
+            if (dirty) {
+                // после правок не перетираем текст подсветкой другого блока
+                if (legendEl) {
+                    legendEl.textContent = isUniq
+                        ? (uniqData.legend || '')
+                        : (eseninMeta.legend || '');
+                }
+                if (footerEl) {
+                    footerEl.textContent = isUniq
+                        ? (uniqData.footer || '')
+                        : (eseninMeta.stats_footer || '');
+                }
+                return;
+            }
+
+            if (!highlightEl) {
+                return;
+            }
+
+            if (isUniq) {
+                highlightEl.innerHTML = (uniqData && uniqData.html) || highlightEl.innerHTML;
+                if (legendEl) {
+                    legendEl.textContent = (uniqData && uniqData.legend) || '';
+                }
+                if (footerEl) {
+                    footerEl.textContent = (uniqData && uniqData.footer) || '';
+                }
+            } else {
+                highlightEl.innerHTML = eseninHighlights[tab]
+                    || eseninHighlights.risk
+                    || eseninMeta.fallback
+                    || highlightEl.innerHTML;
+                if (legendEl) {
+                    legendEl.textContent = eseninMeta.legend || '';
+                }
+                if (footerEl) {
+                    footerEl.textContent = eseninMeta.stats_footer || '';
+                }
+            }
+            initMarkTips(highlightEl);
+        }
+
+        buttons.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                setTab(btn.getAttribute('data-combined-tab') || 'uniqueness');
+            });
+        });
+
+        if (highlightEl) {
+            highlightEl.addEventListener('input', function () {
+                dirty = true;
+                syncTextarea();
+            });
+            highlightEl.addEventListener('blur', syncTextarea);
+        }
+
+        initMarkTips(highlightEl || root);
+    }
+
+    function parseJsonScript(id) {
+        var node = document.getElementById(id);
+        if (!node) {
+            return null;
+        }
+        try {
+            return JSON.parse(node.textContent || 'null');
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function initUniquenessResultsPanel() {
+        // legacy no-op: combined panel replaces separate uniq/esenin grids
+    }
+
+    function initEseninResultsPanel() {
+        // legacy no-op
+    }
+
+    function initMarkTips(scope) {
+        var container = scope || document;
+        if (!container || !container.querySelectorAll) {
+            return;
+        }
+        var tipEl = document.getElementById('cabinet-ta-mark-tip');
+        if (!tipEl) {
+            tipEl = document.createElement('div');
+            tipEl.id = 'cabinet-ta-mark-tip';
+            tipEl.className = 'esenin-tip-popover';
+            document.body.appendChild(tipEl);
+        }
+        function hideTip() {
+            tipEl.classList.remove('is-visible');
+        }
+        function showTip(mark, text) {
+            if (!text) {
+                hideTip();
+                return;
+            }
+            tipEl.textContent = text;
+            tipEl.classList.add('is-visible');
+            var rect = mark.getBoundingClientRect();
+            var top = window.scrollY + rect.top - tipEl.offsetHeight - 8;
+            var left = window.scrollX + rect.left;
+            tipEl.style.top = Math.max(8, top) + 'px';
+            tipEl.style.left = Math.max(8, left) + 'px';
+        }
+        container.querySelectorAll('[data-esenin-tip]').forEach(function (mark) {
+            if (mark.getAttribute('data-ta-tip-bound') === '1') {
+                return;
+            }
+            mark.setAttribute('data-ta-tip-bound', '1');
+            mark.addEventListener('mouseenter', function () {
+                showTip(mark, mark.getAttribute('data-esenin-tip') || '');
+            });
+            mark.addEventListener('mouseleave', hideTip);
+            mark.addEventListener('click', function (ev) {
+                var url = mark.getAttribute('data-uniq-url');
+                if (url) {
+                    ev.preventDefault();
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                }
+            });
+        });
     }
 
     bindExcludeListClickEarly();

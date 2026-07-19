@@ -6,7 +6,10 @@ return [
      * Стабильная база PDF/UI: 6.9s. Дальнейшие правки — +0.1 или суффикс dev.
      * Журнал: titlo.ru/docs/cabinet-text-analyzer-changelog.md
      */
-    'version' => '7.3',
+    'version' => '8.6',
+
+    /** Макс. URL/текстов в пакетной проверке */
+    'batch_max' => 20,
 
     /** Демо на titlo.ru/analiz-teksta/ — POST /api/demo/analiz-teksta/run */
     'demo' => [

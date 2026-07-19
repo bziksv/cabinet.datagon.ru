@@ -147,6 +147,21 @@ class TextAnalyzer extends Model
         $html = TextAnalyzer::clearHTMLFromLinks($html);
         $text = TextAnalyzer::deleteEverythingExceptCharacters($html);
 
+        // KPI «как у RedBox»: слова / стоп-слова — до фильтров анализа
+        $rawTotal = trim($text . ' ' . $alt . ' ' . $title . ' ' . $data);
+        $rawGeneral = trim(preg_replace('/\s+/u', ' ', $rawTotal . ' ' . $link));
+        $rawWordParts = $rawGeneral === ''
+            ? []
+            : array_values(array_filter(explode(' ', $rawGeneral), static function ($word) {
+                return $word !== '';
+            }));
+        $countStopWords = 0;
+        foreach ($rawWordParts as $rawWord) {
+            if (TextAnalyzerStopWords::isPhraseStopWord($rawWord)) {
+                $countStopWords++;
+            }
+        }
+
         if (self::shouldExcludeConjunctionsPrepositionsPronouns($request)) {
             $text = TextAnalyzer::removeConjunctionsPrepositionsPronouns($text);
             $title = TextAnalyzer::removeConjunctionsPrepositionsPronouns($title);
@@ -179,6 +194,10 @@ class TextAnalyzer extends Model
             'countSpaces' => $countSpaces,
             'lengthWithOutSpaces' => $length - $countSpaces,
             'countWords' => count($wordParts),
+            'countWordsAll' => count($rawWordParts),
+            'countStopWords' => $countStopWords,
+            'countWordsWithoutStopWords' => max(0, count($rawWordParts) - $countStopWords),
+            'plainForUniqueness' => self::normalizePlainForUniqueness($string),
         ];
 
         $excludePhraseStopWords = self::shouldExcludeConjunctionsPrepositionsPronouns($request);
@@ -877,16 +896,16 @@ class TextAnalyzer extends Model
         $result = [];
 
         foreach ($wordForms as $key => $wordForm) {
-            $extra = $textAr[$key];
+            $extra = (int) ($textAr[$key] ?? 0);
             $result[$key] = [
                 'text' => $key,
-                'inText' => $textAr[$key],
+                'inText' => $extra,
                 'inLink' => 0,
-                'total' => $textAr[$key],
+                'total' => $extra,
                 'wordForms' => ['inText' => $wordForm]
             ];
             foreach ($wordForm as $item) {
-                $count = array_shift($item);
+                $count = (int) array_shift($item);
                 $result[$key]['total'] += $count;
                 $result[$key]['inText'] += $count;
             }
@@ -943,16 +962,16 @@ class TextAnalyzer extends Model
         $links = [];
 
         foreach ($wordForms as $key => $wordForm) {
-            $extra = $linkAr[$key];
+            $extra = (int) ($linkAr[$key] ?? 0);
             $links[$key] = [
                 'text' => $key,
-                'inLink' => $linkAr[$key],
+                'inLink' => $extra,
                 'inText' => 0,
-                'total' => $linkAr[$key],
+                'total' => $extra,
                 'wordForms' => ['inLink' => $wordForm]
             ];
             foreach ($wordForm as $item) {
-                $count = array_shift($item);
+                $count = (int) array_shift($item);
                 $links[$key]['inLink'] += $count;
                 $links[$key]['total'] += $count;
             }
@@ -1107,6 +1126,163 @@ class TextAnalyzer extends Model
         }
 
         return !in_array($request['compareCompetitor'], [false, 0, '0', 'false', 'off', ''], true);
+    }
+
+    public static function shouldCheckUniqueness(array $request): bool
+    {
+        if (empty($request['checkUniqueness'])) {
+            return false;
+        }
+
+        return ! in_array($request['checkUniqueness'], [false, 0, '0', 'false', 'off', ''], true);
+    }
+
+    public static function shouldCheckEsenin(array $request): bool
+    {
+        if (empty($request['checkEsenin'])) {
+            return false;
+        }
+
+        return ! in_array($request['checkEsenin'], [false, 0, '0', 'false', 'off', ''], true);
+    }
+
+    public static function shouldSaveUniquenessHistory(array $request): bool
+    {
+        if (empty($request['saveUniqueness'])) {
+            return false;
+        }
+
+        return ! in_array($request['saveUniqueness'], [false, 0, '0', 'false', 'off', ''], true);
+    }
+
+    public static function normalizePlainForUniqueness(string $text): string
+    {
+        $text = trim($text);
+        if ($text === '') {
+            return '';
+        }
+
+        // HTML (вставка из Word/сайта / CKEditor) — тот же plain, что и для подсветки Есенина
+        if (\App\Support\Esenin\EseninHtmlHighlighter::isHtml($text)) {
+            return trim(\App\Support\Esenin\EseninAnalyzer::extractPlainText($text));
+        }
+
+        // Как в Есенине для plain: сохраняем абзацы
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = preg_replace("/\r\n?/", "\n", $text) ?? $text;
+        $text = preg_replace('/[ \t]+/u', ' ', $text) ?? $text;
+        $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
+        $text = trim($text);
+
+        return self::ensureReadableParagraphs($text);
+    }
+
+    /**
+     * Исходный HTML текста (если пользователь вставил/набрал с разметкой).
+     */
+    public static function sourceHtmlFromRequest(array $request): string
+    {
+        if (($request['type'] ?? '') === 'url') {
+            return '';
+        }
+        $raw = trim((string) ($request['textarea'] ?? ''));
+        if ($raw === '' || ! \App\Support\Esenin\EseninHtmlHighlighter::isHtml($raw)) {
+            return '';
+        }
+
+        return $raw;
+    }
+
+    /**
+     * Если абзацев нет (вставка «простынёй») — режем по предложениям для читаемого вида.
+     */
+    public static function ensureReadableParagraphs(string $text): string
+    {
+        if ($text === '' || preg_match('/\n/u', $text)) {
+            return $text;
+        }
+
+        $parts = preg_split('/(?<=[.!?…])\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY);
+        if (! is_array($parts) || count($parts) < 3) {
+            return $text;
+        }
+
+        $paras = [];
+        $buf = [];
+        $last = count($parts) - 1;
+        foreach ($parts as $i => $sentence) {
+            $sentence = trim((string) $sentence);
+            if ($sentence === '') {
+                continue;
+            }
+            $buf[] = $sentence;
+            if (count($buf) >= 2 || $i === $last) {
+                $paras[] = implode(' ', $buf);
+                $buf = [];
+            }
+        }
+
+        return $paras === [] ? $text : implode("\n\n", $paras);
+    }
+
+    /**
+     * URL своей страницы — прямое сравнение шинглов (не зависит от выдачи).
+     *
+     * @return array<int, string>
+     */
+    public static function uniquenessForceCompareUrls(array $request): array
+    {
+        $urls = [];
+        if (($request['type'] ?? '') === 'url' && ! empty($request['url'])) {
+            $urls[] = trim((string) $request['url']);
+        }
+        $manual = trim((string) ($request['excludeOwnDomain'] ?? ''));
+        if ($manual !== '' && ! preg_match('/^example\.com$/i', $manual)) {
+            if (! preg_match('#^https?://#i', $manual)) {
+                // домен → пробуем как https://domain/
+                if (preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/i', $manual)) {
+                    $manual = 'https://' . $manual . '/';
+                } else {
+                    $manual = 'https://' . ltrim($manual, '/');
+                }
+            }
+            $urls[] = $manual;
+        }
+
+        $out = [];
+        $seen = [];
+        foreach ($urls as $url) {
+            $url = trim($url);
+            if ($url === '') {
+                continue;
+            }
+            $key = mb_strtolower($url);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $out[] = $url;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Хосты, которые не учитывать как «чужие» в SERP (своя страница / конкурент).
+     *
+     * @return array<int, string>
+     */
+    public static function uniquenessExcludeHosts(array $request): array
+    {
+        $hosts = [];
+        foreach (self::uniquenessForceCompareUrls($request) as $url) {
+            $hosts[] = self::urlHost($url);
+        }
+        if (self::shouldCompareCompetitor($request) && ! empty($request['competitorUrl'])) {
+            $hosts[] = self::urlHost((string) $request['competitorUrl']);
+        }
+
+        return array_values(array_unique(array_filter($hosts)));
     }
 
     /**

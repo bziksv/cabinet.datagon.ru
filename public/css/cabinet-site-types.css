@@ -1,0 +1,404 @@
+.cabinet-st-page {
+    --st-accent: #7c3aed;
+    --st-surface: #f8fafc;
+}
+
+.cabinet-st-lead {
+    background: linear-gradient(135deg, #f5f3ff 0%, #f8fafc 55%, #ecfeff 100%);
+    border-bottom: 1px solid #e9ecef;
+}
+
+.cabinet-st-lead__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    background: #fff;
+    color: var(--st-accent);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    flex: 0 0 auto;
+}
+
+.cabinet-st-cost-preview {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.875rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.cabinet-st-cost-preview__label {
+    color: #64748b;
+    margin-right: 0.35rem;
+}
+
+.cabinet-st-checks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.cabinet-st-checks label {
+    margin: 0;
+    font-weight: 400;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+}
+
+.cabinet-st-checks--inline {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.cabinet-st-depth {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.cabinet-st-depth__btn.is-active {
+    background: var(--st-accent);
+    border-color: var(--st-accent);
+    color: #fff;
+}
+
+.cabinet-st-save-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+    font-weight: 400;
+    cursor: pointer;
+}
+
+.cabinet-st-save-check input {
+    margin: 0;
+    flex: 0 0 auto;
+}
+
+.cabinet-st-catalogs {
+    background: var(--st-surface);
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+}
+
+.cabinet-st-catalogs > summary {
+    cursor: pointer;
+    font-weight: 600;
+    outline: none;
+    list-style: none;
+}
+
+.cabinet-st-catalogs > summary::-webkit-details-marker {
+    display: none;
+}
+
+.cabinet-st-catalogs > summary::before {
+    content: '▸';
+    display: inline-block;
+    margin-right: 0.4rem;
+    color: var(--st-accent);
+    transition: transform 0.15s ease;
+}
+
+.cabinet-st-catalogs[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.cabinet-st-cat-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    margin-bottom: 0.35rem;
+}
+
+.cabinet-st-cat-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--st-cat, #64748b);
+    flex: 0 0 auto;
+}
+
+.cabinet-st-verdict {
+    border-radius: 0.65rem;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    padding: 0.9rem 1.1rem;
+    border-left: 4px solid var(--st-accent);
+}
+
+.cabinet-st-verdict[data-code="commercial"] {
+    border-left-color: #059669;
+    background: linear-gradient(90deg, #ecfdf5 0%, #fff 40%);
+}
+
+.cabinet-st-verdict[data-code="informational"] {
+    border-left-color: #d97706;
+    background: linear-gradient(90deg, #fffbeb 0%, #fff 40%);
+}
+
+.cabinet-st-verdict[data-code="social_reviews"] {
+    border-left-color: #db2777;
+    background: linear-gradient(90deg, #fdf2f8 0%, #fff 40%);
+}
+
+.cabinet-st-verdict[data-code="mixed"] {
+    border-left-color: #0284c7;
+    background: linear-gradient(90deg, #f0f9ff 0%, #fff 40%);
+}
+
+.cabinet-st-verdict[data-code="unknown_heavy"],
+.cabinet-st-verdict[data-code="empty"] {
+    border-left-color: #94a3b8;
+}
+
+.cabinet-st-verdict__title {
+    font-weight: 700;
+    font-size: 1.05rem;
+}
+
+.cabinet-st-verdict__hint {
+    color: #64748b;
+    margin-top: 0.15rem;
+}
+
+.cabinet-st-mix {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11.5rem, 1fr));
+    gap: 0.65rem;
+}
+
+.cabinet-st-mix__card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 0.65rem 0.75rem;
+    border-top: 3px solid var(--st-cat, #64748b);
+}
+
+.cabinet-st-mix__card.is-zero {
+    opacity: 0.45;
+}
+
+.cabinet-st-mix__name {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 0.15rem;
+}
+
+.cabinet-st-mix__value {
+    font-weight: 700;
+    font-size: 1.1rem;
+    line-height: 1.2;
+}
+
+.cabinet-st-mix__bar {
+    height: 4px;
+    background: #e2e8f0;
+    border-radius: 2px;
+    margin-top: 0.45rem;
+    overflow: hidden;
+}
+
+.cabinet-st-mix__bar > span {
+    display: block;
+    height: 100%;
+    background: var(--st-cat, #64748b);
+    border-radius: 2px;
+}
+
+.cabinet-st-query-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 0.5rem;
+}
+
+.cabinet-st-query-tabs__btn {
+    max-width: 16rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cabinet-st-query-tabs__btn.is-short:not(.is-active) {
+    border-style: dashed;
+}
+
+.cabinet-st-query-tabs__btn.is-active.is-short {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+#cabinetStShortfallNote {
+    padding: 0.35rem 0.6rem;
+    border-radius: 0.35rem;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    color: #9a3412;
+}
+
+.cabinet-st-results-scroll {
+    max-height: 32rem;
+    overflow: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.35rem;
+}
+
+.cabinet-st-serp {
+    table-layout: fixed;
+    width: 100%;
+    margin-bottom: 0;
+}
+
+.cabinet-st-serp thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f8fafc;
+    vertical-align: middle;
+    white-space: nowrap;
+    font-size: 0.8rem;
+}
+
+.cabinet-st-serp tbody td {
+    vertical-align: middle;
+    border-color: #e8edf3;
+}
+
+.cabinet-st-col-pos {
+    width: 3rem;
+    text-align: center;
+}
+
+.cabinet-st-col-domain {
+    width: 14rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cabinet-st-col-type {
+    width: 11.5rem;
+}
+
+.cabinet-st-col-url {
+    width: auto;
+    max-width: 0;
+}
+
+.cabinet-st-url-link {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8125rem;
+    max-width: 100%;
+}
+
+.cabinet-st-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 1.5rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+    white-space: nowrap;
+    background: color-mix(in srgb, var(--st-cat, #64748b) 14%, #fff);
+    color: #0f172a;
+    border: 1px solid color-mix(in srgb, var(--st-cat, #64748b) 28%, #e2e8f0);
+}
+
+.cabinet-st-type-badge::before {
+    content: '';
+    flex: 0 0 0.45rem;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+    background: var(--st-cat, #64748b);
+}
+
+#cabinetStResults tbody tr[data-type] td.cabinet-st-col-pos {
+    font-weight: 600;
+    color: #64748b;
+}
+
+#cabinetStResults tbody tr.is-filtered-out {
+    display: none;
+}
+
+.cabinet-st-matrix-scroll {
+    overflow-x: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.35rem;
+}
+
+.cabinet-st-matrix {
+    margin-bottom: 0;
+    min-width: 48rem;
+}
+
+.cabinet-st-matrix thead th {
+    background: #f8fafc;
+    font-size: 0.72rem;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+.cabinet-st-matrix__n {
+    width: 2.5rem;
+    text-align: center;
+}
+
+.cabinet-st-matrix__phrase {
+    min-width: 12rem;
+    max-width: 18rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cabinet-st-matrix__pct {
+    text-align: center;
+    width: 5.5rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.cabinet-st-matrix__pct.is-hit {
+    font-weight: 600;
+    background: color-mix(in srgb, var(--st-cat, #94a3b8) 12%, #fff);
+}
+
+.cabinet-st-hosts td {
+    vertical-align: middle;
+}
+
+@media (max-width: 767.98px) {
+    .cabinet-st-cost-preview {
+        margin-top: 0.5rem;
+    }
+
+    .cabinet-st-lead .d-flex {
+        flex-wrap: wrap;
+    }
+
+    .cabinet-st-col-domain {
+        width: 8rem;
+    }
+
+    .cabinet-st-col-type {
+        width: 8.5rem;
+    }
+}

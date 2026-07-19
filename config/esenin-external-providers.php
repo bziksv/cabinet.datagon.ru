@@ -16,8 +16,8 @@ return [
         'api' => (string) env('TURGENEV_API_MODE', 'risk'),
         'more' => (int) env('TURGENEV_API_MORE', 1),
         'timeout' => (int) env('TURGENEV_API_TIMEOUT', 30),
-        /** Подмешивать баллы Тургенева в локальные блоки (0–100%). */
-        'score_blend_percent' => (int) env('TURGENEV_SCORE_BLEND_PERCENT', 50),
+        /** Доля баллов внешнего отчёта в блоках (0–100%). 100 = как во внешнем отчёте, без разбавления. */
+        'score_blend_percent' => (int) env('TURGENEV_SCORE_BLEND_PERCENT', 100),
     ],
 
     'opencorpora' => [

@@ -4,9 +4,16 @@ namespace App\Http\Controllers;
 
 use App\Exports\TextAnalyzer\TextAnalyzerWorkbookExport;
 use App\Services\TextAnalyzerPdfService;
+use App\Services\TextUniquenessService;
+use App\Support\EseninTextCheckLimits;
+use App\Support\TextAnalyzerEsenin;
+use App\Support\TextAnalyzerHistorySave;
+use App\Support\TextAnalyzerUniqueness;
+use App\Support\TextUniquenessLimits;
 use App\TariffSetting;
 use App\TextAnalyzer;
 use App\TextAnalyzerPublicShare;
+use App\TextUniquenessHistory;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Http\JsonResponse;
@@ -63,12 +70,41 @@ class TextAnalyzerController extends Controller
             }
         }
 
+        $user = Auth::user();
+        $uniquenessLimit = TextUniquenessLimits::limitForUser($user);
+        $uniquenessRemaining = TextUniquenessLimits::remainingForUser($user);
+        $canSaveUniquenessHistory = TextUniquenessLimits::canSaveHistory($user);
+        $uniquenessHistories = [];
+        $uniquenessHistoryLimit = TextUniquenessLimits::historyLimitForUser($user);
+        $uniquenessHistoryCount = TextUniquenessLimits::savedCount($user);
+        if ($canSaveUniquenessHistory) {
+            $uniquenessHistories = TextUniquenessHistory::query()
+                ->where('user_id', $user->id)
+                ->orderByDesc('id')
+                ->limit((int) ($uniquenessHistoryLimit ?: 50))
+                ->get(['id', 'title', 'mode', 'uniqueness_pct', 'cost', 'params', 'created_at']);
+        }
+
+        $canCheckEsenin = $user && $user->can('Esenin text check');
+        $eseninRemaining = $canCheckEsenin ? EseninTextCheckLimits::remainingForUser($user) : null;
+        $eseninLimit = $canCheckEsenin ? EseninTextCheckLimits::limitForUser($user) : null;
+
         return view('text-analyse.index', [
             'response' => $response,
             'request' => $request,
             'url' => $url,
             'scrollToResults' => $scrollToResults,
             'publicShare' => $publicShare,
+            'uniquenessLimit' => $uniquenessLimit,
+            'uniquenessRemaining' => $uniquenessRemaining,
+            'canSaveUniquenessHistory' => $canSaveUniquenessHistory,
+            'uniquenessHistories' => $uniquenessHistories,
+            'uniquenessHistoryLimit' => $uniquenessHistoryLimit,
+            'uniquenessHistoryCount' => $uniquenessHistoryCount,
+            'canCheckEsenin' => $canCheckEsenin,
+            'eseninRemaining' => $eseninRemaining,
+            'eseninLimit' => $eseninLimit,
+            'batchMax' => (int) config('cabinet-text-analyzer.batch_max', 20),
         ]);
     }
 
@@ -115,11 +151,228 @@ class TextAnalyzerController extends Controller
             }
         }
 
+        $pack = TextAnalyzerUniqueness::attach($request, $response, Auth::user());
+        $response = $pack['response'];
+        if ($pack['uniqueness_error']) {
+            flash()->overlay($pack['uniqueness_error'], __('Text uniqueness'))->warning();
+        }
+
+        $eseninInput = (string) (($pack['source_html'] ?? '') !== '' ? $pack['source_html'] : ($pack['plain'] ?? ''));
+        if ($eseninInput === '' && ($request['type'] ?? '') === 'text') {
+            $eseninInput = TextAnalyzer::normalizePlainForUniqueness((string) ($request['textarea'] ?? ''));
+        }
+        $eseninPack = TextAnalyzerEsenin::attach($request, $response, $eseninInput, Auth::user());
+        $response = $eseninPack['response'];
+        if ($eseninPack['esenin_error']) {
+            flash()->overlay($eseninPack['esenin_error'], __('Esenin text check'))->warning();
+        }
+
+        $plainForHistory = (string) ($pack['plain'] ?? $eseninInput);
+        $historyPack = TextAnalyzerHistorySave::maybeSave($request, $response, $plainForHistory, Auth::user());
+        if (! empty($historyPack['warning'])) {
+            flash()->overlay($historyPack['warning'], __('Text uniqueness history title'))->warning();
+        }
+
         session()->flash('text_analyzer.response', $response);
         session()->flash('text_analyzer.request', $request);
         session()->flash('text_analyzer.scroll_to_results', true);
 
         return redirect()->route('text.analyzer.view');
+    }
+
+    /**
+     * Один элемент пакетной проверки (URL или текст).
+     */
+    public function batchItem(Request $request): JsonResponse
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return response()->json(['error' => 'auth', 'message' => __('Unauthorized')], 401);
+        }
+
+        if (TariffSetting::checkTextAnalyserLimits()) {
+            return response()->json([
+                'error' => 'limit',
+                'message' => __('Your limits are exhausted this month'),
+            ], 403);
+        }
+
+        $type = $request->input('type') === 'text' ? 'text' : 'url';
+        $payload = [
+            'type' => $type,
+            'url' => (string) $request->input('url', ''),
+            'textarea' => (string) $request->input('textarea', ''),
+            'noIndex' => $request->input('noIndex'),
+            'hiddenText' => $request->input('hiddenText'),
+            'conjunctionsPrepositionsPronouns' => $request->input('conjunctionsPrepositionsPronouns', 1),
+            'removeWords' => $request->input('removeWords'),
+            'listWords' => $request->input('listWords'),
+            'checkUniqueness' => $request->input('checkUniqueness', 1),
+            'saveUniqueness' => $request->input('saveUniqueness', 0),
+            'checkEsenin' => $request->input('checkEsenin', 0),
+            'excludeOwnDomain' => (string) $request->input('excludeOwnDomain', ''),
+            'batchLabel' => (string) $request->input('label', ''),
+        ];
+
+        if ($type === 'url') {
+            if (trim($payload['url']) === '') {
+                return response()->json(['error' => 'validation', 'message' => __("You didn't fill in the URL field")], 422);
+            }
+            $html = TextAnalyzer::curlInit($payload['url']);
+            if (! $html) {
+                return response()->json([
+                    'ok' => false,
+                    'label' => $payload['url'],
+                    'error' => __('connection attempt failed'),
+                ]);
+            }
+            $html = TextAnalyzer::removeStylesAndScripts($html);
+            $response = TextAnalyzer::analyze($html, $payload);
+            if ($payload['excludeOwnDomain'] === '') {
+                $payload['excludeOwnDomain'] = TextAnalyzer::urlHost($payload['url']);
+            }
+        } else {
+            if (mb_strlen(trim($payload['textarea'])) < 200) {
+                return response()->json([
+                    'error' => 'validation',
+                    'message' => __('The text length is at least 200 characters'),
+                ], 422);
+            }
+            $response = TextAnalyzer::analyze($payload['textarea'], $payload);
+        }
+
+        $pack = TextAnalyzerUniqueness::attach($payload, $response, $user);
+        $response = $pack['response'];
+        $eseninInput = (string) (($pack['source_html'] ?? '') !== '' ? $pack['source_html'] : ($pack['plain'] ?? ''));
+        if ($eseninInput === '' && $type === 'text') {
+            $eseninInput = TextAnalyzer::normalizePlainForUniqueness($payload['textarea']);
+        }
+        $eseninPack = TextAnalyzerEsenin::attach($payload, $response, $eseninInput, $user);
+        $response = $eseninPack['response'];
+        $historyPack = TextAnalyzerHistorySave::maybeSave(
+            $payload,
+            $response,
+            (string) ($pack['plain'] ?? $eseninInput),
+            $user
+        );
+        $uniq = $response['uniqueness'] ?? null;
+        $esenin = $response['esenin'] ?? null;
+
+        return response()->json([
+            'ok' => empty($uniq['error'] ?? null) && empty($esenin['error'] ?? null),
+            'label' => $payload['batchLabel'] !== ''
+                ? $payload['batchLabel']
+                : ($type === 'url' ? $payload['url'] : mb_substr(trim($payload['textarea']), 0, 80)),
+            'type' => $type,
+            'general' => [
+                'countWordsAll' => $response['general']['countWordsAll'] ?? 0,
+                'countStopWords' => $response['general']['countStopWords'] ?? 0,
+                'countWordsWithoutStopWords' => $response['general']['countWordsWithoutStopWords'] ?? 0,
+                'textLength' => $response['general']['textLength'] ?? 0,
+                'lengthWithOutSpaces' => $response['general']['lengthWithOutSpaces'] ?? 0,
+            ],
+            'uniqueness_pct' => $uniq['uniqueness_pct'] ?? null,
+            'uniqueness_cost' => $uniq['cost'] ?? 0,
+            'uniqueness' => $uniq,
+            'esenin_risk' => $esenin['risk'] ?? null,
+            'esenin_level' => $esenin['level'] ?? null,
+            'esenin' => $esenin,
+            'history_id' => $historyPack['history_id'],
+            'history_warning' => $historyPack['warning'],
+            'message' => $pack['uniqueness_error'] ?: $eseninPack['esenin_error'],
+            'uniqueness_remaining' => TextUniquenessLimits::remainingForUser($user),
+            'esenin_remaining' => EseninTextCheckLimits::remainingForUser($user),
+        ]);
+    }
+
+    public function uniquenessHistoryShow(int $id): JsonResponse
+    {
+        $user = Auth::user();
+        if (! $user || ! TextUniquenessLimits::canSaveHistory($user)) {
+            return response()->json(['error' => 'forbidden', 'message' => __('Text uniqueness history paid only')], 403);
+        }
+
+        $row = TextUniquenessHistory::query()
+            ->where('user_id', $user->id)
+            ->where('id', $id)
+            ->first();
+
+        if (! $row) {
+            return response()->json(['error' => 'not_found', 'message' => __('Not found')], 404);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'item' => [
+                'id' => $row->id,
+                'title' => $row->title,
+                'mode' => $row->mode,
+                'params' => $row->params,
+                'results' => $row->results,
+                'uniqueness_pct' => $row->uniqueness_pct,
+                'cost' => $row->cost,
+                'created_at' => optional($row->created_at)->toDateTimeString(),
+            ],
+        ]);
+    }
+
+    public function uniquenessHistoryDestroy(int $id): JsonResponse
+    {
+        $user = Auth::user();
+        if (! $user || ! TextUniquenessLimits::canSaveHistory($user)) {
+            return response()->json(['error' => 'forbidden'], 403);
+        }
+
+        $deleted = TextUniquenessHistory::query()
+            ->where('user_id', $user->id)
+            ->where('id', $id)
+            ->delete();
+
+        return response()->json([
+            'ok' => true,
+            'deleted' => (bool) $deleted,
+            'saved_count' => TextUniquenessLimits::savedCount($user),
+        ]);
+    }
+
+    public function uniquenessEstimate(Request $request): JsonResponse
+    {
+        $type = $request->input('type') === 'url' ? 'url' : 'text';
+        $text = (string) $request->input('text', '');
+        $checkUniqueness = ! in_array($request->input('checkUniqueness'), [false, 0, '0', 'false', 'off', '', null], true);
+        $checkEsenin = ! in_array($request->input('checkEsenin'), [false, 0, '0', 'false', 'off', '', null], true);
+        $compare = TextAnalyzer::shouldCompareCompetitor([
+            'compareCompetitor' => $request->input('compareCompetitor'),
+        ]);
+        $batchCount = max(0, min(50, (int) $request->input('batch_count', 0)));
+
+        $uniquenessApprox = false;
+        if ($checkUniqueness && $text === '' && ($type === 'url' || $batchCount > 0)) {
+            // До загрузки страницы точную длину не знаем — минимум зондов
+            $text = str_repeat('слово ', 80);
+            $uniquenessApprox = true;
+        }
+
+        $uniquenessPerItem = $checkUniqueness
+            ? TextUniquenessService::estimateCost(['mode' => 'internet', 'text' => $text])
+            : 0;
+        $eseninPerItem = $checkEsenin ? EseninTextCheckLimits::checkCost() : 0;
+        $analyzerPerItem = 1 + ($compare && $batchCount === 0 ? 1 : 0);
+
+        $items = $batchCount > 0 ? $batchCount : 1;
+
+        return response()->json([
+            'ok' => true,
+            'items' => $items,
+            'analyzer' => $analyzerPerItem * $items,
+            'uniqueness' => $uniquenessPerItem * $items,
+            'uniqueness_per_item' => $uniquenessPerItem,
+            'uniqueness_approx' => $uniquenessApprox,
+            'esenin' => $eseninPerItem * $items,
+            'esenin_per_item' => $eseninPerItem,
+            // обратная совместимость
+            'cost' => $uniquenessPerItem * $items,
+        ]);
     }
 
     /**
@@ -243,10 +496,17 @@ class TextAnalyzerController extends Controller
     {
         if ($request['type'] === 'text') {
             $this->validate($request, [
-                'textarea' => 'required|min:200',
+                'textarea' => [
+                    'required',
+                    function ($attribute, $value, $fail) {
+                        $plain = TextAnalyzer::normalizePlainForUniqueness((string) $value);
+                        if (mb_strlen($plain) < 200) {
+                            $fail(__('The text length is at least 200 characters'));
+                        }
+                    },
+                ],
             ], [
                 'textarea.required' => __("You didn't fill in the text field"),
-                'textarea.min' => __('The text length is at least 200 characters'),
             ]);
         } else {
             $this->validate($request, [

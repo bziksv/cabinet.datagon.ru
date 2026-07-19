@@ -207,6 +207,40 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('index-check', 'IndexCheckController@index')->name('pages.index-check')->middleware('permission:Index check');
 
+    Route::get('search-suggestions', 'SearchSuggestionsController@index')->name('pages.search-suggestions')->middleware('permission:Search suggestions');
+    Route::post('search-suggestions/collect', 'SearchSuggestionsController@collect')->name('pages.search-suggestions.collect')->middleware('permission:Search suggestions');
+    Route::post('search-suggestions/export', 'SearchSuggestionsController@exportCsv')->name('pages.search-suggestions.export')->middleware('permission:Search suggestions');
+    Route::get('search-suggestions/history/{id}', 'SearchSuggestionsController@historyShow')->name('pages.search-suggestions.history.show')->middleware('permission:Search suggestions');
+    Route::delete('search-suggestions/history/{id}', 'SearchSuggestionsController@historyDestroy')->name('pages.search-suggestions.history.destroy')->middleware('permission:Search suggestions');
+
+    Route::get('domain-records', 'DomainRecordsController@index')->name('pages.domain-records')->middleware('permission:Domain records');
+    Route::post('domain-records/lookup', 'DomainRecordsController@lookup')->name('pages.domain-records.lookup')->middleware('permission:Domain records');
+    Route::post('domain-records/ip-neighbors', 'DomainRecordsController@ipNeighbors')->name('pages.domain-records.ip-neighbors')->middleware('permission:Domain records');
+    Route::get('domain-records/history/{id}', 'DomainRecordsController@historyShow')->name('pages.domain-records.history.show')->middleware('permission:Domain records');
+    Route::delete('domain-records/history/{id}', 'DomainRecordsController@historyDestroy')->name('pages.domain-records.history.destroy')->middleware('permission:Domain records');
+    Route::post('domain-records/compare', 'DomainRecordsController@compare')->name('pages.domain-records.compare')->middleware('permission:Domain records');
+    Route::post('domain-records/add-site-monitoring', 'DomainRecordsController@addSiteMonitoring')->name('pages.domain-records.add-site-monitoring')->middleware('permission:Domain records');
+    Route::post('domain-records/add-domain-information', 'DomainRecordsController@addDomainInformation')->name('pages.domain-records.add-domain-information')->middleware('permission:Domain records');
+
+    Route::get('site-types', 'SiteTypesController@index')->name('pages.site-types')->middleware('permission:Site types');
+    Route::post('site-types/analyze', 'SiteTypesController@analyze')->name('pages.site-types.analyze')->middleware('permission:Site types');
+    Route::post('site-types/export', 'SiteTypesController@exportCsv')->name('pages.site-types.export')->middleware('permission:Site types');
+    Route::get('site-types/history/{id}', 'SiteTypesController@historyShow')->name('pages.site-types.history.show')->middleware('permission:Site types');
+    Route::delete('site-types/history/{id}', 'SiteTypesController@historyDestroy')->name('pages.site-types.history.destroy')->middleware('permission:Site types');
+
+    Route::get('phrase-commerce', 'PhraseCommerceController@index')->name('pages.phrase-commerce')->middleware('permission:Phrase commerce');
+    Route::post('phrase-commerce/analyze', 'PhraseCommerceController@analyze')->name('pages.phrase-commerce.analyze')->middleware('permission:Phrase commerce');
+    Route::post('phrase-commerce/export', 'PhraseCommerceController@exportCsv')->name('pages.phrase-commerce.export')->middleware('permission:Phrase commerce');
+    Route::post('phrase-commerce/history', 'PhraseCommerceController@historyStore')->name('pages.phrase-commerce.history.store')->middleware('permission:Phrase commerce');
+    Route::get('phrase-commerce/history/{id}', 'PhraseCommerceController@historyShow')->name('pages.phrase-commerce.history.show')->middleware('permission:Phrase commerce');
+    Route::delete('phrase-commerce/history/{id}', 'PhraseCommerceController@historyDestroy')->name('pages.phrase-commerce.history.destroy')->middleware('permission:Phrase commerce');
+
+    Route::get('text-uniqueness', 'TextUniquenessController@index')->name('pages.text-uniqueness')->middleware('permission:Text uniqueness');
+    Route::post('text-uniqueness/analyze', 'TextUniquenessController@analyze')->name('pages.text-uniqueness.analyze')->middleware('permission:Text uniqueness');
+    Route::post('text-uniqueness/estimate', 'TextUniquenessController@estimate')->name('pages.text-uniqueness.estimate')->middleware('permission:Text uniqueness');
+    Route::get('text-uniqueness/history/{id}', 'TextUniquenessController@historyShow')->name('pages.text-uniqueness.history.show')->middleware('permission:Text uniqueness');
+    Route::delete('text-uniqueness/history/{id}', 'TextUniquenessController@historyDestroy')->name('pages.text-uniqueness.history.destroy')->middleware('permission:Text uniqueness');
+
     Route::match(['get', 'post'], 'esenin-text-check/settings', 'EseninTextCheckAdminController@settings')->name('pages.esenin-text-check.settings')->middleware(['role:Super Admin|admin']);
     Route::match(['get', 'post'], 'esenin-text-check', 'EseninTextCheckController@index')->name('pages.esenin-text-check')->middleware('permission:Esenin text check');
     Route::post('esenin-text-check/save', 'EseninTextCheckController@save')->name('pages.esenin-text-check.save')->middleware('permission:Esenin text check');
@@ -316,6 +350,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('text-analyzer', 'TextAnalyzerController@index')->name('text.analyzer.view');
     Route::get('/redirect-to-text-analyzer/{url}', 'TextAnalyzerController@redirectToAnalyse')->name('text.analyzer.redirect');
     Route::post('text-analyzer', 'TextAnalyzerController@analyze')->name('text.analyzer');
+    Route::post('text-analyzer/batch-item', 'TextAnalyzerController@batchItem')->name('text.analyzer.batch.item');
+    Route::post('text-analyzer/uniqueness-estimate', 'TextAnalyzerController@uniquenessEstimate')->name('text.analyzer.uniqueness.estimate');
+    Route::get('text-analyzer/uniqueness-history/{id}', 'TextAnalyzerController@uniquenessHistoryShow')->name('text.analyzer.uniqueness.history.show');
+    Route::delete('text-analyzer/uniqueness-history/{id}', 'TextAnalyzerController@uniquenessHistoryDestroy')->name('text.analyzer.uniqueness.history.destroy');
     Route::post('text-analyzer/export/excel', 'TextAnalyzerController@exportExcel')->name('text.analyzer.export.excel');
     Route::post('text-analyzer/export/pdf', 'TextAnalyzerController@exportPdf')->name('text.analyzer.export.pdf');
     Route::post('text-analyzer/public-share', 'TextAnalyzerController@createPublicShare')->name('text.analyzer.public.share.create');

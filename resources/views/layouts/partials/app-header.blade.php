@@ -100,6 +100,24 @@
                         </span>
                     </li>
                 @endif
+                @if(!empty($headerModuleSecondary))
+                    <li class="nav-item d-none d-xl-block cabinet-header-module-secondary"
+                        id="cabinet-header-module-secondary"
+                        data-limit-code="{{ $headerModuleSecondary['code'] }}">
+                        @php
+                            $secondaryTitle = $headerModuleSecondary['label']
+                                . ': ' . $headerModuleSecondary['used']
+                                . ' ' . __('from') . ' ' . $headerModuleSecondary['limit'];
+                        @endphp
+                        <span class="nav-link @if(!empty($headerModuleSecondary['exhausted'])) text-danger @else text-warning-emphasis @endif"
+                              title="{{ $secondaryTitle }}">
+                            <i class="bi bi-folder2-open me-1" aria-hidden="true"></i>
+                            <span class="text-secondary">{{ $headerModuleSecondary['label'] }}:</span>
+                            <strong class="ms-1" id="cabinet-header-module-secondary-used">{{ $headerModuleSecondary['used'] }}</strong>
+                            <span class="text-muted ms-1">{{ __('from') }} {{ $headerModuleSecondary['limit'] }}</span>
+                        </span>
+                    </li>
+                @endif
                 @if(!empty($limitsStatistics))
                     <li class="nav-item dropdown">
                         <a class="nav-link" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false">

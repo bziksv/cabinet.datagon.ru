@@ -69,7 +69,7 @@ class EseninTextCheckSettingsRegistry
             'provider.turgenev.enabled' => self::boolToStored(! empty($turgenev['enabled'])),
             'provider.turgenev.url' => (string) ($turgenev['url'] ?? 'https://turgenev.ashmanov.com/'),
             'provider.turgenev.key' => (string) ($turgenev['key'] ?? ''),
-            'provider.turgenev.score_blend_percent' => (string) (int) ($turgenev['score_blend_percent'] ?? 50),
+            'provider.turgenev.score_blend_percent' => (string) (int) ($turgenev['score_blend_percent'] ?? 100),
             'provider.turgenev.timeout' => (string) (int) ($turgenev['timeout'] ?? 30),
             'provider.opencorpora.enabled' => self::boolToStored(! empty($opencorpora['enabled'])),
             'provider.opencorpora.url' => (string) ($opencorpora['url'] ?? 'https://opencorpora.org/api.php'),

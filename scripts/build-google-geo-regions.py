@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Сборка config/google_geo_regions.json из https://xmlstock.com/geotargets-google.csv"""
+"""Сборка config/google_geo_regions.json из https://xmlstock.com/geotargets-google.csv
+
+Включает:
+- все Active Country
+- все Active City (мир)
+
+Раньше фильтровали только RU City — для модулей с Google-регионами этого мало.
+"""
 import csv
 import importlib.util
 import json
@@ -10,9 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / 'config' / 'google_geo_regions.json'
 CSV_URL = 'https://xmlstock.com/geotargets-google.csv'
-SKIP_TYPES = {'Country', 'Airport'}
-# В анализе конкурентов — только города (без Region/Province и т.п., иначе дубли вроде Москва 1011969 vs 20950).
-ALLOWED_TYPES = {'City'}
+ALLOWED_TYPES = {'Country', 'City'}
 
 
 def load_ru_en() -> dict:
@@ -30,18 +35,15 @@ def load_csv(path: Path) -> None:
 
     with path.open(encoding='utf-8') as f:
         for row in csv.DictReader(f):
-            if row.get('Country Code') != 'RU':
-                continue
             if row.get('Status') != 'Active':
                 continue
-            target_type = row.get('Target Type', '').strip()
-            if target_type in SKIP_TYPES:
-                continue
+            target_type = (row.get('Target Type') or '').strip()
             if target_type not in ALLOWED_TYPES:
                 continue
 
             rid = row['Criteria ID'].strip().strip('"')
             name_en = row['Name'].strip().strip('"')
+            country = (row.get('Country Code') or '').strip().upper()
             if not rid.isdigit() or not name_en or rid in seen:
                 continue
 
@@ -51,15 +53,24 @@ def load_csv(path: Path) -> None:
                 'id': rid,
                 'name': name_ru or name_en,
                 'name_en': name_en,
+                'country_code': country,
+                'type': target_type,
             })
 
-    regions.sort(key=lambda item: item['name'].lower())
+    # Страны сначала, потом города; внутри — по имени
+    type_rank = {'Country': 0, 'City': 1}
+    regions.sort(key=lambda item: (
+        type_rank.get(item.get('type', ''), 9),
+        item['name'].lower(),
+        item.get('country_code') or '',
+    ))
     OUT.write_text(
         json.dumps(regions, ensure_ascii=False, separators=(',', ':')),
         encoding='utf-8',
     )
-    labeled = sum(1 for r in regions if r.get('name_en') and r['name'] != r['name_en'])
-    print(f'{len(regions)} regions ({labeled} with RU label) -> {OUT}')
+    countries = sum(1 for r in regions if r.get('type') == 'Country')
+    cities = sum(1 for r in regions if r.get('type') == 'City')
+    print(f'{len(regions)} regions ({countries} countries, {cities} cities) -> {OUT}')
 
 
 def main() -> None:
@@ -68,8 +79,11 @@ def main() -> None:
         return
 
     tmp = Path('/tmp/geotargets-google.csv')
-    print(f'Downloading {CSV_URL} ...')
-    urllib.request.urlretrieve(CSV_URL, tmp)
+    if not tmp.exists():
+        print(f'Downloading {CSV_URL} ...')
+        urllib.request.urlretrieve(CSV_URL, tmp)
+    else:
+        print(f'Using cached {tmp}')
     load_csv(tmp)
 
 

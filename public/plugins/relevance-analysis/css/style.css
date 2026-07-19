@@ -92,11 +92,17 @@ a.paginate_button.current {
     font-size: 1rem;
     line-height: 1.35;
     white-space: normal;
-    vertical-align: bottom;
-    padding: 8px 6px;
+    vertical-align: middle;
+    text-align: center;
+    padding: 8px 1.5rem 8px 6px;
     border-color: #dee2e6;
     border-top: 0 !important;
     border-bottom: 2px solid #adb5bd !important;
+}
+
+#unigram_wrapper .relevance-tlp-table-scroll thead tr.unigram-thead__titles th.unigram-expand-col,
+#unigram_wrapper .relevance-tlp-table-scroll thead tr.unigram-thead__titles th.unigram-th-words {
+    text-align: left;
 }
 
 #unigram.table-bordered.dataTable > thead.unigram-thead th {
@@ -197,15 +203,15 @@ a.paginate_button.current {
 }
 
 #unigram > thead.unigram-thead .unigram-th-metric {
-    width: 5.75rem;
-    min-width: 5.75rem;
-    max-width: 6.5rem;
+    width: 7rem;
+    min-width: 7rem;
+    max-width: 8rem;
 }
 
 #unigram > thead.unigram-thead .unigram-th-narrow {
-    width: 5.25rem;
-    min-width: 5.25rem;
-    max-width: 6rem;
+    width: 6.5rem;
+    min-width: 6.5rem;
+    max-width: 7.5rem;
 }
 
 #unigram > thead.unigram-thead .unigram-th-wide {
@@ -222,8 +228,14 @@ a.paginate_button.current {
 #unigram > thead.unigram-thead .sorting,
 #unigram > thead.unigram-thead .sorting_asc,
 #unigram > thead.unigram-thead .sorting_desc {
-    padding-right: 1.35rem;
-    background-position: right 4px bottom 6px;
+    padding-right: 1.5rem;
+    background-position: right 3px center;
+}
+
+#unigram > thead.unigram-thead > tr.unigram-thead__titles th .__helper-link,
+#unigram > thead.unigram-thead > tr.unigram-thead__titles th .unigram-th-help {
+    display: inline-block;
+    vertical-align: middle;
 }
 
 #unigram > thead.unigram-thead > tr.unigram-thead__filters > th.sorting,
@@ -491,11 +503,16 @@ th {
     font-size: 1rem;
     line-height: 1.35;
     white-space: normal;
-    vertical-align: bottom;
-    padding: 8px 6px;
+    vertical-align: middle;
+    text-align: center;
+    padding: 8px 1.5rem 8px 6px;
     border-color: #dee2e6;
     border-top: 0 !important;
     border-bottom: 2px solid #adb5bd !important;
+}
+
+#phrases_wrapper .relevance-tlp-table-scroll thead tr.phrases-thead__titles th.phrases-th-words {
+    text-align: left;
 }
 
 #phrases.table-bordered.dataTable > thead.phrases-thead th {
@@ -547,22 +564,27 @@ th {
 }
 
 #phrases > thead.phrases-thead .phrases-th-metric {
-    width: 5.75rem;
-    min-width: 5.75rem;
-    max-width: 6.5rem;
+    width: 7rem;
+    min-width: 7rem;
+    max-width: 8rem;
 }
 
 #phrases > thead.phrases-thead .phrases-th-narrow {
-    width: 5.25rem;
-    min-width: 5.25rem;
-    max-width: 6rem;
+    width: 6.5rem;
+    min-width: 6.5rem;
+    max-width: 7.5rem;
 }
 
 #phrases > thead.phrases-thead .sorting,
 #phrases > thead.phrases-thead .sorting_asc,
 #phrases > thead.phrases-thead .sorting_desc {
-    padding-right: 1.35rem;
-    background-position: right 4px bottom 6px;
+    padding-right: 1.5rem;
+    background-position: right 3px center;
+}
+
+#phrases > thead.phrases-thead > tr.phrases-thead__titles th .__helper-link {
+    display: inline-block;
+    vertical-align: middle;
 }
 
 #phrases > thead.phrases-thead > tr.phrases-thead__filters > th.sorting,

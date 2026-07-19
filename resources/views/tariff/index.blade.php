@@ -41,17 +41,107 @@
         ];
     }
 
+    $suggestMonthlyName = null;
+    $suggestHistoryName = null;
+    $siteTypesMonthlyName = null;
+    $siteTypesHistoryName = null;
+    $domainRecordsMonthlyName = null;
+    $domainRecordsHistoryName = null;
+    $phraseCommerceMonthlyName = null;
+    $phraseCommerceHistoryName = null;
+    $textAnalyzerMonthlyName = null;
+    $textUniquenessHistoryName = null;
+    foreach ($plans as $plan) {
+        if (isset($plan['settings']['SearchSuggestions']['name'])) {
+            $suggestMonthlyName = $plan['settings']['SearchSuggestions']['name'];
+        }
+        if (isset($plan['settings']['SearchSuggestionsHistory']['name'])) {
+            $suggestHistoryName = $plan['settings']['SearchSuggestionsHistory']['name'];
+        }
+        if (isset($plan['settings']['SiteTypes']['name'])) {
+            $siteTypesMonthlyName = $plan['settings']['SiteTypes']['name'];
+        }
+        if (isset($plan['settings']['SiteTypesHistory']['name'])) {
+            $siteTypesHistoryName = $plan['settings']['SiteTypesHistory']['name'];
+        }
+        if (isset($plan['settings']['DomainRecords']['name'])) {
+            $domainRecordsMonthlyName = $plan['settings']['DomainRecords']['name'];
+        }
+        if (isset($plan['settings']['DomainRecordsHistory']['name'])) {
+            $domainRecordsHistoryName = $plan['settings']['DomainRecordsHistory']['name'];
+        }
+        if (isset($plan['settings']['PhraseCommerce']['name'])) {
+            $phraseCommerceMonthlyName = $plan['settings']['PhraseCommerce']['name'];
+        }
+        if (isset($plan['settings']['PhraseCommerceHistory']['name'])) {
+            $phraseCommerceHistoryName = $plan['settings']['PhraseCommerceHistory']['name'];
+        }
+        if (isset($plan['settings']['TextAnalyzer']['name'])) {
+            $textAnalyzerMonthlyName = $plan['settings']['TextAnalyzer']['name'];
+        }
+        if (isset($plan['settings']['TextUniquenessHistory']['name'])) {
+            $textUniquenessHistoryName = $plan['settings']['TextUniquenessHistory']['name'];
+        }
+        if ($suggestMonthlyName && $suggestHistoryName && $siteTypesMonthlyName && $siteTypesHistoryName
+            && $domainRecordsMonthlyName && $domainRecordsHistoryName
+            && $phraseCommerceMonthlyName && $phraseCommerceHistoryName
+            && $textAnalyzerMonthlyName && $textUniquenessHistoryName) {
+            break;
+        }
+    }
+
+    $dualLimitCodes = [
+        'SearchSuggestions' => 'SearchSuggestionsHistory',
+        'SiteTypes' => 'SiteTypesHistory',
+        'DomainRecords' => 'DomainRecordsHistory',
+        'PhraseCommerce' => 'PhraseCommerceHistory',
+        // Сохранения проверок уникальности — в UI анализа текста
+        'TextAnalyzer' => 'TextUniquenessHistory',
+    ];
+
     $featureRows = [];
     foreach ($tariffsArray as $tariff) {
-        foreach ($tariff['settings'] as $setting) {
+        foreach ($tariff['settings'] as $code => $setting) {
             $name = $setting['name'] ?? '';
             if ($name === '' || $name === 'Цена тарифа') {
                 continue;
+            }
+            // History is shown in the same row as monthly dual limits.
+            if ($code === 'SearchSuggestionsHistory' || ($suggestHistoryName && $name === $suggestHistoryName)) {
+                continue;
+            }
+            if ($code === 'SiteTypesHistory' || ($siteTypesHistoryName && $name === $siteTypesHistoryName)) {
+                continue;
+            }
+            if ($code === 'DomainRecordsHistory' || ($domainRecordsHistoryName && $name === $domainRecordsHistoryName)) {
+                continue;
+            }
+            if ($code === 'PhraseCommerceHistory' || ($phraseCommerceHistoryName && $name === $phraseCommerceHistoryName)) {
+                continue;
+            }
+            if ($code === 'TextUniquenessHistory' || ($textUniquenessHistoryName && $name === $textUniquenessHistoryName)) {
+                continue;
+            }
+            $historyCode = $dualLimitCodes[$code] ?? null;
+            if (!$historyCode) {
+                if ($suggestMonthlyName && $name === $suggestMonthlyName) {
+                    $historyCode = 'SearchSuggestionsHistory';
+                } elseif ($siteTypesMonthlyName && $name === $siteTypesMonthlyName) {
+                    $historyCode = 'SiteTypesHistory';
+                } elseif ($domainRecordsMonthlyName && $name === $domainRecordsMonthlyName) {
+                    $historyCode = 'DomainRecordsHistory';
+                } elseif ($phraseCommerceMonthlyName && $name === $phraseCommerceMonthlyName) {
+                    $historyCode = 'PhraseCommerceHistory';
+                } elseif ($textAnalyzerMonthlyName && $name === $textAnalyzerMonthlyName) {
+                    $historyCode = 'TextUniquenessHistory';
+                }
             }
             if (!isset($featureRows[$name])) {
                 $featureRows[$name] = [
                     'slug' => Str::limit(md5($name), 10, ''),
                     'values' => [],
+                    'synthetic_suggest' => $historyCode !== null,
+                    'history_code' => $historyCode,
                 ];
             }
         }
@@ -59,6 +149,11 @@
     foreach ($plans as $plan) {
         foreach ($featureRows as $featureName => &$row) {
             $match = collect($plan['settings'])->firstWhere('name', $featureName);
+            $historyCode = $row['history_code'] ?? null;
+            if (($row['synthetic_suggest'] ?? false) && $historyCode && isset($plan['settings'][$historyCode])) {
+                $match = $match ?? ['name' => $featureName, 'value' => 0];
+                $match['history_value'] = (int) ($plan['settings'][$historyCode]['value'] ?? 0);
+            }
             $row['values'][$plan['code']] = $match ?? null;
         }
         unset($row);
@@ -281,6 +376,20 @@
                                                         <i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i>
                                                         {{ __('Site monitoring compare email telegram') }}
                                                     </span>
+                                                @endif
+                                            @elseif($row['synthetic_suggest'] ?? false)
+                                                @php
+                                                    $suggestMonthly = (int) ($cell['value'] ?? 0);
+                                                    $suggestHistory = (int) ($cell['history_value'] ?? 0);
+                                                @endphp
+                                                @if($suggestMonthly === 0 && $suggestHistory === 0)
+                                                    <span class="text-secondary">
+                                                        <i class="bi bi-x-lg" aria-hidden="true"></i>
+                                                        <span class="visually-hidden">{{ __('Not available') }}</span>
+                                                    </span>
+                                                @else
+                                                    <strong>{{ number_format($suggestMonthly, 0, '.', ' ') }}</strong>
+                                                    <span class="text-secondary"> / {{ number_format($suggestHistory, 0, '.', ' ') }}</span>
                                                 @endif
                                             @elseif(!$cell || (int) ($cell['value'] ?? 0) === 0)
                                                 <span class="text-secondary">

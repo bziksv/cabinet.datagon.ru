@@ -3,18 +3,18 @@
 namespace App\Support;
 
 /**
- * Справочник Google geo (xmlstock geotargets). В JSON только города РФ (Target Type = City).
+ * Справочник Google geo (xmlstock geotargets): страны и города мира.
  */
 class GoogleGeoRegions
 {
-    /** @var array<int, array{id: string, name: string}>|null */
+    /** @var array<int, array{id: string, name: string, name_en?: string, country_code?: string, type?: string}>|null */
     private static $cache;
 
     public static function all(): array
     {
         if (self::$cache === null) {
             $path = config_path('google_geo_regions.json');
-            if (!is_readable($path)) {
+            if (! is_readable($path)) {
                 self::$cache = [];
 
                 return self::$cache;
@@ -36,23 +36,88 @@ class GoogleGeoRegions
             return self::defaults($limit);
         }
 
-        $needle = mb_strtolower($query);
-        $results = [];
+        $needles = GoogleGeoSearchAliases::variantsFor($query);
+        if ($needles === []) {
+            return [];
+        }
+
+        $preferredIds = [];
+        foreach ($needles as $n) {
+            $pref = GoogleGeoSearchAliases::preferredIds()[$n] ?? null;
+            if ($pref) {
+                $preferredIds[$pref] = true;
+            }
+        }
+
+        $scored = [];
 
         foreach (self::all() as $region) {
             $id = (string) ($region['id'] ?? '');
             $name = (string) ($region['name'] ?? '');
             $nameEn = (string) ($region['name_en'] ?? '');
+            $cc = (string) ($region['country_code'] ?? '');
+            $type = (string) ($region['type'] ?? '');
             if ($id === '' || $name === '') {
                 continue;
             }
 
-            $hay = mb_strtolower($name . ' ' . $nameEn . ' ' . $id);
-            if (mb_strpos($hay, $needle) === false) {
+            $nameL = mb_strtolower($name);
+            $nameEnL = mb_strtolower($nameEn);
+            $ccL = mb_strtolower($cc);
+
+            $score = null;
+            foreach ($needles as $needle) {
+                $local = null;
+                if ($nameL === $needle || $nameEnL === $needle) {
+                    $local = 0;
+                } elseif ($ccL === $needle && $type === 'Country') {
+                    $local = 1;
+                } elseif (mb_strpos($nameL, $needle) === 0 || mb_strpos($nameEnL, $needle) === 0) {
+                    $local = 2;
+                } elseif (mb_strpos($nameL, $needle) !== false || mb_strpos($nameEnL, $needle) !== false) {
+                    $local = 3;
+                } elseif ($ccL !== '' && mb_strpos($ccL, $needle) !== false) {
+                    $local = 4;
+                } elseif (mb_strpos($id, $needle) !== false) {
+                    $local = 5;
+                }
+                if ($local !== null && ($score === null || $local < $score)) {
+                    $score = $local;
+                }
+            }
+
+            if ($score === null) {
                 continue;
             }
 
-            $results[] = self::formatItem($id, $name, (string) ($region['name_en'] ?? ''));
+            // Предпочтительные столицы (Вашингтон DC и т.п.) — выше остальных одноимённых
+            $prefBoost = isset($preferredIds[$id]) ? 0 : 1;
+            $typeBoost = $type === 'Country' ? 0 : 1;
+            $scored[] = [
+                'score' => $score,
+                'prefBoost' => $prefBoost,
+                'typeBoost' => $typeBoost,
+                'item' => self::formatItem($id, $name, $nameEn, $cc, $type),
+            ];
+        }
+
+        usort($scored, static function ($a, $b) {
+            if ($a['score'] !== $b['score']) {
+                return $a['score'] <=> $b['score'];
+            }
+            if ($a['prefBoost'] !== $b['prefBoost']) {
+                return $a['prefBoost'] <=> $b['prefBoost'];
+            }
+            if ($a['typeBoost'] !== $b['typeBoost']) {
+                return $a['typeBoost'] <=> $b['typeBoost'];
+            }
+
+            return strcmp($a['item']['name'], $b['item']['name']);
+        });
+
+        $results = [];
+        foreach ($scored as $row) {
+            $results[] = $row['item'];
             if (count($results) >= $limit) {
                 break;
             }
@@ -70,7 +135,13 @@ class GoogleGeoRegions
 
         foreach (self::all() as $region) {
             if ((string) ($region['id'] ?? '') === $id) {
-                return self::formatItem($id, (string) $region['name'], (string) ($region['name_en'] ?? ''));
+                return self::formatItem(
+                    $id,
+                    (string) $region['name'],
+                    (string) ($region['name_en'] ?? ''),
+                    (string) ($region['country_code'] ?? ''),
+                    (string) ($region['type'] ?? '')
+                );
             }
         }
 
@@ -113,7 +184,24 @@ class GoogleGeoRegions
      */
     private static function defaults(int $limit): array
     {
-        $preferred = ['1011969', '1012040', '1011874', '1011952', '1011934', '1011981', '1012052', '1011896', '1011909'];
+        $preferred = [
+            '1011969', // Москва
+            '1012040', // СПб
+            '2840', // United States
+            '1023191', // New York
+            '2826', // United Kingdom
+            '1006886', // London GB
+            '2276', // Germany
+            '1003854', // Berlin
+            '2112', // Belarus
+            '1001493', // Minsk BY
+            '2804', // Ukraine
+            '1012852', // Kyiv
+            '2077', // Kazakhstan
+            '9063099', // Almaty
+            '2124', // Poland
+            '1011419', // Warsaw
+        ];
         $out = [];
 
         foreach ($preferred as $id) {
@@ -132,7 +220,13 @@ class GoogleGeoRegions
             if ($id === '' || in_array($id, $preferred, true)) {
                 continue;
             }
-            $out[] = self::formatItem($id, (string) $region['name'], (string) ($region['name_en'] ?? ''));
+            $out[] = self::formatItem(
+                $id,
+                (string) $region['name'],
+                (string) ($region['name_en'] ?? ''),
+                (string) ($region['country_code'] ?? ''),
+                (string) ($region['type'] ?? '')
+            );
             if (count($out) >= $limit) {
                 break;
             }
@@ -141,17 +235,30 @@ class GoogleGeoRegions
         return $out;
     }
 
-    private static function formatItem(string $id, string $name, string $nameEn = ''): array
-    {
+    private static function formatItem(
+        string $id,
+        string $name,
+        string $nameEn = '',
+        string $countryCode = '',
+        string $type = ''
+    ): array {
         $label = $name;
         if ($nameEn !== '' && $nameEn !== $name) {
             $label = $name . ' (' . $nameEn . ')';
+        }
+        if ($countryCode !== '') {
+            $label .= ' · ' . strtoupper($countryCode);
+        }
+        if ($type === 'Country') {
+            $label .= ' · страна';
         }
 
         return [
             'id' => $id,
             'name' => $name,
             'name_en' => $nameEn,
+            'country_code' => $countryCode,
+            'type' => $type,
             'text' => $label . ' [' . $id . ']',
         ];
     }

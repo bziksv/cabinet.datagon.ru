@@ -328,6 +328,10 @@ final class EseninPlainIndexMap
         if ($hint !== '') {
             $markEl->setAttribute('data-esenin-tip', $hint);
         }
+        $url = (string) ($mark['url'] ?? '');
+        if ($url !== '') {
+            $markEl->setAttribute('data-uniq-url', $url);
+        }
 
         return $markEl;
     }

@@ -1,0 +1,93 @@
+.cabinet-ss-page {
+    --ss-accent: #0d6efd;
+}
+
+.cabinet-ss-lead {
+    background: linear-gradient(135deg, #f0f6ff 0%, #f8fafc 100%);
+    border-bottom: 1px solid #e9ecef;
+}
+
+.cabinet-ss-lead__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    background: #fff;
+    color: var(--ss-accent);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    flex: 0 0 auto;
+}
+
+.cabinet-ss-checks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.cabinet-ss-checks label {
+    margin: 0;
+    font-weight: 400;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+}
+
+.cabinet-ss-checks--inline {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.cabinet-ss-quick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.cabinet-ss-quick__btn.is-active {
+    background: var(--ss-accent);
+    border-color: var(--ss-accent);
+    color: #fff;
+}
+
+.cabinet-ss-save-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+    font-weight: 400;
+    cursor: pointer;
+    max-width: 100%;
+}
+
+.cabinet-ss-save-check input {
+    flex: 0 0 auto;
+    margin: 0;
+}
+
+.cabinet-ss-results-scroll {
+    max-height: min(70vh, 720px);
+    overflow: auto;
+}
+
+.cabinet-ss-results-scroll table th {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 1;
+}
+
+#cabinetSsStatus.is-busy {
+    color: #6c757d;
+}
+
+#cabinetSsStatus.is-error {
+    color: #dc3545;
+}
+
+#cabinetSsStatus.is-ok {
+    color: #198754;
+}

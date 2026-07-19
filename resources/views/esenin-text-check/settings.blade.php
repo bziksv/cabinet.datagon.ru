@@ -140,7 +140,8 @@
                                 <div class="col-md-4">
                                     <label class="form-label" for="provider_turgenev_score_blend_percent">{{ __('Esenin admin turgenev blend') }}</label>
                                     <input type="number" name="provider_turgenev_score_blend_percent" id="provider_turgenev_score_blend_percent" min="0" max="100"
-                                           class="form-control form-control-sm" value="{{ old('provider_turgenev_score_blend_percent', $s['provider.turgenev.score_blend_percent'] ?? 50) }}">
+                                           class="form-control form-control-sm" value="{{ old('provider_turgenev_score_blend_percent', $s['provider.turgenev.score_blend_percent'] ?? 100) }}">
+                                    <div class="form-text">{{ __('Esenin admin turgenev blend hint') }}</div>
                                 </div>
                                 <div class="col-md-8">
                                     <label class="form-label" for="provider_turgenev_key">{{ __('Esenin admin turgenev key') }}</label>

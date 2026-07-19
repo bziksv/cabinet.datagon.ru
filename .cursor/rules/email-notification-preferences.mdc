@@ -1,0 +1,65 @@
+---
+description: Email notification preferences — profile toggles, unsubscribe footers, auto-registration from registry and trigger campaigns
+globs:
+  - app/Notifications/**/*.php
+  - app/Mail/**/*.php
+  - app/Services/UserNotificationPreferenceService.php
+  - config/cabinet-users-notifications.php
+  - resources/views/profile/**/*.blade.php
+  - resources/views/emails/**/*.blade.php
+alwaysApply: false
+---
+
+# Email notification preferences
+
+## Profile UI (`/profile#notifications`)
+
+- Users manage **email only** on the «Уведомления» tab.
+- Toggleable items come from:
+  1. `config/cabinet-users-notifications.php` events with channel `email_event`
+  2. All rows in `trigger_campaigns` (key `trigger.{slug}`)
+- Items with channel `email_service` appear in the list but **cannot be disabled** (`can_toggle: false`).
+- Default: **enabled** when no row in `user_notification_preferences`.
+- Opt-out: row with `enabled = false`.
+
+## Auto-registration (no manual profile UI changes)
+
+When adding a new **event email**:
+
+1. Add entry to `config/cabinet-users-notifications.php` with `'channels' => ['email_event']` and unique `id`.
+2. Implement `App\Contracts\EmailPreferenceAware` on the notification; return that `id` from `emailPreferenceKey()`.
+3. Append unsubscribe footer via `AppendsMailUnsubscribe` trait or `MailNotificationFooter::unsubscribeMarkdown($key)`.
+4. It automatically appears in profile and admin registry — **do not** duplicate lists in views.
+
+When adding a new **trigger campaign**:
+
+1. Create `TriggerCampaign` as usual — `TriggerCampaignObserver` flushes catalog cache.
+2. Profile shows `trigger.{slug}` automatically, **enabled by default**; описание — `TriggerCampaign::profileDescription()` (перевод `Trigger campaign profile desc.{slug}`), не поле `description` из админки.
+3. `TriggerCampaignMailService::sendToUser()` must check `UserNotificationPreferenceService::isEnabled()` before send.
+4. `TriggerCampaignMail` must pass `manageNotificationsUrl` with the trigger key.
+
+Trigger types (`trigger_type`):
+
+- `inactive_days` — не заходил N+ дней (`last_online_at` / `created_at`), tier-окна между кампаниями одного типа.
+- `registered_no_topup` — email подтверждён, `balance = 0`, N+ дней с `created_at`, нет успешных пополнений (`balances.status = 1` и `paid_sum > 0`), tier-окна между кампаниями этого типа.
+- `registered_no_tool` — email подтверждён, N+ дней с `created_at`, в `visit_statistics` пусто **или** только проекты «Главная» (`HomeController` в `main_projects`), tier-окна между кампаниями типа, **с промокодом и гайдом активации** (CTA → `/`).
+- `tariff_expiring` — активный платный `tariff_pays` (`status = 1`, не Free), `DATE(active_to) = today + N days`, **без промокода** (`sendsPromo() === false`), dispatch привязан к `tariff_pay_id` (повтор при новой подписке).
+- `tariff_expired` — нет активного платного тарифа, `DATE(active_to) = today - N days` у последней подписки, **с персональным standalone-купоном**, dispatch по `tariff_pay_id`, tier-окна между кампаниями типа.
+
+## Unsubscribe link in every email
+
+All outgoing emails (event, trigger, service) must include a footer linking to:
+
+`route('profile.index') . '?pref=' . rawurlencode($key) . '#notifications'`
+
+Use `MailNotificationFooter::manageUrl($preferenceKey)` — omit `$key` for service/system mail without a toggle.
+
+## Send blocking
+
+- Laravel notifications: `NotificationSending` listener in `AppServiceProvider` cancels mail when `EmailPreferenceAware` and preference disabled.
+- Trigger mailables: check preference in `TriggerCampaignMailService` before `Mail::send`.
+
+## Storage
+
+- Table: `user_notification_preferences` (`user_id`, `preference_key`, `enabled`)
+- Service: `App\Services\UserNotificationPreferenceService`

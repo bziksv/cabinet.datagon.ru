@@ -368,7 +368,8 @@ class SimplifiedXmlFacade extends XmlFacade
                 $this->setUser(config('xmlstock.user'));
                 $this->setKey(config('xmlstock.key'));
 
-                return "$this->path?user=$this->user&key=$this->key&query=$query&groupby=$this->count&lr=$this->lr&sortby=$this->sortby";
+                // Google отдаёт ≤10 URL на страницу; глубже — через &page=0,1,2…
+                return "$this->path?user=$this->user&key=$this->key&query=$query&groupby=$this->count&lr=$this->lr&sortby=$this->sortby&page=$this->page";
             }
 
             if ($provider === 'xmlriver') {

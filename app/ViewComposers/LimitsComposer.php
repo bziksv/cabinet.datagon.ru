@@ -222,6 +222,66 @@ class LimitsComposer
                     'position' => 4,
                 ];
 
+            case 'SearchSuggestions':
+                return [
+                    'count' => \App\Support\SearchSuggestionsLimits::usedForUser($user),
+                    'position' => 4,
+                ];
+
+            case 'SearchSuggestionsHistory':
+                return [
+                    'count' => \App\Support\SearchSuggestionsLimits::savedCount($user),
+                    'position' => 5,
+                ];
+
+            case 'DomainRecords':
+                return [
+                    'count' => \App\Support\DomainRecordsLimits::usedForUser($user),
+                    'position' => 4,
+                ];
+
+            case 'DomainRecordsHistory':
+                return [
+                    'count' => \App\Support\DomainRecordsLimits::savedCount($user),
+                    'position' => 5,
+                ];
+
+            case 'SiteTypes':
+                return [
+                    'count' => \App\Support\SiteTypesLimits::usedForUser($user),
+                    'position' => 4,
+                ];
+
+            case 'SiteTypesHistory':
+                return [
+                    'count' => \App\Support\SiteTypesLimits::savedCount($user),
+                    'position' => 5,
+                ];
+
+            case 'PhraseCommerce':
+                return [
+                    'count' => \App\Support\PhraseCommerceLimits::usedForUser($user),
+                    'position' => 4,
+                ];
+
+            case 'PhraseCommerceHistory':
+                return [
+                    'count' => \App\Support\PhraseCommerceLimits::savedCount($user),
+                    'position' => 5,
+                ];
+
+            case 'TextUniqueness':
+                return [
+                    'count' => \App\Support\TextUniquenessLimits::usedForUser($user),
+                    'position' => 4,
+                ];
+
+            case 'TextUniquenessHistory':
+                return [
+                    'count' => \App\Support\TextUniquenessLimits::savedCount($user),
+                    'position' => 5,
+                ];
+
             case 'GeneratorWords':
                 return [
                     'count' => __('Restrictions are not tracked'),
@@ -285,6 +345,36 @@ class LimitsComposer
 
             case 'EseninTextCheck':
                 return 4;
+
+            case 'SearchSuggestions':
+                return 4;
+
+            case 'SearchSuggestionsHistory':
+                return 5;
+
+            case 'DomainRecords':
+                return 4;
+
+            case 'DomainRecordsHistory':
+                return 5;
+
+            case 'SiteTypes':
+                return 4;
+
+            case 'SiteTypesHistory':
+                return 5;
+
+            case 'PhraseCommerce':
+                return 4;
+
+            case 'PhraseCommerceHistory':
+                return 5;
+
+            case 'TextUniqueness':
+                return 4;
+
+            case 'TextUniquenessHistory':
+                return 5;
 
             case 'HttpHeaders':
                 return 15;

@@ -37,43 +37,73 @@
     @else
 
     <div class="row g-2 g-md-3 mb-3 cabinet-ta-kpi">
-        <div class="col-6 col-lg-3 d-flex min-w-0">
+        <div class="col-6 col-lg-4 col-xl-2 d-flex min-w-0">
             <div class="info-box mb-0 flex-fill h-100">
                 <span class="info-box-icon text-bg-primary shadow-sm"><i class="bi bi-fonts"></i></span>
                 <div class="info-box-content">
                     <span class="info-box-text text-wrap">{{ __('Number of words') }}</span>
-                    <span class="info-box-number">{{ number_format($response['general']['countWords'], 0, ',', ' ') }}</span>
+                    <span class="info-box-number">{{ number_format($response['general']['countWordsAll'] ?? $response['general']['countWords'], 0, ',', ' ') }}</span>
                 </div>
             </div>
         </div>
-        <div class="col-6 col-lg-3 d-flex min-w-0">
+        <div class="col-6 col-lg-4 col-xl-2 d-flex min-w-0">
             <div class="info-box mb-0 flex-fill h-100">
                 <span class="info-box-icon text-bg-info shadow-sm"><i class="bi bi-textarea-t"></i></span>
-                <div class="info-box-content">
-                    <span class="info-box-text text-wrap">{{ __('Number of characters') }}</span>
-                    <span class="info-box-number">{{ number_format($response['general']['textLength'], 0, ',', ' ') }}</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-lg-3 d-flex min-w-0">
-            <div class="info-box mb-0 flex-fill h-100">
-                <span class="info-box-icon text-bg-secondary shadow-sm"><i class="bi bi-distribute-vertical"></i></span>
-                <div class="info-box-content">
-                    <span class="info-box-text text-wrap">{{ __('Number of spaces') }}</span>
-                    <span class="info-box-number">{{ number_format($response['general']['countSpaces'], 0, ',', ' ') }}</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-lg-3 d-flex min-w-0">
-            <div class="info-box mb-0 flex-fill h-100">
-                <span class="info-box-icon text-bg-success shadow-sm"><i class="bi bi-type"></i></span>
                 <div class="info-box-content">
                     <span class="info-box-text text-wrap">{{ __('Number of characters without spaces') }}</span>
                     <span class="info-box-number">{{ number_format($response['general']['lengthWithOutSpaces'], 0, ',', ' ') }}</span>
                 </div>
             </div>
         </div>
+        <div class="col-6 col-lg-4 col-xl-2 d-flex min-w-0">
+            <div class="info-box mb-0 flex-fill h-100">
+                <span class="info-box-icon text-bg-secondary shadow-sm"><i class="bi bi-type"></i></span>
+                <div class="info-box-content">
+                    <span class="info-box-text text-wrap">{{ __('Number of characters') }}</span>
+                    <span class="info-box-number">{{ number_format($response['general']['textLength'], 0, ',', ' ') }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2 d-flex min-w-0">
+            <div class="info-box mb-0 flex-fill h-100">
+                <span class="info-box-icon text-bg-warning shadow-sm"><i class="bi bi-funnel"></i></span>
+                <div class="info-box-content">
+                    <span class="info-box-text text-wrap">{{ __('Number of stop words') }}</span>
+                    <span class="info-box-number">{{ number_format($response['general']['countStopWords'] ?? 0, 0, ',', ' ') }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2 d-flex min-w-0">
+            <div class="info-box mb-0 flex-fill h-100">
+                <span class="info-box-icon text-bg-success shadow-sm"><i class="bi bi-check2-all"></i></span>
+                <div class="info-box-content">
+                    <span class="info-box-text text-wrap">{{ __('Number of words without stop words') }}</span>
+                    <span class="info-box-number">{{ number_format($response['general']['countWordsWithoutStopWords'] ?? $response['general']['countWords'], 0, ',', ' ') }}</span>
+                </div>
+            </div>
+        </div>
+        @if(!empty($response['uniqueness']) && empty($response['uniqueness']['error']))
+            <div class="col-6 col-lg-4 col-xl-2 d-flex min-w-0">
+                <div class="info-box mb-0 flex-fill h-100">
+                    <span class="info-box-icon text-bg-danger shadow-sm"><i class="bi bi-fingerprint"></i></span>
+                    <div class="info-box-content">
+                        <span class="info-box-text text-wrap">{{ __('Text uniqueness') }}</span>
+                        @if(!empty($response['uniqueness']['no_significant_matches']))
+                            <span class="info-box-number" style="font-size:1rem">{{ __('Text analyzer uniqueness nd') }}</span>
+                            <span class="small text-muted">{{ __('Text analyzer uniqueness nd hint') }}</span>
+                        @else
+                            <span class="info-box-number">{{ number_format($response['uniqueness']['uniqueness_pct'] ?? 0, 1, ',', ' ') }}%</span>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @endif
     </div>
+
+    @include('text-analyse.partials.uniq-esenin-results', [
+        'uniqueness' => $response['uniqueness'] ?? null,
+        'esenin' => $response['esenin'] ?? null,
+    ])
 
     <div class="card shadow-sm mb-3">
         <div class="card-header py-2">

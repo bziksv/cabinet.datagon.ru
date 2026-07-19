@@ -18,9 +18,39 @@
 .cabinet-text-analyzer-page .cabinet-ta-textarea {
     min-height: 12rem;
     resize: vertical;
-    font-family: var(--bs-font-monospace);
-    font-size: 0.9rem;
-    line-height: 1.5;
+    font-family: var(--bs-font-sans-serif);
+    font-size: 0.95rem;
+    line-height: 1.65;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-editor-wrap .cke {
+    border-radius: 0.375rem;
+    overflow: hidden;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-editor-wrap .cke_contents {
+    min-height: 16rem !important;
+}
+
+.cabinet-text-analyzer-page .cabinet-esenin-text-view__content p {
+    margin: 0 0 0.75rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-esenin-text-view__content p:last-child {
+    margin-bottom: 0;
+}
+
+.cabinet-text-analyzer-page .cabinet-esenin-text-view__content ul,
+.cabinet-text-analyzer-page .cabinet-esenin-text-view__content ol {
+    margin-bottom: 0.75rem;
+    padding-left: 1.35rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-esenin-text-view__content h1,
+.cabinet-text-analyzer-page .cabinet-esenin-text-view__content h2,
+.cabinet-text-analyzer-page .cabinet-esenin-text-view__content h3 {
+    font-weight: 600;
+    margin-bottom: 0.65rem;
 }
 
 .cabinet-text-analyzer-page .cabinet-ta-options .form-check-label {
@@ -926,4 +956,198 @@
 .cabinet-text-analyzer-page #listWords.cabinet-ta-list-words--highlight {
     box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.28);
     transition: box-shadow 0.2s ease;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-checks label {
+    font-weight: 400;
+    margin-right: 0.75rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-uniq-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-uniq-chip {
+    display: inline-block;
+    padding: 0.15rem 0.45rem;
+    border-radius: 0.25rem;
+    background: rgba(220, 53, 69, 0.08);
+    border: 1px solid rgba(220, 53, 69, 0.2);
+    font-size: 0.8rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-esenin-like {
+    --esenin-accent: #6f42c1;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-uniq-grid .cabinet-esenin-score-btn.active,
+.cabinet-text-analyzer-page .cabinet-ta-esenin-grid .cabinet-esenin-score-btn.active {
+    border-color: rgba(220, 53, 69, 0.4);
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-uniqueness .cabinet-esenin-score-btn.active {
+    box-shadow: inset 3px 0 0 #dc3545;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-uniqueness .cabinet-esenin-score-btn__value {
+    color: #dc3545;
+}
+
+.cabinet-text-analyzer-page mark.cabinet-ta-uniq-mark,
+.cabinet-text-analyzer-page mark.esenin-mark--uniqueness {
+    background: rgba(220, 53, 69, 0.18);
+    border-bottom: 2px solid rgba(220, 53, 69, 0.45);
+    position: relative;
+    padding: 0 0.1em;
+    border-radius: 0.2em;
+    cursor: pointer;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-uniq-source-list a {
+    word-break: break-all;
+}
+
+.cabinet-text-analyzer-page .cabinet-esenin-text-view__content--readonly,
+.cabinet-text-analyzer-page .cabinet-esenin-text-view__content--editable {
+    max-height: 36rem;
+    overflow: auto;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-uniq-esenin .cabinet-esenin-score-btn[data-combined-tab="uniqueness"].active {
+    border-color: rgba(220, 53, 69, 0.4);
+    box-shadow: inset 3px 0 0 #dc3545;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-uniq-esenin .cabinet-esenin-score-btn[data-combined-tab="uniqueness"] .cabinet-esenin-score-btn__value {
+    color: #dc3545;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-side-stat {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.65rem;
+    padding: 0.65rem 0.75rem;
+    background: #fff;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-side-stat__title {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.15rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-side-stat__value {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-weight: 700;
+    font-size: 1.15rem;
+    color: #dc3545;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-combined-right-uniq {
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-save {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    font-weight: 400;
+    cursor: pointer;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-batch-progress {
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.35rem;
+    background: rgba(var(--bs-primary-rgb), 0.06);
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-cost-line {
+    font-size: 0.875rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-save-row {
+    display: flex;
+    align-items: center;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-save-row .cabinet-ta-save {
+    font-size: 0.9rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-cost-summary {
+    background: rgba(var(--bs-primary-rgb), 0.04);
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-cost-summary ul {
+    padding-left: 1.1rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-progress {
+    border: 1px solid #bfdbfe;
+    background: #eff6ff;
+    border-radius: 0.5rem;
+    padding: 0.75rem 0.9rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-progress__head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-progress__spinner {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 1.35rem;
+    height: 1.35rem;
+    margin-top: 0.15rem;
+    flex: 0 0 auto;
+    border: 2.5px solid rgba(37, 99, 235, 0.28);
+    border-top-color: #2563eb;
+    border-radius: 50%;
+    animation: cabinet-ta-spin 0.7s linear infinite !important;
+    animation-duration: 0.7s !important;
+    animation-iteration-count: infinite !important;
+}
+
+@keyframes cabinet-ta-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cabinet-text-analyzer-page .cabinet-ta-progress__spinner {
+        animation: cabinet-ta-spin 0.7s linear infinite !important;
+        animation-duration: 0.7s !important;
+        animation-iteration-count: infinite !important;
+    }
+
+    .cabinet-text-analyzer-page .cabinet-ta-progress__bar .progress-bar {
+        animation-duration: 1s !important;
+        animation-iteration-count: infinite !important;
+    }
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-progress__title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #1e3a8a;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-progress__bar {
+    height: 0.55rem;
+    border-radius: 999px;
+    background: #dbeafe;
+    overflow: hidden;
+}
+
+.cabinet-text-analyzer-page .cabinet-ta-progress__bar .progress-bar {
+    background-color: #2563eb;
 }

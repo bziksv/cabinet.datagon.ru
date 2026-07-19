@@ -52,6 +52,16 @@ class MainProjectMenuIcons
         40 => '<i class="fas fa-magnifying-glass-chart"></i>',
         // Проверка текста Есенин
         41 => '<i class="fas fa-spell-check"></i>',
+        // Сбор поисковых подсказок
+        42 => '<i class="fas fa-lightbulb"></i>',
+        // Записи домена (id после миграции может быть 43)
+        43 => '<i class="fas fa-globe"></i>',
+        // Типы сайтов в выдаче
+        44 => '<i class="fas fa-layer-group"></i>',
+        // Гео / локализация / коммерция
+        45 => '<i class="fas fa-map-marked-alt"></i>',
+        // Уникальность текста (id после миграции может быть 46)
+        46 => '<i class="fas fa-fingerprint"></i>',
         // UTM-метки
         9 => '<i class="fas fa-tags"></i>',
         // Генератор паролей

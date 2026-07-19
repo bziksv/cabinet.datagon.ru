@@ -191,7 +191,7 @@ class MonitoringKeywordsController extends Controller
                 $this->columns->forget(['dynamics', 'base', 'phrasal', 'exact']);
             } else {
                 $this->setUrls($dates);
-                $this->getLatestPositions()->updateDynamics();
+                $this->getLatestPositions($dates)->updateDynamics();
             }
         }
 
@@ -493,9 +493,8 @@ class MonitoringKeywordsController extends Controller
         return $html;
     }
 
-    private function getLatestPositions()
+    private function getLatestPositions(?array $dates = null)
     {
-        $dateCollection = collect([]);
         foreach ($this->queries as &$keyword) {
 
             $grouped = $keyword->positions->groupBy(function ($item) {
@@ -510,18 +509,12 @@ class MonitoringKeywordsController extends Controller
                 })->values()->first();
             });
 
-            foreach ($grouped->keys() as $date)
-                if (!$dateCollection->contains($date))
-                    $dateCollection->push($date);
-
             $keyword->positions_data_table = $grouped;
         }
 
-        $columnCollection = collect([]);
-        foreach ($dateCollection->sortByDesc(function ($i) {
-            return Carbon::createFromFormat(self::MONITORING_TABLE_DATE_FORMAT, $i)->timestamp;
-        }) as $col_idx => $col_date)
-            $columnCollection->put('col_' . $col_idx, $col_date);
+        // Колонки дат — по всему проекту/региону/диапазону, не по текущей странице.
+        // Иначе при пагинации набор col_* меняется, DataTables ждёт col_N из init и падает с tn/4.
+        $columnCollection = $this->collectProjectDateColumns($dates);
 
         switch ($this->mode) {
             case "dates":
@@ -669,6 +662,47 @@ class MonitoringKeywordsController extends Controller
         ]);
 
         return $columns;
+    }
+
+    /**
+     * Стабильный набор дат для заголовков col_* (весь проект + текущий регион + диапазон).
+     *
+     * @return \Illuminate\Support\Collection<string, string> col_N => d.m.y
+     */
+    private function collectProjectDateColumns(?array $dates): Collection
+    {
+        [$start, $end] = $this->positionsDateBounds($dates);
+        $regionIds = $this->regions->pluck('id')->filter()->values()->all();
+        $projectId = $this->getProjectID();
+
+        $query = DB::table('monitoring_positions as mp')
+            ->join('monitoring_keywords as mk', 'mk.id', '=', 'mp.monitoring_keyword_id')
+            ->where('mk.monitoring_project_id', $projectId)
+            ->where('mp.created_at', '>=', $start)
+            ->where('mp.created_at', '<=', $end);
+
+        if ($regionIds !== []) {
+            $query->whereIn('mp.monitoring_searchengine_id', $regionIds);
+        }
+
+        $rawDates = $query
+            ->selectRaw('DATE(mp.created_at) as d')
+            ->distinct()
+            ->orderByDesc('d')
+            ->pluck('d');
+
+        $columnCollection = collect([]);
+        foreach ($rawDates as $colIdx => $rawDate) {
+            if ($rawDate === null || $rawDate === '') {
+                continue;
+            }
+            $columnCollection->put(
+                'col_' . $colIdx,
+                Carbon::parse($rawDate)->format(self::MONITORING_TABLE_DATE_FORMAT)
+            );
+        }
+
+        return $columnCollection;
     }
 
     private function setOccurrence()

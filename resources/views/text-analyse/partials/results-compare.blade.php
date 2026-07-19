@@ -26,6 +26,9 @@
     @include('text-analyse.partials.results-kpi-row', ['general' => $competitor['general'] ?? []])
 </div>
 
+@include('text-analyse.partials.uniqueness-results', ['uniqueness' => $response['uniqueness'] ?? null])
+@include('text-analyse.partials.esenin-results', ['esenin' => $response['esenin'] ?? null])
+
 <div class="card shadow-sm mb-3">
     <div class="card-header py-2">
         <h3 class="card-title h6 mb-0">

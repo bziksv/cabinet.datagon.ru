@@ -49,6 +49,11 @@ class ModuleHeaderLimitResolver
         ['prefix' => 'http-headers', 'code' => 'HttpHeaders'],
         ['prefix' => 'index-check', 'code' => 'IndexCheck'],
         ['prefix' => 'esenin-text-check', 'code' => 'EseninTextCheck'],
+        ['prefix' => 'search-suggestions', 'code' => 'SearchSuggestions'],
+        ['prefix' => 'domain-records', 'code' => 'DomainRecords'],
+        ['prefix' => 'site-types', 'code' => 'SiteTypes'],
+        ['prefix' => 'phrase-commerce', 'code' => 'PhraseCommerce'],
+        ['prefix' => 'text-uniqueness', 'code' => 'TextUniqueness'],
     ];
 
     /** @var list<array{prefix: string, code: string}> */
@@ -78,6 +83,11 @@ class ModuleHeaderLimitResolver
         ['prefix' => 'pages.roi', 'code' => 'ROI'],
         ['prefix' => 'pages.headers', 'code' => 'HttpHeaders'],
         ['prefix' => 'pages.esenin', 'code' => 'EseninTextCheck'],
+        ['prefix' => 'pages.search-suggestions', 'code' => 'SearchSuggestions'],
+        ['prefix' => 'pages.domain-records', 'code' => 'DomainRecords'],
+        ['prefix' => 'pages.site-types', 'code' => 'SiteTypes'],
+        ['prefix' => 'pages.phrase-commerce', 'code' => 'PhraseCommerce'],
+        ['prefix' => 'pages.text-uniqueness', 'code' => 'TextUniqueness'],
     ];
 
     public static function resolve(?Request $request = null): ?string

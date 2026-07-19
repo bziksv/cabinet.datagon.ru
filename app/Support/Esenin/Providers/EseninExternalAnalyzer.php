@@ -109,7 +109,8 @@ final class EseninExternalAnalyzer
     private static function blendTurgenevScores(array $result, array $turgenevData): array
     {
         $cfg = EseninTextCheckSettingsRegistry::provider('turgenev');
-        $blend = max(0, min(100, (int) ($cfg['score_blend_percent'] ?? 50)));
+        // 100% = брать баллы внешнего отчёта как есть (не разбавлять «высокий риск»).
+        $blend = max(0, min(100, (int) ($cfg['score_blend_percent'] ?? 100)));
 
         if ($blend <= 0) {
             $result['turgenev'] = $turgenevData;
@@ -153,9 +154,8 @@ final class EseninExternalAnalyzer
         }
 
         $result['details'] = $details;
-        $result['risk'] = isset($turgenevData['risk'])
-            ? (int) round(((int) $result['risk']) * (1 - $blend / 100) + ((int) $turgenevData['risk']) * ($blend / 100))
-            : $totalRisk;
+        // Общий риск = сумма вкладок (не отдельный mix итогов — иначе 6 при сумме 7).
+        $result['risk'] = $totalRisk;
         $result['level'] = EseninAnalyzer::levelFromScore((int) $result['risk']);
         $result['turgenev'] = $turgenevData;
 

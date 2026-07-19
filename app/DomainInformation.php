@@ -207,9 +207,23 @@ class DomainInformation extends Model
 
             $dns = DomainInformationDns::formatFromNameServers($info->nameServers ?? []);
             $dnsServers = DomainInformationDns::normalizeList($info->nameServers ?? []);
-            $registeredAt = isset($info->creationDate) ? date('Y-m-d', $info->creationDate) : null;
-            $expiresAt = isset($info->expirationDate) ? date('Y-m-d', $info->expirationDate) : null;
-            $daysLeft = $expiresAt !== null ? (new Carbon($expiresAt))->diffInDays(Carbon::now()) : null;
+            // iodev/whois: creationDate/expirationDate — magic props; isset()/empty() дают false даже когда значение есть.
+            $creationTs = $info->creationDate;
+            $expirationTs = $info->expirationDate;
+            $registeredAt = $creationTs ? date('Y-m-d', (int) $creationTs) : null;
+            $expiresAt = $expirationTs ? date('Y-m-d', (int) $expirationTs) : null;
+            if ($registeredAt === null || $expiresAt === null) {
+                $extraDates = self::datesFromWhoisExtra($info);
+                $registeredAt = $registeredAt ?: ($extraDates['registered_at'] ?? null);
+                $expiresAt = $expiresAt ?: ($extraDates['expires_at'] ?? null);
+            }
+            $daysLeft = null;
+            if ($expiresAt !== null) {
+                $daysLeft = Carbon::now()->startOfDay()->diffInDays(Carbon::parse($expiresAt)->startOfDay(), false);
+                if ($daysLeft < 0) {
+                    $daysLeft = 0;
+                }
+            }
             $registrationSummary = $registeredAt && $expiresAt
                 ? self::formatRegistrationSummary(
                     __('Registration date') . ' ' . $registeredAt,
@@ -249,6 +263,47 @@ class DomainInformation extends Model
                 'registration_summary' => $message,
             ];
         }
+    }
+
+    /**
+     * Fallback дат из extra (created / paid-till), если magic props не отдались через isset.
+     *
+     * @return array{registered_at: ?string, expires_at: ?string}
+     */
+    private static function datesFromWhoisExtra($info): array
+    {
+        $out = ['registered_at' => null, 'expires_at' => null];
+        try {
+            $extra = method_exists($info, 'getExtra') ? $info->getExtra() : null;
+            if (! is_array($extra)) {
+                return $out;
+            }
+            $groups = $extra['groups'] ?? [];
+            if (! is_array($groups) || $groups === []) {
+                return $out;
+            }
+            $group = $groups[0] ?? [];
+            if (! is_array($group)) {
+                return $out;
+            }
+            if (! empty($group['created'])) {
+                $ts = strtotime((string) $group['created']);
+                if ($ts) {
+                    $out['registered_at'] = date('Y-m-d', $ts);
+                }
+            }
+            $paid = $group['paid-till'] ?? $group['paid_till'] ?? $group['free-date'] ?? null;
+            if (! empty($paid)) {
+                $ts = strtotime((string) $paid);
+                if ($ts) {
+                    $out['expires_at'] = date('Y-m-d', $ts);
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
+        return $out;
     }
 
 }

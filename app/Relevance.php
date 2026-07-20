@@ -2928,15 +2928,9 @@ class Relevance
             return true;
         }
 
-        foreach ($phrases as $row) {
-            if (!is_array($row)) {
-                continue;
-            }
-
-            return !isset($row['tfidfTop']);
-        }
-
-        return true;
+        // Нет tfidfTop у старых снимков — дообогащаем enrichPhrasesHybridMetrics (~мс),
+        // а не полной пересборкой через hydrate HTML/morphy (~десятки секунд).
+        return false;
     }
 
     /**

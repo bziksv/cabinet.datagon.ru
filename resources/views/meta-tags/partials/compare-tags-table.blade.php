@@ -61,8 +61,10 @@
         <tr class="{{ $rowDiffClass }}">
             <td><span class="badge text-bg-success">&lt; {{ $tag }} &gt;</span></td>
             <td>
-                @if(is_array($value))
+                @if(is_array($value) && count($value) > 0)
                     <textarea class="form-control form-control-sm" rows="3" readonly>{!! implode(', ' . PHP_EOL, $value) !!}</textarea>
+                @elseif($value === false || $value === null || $value === '' || $value === 'false' || (is_array($value) && count($value) === 0))
+                    <span class="badge text-bg-danger">{{ __('Meta tags tag missing') }}</span>
                 @else
                     <span class="badge text-bg-danger">{{ $value }}</span>
                 @endif
@@ -70,6 +72,8 @@
             <td class="text-center">
                 @if(is_array($value))
                     <span class="badge text-bg-secondary">{{ count($value) }}</span>
+                @else
+                    <span class="badge text-bg-secondary">0</span>
                 @endif
             </td>
             <td class="small">

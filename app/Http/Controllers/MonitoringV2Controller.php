@@ -12,11 +12,13 @@ use App\Classes\Monitoring\MonitoringProjectPageSummary;
 use App\Support\MonitoringProjectPublicStats;
 use App\Support\MonitoringPublicShareTtl;
 use App\MonitoringV2UserPreference;
+use App\Support\DemoCabinet;
 use App\Support\MonitoringPositionsSchedule;
 use App\Support\MonitoringV2DebugLog;
 use App\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Illuminate\Support\Facades\App;
@@ -32,9 +34,20 @@ class MonitoringV2Controller extends Controller
         });
     }
 
-    public function index(): View
+    /**
+     * @return View|RedirectResponse
+     */
+    public function index()
     {
         App::setLocale('ru');
+
+        // Демо: сразу открываем готовый проект с позициями
+        if (DemoCabinet::isCurrentUser()) {
+            $showcase = DemoCabinet::monitoringShowcasePath();
+            if ($showcase) {
+                return redirect($showcase);
+            }
+        }
 
         /** @var User $user */
         $user = Auth::user();

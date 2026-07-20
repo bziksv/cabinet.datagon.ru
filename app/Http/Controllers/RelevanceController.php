@@ -7,9 +7,11 @@ use App\Queue;
 use App\RelevanceAnalyseResults;
 use App\RelevanceAnalysisConfig;
 use App\RelevanceHistory;
+use App\Support\DemoCabinet;
 use App\User;
 use App\UsersJobs;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -22,8 +24,19 @@ class RelevanceController extends Controller
     const MEDIUM_QUEUE = 'relevance_medium_priority';
     const NORMAL_QUEUE = 'relevance_normal_priority';
 
-    public function index(): View
+    /**
+     * @return View|RedirectResponse
+     */
+    public function index()
     {
+        // В демо сразу открываем готовый снимок — на пустой форме данных нет.
+        if (DemoCabinet::isCurrentUser()) {
+            $showcase = DemoCabinet::relevanceShowcasePath();
+            if ($showcase) {
+                return redirect($showcase);
+            }
+        }
+
         $admin = User::isUserAdmin();
         $config = RelevanceAnalysisConfig::first();
 

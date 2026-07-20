@@ -1,0 +1,11 @@
+{
+  "text": "купить диван москва\nкупить диван москва\nугловой диван\n\nдиван кровать\nугловой диван\nдоставка дивана\nкупить диваны недорого\nдоставка дивана\n",
+  "options": {
+    "removeExtraSpace": true,
+    "trim": true,
+    "removeEmptyRows": true,
+    "removeDuplicates": true,
+    "sortAlphabetically": true
+  },
+  "caseInsensitiveDedup": true
+}

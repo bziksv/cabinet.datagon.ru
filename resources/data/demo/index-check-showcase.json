@@ -1,0 +1,50 @@
+{
+    "urls": "https:\/\/titlo.ru\/\nhttps:\/\/titlo.ru\/modules\/\nhttps:\/\/demo-shop.ru\/catalog\/divany\/",
+    "items": [
+        {
+            "url": "https:\/\/titlo.ru\/",
+            "yandex": {
+                "indexed": true,
+                "results_count": 12,
+                "matched_url": "https:\/\/titlo.ru\/",
+                "error": null
+            },
+            "google": {
+                "indexed": true,
+                "results_count": 8,
+                "matched_url": "https:\/\/titlo.ru\/",
+                "error": null
+            }
+        },
+        {
+            "url": "https:\/\/titlo.ru\/modules\/",
+            "yandex": {
+                "indexed": true,
+                "results_count": 3,
+                "matched_url": "https:\/\/titlo.ru\/modules\/",
+                "error": null
+            },
+            "google": {
+                "indexed": false,
+                "results_count": 0,
+                "matched_url": null,
+                "error": null
+            }
+        },
+        {
+            "url": "https:\/\/demo-shop.ru\/catalog\/divany\/",
+            "yandex": {
+                "indexed": false,
+                "results_count": 0,
+                "matched_url": null,
+                "error": null
+            },
+            "google": {
+                "indexed": true,
+                "results_count": 2,
+                "matched_url": "https:\/\/demo-shop.ru\/catalog\/divany\/",
+                "error": null
+            }
+        }
+    ]
+}

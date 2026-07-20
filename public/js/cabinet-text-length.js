@@ -276,6 +276,28 @@
         }
     }
 
+    function applyDemoShowcase() {
+        var demo = config.demoShowcase;
+        if (!demo || !demo.text) {
+            return false;
+        }
+        if (textEl) {
+            textEl.value = String(demo.text);
+        }
+        if (titleEl && demo.title != null) {
+            titleEl.value = String(demo.title);
+        }
+        if (descriptionEl && demo.description != null) {
+            descriptionEl.value = String(demo.description);
+        }
+        if (h1El && demo.h1 != null) {
+            h1El.value = String(demo.h1);
+        }
+        updateCharCounter();
+        calculate();
+        return true;
+    }
+
     if (textEl) {
         textEl.addEventListener('input', updateCharCounter);
     }
@@ -302,5 +324,7 @@
     });
 
     updateCharCounter();
-    restoreState();
+    if (!applyDemoShowcase()) {
+        restoreState();
+    }
 }(window, document));

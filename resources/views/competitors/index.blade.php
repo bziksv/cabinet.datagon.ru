@@ -38,7 +38,11 @@
                         <label class="form-label">{{ __('List of phrases') }}</label>
                         <div class="text-muted">{{__('count phrases')}}: <span id="countAddedPhrases">0</span></div>
                     </div>
-                    {!! Form::textarea("phrases", null ,["class" => "form-control phrases","required" => "required", 'id' => 'phrasesList']) !!}
+                    {!! Form::textarea(
+                        "phrases",
+                        !empty($demoShowcase['phrases']) ? implode("\n", $demoShowcase['phrases']) : null,
+                        ["class" => "form-control phrases","required" => "required", 'id' => 'phrasesList']
+                    ) !!}
                     <span class="text-muted">{{ __('The maximum number of phrases is 40') }}</span>
                 </div>
                 <div class="mb-3 required">
@@ -93,7 +97,16 @@
                                 data-engine="{{ $engineKey }}"
                                 data-max-regions="{{ (int) config('cabinet-competitor-analysis.max_regions', 5) }}"
                                 data-placeholder="{{ __('Add cities (up to 5)') }}">
-                            @if(!empty($defaultReg))
+                            @if($engineKey === 'yandex' && !empty($demoShowcase['regions_yandex']))
+                                @foreach($demoShowcase['regions_yandex'] as $demoRegionId)
+                                    @php $demoReg = \App\Support\YandexLrRegions::find((string) $demoRegionId); @endphp
+                                    @if(!empty($demoReg))
+                                        <option value="{{ $demoReg['id'] }}" selected>
+                                            {{ $demoReg['text'] }}
+                                        </option>
+                                    @endif
+                                @endforeach
+                            @elseif(!empty($defaultReg))
                                 <option value="{{ $defaultReg['id'] }}" selected>
                                     {{ $defaultReg['text'] }}
                                 </option>
@@ -1245,17 +1258,64 @@
                 }
             });
 
+            @if(!empty($demoShowcase['result']))
+            (async function loadDemoCompetitorShowcase() {
+                var demo = @json($demoShowcase);
+                if (!demo || !demo.result) {
+                    return;
+                }
+
+                if (demo.phrases && demo.phrases.length) {
+                    $('#phrasesList').val(demo.phrases.join('\n'));
+                    document.getElementById('phrasesList').dispatchEvent(new Event('keyup'));
+                }
+                if (demo.count) {
+                    $('.form-select.count').val(String(demo.count));
+                }
+
+                var localization = {
+                    'protected': "{{ __('The site is protected from information collection, we recommend analyzing it manually') }}",
+                    'fetchFailed': "{{ __('Could not load the page (timeout or network error)') }}",
+                    'metaEmpty': "{{ __('Page loaded but meta tags were not found in HTML (non-standard markup or JS rendering)') }}",
+                    'domain': "{{ __('domain') }}",
+                    'mainPage': "{{ __('Go to the landing page') }}",
+                    'site': "{{ __('Go to site') }}",
+                    'analyzeText': "{{ __('Analyze the text') }}",
+                    'SelectPhrases': "{{ __('Select phrases') }}",
+                };
+                window.competitorLocalization = localization;
+
+                setCompetitorResultBundle(demo.result);
+                var resultCount = resolveAnalysisCount(demo.result, demo.count || 30);
+                var regionList = demo.result.regions || [];
+                buildRegionTabs(regionList);
+                var regionKeysForUi = (typeof getCompetitorRegionsList === 'function')
+                    ? getCompetitorRegionsList()
+                    : regionList;
+                var uiFirstKey = regionKeysForUi.length
+                    ? resolveRegionKey(regionKeysForUi[0])
+                    : (regionList.length ? resolveRegionKey(regionList[0]) : '');
+                if (uiFirstKey) {
+                    await renderCompetitorRegion(uiFirstKey, resultCount, localization);
+                } else if (typeof renderGeoDependencyVerdict === 'function') {
+                    renderGeoDependencyVerdict(demo.result.geoDependency || null);
+                }
+            })();
+            @endif
+
             console.clear()
             });
         </script>
         <script>
             $(document).ready(function () {
+                @if(empty($demoShowcase['result']))
                 let phrases = localStorage.getItem('lk_redbox_phrases_for_analyse')
 
                 if (phrases !== null) {
                     $('#phrasesList').val(phrases)
                     localStorage.removeItem('lk_redbox_phrases_for_analyse')
                 }
+                @endif
             })
         </script>
     @endslot

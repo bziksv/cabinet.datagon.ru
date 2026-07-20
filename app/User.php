@@ -486,6 +486,10 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function shouldShowTelegramConnectPrompt(): bool
     {
+        if (\App\Support\DemoCabinet::isDemoUser($this)) {
+            return false;
+        }
+
         if ($this->isTelegramConnected()) {
             return false;
         }

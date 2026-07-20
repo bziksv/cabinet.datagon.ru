@@ -402,6 +402,34 @@
         }
     }
 
+    function applyDemoShowcase() {
+        var demo = config.demoShowcase;
+        if (!demo || !demo.listA || !demo.listB) {
+            return false;
+        }
+        listAEl.value = String(demo.listA);
+        listBEl.value = String(demo.listB);
+        if (demo.mode) {
+            setMode(demo.mode);
+        }
+        if (demo.options) {
+            var map = {
+                trim: '#cabinet-lc-opt-trim',
+                removeEmpty: '#cabinet-lc-opt-empty',
+                caseInsensitive: '#cabinet-lc-opt-ci',
+                sortResult: '#cabinet-lc-opt-sort',
+            };
+            Object.keys(map).forEach(function (key) {
+                var el = root.querySelector(map[key]);
+                if (el && typeof demo.options[key] === 'boolean') {
+                    el.checked = demo.options[key];
+                }
+            });
+        }
+        processLists();
+        return true;
+    }
+
     function bindDropZone(pane, targetEl) {
         if (!pane || !targetEl) {
             return;
@@ -503,7 +531,11 @@
         }
     });
 
-    restoreState();
+    if (!applyDemoShowcase()) {
+        restoreState();
+    }
     updateCounts();
-    resetKpi();
+    if (!config.demoShowcase) {
+        resetKpi();
+    }
 })(window, document);

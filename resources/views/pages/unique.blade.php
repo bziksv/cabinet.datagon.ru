@@ -192,7 +192,7 @@
     </div>
 
     <script type="application/json" id="cabinet-unique-config">
-        {!! json_encode([
+        {!! json_encode(array_filter([
             'processUrl' => url('/unique'),
             'copiedText' => __('Copied'),
             'copyFailedText' => __('Copy failed'),
@@ -205,7 +205,10 @@
             'processingWaitText' => __('Processing…'),
             'exampleText' => "купить телефон москва\nкупить телефоны недорого\nзаказать доставку телефона\nремонт смартфона\nтелефоны samsung цена\nкупить телефон москва",
             'searchShownText' => __('Shown in table: :count of :total'),
-        ], JSON_UNESCAPED_UNICODE) !!}
+            'demoShowcase' => \App\Support\DemoCabinet::isCurrentUser()
+                ? \App\Support\DemoCabinet::uniqueShowcase()
+                : null,
+        ]), JSON_UNESCAPED_UNICODE) !!}
     </script>
 
     @slot('js')

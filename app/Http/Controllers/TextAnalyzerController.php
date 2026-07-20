@@ -6,6 +6,7 @@ use App\Exports\TextAnalyzer\TextAnalyzerWorkbookExport;
 use App\Services\TextAnalyzerPdfService;
 use App\Services\TextUniquenessService;
 use App\Support\EseninTextCheckLimits;
+use App\Support\DemoCabinet;
 use App\Support\TextAnalyzerEsenin;
 use App\Support\TextAnalyzerHistorySave;
 use App\Support\TextAnalyzerUniqueness;
@@ -88,6 +89,16 @@ class TextAnalyzerController extends Controller
         $canCheckEsenin = $user && $user->can('Esenin text check');
         $eseninRemaining = $canCheckEsenin ? EseninTextCheckLimits::remainingForUser($user) : null;
         $eseninLimit = $canCheckEsenin ? EseninTextCheckLimits::limitForUser($user) : null;
+
+        // Демо: сразу полный снимок (слова / Zipf / уникальность / Есенин), не пустая форма.
+        if (DemoCabinet::isCurrentUser()) {
+            $showcase = DemoCabinet::textAnalyzerShowcase();
+            if ($showcase && empty($response)) {
+                $response = $showcase['response'];
+                $request = $showcase['request'];
+                $scrollToResults = true;
+            }
+        }
 
         return view('text-analyse.index', [
             'response' => $response,

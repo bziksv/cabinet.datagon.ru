@@ -7,18 +7,30 @@ use App\DomainMonitoring;
 use App\DomainRecordsHistory;
 use App\Services\DomainRecordsService;
 use App\SiteMonitoringConfig;
+use App\Support\DemoCabinet;
 use App\Support\DomainRecordsLimits;
 use App\Support\SiteMonitoringTiming;
 use App\TariffSetting;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class DomainRecordsController extends Controller
 {
-    public function index(): View
+    /**
+     * @return View|RedirectResponse
+     */
+    public function index(Request $request)
     {
+        if (DemoCabinet::isCurrentUser() && ! $request->filled('history')) {
+            $showcase = DemoCabinet::domainRecordsShowcasePath();
+            if ($showcase) {
+                return redirect($showcase);
+            }
+        }
+
         $user = Auth::user();
         $canSaveHistory = DomainRecordsLimits::canSaveHistory($user);
         $historyLimit = DomainRecordsLimits::historyLimitForUser($user);

@@ -28,6 +28,9 @@ Route::get('email/resend', 'Auth\VerificationController@resend');
 
 Auth::routes(['verify' => true]);
 
+Route::get('demo-cabinet', 'DemoCabinetController@enter')->name('demo-cabinet.enter');
+Route::post('demo-cabinet/exit', 'DemoCabinetController@exit')->name('demo-cabinet.exit')->middleware('auth');
+
 Route::post('/validate-registration-form', 'Auth\RegisterController@validateData')->name('validate.registration.form');
 Route::post('/validate-verify-code', 'Auth\VerificationController@validateVerifyCode')->name('validate.verify.code');
 Route::post('email/verify/code', 'Auth\VerificationController@verifyCode')->name('verification.code');
@@ -663,6 +666,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('/click-tracking', 'HomeController@clickTracking')->name('click.tracking');
 
+    Route::redirect('/ai-generation', '/ai-generation/prompt');
     Route::get('/ai-generation/story', 'AiController@story')->name('ai.generation.story');
     Route::get('/ai-generation/all-history', 'AiController@allHistory')->name('ai.generation.all.story');
 

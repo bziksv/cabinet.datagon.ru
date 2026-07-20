@@ -79,4 +79,15 @@ return [
         'questions' => ['как', 'что', 'где', 'когда', 'почему', 'сколько', 'какой'],
         'reviews' => ['отзывы', 'отзывы клиентов', 'отзывы сотрудников'],
     ],
+
+    /** Демо на titlo.ru/sbor-poiskovykh-podskazok/ — POST /api/demo/sbor-poiskovykh-podskazok/run */
+    'demo' => [
+        'max_runs_per_day' => 2,
+        'max_seed_chars' => 80,
+        'max_rows' => 20,
+        'yandex_lr' => '213',
+        'google_hl' => 'ru',
+        'google_gl' => 'ru',
+    ],
 ];
+

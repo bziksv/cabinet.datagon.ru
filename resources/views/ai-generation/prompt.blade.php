@@ -193,11 +193,51 @@
 
         <script>
             let historyTable;
+            let lastId = null;
+            @if(!empty($demoShowcase))
+            lastId = {{ (int) $demoShowcase->id }};
+            @endif
 
             $(document).ready(function() {
                 const defaultPrompt = `Роль: \nТы — профессиональный копирайтер.\n\nЗадача:\nСоставь уникальный текст для категории товаров, которая расположена по ссылке: {link}. \nДля составления текста используй реальное содержимое указанной страницы.\n\nТекст должен быть составлен таким образом, чтобы его можно было разместить на сайте в качестве SEO-текста для привлечения клиентов. Достаточно составить один вариант текста.\n\nУникальность и грамотность:\nТекст должен быть полностью уникальным (не скопирован с других сайтов).\nПредложения должны быть грамотными, правильными с точки зрения русского языка и легко читаться.`;
 
                 $('#prompt-text').val(defaultPrompt);
+
+                @if(!empty($demoShowcase))
+                (function applyDemoShowcase() {
+                    var demo = @json([
+                        'id' => $demoShowcase->id,
+                        'prompt' => $demoShowcase->prompt,
+                        'result' => $demoShowcase->result,
+                        'link' => data_get($demoShowcase->parrameters, 'link', ''),
+                        'source' => data_get($demoShowcase->parrameters, 'source', 'ai_database'),
+                        'keywords' => data_get($demoShowcase->parrameters, 'keywords', []),
+                        'stopwords' => data_get($demoShowcase->parrameters, 'stopwords', []),
+                    ]);
+                    if (demo.prompt) {
+                        $('#prompt-text').val(demo.prompt);
+                    }
+                    if (demo.link) {
+                        $('#category-link').val(demo.link).trigger('input');
+                    }
+                    if (demo.source) {
+                        $('input[name="parsing_method"][value="' + demo.source + '"]').prop('checked', true);
+                    }
+                    if (window.applyWordsFromHistory) {
+                        window.applyWordsFromHistory(demo.keywords || [], demo.stopwords || []);
+                    } else {
+                        setTimeout(function () {
+                            if (window.applyWordsFromHistory) {
+                                window.applyWordsFromHistory(demo.keywords || [], demo.stopwords || []);
+                            }
+                        }, 50);
+                    }
+                    $('#generation-result').removeClass('d-none');
+                    $('#generation-loading').addClass('d-none');
+                    $('#generation-success').removeClass('d-none');
+                    $('#result-text').val(demo.result || '');
+                })();
+                @endif
 
                 historyTable = $('#sidebar-history-table').DataTable({
                     processing: true,
@@ -314,8 +354,6 @@
                     }
                 });
             });
-
-            let lastId = null;
 
             $('.generate-button').click(function () {
                 let mode = $(this).data('mode');

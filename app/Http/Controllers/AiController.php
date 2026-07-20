@@ -18,8 +18,10 @@ class AiController extends Controller
     public function story()
     {
         $isAllHistory = request()->is('*/all-history');
+        $demoAutoOpen = \App\Support\DemoCabinet::isCurrentUser()
+            && (bool) \App\Support\DemoCabinet::aiGenerationShowcase();
 
-        return view('ai-generation.story', compact('isAllHistory'));
+        return view('ai-generation.story', compact('isAllHistory', 'demoAutoOpen'));
     }
 
     public function getHistoryJson(Request $request)
@@ -86,7 +88,12 @@ class AiController extends Controller
 
     public function prompt()
     {
-        return view('ai-generation.prompt');
+        $demoShowcase = null;
+        if (\App\Support\DemoCabinet::isCurrentUser()) {
+            $demoShowcase = \App\Support\DemoCabinet::aiGenerationShowcase();
+        }
+
+        return view('ai-generation.prompt', compact('demoShowcase'));
     }
 
     public function getProjects()

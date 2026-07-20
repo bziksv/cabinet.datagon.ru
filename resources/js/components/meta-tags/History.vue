@@ -57,11 +57,11 @@
                                         <tr v-for="(value, tag) in item.data">
                                             <td><span class="badge badge-success">< {{ tag }} ></span></td>
                                             <td>
-                                                <span v-if="value.length"><textarea class="form-control">{{ value.join( ', \r\n' ) }}</textarea></span>
-                                                <span v-else class="badge badge-danger">{{ value }}</span>
+                                                <span v-if="isTagContentPresent(value)"><textarea class="form-control">{{ value.join( ', \r\n' ) }}</textarea></span>
+                                                <span v-else class="badge badge-danger">{{ tagMissingLabel }}</span>
                                             </td>
                                             <td>
-                                                <span class="badge bg-warning">{{ value.length }}</span>
+                                                <span class="badge bg-warning">{{ tagContentCount(value) }}</span>
                                             </td>
                                             <td v-html="item.error.main[tag].join(' <br />')"></td>
                                         </tr>
@@ -115,10 +115,21 @@
                 hasMore: false,
             }
         },
+        computed: {
+            tagMissingLabel() {
+                return (this.lang && this.lang.tag_missing) ? this.lang.tag_missing : 'Не найден';
+            },
+        },
         mounted() {
             this.fetchChunk(0, true);
         },
         methods: {
+            isTagContentPresent(value) {
+                return Array.isArray(value) && value.length > 0;
+            },
+            tagContentCount(value) {
+                return Array.isArray(value) ? value.length : 0;
+            },
             fetchChunk(offset, initial) {
                 if (initial) {
                     this.loading = true;

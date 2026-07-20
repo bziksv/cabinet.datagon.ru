@@ -1769,6 +1769,7 @@
     "Meta tags registry lead": "Все проекты модуля: пользователь, тариф, число URL, статус мониторинга, история снимков и ошибки последней проверки.",
     "Meta tags registry title": "Реестр проектов",
     "Meta tags results title": "Результаты проверки",
+    "Meta tags tag missing": "Не найден",
     "Meta tags retention off": "без автоочистки",
     "Meta tags saved success": "Изменения сохранены",
     "Meta tags settings retention": "Хранить записи в истории (дней)",

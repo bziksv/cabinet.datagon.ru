@@ -249,6 +249,8 @@ export default {
         costPerEngine: { type: Number, default: 1 },
         googleDomainsJson: { type: String, default: "{}" },
         delayMs: { type: Number, default: 1200 },
+        demoItemsJson: { type: String, default: "[]" },
+        demoUrls: { type: String, default: "" },
     },
     data() {
         return {
@@ -266,6 +268,9 @@ export default {
             pendingUrlList: [],
             urlSearch: "",
         };
+    },
+    mounted() {
+        this.applyDemoShowcase();
     },
     computed: {
         googleDomains() {
@@ -554,6 +559,33 @@ export default {
             this.totalCount = 0;
             this.errorMessage = "";
             this.urlSearch = "";
+        },
+
+        applyDemoShowcase() {
+            let items = [];
+            try {
+                items = JSON.parse(this.demoItemsJson || "[]");
+            } catch (e) {
+                items = [];
+            }
+            if (!Array.isArray(items) || !items.length) {
+                return;
+            }
+            if (this.demoUrls) {
+                this.urls = this.demoUrls;
+            } else {
+                this.urls = items.map((row) => row.url || "").filter(Boolean).join("\n");
+            }
+            this.items = items.map((row, index) => ({
+                id: index,
+                url: row.url || "",
+                yandex: row.yandex != null ? row.yandex : null,
+                google: row.google != null ? row.google : null,
+            }));
+            this.doneCount = this.items.length;
+            this.totalCount = this.items.length;
+            this.loading = false;
+            this.errorMessage = "";
         },
 
         normalizeUrlForSearch(value) {

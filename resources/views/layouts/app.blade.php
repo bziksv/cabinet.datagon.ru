@@ -11,10 +11,15 @@
     <link rel="stylesheet" href="{{ asset('css/cabinet-telegram-prompt.css') }}">
     <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-schedule-prompt.css') }}">
     <link rel="stylesheet" href="{{ asset('css/cabinet-app-footer.css') }}?v={{ @filemtime(public_path('css/cabinet-app-footer.css')) ?: time() }}">
+    <link rel="stylesheet" href="{{ asset('css/cabinet-demo-banner.css') }}?v={{ @filemtime(public_path('css/cabinet-demo-banner.css')) ?: time() }}">
     @yield('css')
     <script src="{{ asset('plugins/jquery/jquery.min.js') }}"></script>
 </head>
-<body class="layout-fixed sidebar-expand-lg sidebar-mini bg-body-tertiary">
+<body class="layout-fixed sidebar-expand-lg sidebar-mini bg-body-tertiary @if(\App\Support\DemoCabinet::isCurrentUser()) cabinet-demo-readonly @endif"
+      @if(\App\Support\DemoCabinet::isCurrentUser())
+          data-demo-cabinet="1"
+          data-demo-readonly-allow='@json(\App\Support\DemoCabinet::readonlyPostPathPrefixes())'
+      @endif>
 <script>
     (function () {
         try {
@@ -28,8 +33,24 @@
     @include('layouts.partials.app-header')
     @include('layouts.partials.app-sidebar')
     <main class="app-main">
+        @include('layouts.partials.demo-cabinet-banner')
         <div class="app-content pt-3 pb-3">
             <div class="container-fluid" id="app">
+                @if(session('demo_cabinet_error'))
+                    <div class="alert alert-danger">{{ session('demo_cabinet_error') }}</div>
+                @endif
+                @if(session('demo_cabinet_welcome'))
+                    <div class="alert alert-info">
+                        Вы в демо-кабинете. Сейчас открыта <strong>история анализа релевантности</strong> —
+                        откройте проект <em>demo-shop.ru</em> и снимок проверки, чтобы увидеть полный отчёт.
+                        Также есть готовые результаты в
+                        <a href="{{ url('/search-suggestions') }}">подсказках</a>,
+                        <a href="{{ url('/domain-records') }}">записях домена</a>,
+                        <a href="{{ url('/site-types') }}">типах сайтов</a>,
+                        <a href="{{ url('/phrase-commerce') }}">гео и коммерции</a>.
+                        Форма «Анализатор» пустая намеренно — в демо запуски отключены.
+                    </div>
+                @endif
                 @yield('content')
             </div>
         </div>
@@ -290,6 +311,9 @@
 
 @if(config('app.env') !== 'local')
 <script src="{{ asset('js/demo.js') }}"></script>
+@endif
+@if(\App\Support\DemoCabinet::isCurrentUser())
+<script src="{{ asset('js/cabinet-demo-readonly.js') }}?v={{ @filemtime(public_path('js/cabinet-demo-readonly.js')) ?: time() }}"></script>
 @endif
 @yield('js')
 

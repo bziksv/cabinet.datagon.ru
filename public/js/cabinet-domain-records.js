@@ -732,4 +732,16 @@
 
     if (canSite) wireAdd(addSiteBtn, addSiteUrl);
     if (canDomain) wireAdd(addDomainBtn, addDomainUrl, { check_dns: 1, check_registration_date: 1 });
+
+    (function tryOpenHistoryFromUrl() {
+        var match = window.location.search.match(/(?:\?|&)history=(\d+)/);
+        if (!match || !historyBase) {
+            return;
+        }
+        var id = match[1];
+        var btn = document.querySelector('tr[data-id="' + id + '"] .cabinet-dr-history-open');
+        if (btn) {
+            btn.click();
+        }
+    })();
 })();

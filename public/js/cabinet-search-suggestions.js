@@ -550,4 +550,43 @@
                 });
         }
     });
+
+    (function tryOpenHistoryFromUrl() {
+        var match = window.location.search.match(/(?:\?|&)history=(\d+)/);
+        if (!match || !historyBase) {
+            return;
+        }
+        var id = match[1];
+        var btn = document.querySelector('tr[data-id="' + id + '"] .cabinet-ss-history-open');
+        if (btn) {
+            btn.click();
+            return;
+        }
+        setStatus('Загрузка истории…', 'busy');
+        fetch(historyBase + '/' + id, {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.ok) {
+                    setStatus(data.message || 'Не найдено', 'error');
+                    return;
+                }
+                var params = data.item.params || {};
+                if (params.seeds) {
+                    document.getElementById('cabinetSsSeeds').value = (params.seeds || []).join('\n');
+                }
+                if (params.stop_words) {
+                    document.getElementById('cabinetSsStop').value = (params.stop_words || []).join('\n');
+                }
+                renderResults(data.item.results || []);
+                setStatus('История #' + id + ' открыта', 'ok');
+                if (resultsWrap) {
+                    resultsWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            })
+            .catch(function () {
+                setStatus('Не удалось открыть историю', 'error');
+            });
+    })();
 })();

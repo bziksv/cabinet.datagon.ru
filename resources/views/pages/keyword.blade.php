@@ -220,6 +220,32 @@
                     $('#keyword-generator'),
                     "{{ asset('plugins/keyword-generator/js/apps/keywordGenerator/') }}"
                 );
+                @php $demoKw = \App\Support\DemoCabinet::isCurrentUser() ? \App\Support\DemoCabinet::keywordGeneratorShowcase() : null; @endphp
+                @if($demoKw)
+                (function applyDemoKeyword() {
+                    var demo = @json($demoKw);
+                    var tries = 0;
+                    var timer = setInterval(function () {
+                        tries += 1;
+                        var $areas = $('#keyword-generator .wordList');
+                        if ($areas.length < 2) {
+                            if (tries > 40) {
+                                clearInterval(timer);
+                            }
+                            return;
+                        }
+                        clearInterval(timer);
+                        (demo.lists || []).forEach(function (text, index) {
+                            if ($areas[index]) {
+                                $($areas[index]).val(String(text)).trigger('input');
+                            }
+                        });
+                        setTimeout(function () {
+                            $('#keyword-generator .get').first().trigger('click');
+                        }, 200);
+                    }, 100);
+                })();
+                @endif
             });
         </script>
     @endslot

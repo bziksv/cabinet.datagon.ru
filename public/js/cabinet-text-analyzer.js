@@ -1212,7 +1212,10 @@
             }
             $.getJSON(base + '/' + id).done(function (data) {
                 if (data && data.ok && data.item) {
-                    renderUniquenessPanel(data.item.results || {});
+                    var results = data.item.results || {};
+                    // История анализатора: { uniqueness, esenin }; старый модуль — плоский объект
+                    var uniq = results.uniqueness || results;
+                    renderUniquenessPanel(uniq);
                     var el = document.getElementById('cabinet-ta-uniq-history-panel');
                     if (el) {
                         el.scrollIntoView({ behavior: 'smooth', block: 'start' });

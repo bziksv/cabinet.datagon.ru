@@ -36,6 +36,13 @@ class TextEditorController extends Controller
      */
     public function index()
     {
+        if (\App\Support\DemoCabinet::isCurrentUser()) {
+            $showcase = \App\Support\DemoCabinet::htmlEditorShowcasePath();
+            if ($showcase) {
+                return redirect($showcase);
+            }
+        }
+
         $projects = Project::where('user_id', Auth::id())
             ->with('descriptions')
             ->orderByDesc('id')

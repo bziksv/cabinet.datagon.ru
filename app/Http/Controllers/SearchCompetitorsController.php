@@ -8,6 +8,7 @@ use App\Jobs\CompetitorAnalyse\CompetitorAnalyseQueue;
 use App\SearchCompetitors;
 use App\Support\CompetitorAnalysisDebugLog;
 use App\Support\CompetitorSearchRegions;
+use App\Support\DemoCabinet;
 use App\Support\GoogleGeoRegions;
 use App\Support\PhpCliBinary;
 use App\Support\YandexLrRegions;
@@ -40,6 +41,7 @@ class SearchCompetitorsController extends Controller
         $config = CompetitorConfig::first();
 
         $defaultSearchEngine = config('cabinet-competitor-analysis.default_search_engine', 'yandex');
+        $demoShowcase = DemoCabinet::isCurrentUser() ? DemoCabinet::competitorShowcase() : null;
 
         return view('competitors.index', [
             'admin' => $admin,
@@ -47,6 +49,7 @@ class SearchCompetitorsController extends Controller
             'defaultSearchEngine' => $defaultSearchEngine,
             'defaultRegion' => YandexLrRegions::find('213'),
             'defaultGoogleRegion' => GoogleGeoRegions::find('1011969'),
+            'demoShowcase' => $demoShowcase,
         ]);
     }
 

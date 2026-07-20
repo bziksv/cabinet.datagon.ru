@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Services\SiteTypesService;
 use App\SiteTypesHistory;
 use App\Support\CompetitorSearchRegions;
+use App\Support\DemoCabinet;
 use App\Support\SiteTypesLimits;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -14,8 +16,18 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SiteTypesController extends Controller
 {
-    public function index(): View
+    /**
+     * @return View|RedirectResponse
+     */
+    public function index(Request $request)
     {
+        if (DemoCabinet::isCurrentUser() && ! $request->filled('history')) {
+            $showcase = DemoCabinet::siteTypesShowcasePath();
+            if ($showcase) {
+                return redirect($showcase);
+            }
+        }
+
         $user = Auth::user();
         $defaultYandex = CompetitorSearchRegions::defaultRegion('yandex');
         $defaultGoogle = CompetitorSearchRegions::defaultRegion('google');

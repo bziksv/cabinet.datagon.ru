@@ -1,0 +1,18 @@
+{
+    "url": "https:\/\/titlo.ru\/",
+    "response": [
+        {
+            "status": 200,
+            "headers": {
+                "server": "nginx",
+                "content-type": "text\/html; charset=UTF-8",
+                "cache-control": "no-cache, private",
+                "x-frame-options": "SAMEORIGIN",
+                "x-content-type-options": "nosniff",
+                "strict-transport-security": "max-age=31536000",
+                "content-length": "4821"
+            },
+            "content": "<!DOCTYPE html><html lang=\"ru\"><head><title>Титло — SEO-кабинет<\/title><\/head><body><h1>Титло<\/h1><p>Демо HTML для витрины HTTP-заголовков.<\/p><\/body><\/html>"
+        }
+    ]
+}

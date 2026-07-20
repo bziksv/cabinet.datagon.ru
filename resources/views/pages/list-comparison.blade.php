@@ -242,7 +242,7 @@
     </div>
 
     <script type="application/json" id="cabinet-list-comparison-config">
-        {!! json_encode([
+        {!! json_encode(array_filter([
             'copiedText' => __('Copied'),
             'copyTitle' => __('Copy'),
             'emptyText' => __('Nothing to copy'),
@@ -252,7 +252,10 @@
             'invalidFileText' => __('Only .txt files are supported'),
             'fileTitle' => __('File'),
             'downloadTitle' => __('Download file'),
-        ], JSON_UNESCAPED_UNICODE) !!}
+            'demoShowcase' => \App\Support\DemoCabinet::isCurrentUser()
+                ? \App\Support\DemoCabinet::listComparisonShowcase()
+                : null,
+        ]), JSON_UNESCAPED_UNICODE) !!}
     </script>
 
     @slot('js')

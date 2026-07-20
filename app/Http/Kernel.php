@@ -72,6 +72,7 @@ class Kernel extends HttpKernel
             DeleteTariffByUsers::class,
             LastOnline::class,
             VisitStatistics::class,
+            \App\Http\Middleware\DemoCabinetReadonly::class,
         ],
 
         'api' => [

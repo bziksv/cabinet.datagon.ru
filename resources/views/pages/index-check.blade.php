@@ -58,6 +58,9 @@
             :remaining="{{ $remaining !== null ? (int) $remaining : 'null' }}"
             :cost-per-engine="{{ (int) $costPerEngine }}"
             google-domains-json="{{ json_encode($googleDomains, JSON_UNESCAPED_UNICODE) }}"
+            @php $demoIndex = \App\Support\DemoCabinet::isCurrentUser() ? \App\Support\DemoCabinet::indexCheckShowcase() : null; @endphp
+            demo-items-json='@json($demoIndex["items"] ?? [])'
+            demo-urls="{{ $demoIndex['urls'] ?? '' }}"
         ></index-check-bulk>
     </div>
 @endcomponent

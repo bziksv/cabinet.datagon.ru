@@ -33,6 +33,13 @@ class BacklinkController extends Controller
 
     public function index()
     {
+        if (\App\Support\DemoCabinet::isCurrentUser()) {
+            $showcase = \App\Support\DemoCabinet::backlinkShowcasePath();
+            if ($showcase) {
+                return redirect($showcase);
+            }
+        }
+
         $backlinks = ProjectTracking::where('user_id', '=', Auth::id())->get();
         $user = Auth::user();
         $onFreeTariff = $user->onFreeTariff();

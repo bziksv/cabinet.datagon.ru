@@ -251,7 +251,7 @@
     </div>
 
     <script type="application/json" id="cabinet-duplicates-config">
-        {!! json_encode([
+        {!! json_encode(array_filter([
             'copiedText' => __('Copied'),
             'copyTitle' => __('Copy'),
             'emptyText' => __('Nothing to copy'),
@@ -260,7 +260,10 @@
             'mainLabelProcessed' => __('Processed list'),
             'invalidFileText' => __('Only .txt files are supported'),
             'fileTitle' => __('File'),
-        ], JSON_UNESCAPED_UNICODE) !!}
+            'demoShowcase' => \App\Support\DemoCabinet::isCurrentUser()
+                ? \App\Support\DemoCabinet::duplicatesShowcase()
+                : null,
+        ]), JSON_UNESCAPED_UNICODE) !!}
     </script>
 
     @slot('js')

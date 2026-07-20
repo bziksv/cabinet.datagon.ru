@@ -1,7 +1,7 @@
 @php
     $hasResponse = !empty($response) && is_array($response) && count($response) > 0;
     $singleUrl = request('url');
-    $publicShareUrl = $hasResponse
+    $publicShareUrl = ($hasResponse && !empty($id))
         ? url('/public/http-headers/' . $id . '?lang=' . urlencode($lang ?? 'ru'))
         : '';
 @endphp
@@ -79,6 +79,7 @@
         ></response-http-code>
 
         @if($hasResponse)
+            @if($publicShareUrl !== '')
             <section class="cabinet-hh-share cabinet-hh-panel card border shadow-sm" aria-labelledby="cabinet-hh-share-title">
                 <div class="card-body">
                     <h2 class="h6 fw-semibold mb-2" id="cabinet-hh-share-title">
@@ -97,6 +98,7 @@
                     <p class="form-text mb-0 mt-2">{{ __('Http headers public share hint') }}</p>
                 </div>
             </section>
+            @endif
 
             <div id="response-code">
                 @foreach($response as $arItems)

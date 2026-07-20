@@ -1135,6 +1135,18 @@
     updateCostPreview();
 
     initTips(root);
+
+    (function tryOpenHistoryFromUrl() {
+        var match = window.location.search.match(/(?:\?|&)history=(\d+)/);
+        if (!match || !historyBase) {
+            return;
+        }
+        var id = match[1];
+        var btn = document.querySelector('tr[data-id="' + id + '"] .cabinet-pc-history-open');
+        if (btn) {
+            btn.click();
+        }
+    })();
 })();
 
 

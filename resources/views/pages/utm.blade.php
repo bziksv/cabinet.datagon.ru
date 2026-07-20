@@ -948,10 +948,35 @@
         <script type="text/javascript" src="{{ asset('plugins/utm-marks/js/url-builder.min.js') }}"></script>
         <script>
             document.addEventListener('DOMContentLoaded', function () {
-                if (typeof bootstrap === 'undefined' || !bootstrap.Tooltip) return;
-                document.querySelectorAll('.cabinet-utm-page [data-bs-toggle="tooltip"]').forEach(function (el) {
-                    bootstrap.Tooltip.getOrCreateInstance(el);
-                });
+                if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+                    document.querySelectorAll('.cabinet-utm-page [data-bs-toggle="tooltip"]').forEach(function (el) {
+                        bootstrap.Tooltip.getOrCreateInstance(el);
+                    });
+                }
+                @php $demoUtm = \App\Support\DemoCabinet::isCurrentUser() ? \App\Support\DemoCabinet::utmMarksShowcase() : null; @endphp
+                @if($demoUtm)
+                (function applyDemoUtm() {
+                    var demo = @json($demoUtm);
+                    var map = {
+                        urlBuilderUrl: demo.url,
+                        urlBuilderUtmSource: demo.utm_source,
+                        urlBuilderUtmMedium: demo.utm_medium,
+                        urlBuilderUtmCampaign: demo.utm_campaign,
+                        urlBuilderUtmContent: demo.utm_content,
+                        urlBuilderUtmTerm: demo.utm_term
+                    };
+                    Object.keys(map).forEach(function (id) {
+                        var el = document.getElementById(id);
+                        if (el && map[id] != null) {
+                            el.value = String(map[id]);
+                        }
+                    });
+                    var go = document.querySelector('.urlBuilder_go');
+                    if (go) {
+                        go.click();
+                    }
+                })();
+                @endif
             });
         </script>
     @endslot

@@ -1,0 +1,32 @@
+/* Демо-кабинет: полоска над контентом (внутри .app-main, не ломает grid .app-wrapper) */
+.cabinet-demo-banner {
+    flex-shrink: 0;
+    width: 100%;
+    background: #fff3cd;
+    border-bottom: 1px solid #ffecb5;
+    color: #664d03;
+    z-index: 10;
+}
+
+.cabinet-demo-banner__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    padding: 0.5rem 1rem;
+}
+
+.cabinet-demo-banner__text {
+    font-size: 0.875rem;
+    line-height: 1.35;
+    min-width: 0;
+    flex: 1 1 16rem;
+}
+
+.cabinet-demo-banner__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    flex: 0 0 auto;
+}

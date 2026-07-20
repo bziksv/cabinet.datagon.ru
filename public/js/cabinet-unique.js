@@ -388,6 +388,19 @@
         }
     }
 
+    function applyDemoShowcase() {
+        var demo = config.demoShowcase;
+        if (!demo || !demo.content || !demo.rows) {
+            return false;
+        }
+        if (contentEl) {
+            contentEl.value = String(demo.content);
+            updatePhraseCount();
+        }
+        setRows(demo.rows, demo.metrics || null);
+        return true;
+    }
+
     function readTxtFile(file, onLoad) {
         if (!file || !/\.txt$/i.test(file.name)) {
             if (window.toastr) {
@@ -616,7 +629,11 @@
         }
     });
 
-    restoreState();
+    if (!applyDemoShowcase()) {
+        restoreState();
+    }
     updatePhraseCount();
-    renderTable();
+    if (!config.demoShowcase) {
+        renderTable();
+    }
 })(window, document);

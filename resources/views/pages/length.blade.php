@@ -194,7 +194,7 @@
     </div>
 
     <script type="application/json" id="cabinet-text-length-config">
-        {!! json_encode([
+        {!! json_encode(array_filter([
             'maxChars' => (int) config('cabinet-text-length.max_chars', 38600),
             'titleMax' => (int) config('cabinet-text-length.seo.title_max', 60),
             'descriptionMax' => (int) config('cabinet-text-length.seo.description_max', 160),
@@ -204,7 +204,12 @@
             'recommendedDescriptionText' => __('Recommended up to :count characters', ['count' => (int) config('cabinet-text-length.seo.description_max', 160)]),
             'notFilledText' => __('Not filled'),
             'readingMinText' => __('min'),
-        ], JSON_UNESCAPED_UNICODE) !!}
+            'demoShowcase' => \App\Support\DemoCabinet::isCurrentUser()
+                ? \App\Support\DemoCabinet::textLengthShowcase()
+                : null,
+        ], static function ($v) {
+            return $v !== null && $v !== '';
+        }), JSON_UNESCAPED_UNICODE) !!}
     </script>
 
     @slot('js')

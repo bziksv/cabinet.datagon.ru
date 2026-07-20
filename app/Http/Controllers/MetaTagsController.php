@@ -213,6 +213,7 @@ class MetaTagsController extends Controller
             'content' => __('Content'),
             'count' => __('Count'),
             'main_problems' => __('Main problems'),
+            'tag_missing' => __('Meta tags tag missing'),
             'go_to_site' => __('Go to site'),
             'actions' => __('Actions'),
         ]);
@@ -220,6 +221,13 @@ class MetaTagsController extends Controller
 
     public function index()
     {
+        if (\App\Support\DemoCabinet::isCurrentUser()) {
+            $showcase = \App\Support\DemoCabinet::metaTagsShowcasePath();
+            if ($showcase) {
+                return redirect($showcase);
+            }
+        }
+
         $lang = $this->lang();
         $tagsOptions = $this->buildTagsOptions();
 

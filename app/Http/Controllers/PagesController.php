@@ -28,6 +28,17 @@ class PagesController extends Controller
         if($request->input('http', false))
             return (new CurlFacade($request->input('url')))->httpCode();
 
+        if (\App\Support\DemoCabinet::isCurrentUser() && ! $request->filled('url')) {
+            $showcase = \App\Support\DemoCabinet::httpHeadersShowcase();
+            if ($showcase) {
+                $response = $showcase['response'];
+                $id = 0;
+                $request->merge(['url' => $showcase['url'] ?? 'https://titlo.ru/']);
+
+                return view('pages.headers', compact('response', 'id', 'lang'));
+            }
+        }
+
         $response = (new CurlFacade($request->input('url')))->run();
         $id = $header->saveData($response);
 

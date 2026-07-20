@@ -52,4 +52,13 @@ return [
      * Яндекс: 1 стр. × 2 региона; Google: ceil(depth/10) × 2 региона.
      */
     'regions_per_check' => 2,
+
+    /** Демо на titlo.ru/geo-lokalizaciya-kommerciya/ — POST /api/demo/geo-lokalizaciya-kommerciya/run */
+    'demo' => [
+        'max_runs_per_day' => 2,
+        'max_phrase_chars' => 80,
+        'depth' => 10,
+        'yandex_lr' => '213',
+        'google_lr' => '1011969',
+    ],
 ];

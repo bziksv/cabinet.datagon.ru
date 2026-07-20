@@ -118,6 +118,18 @@
                     },
                     columns: columns,
                     order: [[isAllHistory ? 5 : 4, "desc"]],
+                    @if(!empty($demoAutoOpen))
+                    drawCallback: function () {
+                        if (window.__demoAiHistoryOpened) {
+                            return;
+                        }
+                        var first = $('#history-table tbody td.details-control').first();
+                        if (first.length) {
+                            window.__demoAiHistoryOpened = true;
+                            first.trigger('click');
+                        }
+                    },
+                    @endif
                 });
 
                 $('#history-table tbody').on('click', 'td.details-control', function () {

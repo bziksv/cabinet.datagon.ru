@@ -163,4 +163,14 @@ return [
         'organizations',
         'content',
     ],
+
+    /** Демо на titlo.ru/tipy-saitov-v-vydache/ — POST /api/demo/tipy-saitov-v-vydache/run */
+    'demo' => [
+        'max_runs_per_day' => 2,
+        'max_phrase_chars' => 80,
+        'depth' => 10,
+        'max_rows' => 10,
+        'yandex_lr' => '213',
+        'google_lr' => '1011969',
+    ],
 ];

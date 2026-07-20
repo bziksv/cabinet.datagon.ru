@@ -152,11 +152,11 @@
                                     <tr v-for="(item, tag) in url.data" :key="tag">
                                         <td><span class="badge text-bg-success">&lt; {{ tag }} &gt;</span></td>
                                         <td>
-                                            <span v-if="item.length"><textarea class="form-control form-control-sm" readonly>{{ item.join( ', \r\n' ) }}</textarea></span>
-                                            <span v-else class="badge text-bg-danger">{{ item }}</span>
+                                            <span v-if="isTagContentPresent(item)"><textarea class="form-control form-control-sm" readonly>{{ item.join( ', \r\n' ) }}</textarea></span>
+                                            <span v-else class="badge text-bg-danger">{{ tagMissingLabel }}</span>
                                         </td>
                                         <td>
-                                            <span class="badge text-bg-warning">{{ item.length }}</span>
+                                            <span class="badge text-bg-warning">{{ tagContentCount(item) }}</span>
                                         </td>
                                         <td v-html="url.error.main[tag].join(' <br />')"></td>
                                     </tr>
@@ -318,6 +318,9 @@
             }
         },
         computed: {
+            tagMissingLabel() {
+                return (this.lang && this.lang.tag_missing) ? this.lang.tag_missing : 'Не найден';
+            },
         },
         created() {
             var app = this;
@@ -409,6 +412,12 @@
             }
         },
         methods: {
+            isTagContentPresent(value) {
+                return Array.isArray(value) && value.length > 0;
+            },
+            tagContentCount(value) {
+                return Array.isArray(value) ? value.length : 0;
+            },
             initTagOptions(options) {
                 if (!Array.isArray(options) || !options.length) {
                     return;

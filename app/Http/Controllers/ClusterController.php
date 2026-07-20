@@ -15,6 +15,7 @@ use App\Jobs\Cluster\StartClusterAnalyseQueue;
 use App\Support\ClusterAnalysisDebugLog;
 use App\Support\ClusterProgress;
 use App\Support\ClusterQueues;
+use App\Support\DemoCabinet;
 use App\Support\YandexLrRegions;
 use App\User;
 use Carbon\Carbon;
@@ -31,8 +32,18 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class ClusterController extends Controller
 {
-    public function index($result = null): View
+    /**
+     * @return View|RedirectResponse
+     */
+    public function index($result = null)
     {
+        if (DemoCabinet::isCurrentUser()) {
+            $showcase = DemoCabinet::clusterShowcasePath();
+            if ($showcase) {
+                return redirect($showcase);
+            }
+        }
+
         $admin = User::isUserAdmin();
         $config = ClusterConfiguration::first();
         $configClassic = ClusterConfigurationClassic::first();

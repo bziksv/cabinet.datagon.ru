@@ -473,6 +473,28 @@
         }
     }
 
+    function applyDemoShowcase() {
+        var demo = config.demoShowcase;
+        if (!demo || !demo.text) {
+            return false;
+        }
+        textEl.value = String(demo.text);
+        if (demo.options) {
+            root.querySelectorAll('[data-dup-option]').forEach(function (input) {
+                if (Object.prototype.hasOwnProperty.call(demo.options, input.value)) {
+                    input.checked = !!demo.options[input.value];
+                }
+            });
+        }
+        var ciEl = root.querySelector('#cabinet-dup-opt-dedup-ci');
+        if (ciEl && demo.caseInsensitiveDedup !== undefined) {
+            ciEl.checked = !!demo.caseInsensitiveDedup;
+        }
+        updateCharFieldsState();
+        processText();
+        return true;
+    }
+
     function readTextFile(file) {
         if (!file) {
             return;
@@ -614,7 +636,9 @@
     });
 
     bindDropZone();
-    restoreState();
+    if (!applyDemoShowcase()) {
+        restoreState();
+    }
     updateSplitLayout();
     updateLineCount();
     updateCharFieldsState();

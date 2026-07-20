@@ -158,5 +158,23 @@
 
     @slot('js')
         <script src="{{ asset('plugins/roi/js/calc.js') }}?v={{ @filemtime(public_path('plugins/roi/js/calc.js')) ?: time() }}"></script>
+        @php $demoRoi = \App\Support\DemoCabinet::isCurrentUser() ? \App\Support\DemoCabinet::roiCalculatorShowcase() : null; @endphp
+        @if($demoRoi)
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                var demo = @json($demoRoi);
+                ['zatrat', 'doxod', 'prosmotr', 'kliki', 'zayavka', 'pokupka'].forEach(function (id) {
+                    var el = document.getElementById(id);
+                    if (el && demo[id] != null) {
+                        el.value = demo[id];
+                    }
+                });
+                var btn = document.getElementById('go-calc');
+                if (btn) {
+                    btn.click();
+                }
+            });
+        </script>
+        @endif
     @endslot
 @endcomponent

@@ -68,3 +68,7 @@ Route::post('demo/otslezhivanie-ssylok/run', 'Api\\Demo\\BacklinkDemoController@
 Route::post('demo/http-headers/run', 'Api\\Demo\\HttpHeadersDemoController@run');
 Route::post('demo/proverka-indeksacii/run', 'Api\\Demo\\IndexCheckDemoController@run');
 Route::post('demo/proverka-teksta-esenin/run', 'Api\\Demo\\EseninTextCheckDemoController@run');
+Route::post('demo/sbor-poiskovykh-podskazok/run', 'Api\\Demo\\SearchSuggestionsDemoController@run');
+Route::post('demo/zapisi-domena/run', 'Api\\Demo\\DomainRecordsDemoController@run');
+Route::post('demo/tipy-saitov-v-vydache/run', 'Api\\Demo\\SiteTypesDemoController@run');
+Route::post('demo/geo-lokalizaciya-kommerciya/run', 'Api\\Demo\\PhraseCommerceDemoController@run');

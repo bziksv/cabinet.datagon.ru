@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\EseninTextCheckPublicShare;
 use App\Services\EseninTextCheckService;
 use App\Services\EseninTextCheckSessionService;
+use App\Support\DemoCabinet;
 use App\Support\Esenin\EseninAnalyzer;
 use App\Support\EseninTextCheckLimits;
 use App\Support\EseninTextCheckPublicShareTtl;
 use App\Support\EseninTextCheckSettingsRegistry;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -23,12 +25,20 @@ class EseninTextCheckController extends Controller
     }
 
     /**
-     * @return array|Factory|JsonResponse|View
+     * @return array|Factory|JsonResponse|RedirectResponse|View
      */
     public function index(Request $request)
     {
         if ($request->boolean('ajax')) {
             return $this->ajaxCheck($request);
+        }
+
+        // Демо: сразу открываем готовую сессию с результатом
+        if (DemoCabinet::isCurrentUser() && ! $request->filled('session')) {
+            $showcase = DemoCabinet::eseninShowcasePath();
+            if ($showcase) {
+                return redirect($showcase);
+            }
         }
 
         $limit = EseninTextCheckLimits::limitForUser();

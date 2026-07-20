@@ -1,0 +1,11 @@
+{
+  "listA": "купить диван\nугловой диван\nдиван кровать\nдоставка дивана\nремонт мебели",
+  "listB": "угловой диван\nпуф в гостиную\nдиван кровать\nчехол на диван\nдоставка дивана",
+  "mode": "unique",
+  "options": {
+    "trim": true,
+    "removeEmpty": true,
+    "caseInsensitive": true,
+    "sortResult": true
+  }
+}

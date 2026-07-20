@@ -5,7 +5,9 @@ namespace App\Classes\Cron;
 
 use App\RelevanceAnalysisConfig;
 use App\RelevanceHistoryResult;
+use App\Support\DemoCabinet;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 
 
 class RelevanceCleaningResults
@@ -24,10 +26,11 @@ class RelevanceCleaningResults
         $total = 0;
         $config = RelevanceAnalysisConfig::first();
 
-        $results = RelevanceHistoryResult::where([
-            ['created_at', '<', Carbon::now()->subDays($config->cleaning_interval)],
-            ['cleaning', '=', 0]
-        ])->take(5)->get();
+        $results = $this->baseQuery()
+            ->where([
+                ['created_at', '<', Carbon::now()->subDays($config->cleaning_interval)],
+                ['cleaning', '=', 0]
+            ])->take(5)->get();
 
         while (count($results) != 0) {
             foreach ($results as $result) {
@@ -51,10 +54,11 @@ class RelevanceCleaningResults
             }
 
             $total += count($results);
-            $results = RelevanceHistoryResult::where([
-                ['created_at', '<', Carbon::now()->subDays($config->cleaning_interval)],
-                ['cleaning', '=', 0]
-            ])->take(5)->get();
+            $results = $this->baseQuery()
+                ->where([
+                    ['created_at', '<', Carbon::now()->subDays($config->cleaning_interval)],
+                    ['cleaning', '=', 0]
+                ])->take(5)->get();
         }
     }
 
@@ -66,11 +70,12 @@ class RelevanceCleaningResults
         $total = 0;
         $config = RelevanceAnalysisConfig::first();
 
-        $results = RelevanceHistoryResult::where([
-            ['created_at', '<', Carbon::now()->subDays($config->cleaning_interval)],
-            ['cleaning', '=', 1],
-            ['compressed', '=', 0],
-        ])->take(5)->get();
+        $results = $this->baseQuery()
+            ->where([
+                ['created_at', '<', Carbon::now()->subDays($config->cleaning_interval)],
+                ['cleaning', '=', 1],
+                ['compressed', '=', 0],
+            ])->take(5)->get();
 
         while (count($results) != 0) {
             foreach ($results as $result) {
@@ -81,12 +86,28 @@ class RelevanceCleaningResults
             }
 
             $total += count($results);
-            $results = RelevanceHistoryResult::where([
-                ['created_at', '<', Carbon::now()->subDays($config->cleaning_interval)],
-                ['cleaning', '=', 1],
-                ['compressed', '=', 0],
-            ])->take(5)->get();
+            $results = $this->baseQuery()
+                ->where([
+                    ['created_at', '<', Carbon::now()->subDays($config->cleaning_interval)],
+                    ['cleaning', '=', 1],
+                    ['compressed', '=', 0],
+                ])->take(5)->get();
         }
     }
 
+    /**
+     * Демо-кабинет не чистим — иначе витрина через cleaning_interval остаётся без деталки.
+     */
+    private function baseQuery(): Builder
+    {
+        $query = RelevanceHistoryResult::query();
+        $demo = DemoCabinet::findUser();
+        if ($demo) {
+            $query->whereDoesntHave('mainHistory', function (Builder $q) use ($demo) {
+                $q->where('user_id', $demo->id);
+            });
+        }
+
+        return $query;
+    }
 }

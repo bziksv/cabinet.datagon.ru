@@ -139,6 +139,8 @@ class SiteAuditPageProcessor
                 $pageData['top_word_count'] = $parsed['top_word_count'] ?? 0;
                 $pageData['top_bigram'] = $parsed['top_bigram'] ?? null;
                 $pageData['top_bigram_count'] = $parsed['top_bigram_count'] ?? 0;
+                $pageData['top_trigram'] = $parsed['top_trigram'] ?? null;
+                $pageData['top_trigram_count'] = $parsed['top_trigram_count'] ?? 0;
                 $pageData['noindex_text_len'] = $parsed['noindex_text_len'] ?? 0;
                 $pageData['charset'] = $parsed['charset'] ?? null;
 
@@ -448,6 +450,7 @@ class SiteAuditPageProcessor
                 'h1_spam',
                 'text_nausea',
                 'text_bigram_spam',
+                'text_trigram_spam',
                 'no_unique_images',
                 'text_in_noindex',
                 'not_in_sitemap',

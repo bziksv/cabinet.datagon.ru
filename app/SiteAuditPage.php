@@ -46,6 +46,8 @@ class SiteAuditPage extends Model
         'top_word_count',
         'top_bigram',
         'top_bigram_count',
+        'top_trigram',
+        'top_trigram_count',
         'noindex_text_len',
         'charset',
         'html_storage_key',

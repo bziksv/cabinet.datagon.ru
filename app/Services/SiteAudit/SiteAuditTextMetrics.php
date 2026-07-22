@@ -31,6 +31,8 @@ class SiteAuditTextMetrics
      *   top_word_count: int,
      *   top_bigram: ?string,
      *   top_bigram_count: int,
+     *   top_trigram: ?string,
+     *   top_trigram_count: int,
      *   spam: bool,
      *   spam_word: ?string,
      *   spam_count: int
@@ -48,6 +50,8 @@ class SiteAuditTextMetrics
             'top_word_count' => 0,
             'top_bigram' => null,
             'top_bigram_count' => 0,
+            'top_trigram' => null,
+            'top_trigram_count' => 0,
             'spam' => false,
             'spam_word' => null,
             'spam_count' => 0,
@@ -82,6 +86,19 @@ class SiteAuditTextMetrics
             $bigramCount = (int) $bigrams[$topBigram];
         }
 
+        $trigramCount = 0;
+        $topTrigram = null;
+        if ($n >= 3) {
+            $trigrams = [];
+            for ($i = 2; $i < $n; $i++) {
+                $tg = $tokens[$i - 2] . ' ' . $tokens[$i - 1] . ' ' . $tokens[$i];
+                $trigrams[$tg] = ($trigrams[$tg] ?? 0) + 1;
+            }
+            arsort($trigrams);
+            $topTrigram = (string) array_key_first($trigrams);
+            $trigramCount = (int) $trigrams[$topTrigram];
+        }
+
         $spam = false;
         $spamWord = null;
         $spamCount = 0;
@@ -103,6 +120,8 @@ class SiteAuditTextMetrics
             'top_word_count' => $topCount,
             'top_bigram' => $topBigram,
             'top_bigram_count' => $bigramCount,
+            'top_trigram' => $topTrigram,
+            'top_trigram_count' => $trigramCount,
             'spam' => $spam,
             'spam_word' => $spamWord,
             'spam_count' => $spamCount,

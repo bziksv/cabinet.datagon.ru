@@ -70,6 +70,7 @@ class SiteAuditReportFilter
             'h1_spam' => ['h1'],
             'text_nausea' => ['details'],
             'text_bigram_spam' => ['details'],
+            'text_trigram_spam' => ['details'],
             'text_in_noindex' => ['details'],
             'canonical_empty' => ['canonical'],
             'canonical_foreign' => ['canonical'],

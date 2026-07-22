@@ -1268,9 +1268,18 @@ class SiteAuditController extends Controller
 
     private function bucketsFromTree(array $tree): array
     {
+        $catalog = config('site_audit.findings', []);
         $out = ['critical' => 0, 'other' => 0, 'warning' => 0, 'info' => 0];
         foreach ($tree as $sev => $items) {
             foreach ($items as $item) {
+                if (! empty($item['external'])) {
+                    continue;
+                }
+                // Virtual-паки (security_headers и т.п.) — сумма children; не дублируем в корзине.
+                $code = (string) ($item['code'] ?? '');
+                if (! empty($catalog[$code]['virtual'])) {
+                    continue;
+                }
                 $out[$sev] = ($out[$sev] ?? 0) + (int) ($item['count'] ?? 0);
             }
         }

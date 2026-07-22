@@ -163,6 +163,14 @@ class SiteAuditFindingPresenter
 
                 return '—';
 
+            case 'text_trigram_spam':
+                if (! empty($meta['trigram'])) {
+                    return '«' . self::clip($meta['trigram'], 60) . '»×' . (int) ($meta['count'] ?? 0)
+                        . (isset($meta['density']) ? (' · ' . $meta['density'] . '%') : '');
+                }
+
+                return '—';
+
             case 'no_unique_images':
                 return 'img: ' . (int) ($meta['img_count'] ?? 0) . ' · unique src: 0';
 

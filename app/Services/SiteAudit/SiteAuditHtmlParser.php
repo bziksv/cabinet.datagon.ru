@@ -153,6 +153,8 @@ class SiteAuditHtmlParser
             'top_word_count' => $textMetrics['top_word_count'],
             'top_bigram' => $textMetrics['top_bigram'],
             'top_bigram_count' => $textMetrics['top_bigram_count'],
+            'top_trigram' => $textMetrics['top_trigram'],
+            'top_trigram_count' => $textMetrics['top_trigram_count'],
             'noindex_text_len' => mb_strlen($noindexText),
             'img_count' => $imgCount,
             'img_without_alt' => $imgWithoutAlt,

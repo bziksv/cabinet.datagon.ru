@@ -41,6 +41,7 @@ class SiteAuditAggregator
         'h1_spam',
         'text_nausea',
         'text_bigram_spam',
+        'text_trigram_spam',
         'no_unique_images',
         'text_in_noindex',
         'not_in_sitemap',
@@ -315,6 +316,22 @@ class SiteAuditAggregator
                             'density' => $bgDensity,
                             'threshold_count' => $bigramMin,
                             'threshold_density' => $bigramDensityMin,
+                        ]);
+                    }
+
+                    $trigramMin = (int) config('site_audit.trigram_spam_min', 3);
+                    $trigramDensityMin = (float) config('site_audit.trigram_spam_density_min', 1.0);
+                    $tgCount = (int) ($page->top_trigram_count ?? 0);
+                    $tgDensity = ($words > 0 && $tgCount > 0)
+                        ? round(($tgCount / $words) * 100, 2)
+                        : 0.0;
+                    if (! empty($page->top_trigram) && $tgCount >= $trigramMin && $tgDensity >= $trigramDensityMin) {
+                        $findings[] = $this->row($crawlId, 'text_trigram_spam', $page, [
+                            'trigram' => $page->top_trigram,
+                            'count' => $tgCount,
+                            'density' => $tgDensity,
+                            'threshold_count' => $trigramMin,
+                            'threshold_density' => $trigramDensityMin,
                         ]);
                     }
 

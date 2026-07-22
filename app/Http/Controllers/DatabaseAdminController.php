@@ -91,27 +91,62 @@ class DatabaseAdminController extends Controller
             ]));
     }
 
-    public function optimizeTable(string $table, TableOptimizeService $optimizer, Request $request): RedirectResponse
+    public function optimizeTable(string $table, TableOptimizeService $optimizer, Request $request)
     {
         set_time_limit(max(120, (int) config('cabinet-database-admin.optimize_lock_seconds', 7200)));
 
+        $wantsJson = $request->ajax() || $request->wantsJson() || $request->expectsJson();
         $filter = (string) $request->get('filter', 'all');
 
         try {
-            $result = $optimizer->requestOptimize($table, 'ui');
+            // UI AJAX всегда в очередь — без блокировки запроса и без reload
+            $result = $optimizer->requestOptimize($table, 'ui', $wantsJson);
         } catch (\InvalidArgumentException $e) {
+            if ($wantsJson) {
+                return response()->json(['ok' => false, 'error' => $e->getMessage()], 422);
+            }
+
             return redirect()
                 ->route('admin.database.index', ['filter' => $filter])
                 ->with('error', $e->getMessage());
         } catch (\Throwable $e) {
+            if ($wantsJson) {
+                return response()->json(['ok' => false, 'error' => $e->getMessage()], 500);
+            }
+
             return redirect()
                 ->route('admin.database.index', ['filter' => $filter])
                 ->with('error', $e->getMessage());
         }
 
+        if ($wantsJson) {
+            $status = $optimizer->statusPayload($table);
+
+            return response()->json([
+                'ok' => true,
+                'queued' => (bool) $result['queued'],
+                'message' => $result['message'],
+                'run' => $optimizer->serializeRun($result['run']),
+                'size_mb' => $status['size_mb'],
+                'data_free_mb' => $status['data_free_mb'],
+                'optimize' => $status['optimize'],
+            ]);
+        }
+
         return redirect()
             ->route('admin.database.index', ['filter' => $filter, 'fresh' => 1])
             ->with('success', $result['message']);
+    }
+
+    public function optimizeStatus(string $table, TableOptimizeService $optimizer): JsonResponse
+    {
+        try {
+            return response()->json(array_merge(['ok' => true], $optimizer->statusPayload($table)));
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['ok' => false, 'error' => $e->getMessage()], 404);
+        } catch (\Throwable $e) {
+            return response()->json(['ok' => false, 'error' => $e->getMessage()], 500);
+        }
     }
 
     public function previewRows(string $table, TableRowPreviewService $preview): JsonResponse

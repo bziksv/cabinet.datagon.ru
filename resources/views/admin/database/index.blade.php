@@ -202,7 +202,7 @@
                                     </details>
                                 @endif
                             </td>
-                            <td class="text-end text-nowrap">{{ number_format($t['size_mb'], 1, '.', ' ') }} MB</td>
+                            <td class="text-end text-nowrap db-size-cell">{{ number_format($t['size_mb'], 1, '.', ' ') }} MB</td>
                             <td class="text-end text-nowrap">{{ number_format($t['rows_estimate'], 0, '.', ' ') }}</td>
                             <td>
                                 @if(!empty($t['system']))
@@ -236,7 +236,7 @@
                             <td class="small text-nowrap">
                                 @include('admin.database.partials.date-range', ['t' => $t])
                             </td>
-                            <td class="small">
+                            <td class="small db-optimize-cell" data-table="{{ $t['name'] }}">
                                 @php
                                     $opt = $t['optimize'] ?? null;
                                     $freeMb = (float) ($t['data_free_mb'] ?? 0);
@@ -244,6 +244,7 @@
                                     $syncMax = (int) config('cabinet-database-admin.optimize_sync_max_mb', 500);
                                     $willQueue = ($t['size_mb'] ?? 0) >= $syncMax;
                                 @endphp
+                                <div class="db-optimize-status">
                                 @if($opt && ($opt['status'] ?? '') === 'ok' && !empty($opt['optimized_at']))
                                     <div class="text-nowrap">{{ \Illuminate\Support\Carbon::parse($opt['optimized_at'])->format('d.m.Y H:i') }}</div>
                                     @if(isset($opt['freed_mb']))
@@ -264,12 +265,11 @@
                                 @else
                                     <span class="text-secondary">—</span>
                                 @endif
-                                @if($freeMb >= 1)
-                                    <div class="text-secondary text-nowrap" title="{{ __('Database optimize data free hint') }}">
-                                        {{ __('Database optimize reclaimable') }}:
-                                        {{ $freeMb >= 1024 ? number_format($freeMb / 1024, 2, '.', ' ') . ' GB' : number_format($freeMb, 1, '.', ' ') . ' MB' }}
-                                    </div>
-                                @endif
+                                </div>
+                                <div class="db-optimize-free text-secondary text-nowrap {{ $freeMb >= 1 ? '' : 'd-none' }}" title="{{ __('Database optimize data free hint') }}">
+                                    {{ __('Database optimize reclaimable') }}:
+                                    <span class="db-optimize-free-val">{{ $freeMb >= 1024 ? number_format($freeMb / 1024, 2, '.', ' ') . ' GB' : number_format($freeMb, 1, '.', ' ') . ' MB' }}</span>
+                                </div>
                             </td>
                             <td>
                                 @if($isOrphan)
@@ -296,16 +296,15 @@
                                                 ? __('Database optimize confirm queue', ['table' => $t['name'], 'size' => number_format($t['size_mb'], 1, '.', ' ') . ' MB'])
                                                 : __('Database optimize confirm sync', ['table' => $t['name'], 'size' => number_format($t['size_mb'], 1, '.', ' ') . ' MB']);
                                         @endphp
-                                        <form action="{{ route('admin.database.optimize', ['table' => $t['name']]) }}" method="post" class="d-inline"
-                                              onsubmit='return confirm(@json($optConfirm));'>
-                                            @csrf
-                                            <input type="hidden" name="filter" value="{{ $filter }}">
-                                            <button type="submit" class="btn btn-sm btn-outline-primary"
-                                                    title="{{ __('Database optimize action') }}">
-                                                <i class="bi bi-lightning-charge" aria-hidden="true"></i>
-                                                <span class="d-none d-lg-inline ms-1">{{ __('Database optimize action') }}</span>
-                                            </button>
-                                        </form>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-primary db-optimize-btn"
+                                                data-table="{{ $t['name'] }}"
+                                                data-confirm="{{ $optConfirm }}"
+                                                data-size-mb="{{ $t['size_mb'] }}"
+                                                title="{{ __('Database optimize action') }}">
+                                            <i class="bi bi-lightning-charge" aria-hidden="true"></i>
+                                            <span class="d-none d-lg-inline ms-1">{{ __('Database optimize action') }}</span>
+                                        </button>
                                     @endunless
                                     @if(isset($clearableTables[$t['name']]))
                                         @php
@@ -344,16 +343,151 @@
     <script>
         (function () {
             var previewUrlTemplate = @json(route('admin.database.preview', ['table' => '__TABLE__']));
+            var optimizeUrlTemplate = @json(route('admin.database.optimize', ['table' => '__TABLE__']));
+            var optimizeStatusUrlTemplate = @json(route('admin.database.optimize.status', ['table' => '__TABLE__']));
+            var csrf = document.querySelector('meta[name="csrf-token"]');
+            var csrfToken = csrf ? csrf.getAttribute('content') : '';
             var labels = {
                 empty: @json(__('Database preview empty')),
                 error: @json(__('Database preview error')),
                 order: @json(__('Database preview order')),
                 excerpt: @json(__('Exception excerpt')),
-                loading: @json(__('Database preview loading'))
+                loading: @json(__('Database preview loading')),
+                queued: @json(__('Database optimize status queued')),
+                running: @json(__('Database optimize status running')),
+                failed: @json(__('Database optimize status failed')),
+                reclaimable: @json(__('Database optimize reclaimable')),
+                optimizeError: @json(__('Database optimize status failed'))
             };
+            var pollTimers = {};
 
             function escapeHtml(s) {
                 return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            }
+
+            function formatMb(mb) {
+                mb = Number(mb) || 0;
+                if (Math.abs(mb) >= 1024) {
+                    return (Math.round(mb / 1024 * 100) / 100).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' GB';
+                }
+                return (Math.round(mb * 10) / 10).toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' MB';
+            }
+
+            function formatFreed(mb) {
+                mb = Number(mb) || 0;
+                var sign = mb > 0 ? '−' : (mb < 0 ? '+' : '');
+                return sign + formatMb(Math.abs(mb));
+            }
+
+            function formatDateTime(iso) {
+                if (!iso) return '';
+                var d = new Date(String(iso).replace(' ', 'T'));
+                if (isNaN(d.getTime())) return String(iso);
+                var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+                return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+            }
+
+            function renderOptimizeCell(opt, dataFreeMb) {
+                var html = '<div class="db-optimize-status">';
+                if (opt && opt.status === 'ok' && opt.optimized_at) {
+                    html += '<div class="text-nowrap">' + escapeHtml(formatDateTime(opt.optimized_at)) + '</div>';
+                    if (opt.freed_mb != null) {
+                        html += '<div class="text-success">' + escapeHtml(formatFreed(opt.freed_mb)) + '</div>';
+                    }
+                } else if (opt && (opt.status === 'queued' || opt.status === 'running')) {
+                    html += '<span class="badge text-bg-info">' + escapeHtml(opt.status === 'queued' ? labels.queued : labels.running) + '</span>';
+                } else if (opt && opt.status === 'failed') {
+                    html += '<div class="text-danger" title="' + escapeHtml(opt.message || '') + '">' + escapeHtml(labels.failed) + '</div>';
+                } else {
+                    html += '<span class="text-secondary">—</span>';
+                }
+                html += '</div>';
+                var free = Number(dataFreeMb) || 0;
+                html += '<div class="db-optimize-free text-secondary text-nowrap' + (free >= 1 ? '' : ' d-none') + '">';
+                html += escapeHtml(labels.reclaimable) + ': <span class="db-optimize-free-val">' + escapeHtml(formatMb(free)) + '</span></div>';
+                return html;
+            }
+
+            function findRow(table) {
+                return document.querySelector('#db-inventory-table tbody tr[data-inventory-row="1"][data-table-name="' + table + '"]');
+            }
+
+            function updateRowOptimize(table, payload) {
+                var row = findRow(table);
+                if (!row) return;
+                var cell = row.querySelector('.db-optimize-cell');
+                if (cell) {
+                    cell.innerHTML = renderOptimizeCell(payload.optimize || null, payload.data_free_mb);
+                }
+                if (payload.size_mb != null) {
+                    var sizeCell = row.querySelector('.db-size-cell');
+                    if (sizeCell) {
+                        sizeCell.textContent = formatMb(payload.size_mb);
+                    }
+                }
+                var btn = row.querySelector('.db-optimize-btn');
+                if (btn) {
+                    var st = payload.optimize && payload.optimize.status;
+                    var busy = st === 'queued' || st === 'running';
+                    btn.disabled = !!busy;
+                    if (busy) {
+                        btn.setAttribute('aria-busy', 'true');
+                    } else {
+                        btn.removeAttribute('aria-busy');
+                    }
+                }
+            }
+
+            function showFlash(type, message) {
+                var existing = document.querySelector('.cabinet-database-admin-page .db-ajax-flash');
+                if (existing) existing.remove();
+                var el = document.createElement('div');
+                el.className = 'alert alert-' + (type === 'error' ? 'danger' : 'success') + ' alert-dismissible fade show db-ajax-flash';
+                el.setAttribute('role', 'alert');
+                el.innerHTML = escapeHtml(message) +
+                    '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+                var page = document.querySelector('.cabinet-database-admin-page');
+                var toolbar = page ? page.querySelector('.db-sticky-toolbar') : null;
+                if (toolbar && toolbar.parentNode) {
+                    toolbar.parentNode.insertBefore(el, toolbar);
+                } else if (page) {
+                    page.insertBefore(el, page.firstChild);
+                }
+            }
+
+            function stopPoll(table) {
+                if (pollTimers[table]) {
+                    clearInterval(pollTimers[table]);
+                    delete pollTimers[table];
+                }
+            }
+
+            function startPoll(table) {
+                stopPoll(table);
+                pollTimers[table] = setInterval(function () {
+                    fetch(optimizeStatusUrlTemplate.replace('__TABLE__', encodeURIComponent(table)), {
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin'
+                    })
+                        .then(function (r) { return r.json(); })
+                        .then(function (data) {
+                            if (!data || !data.ok) return;
+                            updateRowOptimize(table, data);
+                            var st = data.optimize && data.optimize.status;
+                            if (!st || st === 'ok' || st === 'failed') {
+                                stopPoll(table);
+                                if (st === 'ok') {
+                                    showFlash('success', @json(__('Database optimize done', ['table' => ':table', 'freed' => ':freed', 'after' => ':after']))
+                                        .replace(':table', table)
+                                        .replace(':freed', formatFreed((data.optimize && data.optimize.freed_mb) || 0))
+                                        .replace(':after', formatMb(data.size_mb || 0)));
+                                } else if (st === 'failed') {
+                                    showFlash('error', (data.optimize && data.optimize.message) || labels.failed);
+                                }
+                            }
+                        })
+                        .catch(function () { /* keep polling */ });
+                }, 5000);
             }
 
             function renderPreview(data) {
@@ -431,6 +565,82 @@
                             panel.innerHTML = '<p class="text-danger mb-0">' + escapeHtml(labels.error) + '</p>';
                         });
                 });
+            });
+
+            document.querySelectorAll('.db-optimize-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var table = btn.getAttribute('data-table');
+                    var confirmMsg = btn.getAttribute('data-confirm') || '';
+                    if (confirmMsg && !window.confirm(confirmMsg)) {
+                        return;
+                    }
+                    btn.disabled = true;
+                    btn.setAttribute('aria-busy', 'true');
+                    updateRowOptimize(table, {
+                        optimize: { status: 'queued' },
+                        data_free_mb: (function () {
+                            var cell = document.querySelector('.db-optimize-cell[data-table="' + table + '"]');
+                            var freeEl = cell && cell.querySelector('.db-optimize-free');
+                            if (!freeEl || freeEl.classList.contains('d-none')) return 0;
+                            return 1; // keep free line visible; exact value refreshed from response
+                        })()
+                    });
+                    fetch(optimizeUrlTemplate.replace('__TABLE__', encodeURIComponent(table)), {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ _token: csrfToken })
+                    })
+                        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, json: j }; }); })
+                        .then(function (res) {
+                            if (!res.ok || !res.json.ok) {
+                                btn.disabled = false;
+                                btn.removeAttribute('aria-busy');
+                                showFlash('error', (res.json && res.json.error) || labels.optimizeError);
+                                // refresh status cell
+                                fetch(optimizeStatusUrlTemplate.replace('__TABLE__', encodeURIComponent(table)), {
+                                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                                }).then(function (r) { return r.json(); }).then(function (d) {
+                                    if (d && d.ok) updateRowOptimize(table, d);
+                                }).catch(function () {});
+                                return;
+                            }
+                            updateRowOptimize(table, res.json);
+                            showFlash('success', res.json.message || labels.queued);
+                            var st = res.json.optimize && res.json.optimize.status;
+                            if (st === 'queued' || st === 'running') {
+                                startPoll(table);
+                            } else {
+                                btn.disabled = false;
+                                btn.removeAttribute('aria-busy');
+                            }
+                        })
+                        .catch(function () {
+                            btn.disabled = false;
+                            btn.removeAttribute('aria-busy');
+                            showFlash('error', labels.optimizeError);
+                        });
+                });
+            });
+
+            // Resume polling for rows already in progress
+            document.querySelectorAll('.db-optimize-cell').forEach(function (cell) {
+                var table = cell.getAttribute('data-table');
+                if (!table) return;
+                if (cell.querySelector('.badge.text-bg-info')) {
+                    startPoll(table);
+                    var row = findRow(table);
+                    var btn = row && row.querySelector('.db-optimize-btn');
+                    if (btn) {
+                        btn.disabled = true;
+                        btn.setAttribute('aria-busy', 'true');
+                    }
+                }
             });
 
             var input = document.getElementById('db-table-search');

@@ -18,7 +18,7 @@ class TableOptimizeService
     /**
      * @return array{queued: bool, run: DatabaseTableOptimizeRun, message: string}
      */
-    public function requestOptimize(string $table, string $triggeredBy = 'ui'): array
+    public function requestOptimize(string $table, string $triggeredBy = 'ui', bool $forceQueue = false): array
     {
         $table = $this->sanitizeTableName($table);
         if (! $this->tableExists($table)) {
@@ -41,7 +41,7 @@ class TableOptimizeService
 
         $stats = $this->measureTable($table);
         $syncMaxMb = (float) config('cabinet-database-admin.optimize_sync_max_mb', 500);
-        $useQueue = $stats['size_mb'] >= $syncMaxMb;
+        $useQueue = $forceQueue || $stats['size_mb'] >= $syncMaxMb;
 
         $run = DatabaseTableOptimizeRun::query()->create([
             'table_name' => $table,
@@ -260,5 +260,60 @@ class TableOptimizeService
         $sign = $mb > 0 ? '−' : ($mb < 0 ? '+' : '');
 
         return $sign . $this->formatMb(abs($mb));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function serializeRun(?DatabaseTableOptimizeRun $run): ?array
+    {
+        if ($run === null) {
+            return null;
+        }
+
+        $finished = $run->finished_at ?: $run->started_at ?: $run->created_at;
+        if ($finished && ! is_string($finished)) {
+            $finished = $finished->toDateTimeString();
+        }
+
+        return [
+            'id' => (int) $run->id,
+            'table' => (string) $run->table_name,
+            'status' => (string) $run->status,
+            'mode' => (string) $run->mode,
+            'optimized_at' => $finished ? (string) $finished : null,
+            'freed_mb' => $run->freed_mb !== null ? (float) $run->freed_mb : null,
+            'size_before_mb' => $run->size_before_mb !== null ? (float) $run->size_before_mb : null,
+            'size_after_mb' => $run->size_after_mb !== null ? (float) $run->size_after_mb : null,
+            'data_free_before_mb' => $run->data_free_before_mb !== null ? (float) $run->data_free_before_mb : null,
+            'message' => $run->message !== null ? (string) $run->message : null,
+        ];
+    }
+
+    /**
+     * Текущий статус OPTIMIZE + актуальный DATA_FREE / size для UI.
+     *
+     * @return array{table: string, size_mb: float, data_free_mb: float, optimize: ?array}
+     */
+    public function statusPayload(string $table): array
+    {
+        $table = $this->sanitizeTableName($table);
+        $stats = $this->measureTable($table);
+        $run = null;
+        if ($this->historyReady()) {
+            $run = DatabaseTableOptimizeRun::query()
+                ->where('table_name', $table)
+                ->orderByDesc('id')
+                ->first();
+        }
+
+        return [
+            'table' => $table,
+            'size_mb' => $stats['size_mb'],
+            'data_free_mb' => $stats['data_free_mb'],
+            'busy' => $this->isBusy(),
+            'busy_table' => $this->isBusy() ? (string) Cache::get(self::LOCK_KEY, '') : null,
+            'optimize' => $this->serializeRun($run),
+        ];
     }
 }

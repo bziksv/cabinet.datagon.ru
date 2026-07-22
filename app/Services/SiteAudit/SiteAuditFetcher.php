@@ -36,7 +36,7 @@ class SiteAuditFetcher
     }
 
     /**
-     * @return array{ok:bool,status_code:?int,final_url:string,redirect_chain:array,body:?string,size_bytes:int,content_type:?string,x_robots:?string,sec_headers:array{hsts:bool,x_frame:bool,x_content_type:bool,csp:bool,referrer_policy:bool,permissions_policy:bool,coop:bool,coep:bool,corp:bool},error:?string,user_agent:?string,ua_rotated:bool}
+     * @return array{ok:bool,status_code:?int,final_url:string,redirect_chain:array,body:?string,body_path:?string,size_bytes:int,content_type:?string,x_robots:?string,sec_headers:array,error:?string,user_agent:?string,ua_rotated:bool}
      */
     public function fetch(string $url): array
     {
@@ -45,11 +45,11 @@ class SiteAuditFetcher
 
         $bad = SiteAuditUserAgentSession::shouldRotate(
             $result['status_code'],
-            ! $result['ok'] && $result['body'] === null
+            ! $result['ok'] && ($result['body'] ?? null) === null && ($result['body_path'] ?? null) === null
         );
 
-        // sticky до ошибки; при 403/429/503/transport — новый UA + один retry
         if ($this->crawlId && $bad) {
+            SiteAuditBodyTemp::release($result['body_path'] ?? null);
             $ua = SiteAuditUserAgentSession::rotate($this->crawlId, $ua);
             $retry = $this->doRequest($url, $ua);
             $retry['ua_rotated'] = true;
@@ -81,11 +81,18 @@ class SiteAuditFetcher
     private function doRequest(string $url, string $ua): array
     {
         $headers = $this->browserHeaders($ua);
+        $useTemp = SiteAuditBodyTemp::enabled();
+        $bodyPath = null;
 
         try {
-            $response = $this->client->get($url, ['headers' => $headers]);
+            $options = ['headers' => $headers];
+            if ($useTemp) {
+                $bodyPath = SiteAuditBodyTemp::allocate($this->crawlId);
+                $options['sink'] = $bodyPath;
+            }
+
+            $response = $this->client->get($url, $options);
             $status = $response->getStatusCode();
-            $body = (string) $response->getBody();
             $history = $response->getHeader(RedirectMiddleware::HISTORY_HEADER);
             $chain = [];
             if (is_array($history) && $history) {
@@ -103,13 +110,38 @@ class SiteAuditFetcher
                 $final = end($hist) ?: $final;
             }
 
+            $maxBytes = max(1, (int) config('site_audit.large_page_bytes', 1_500_000));
+            $body = null;
+            $size = 0;
+
+            if ($useTemp && $bodyPath) {
+                $size = is_file($bodyPath) ? (int) filesize($bodyPath) : 0;
+                if ($size > $maxBytes) {
+                    // обрезаем файл на диске до лимита — парсер читает truncate
+                    $fh = @fopen($bodyPath, 'c+b');
+                    if ($fh) {
+                        ftruncate($fh, $maxBytes);
+                        fclose($fh);
+                        $size = $maxBytes;
+                    }
+                }
+            } else {
+                $body = (string) $response->getBody();
+                $size = strlen($body);
+                if ($size > $maxBytes) {
+                    $body = substr($body, 0, $maxBytes);
+                    $size = strlen($body);
+                }
+            }
+
             return [
                 'ok' => true,
                 'status_code' => $status,
                 'final_url' => $final,
                 'redirect_chain' => $chain,
                 'body' => $body,
-                'size_bytes' => strlen($body),
+                'body_path' => $useTemp ? $bodyPath : null,
+                'size_bytes' => $size,
                 'content_type' => $response->getHeaderLine('Content-Type') ?: null,
                 'x_robots' => $response->getHeaderLine('X-Robots-Tag') ?: null,
                 'sec_headers' => [
@@ -129,10 +161,14 @@ class SiteAuditFetcher
                 'ua_rotated' => false,
             ];
         } catch (RequestException $e) {
+            SiteAuditBodyTemp::release($bodyPath);
+
             return $this->fail($url, $ua, $e->hasResponse() && $e->getResponse()
                 ? $e->getResponse()->getStatusCode()
                 : null, $e->getMessage());
         } catch (\Throwable $e) {
+            SiteAuditBodyTemp::release($bodyPath);
+
             return $this->fail($url, $ua, null, $e->getMessage());
         }
     }
@@ -145,6 +181,7 @@ class SiteAuditFetcher
             'final_url' => $url,
             'redirect_chain' => [],
             'body' => null,
+            'body_path' => null,
             'size_bytes' => 0,
             'content_type' => null,
             'x_robots' => null,

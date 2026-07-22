@@ -45,6 +45,7 @@ class AggregateSiteAuditCrawlJob implements ShouldQueue
             $crawl->save();
 
             (new SiteAuditAggregator())->aggregate($crawl);
+            \App\Services\SiteAudit\SiteAuditBodyTemp::prune($this->crawlId);
         } catch (\Throwable $e) {
             $crawl = SiteAuditCrawl::query()->find($this->crawlId);
             if ($crawl && ! $crawl->isFinished()) {

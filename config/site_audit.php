@@ -15,6 +15,12 @@ return [
     'per_host_rps' => (float) env('SITE_AUDIT_HOST_RPS', 1),
     'large_page_bytes' => (int) env('SITE_AUDIT_LARGE_PAGE_BYTES', 1_500_000),
     'html_path' => env('SITE_AUDIT_HTML_PATH', storage_path('app/site-audit-html')),
+    // Body на диск на время parse (не HTML.gz). Чистится сразу + prune TTL/caps.
+    'body_tempfile_enabled' => (bool) env('SITE_AUDIT_BODY_TEMPFILE', true),
+    'body_temp_path' => env('SITE_AUDIT_BODY_TEMP_PATH', storage_path('app/site-audit-body-tmp')),
+    'body_temp_max_age_sec' => (int) env('SITE_AUDIT_BODY_TEMP_MAX_AGE', 1800), // 30 мин
+    'body_temp_max_total_bytes' => (int) env('SITE_AUDIT_BODY_TEMP_MAX_BYTES', 200_000_000), // 200 MB
+    'body_temp_max_files' => (int) env('SITE_AUDIT_BODY_TEMP_MAX_FILES', 200),
     'max_active_crawls_per_user' => 1,
     // local/тесты: не резать по тарифу, пока UI/модуль сырые
     'bypass_limits' => (bool) env('SITE_AUDIT_BYPASS_LIMITS', false),

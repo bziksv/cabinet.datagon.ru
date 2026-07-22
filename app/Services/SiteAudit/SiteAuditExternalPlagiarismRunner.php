@@ -134,10 +134,17 @@ class SiteAuditExternalPlagiarismRunner
 
                 try {
                     $fetched = $fetcher->fetch($url);
-                    if (empty($fetched['ok']) || empty($fetched['body'])) {
-                        throw new \RuntimeException($fetched['error'] ?: ('HTTP ' . ($fetched['status_code'] ?? '?')));
+                    $bodyPath = isset($fetched['body_path']) ? (string) $fetched['body_path'] : null;
+                    try {
+                        $body = SiteAuditBodyTemp::takeBody($fetched);
+                        if (empty($fetched['ok']) || $body === null || $body === '') {
+                            throw new \RuntimeException($fetched['error'] ?: ('HTTP ' . ($fetched['status_code'] ?? '?')));
+                        }
+                        $text = $parser->extractVisibleText($body);
+                    } finally {
+                        SiteAuditBodyTemp::release($bodyPath);
+                        unset($body, $fetched);
                     }
-                    $text = $parser->extractVisibleText((string) $fetched['body']);
                     $params = [
                         'mode' => 'internet',
                         'text' => $text,

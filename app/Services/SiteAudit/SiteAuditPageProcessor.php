@@ -34,7 +34,22 @@ class SiteAuditPageProcessor
 
         $urlHash = SiteAuditUrlNormalizer::hash($url);
         $result = $this->fetcher->fetch($url);
+        $bodyPath = isset($result['body_path']) ? (string) $result['body_path'] : null;
 
+        try {
+            return $this->processFetched($crawlId, $url, $urlHash, $result, $crawlSettings);
+        } finally {
+            SiteAuditBodyTemp::release($bodyPath);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     * @param array<string, mixed> $crawlSettings
+     * @return array{internal_links:string[]}
+     */
+    private function processFetched(int $crawlId, string $url, string $urlHash, array $result, array $crawlSettings): array
+    {
         $findings = [];
         $internalLinks = [];
 
@@ -75,7 +90,7 @@ class SiteAuditPageProcessor
             'img_without_alt' => 0,
         ];
 
-        $body = $result['body'] ?? null;
+        $body = SiteAuditBodyTemp::takeBody($result);
 
         if (! $result['ok'] || $body === null) {
             $findings[] = $this->finding('unreachable', $url, $urlHash, ['error' => $result['error']]);

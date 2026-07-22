@@ -959,6 +959,15 @@ return [
             'external' => true,
             'route' => 'competitor.analysis',
         ],
+        'site_index_check' => [
+            'phase' => 'D',
+            'severity' => 'info',
+            'title' => 'Проверка индексации (модуль)',
+            'description' => 'Сниппеты и проверка индекса URL — отдельный модуль «Проверка индексации» (не дублируем краул).',
+            'group' => 'seo',
+            'external' => true,
+            'route' => 'pages.index-check',
+        ],
         'security_headers' => [
             'phase' => 'B',
             'severity' => 'warning',

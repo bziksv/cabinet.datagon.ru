@@ -70,6 +70,10 @@
                     @if(isset(($crawl->counts_json ?? [])['click_depth_max']))
                         · глубина клика до {{ (int) $crawl->counts_json['click_depth_max'] }}
                     @endif
+                    @php $unchanged = (int) (($crawl->progress_json['pages_unchanged'] ?? 0)); @endphp
+                    @if($unchanged > 0)
+                        · без изменений {{ $unchanged }} стр.
+                    @endif
                 </div>
             </div>
             @php
@@ -283,6 +287,17 @@
                                 </div>
                                 <a class="btn btn-sm btn-outline-primary" href="{{ route('competitor.analysis') }}" target="_blank" rel="noopener">
                                     Открыть анализ конкурентов <i class="fa fa-external-link" aria-hidden="true"></i>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="alert alert-light border cabinet-sa-module-link mb-3">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between" style="gap:8px">
+                                <div>
+                                    <strong>Проверка индексации</strong>
+                                    <div class="small text-muted mb-0">Сниппеты и статус в индексе по URL — модуль «Проверка индексации». В аудите уже есть lite-отчёты по индексу/SERP.</div>
+                                </div>
+                                <a class="btn btn-sm btn-outline-primary" href="{{ route('pages.index-check') }}" target="_blank" rel="noopener">
+                                    Открыть проверку индексации <i class="fa fa-external-link" aria-hidden="true"></i>
                                 </a>
                             </div>
                         </div>
@@ -668,7 +683,13 @@
                     fetch(url, { headers: { 'Accept': 'application/json' } })
                         .then(function (r) { return r.json(); })
                         .then(function (j) {
-                            if (label) label.textContent = j.pages_fetched + ' / ' + j.pages_total;
+                            if (label) {
+                                var txt = j.pages_fetched + ' / ' + j.pages_total;
+                                if (j.pages_unchanged > 0) {
+                                    txt += ' · без изменений ' + j.pages_unchanged;
+                                }
+                                label.textContent = txt;
+                            }
                             if (bar) bar.style.width = (j.progress_pct || 0) + '%';
                             if (pill) {
                                 pill.textContent = j.status_label || j.status;

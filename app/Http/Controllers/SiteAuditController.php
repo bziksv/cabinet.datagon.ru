@@ -849,6 +849,7 @@ class SiteAuditController extends Controller
             'status_label' => $crawl->statusLabelRu(),
             'pages_fetched' => (int) $crawl->pages_fetched,
             'pages_total' => (int) $crawl->pages_total,
+            'pages_unchanged' => (int) (($crawl->progress_json['pages_unchanged'] ?? 0)),
             'buckets' => $crawl->buckets_json,
             'counts' => $counts,
             'error' => $crawl->error,

@@ -261,6 +261,10 @@ class SiteAuditExternalPlagiarismRunner
         }
 
         $minWords = max(20, (int) config('site_audit.thin_words', 150) / 2);
+        $landingList = array_keys($landingUrls);
+        if ($landingList === []) {
+            $landingList = ['__none__'];
+        }
         $pages = SiteAuditPage::query()
             ->where('crawl_id', $crawl->id)
             ->where(function ($q) {
@@ -269,9 +273,9 @@ class SiteAuditExternalPlagiarismRunner
                         $q2->where('status_code', '>=', 200)->where('status_code', '<', 400);
                     });
             })
-            ->where(function ($q) use ($minWords) {
+            ->where(function ($q) use ($minWords, $landingList) {
                 $q->where('word_count', '>=', $minWords)
-                    ->orWhereIn('url', array_keys($landingUrls) ?: ['__none__']);
+                    ->orWhereIn('url', $landingList);
             })
             ->orderByDesc('word_count')
             ->limit(max(20, $limit * 2))

@@ -2,146 +2,137 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use Illuminate\Database\Query\Builder;
-use Illuminate\Support\Collection;
+use App\Services\Database\TableOptimizeService;
 use Exception;
+use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class DataBaseOptimize extends Command
 {
     /**
-     * The name and signature of the console command.
-     *
      * @var string
      */
     protected $signature = 'db:optimize
                         {--table=* : Defaulting to all tables in the default database.}';
 
     /**
-     * The console command description.
-     *
      * @var string
      */
-    protected $description = 'Optimize table/s of the database';
+    protected $description = 'Optimize table/s of the database (OPTIMIZE TABLE + history)';
 
     /**
-     * Create a new command instance.
-     *
-     * @return void
+     * @var \Illuminate\Database\Query\Builder
      */
-    public function __construct(Builder $builder)
+    protected $db;
+
+    /**
+     * @var \Symfony\Component\Console\Helper\ProgressBar|null
+     */
+    protected $progress;
+
+    public function __construct()
     {
-        $this->db = $builder;
         parent::__construct();
+        $this->db = DB::table(DB::raw('dual'));
     }
 
     /**
-     * Execute the console command.
-     *
-     * @return void
      * @throws Exception
      */
-    public function handle(): void
+    public function handle(TableOptimizeService $optimizer): void
     {
         $this->info('Starting Optimization.');
 
-        $this->getTables()
-            ->tap(function($collection) {
-                $this->progress = $this->output->createProgressBar($collection->count());
-            })
-            ->each(function($table){
-                $this->optimize($table);
-            });
+        $tables = $this->getTables();
+        $this->progress = $this->output->createProgressBar($tables->count());
 
-        $this->info(PHP_EOL.'Optimization Completed');
+        $triggeredBy = $this->option('table') ? 'artisan' : 'cron';
+
+        $tables->each(function ($table) use ($optimizer, $triggeredBy) {
+            try {
+                // Прямой execute (не requestOptimize): cron не должен уходить в очередь по порогу
+                if (! $optimizer->historyReady()) {
+                    DB::statement('OPTIMIZE TABLE `' . str_replace('`', '', $table) . '`');
+                    $this->progress->advance();
+
+                    return;
+                }
+
+                $run = \App\DatabaseTableOptimizeRun::query()->create([
+                    'table_name' => $table,
+                    'status' => 'running',
+                    'mode' => 'sync',
+                    'triggered_by' => $triggeredBy,
+                    'started_at' => now(),
+                ]);
+                $optimizer->executeRun($run, false);
+                $this->progress->advance();
+            } catch (\Throwable $e) {
+                $this->error(" {$table}: " . $e->getMessage());
+            }
+        });
+
+        try {
+            app(\App\Services\Database\DatabaseInventoryService::class)->refreshMetadata();
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
+        $this->info(PHP_EOL . 'Optimization Completed');
     }
 
     /**
-     * Get database which need optimization
-     *
-     * @return string
      * @throws Exception
      */
     protected function getDatabase(): string
     {
-        $database = config('database.database');
+        $database = (string) config('database.connections.mysql.database');
 
-        // Check if the database exists
-        if (is_string($database) && $this->existsDatabase($database)) {
+        if ($database !== '' && $this->existsDatabase($database)) {
             return $database;
         }
+
         throw new Exception("This database {$database} doesn't exists.");
     }
 
-    /**
-     * Check if the database exists
-     *
-     * @param  string $databaseName
-     * @return bool
-     */
-    private function existsDatabase(string &$databaseName): bool
+    private function existsDatabase(string $databaseName): bool
     {
-        return $this->db
-            ->newQuery()
-            ->selectRaw('SCHEMA_NAME')
-            ->fromRaw('INFORMATION_SCHEMA.SCHEMATA')
-            ->whereRaw("SCHEMA_NAME = '{$databaseName}'")
-            ->count();
+        return DB::table('information_schema.schemata')
+            ->where('SCHEMA_NAME', $databaseName)
+            ->exists();
     }
 
     /**
-     * Get all the tables that need to the optimized
-     *
-     * @return Collection
      * @throws Exception
      */
     private function getTables(): Collection
     {
-        $tableList = collect($this->option('table'));
+        $tableList = collect($this->option('table'))->filter()->values();
         if ($tableList->isEmpty()) {
-            $tableList = $this->db
-                ->newQuery()
-                ->selectRaw('TABLE_NAME')
-                ->fromRaw('INFORMATION_SCHEMA.TABLES')
-                ->whereRaw("TABLE_SCHEMA = '{$this->getDatabase()}'")
-                ->get();
-            return $tableList->pluck('TABLE_NAME');
+            return DB::table('information_schema.tables')
+                ->where('TABLE_SCHEMA', $this->getDatabase())
+                ->orderBy('TABLE_NAME')
+                ->pluck('TABLE_NAME');
         }
-        // Check if the table exists
+
         if ($this->existsTables($tableList)) {
             return $tableList;
         }
+
         throw new Exception("One or more tables provided doesn't exists.");
     }
 
     /**
-     * Check if the table exists
-     *
-     * @param Collection $tables
-     * @return bool
      * @throws Exception
      */
     private function existsTables(Collection $tables): bool
     {
-        return $this->db
-                ->newQuery()
-                ->fromRaw('INFORMATION_SCHEMA.TABLES')
-                ->whereRaw("TABLE_SCHEMA = '{$this->getDatabase()}'")
-                ->whereRaw('TABLE_NAME IN (\'' . $tables->implode("','") . '\')')
-                ->count() == $tables->count();
-    }
+        $count = DB::table('information_schema.tables')
+            ->where('TABLE_SCHEMA', $this->getDatabase())
+            ->whereIn('TABLE_NAME', $tables->all())
+            ->count();
 
-    /**
-     * Optimize the table
-     *
-     * @param  string $table
-     * @return void
-     */
-    protected function optimize(string $table): void
-    {
-        $result = $this->db->getConnection()->select("OPTIMIZE TABLE `{$table}`");
-        if (collect($result)->pluck('Msg_text')->contains('OK')) {
-            $this->progress->advance();
-        }
+        return $count === $tables->count();
     }
 }

@@ -6,7 +6,7 @@
  * @see App\Services\Database\DatabaseInventoryService
  */
 return [
-    'version' => '1.1.4s',
+    'version' => '1.2.0s',
 
     /** Таймаут AJAX-превью строк, секунды */
     'row_preview_timeout_seconds' => 15,
@@ -28,6 +28,23 @@ return [
      */
     'clearable_tables' => [
         'failed_jobs',
+    ],
+
+    /**
+     * OPTIMIZE: синхронно из UI, если размер таблицы < этого порога (МБ).
+     * Крупнее — в очередь (OptimizeDatabaseTableJob).
+     */
+    'optimize_sync_max_mb' => (int) env('CABINET_DB_OPTIMIZE_SYNC_MB', 500),
+
+    /** Очередь для фонового OPTIMIZE */
+    'optimize_queue' => env('CABINET_DB_OPTIMIZE_QUEUE', 'default'),
+
+    /** TTL глобального lock на время OPTIMIZE, секунды */
+    'optimize_lock_seconds' => (int) env('CABINET_DB_OPTIMIZE_LOCK', 7200),
+
+    /** Таблицы, которые нельзя оптимизировать из UI */
+    'optimize_deny_tables' => [
+        // 'migrations',
     ],
 
     /**

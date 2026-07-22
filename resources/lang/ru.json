@@ -5195,5 +5195,19 @@
     "your own list of words": "свой список слов",
     "Мониторинг позиций (новый)": "Мониторинг позиций",
     "Database preview order by id note": "Последние записи по id (TEXT/BLOB обрезаны). Сортировка по дате на таких объёмах занимает минуты.",
-    "Database preview secrets hidden": "Скрыты секретные поля: :columns."
+    "Database preview secrets hidden": "Скрыты секретные поля: :columns.",
+    "Optimized": "Оптимизировано",
+    "Database optimize action": "Оптимизировать",
+    "Database optimize confirm sync": "Оптимизировать таблицу :table (:size)? Синхронно, обычно быстро.",
+    "Database optimize confirm queue": "Таблица :table (:size) крупная — OPTIMIZE уйдёт в очередь и может идти долго. Продолжить?",
+    "Database optimize queued": "Таблица :table (:size) поставлена в очередь на OPTIMIZE.",
+    "Database optimize done": "Таблица :table оптимизирована: :freed (теперь :after).",
+    "Database optimize busy": "Уже идёт OPTIMIZE (:table). Дождитесь завершения.",
+    "Database optimize not allowed": "Оптимизация этой таблицы запрещена.",
+    "Database optimize history missing": "Нет таблицы истории optimize — выполните php artisan migrate.",
+    "Database optimize status queued": "В очереди",
+    "Database optimize status running": "Идёт…",
+    "Database optimize status failed": "Ошибка",
+    "Database optimize reclaimable": "дырок",
+    "Database optimize data free hint": "DATA_FREE — место, которое InnoDB держит после DELETE; OPTIMIZE может вернуть его ОС."
 }

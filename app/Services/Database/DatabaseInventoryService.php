@@ -161,6 +161,7 @@ class DatabaseInventoryService
         $rows = DB::select(
             'SELECT TABLE_NAME AS name, ENGINE AS engine, TABLE_ROWS AS rows_estimate,
                     DATA_LENGTH AS data_length, INDEX_LENGTH AS index_length,
+                    DATA_FREE AS data_free,
                     CREATE_TIME AS create_time, UPDATE_TIME AS update_time,
                     TABLE_COMMENT AS table_comment
              FROM information_schema.TABLES
@@ -174,6 +175,7 @@ class DatabaseInventoryService
         }, $rows);
         $codeRefsApp = $this->buildCodeReferenceCounts($tableNames, false);
         $codeRefsAll = $this->buildCodeReferenceCounts($tableNames, true);
+        $optimizeLatest = app(TableOptimizeService::class)->latestRunsByTable();
 
         $tables = [];
         $totalBytes = 0;
@@ -184,6 +186,7 @@ class DatabaseInventoryService
         foreach ($rows as $row) {
             $name = (string) $row->name;
             $bytes = (int) $row->data_length + (int) $row->index_length;
+            $dataFreeBytes = (int) ($row->data_free ?? 0);
             $totalBytes += $bytes;
             if ($bytes >= $largeThreshold) {
                 $largeCount++;
@@ -202,10 +205,14 @@ class DatabaseInventoryService
 
             $orphanNote = config('cabinet-database-admin.orphan_notes.' . $name);
             $sizeMb = round($bytes / 1024 / 1024, 1);
+            $dataFreeMb = round($dataFreeBytes / 1024 / 1024, 1);
             $tables[] = [
                 'name' => $name,
                 'size_mb' => $sizeMb,
                 'size_bytes' => $bytes,
+                'data_free_mb' => $dataFreeMb,
+                'data_free_bytes' => $dataFreeBytes,
+                'optimize' => $optimizeLatest[$name] ?? null,
                 'rows_estimate' => (int) $row->rows_estimate,
                 'engine' => (string) ($row->engine ?? ''),
                 'schema_created' => $row->create_time ? (string) $row->create_time : null,

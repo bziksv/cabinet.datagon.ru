@@ -102,6 +102,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/admin/database/refresh', 'DatabaseAdminController@refresh')->name('admin.database.refresh');
     Route::post('/admin/database/probe-dates', 'DatabaseAdminController@probeDates')->name('admin.database.probe-dates');
     Route::post('/admin/database/clear/{table}', 'DatabaseAdminController@clearTable')->name('admin.database.clear');
+    Route::post('/admin/database/optimize/{table}', 'DatabaseAdminController@optimizeTable')->name('admin.database.optimize');
 
     Route::get('/admin/queues', 'QueueAdminController@index')->name('admin.queue.index');
     Route::post('/admin/queues/refresh', 'QueueAdminController@refresh')->name('admin.queue.refresh');

@@ -79,6 +79,12 @@
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ __('Close') }}"></button>
             </div>
         @endif
+        @if(session('error'))
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                {{ session('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="{{ __('Close') }}"></button>
+            </div>
+        @endif
 
         <div class="row g-3 mb-4">
             <div class="col-6 col-md-3">
@@ -156,6 +162,7 @@
                         <th>{{ __('Module') }}</th>
                         <th>{{ __('Models / code') }}</th>
                         <th>{{ __('Data range') }}</th>
+                        <th>{{ __('Optimized') }}</th>
                         <th>{{ __('Status') }}</th>
                         <th class="text-end">{{ __('Actions') }}</th>
                     </tr>
@@ -229,6 +236,41 @@
                             <td class="small text-nowrap">
                                 @include('admin.database.partials.date-range', ['t' => $t])
                             </td>
+                            <td class="small">
+                                @php
+                                    $opt = $t['optimize'] ?? null;
+                                    $freeMb = (float) ($t['data_free_mb'] ?? 0);
+                                    $denyOptimize = isset(array_flip(config('cabinet-database-admin.optimize_deny_tables', []))[$t['name']]);
+                                    $syncMax = (int) config('cabinet-database-admin.optimize_sync_max_mb', 500);
+                                    $willQueue = ($t['size_mb'] ?? 0) >= $syncMax;
+                                @endphp
+                                @if($opt && ($opt['status'] ?? '') === 'ok' && !empty($opt['optimized_at']))
+                                    <div class="text-nowrap">{{ \Illuminate\Support\Carbon::parse($opt['optimized_at'])->format('d.m.Y H:i') }}</div>
+                                    @if(isset($opt['freed_mb']))
+                                        @php
+                                            $freedMb = (float) $opt['freed_mb'];
+                                            $freedAbs = abs($freedMb);
+                                            $freedLabel = $freedAbs >= 1024
+                                                ? number_format($freedAbs / 1024, 2, '.', ' ') . ' GB'
+                                                : number_format($freedAbs, 1, '.', ' ') . ' MB';
+                                            $freedSign = $freedMb > 0 ? '−' : ($freedMb < 0 ? '+' : '');
+                                        @endphp
+                                        <div class="text-success">{{ $freedSign . $freedLabel }}</div>
+                                    @endif
+                                @elseif($opt && in_array($opt['status'] ?? '', ['queued', 'running'], true))
+                                    <span class="badge text-bg-info">{{ $opt['status'] === 'queued' ? __('Database optimize status queued') : __('Database optimize status running') }}</span>
+                                @elseif($opt && ($opt['status'] ?? '') === 'failed')
+                                    <div class="text-danger" title="{{ $opt['message'] ?? '' }}">{{ __('Database optimize status failed') }}</div>
+                                @else
+                                    <span class="text-secondary">—</span>
+                                @endif
+                                @if($freeMb >= 1)
+                                    <div class="text-secondary text-nowrap" title="{{ __('Database optimize data free hint') }}">
+                                        {{ __('Database optimize reclaimable') }}:
+                                        {{ $freeMb >= 1024 ? number_format($freeMb / 1024, 2, '.', ' ') . ' GB' : number_format($freeMb, 1, '.', ' ') . ' MB' }}
+                                    </div>
+                                @endif
+                            </td>
                             <td>
                                 @if($isOrphan)
                                     <span class="badge text-bg-warning">{{ __('Orphan') }}</span>
@@ -248,6 +290,23 @@
                                         <i class="bi bi-list-ul" aria-hidden="true"></i>
                                         <span class="d-none d-md-inline ms-1">{{ __('Preview') }}</span>
                                     </button>
+                                    @unless($denyOptimize)
+                                        @php
+                                            $optConfirm = $willQueue
+                                                ? __('Database optimize confirm queue', ['table' => $t['name'], 'size' => number_format($t['size_mb'], 1, '.', ' ') . ' MB'])
+                                                : __('Database optimize confirm sync', ['table' => $t['name'], 'size' => number_format($t['size_mb'], 1, '.', ' ') . ' MB']);
+                                        @endphp
+                                        <form action="{{ route('admin.database.optimize', ['table' => $t['name']]) }}" method="post" class="d-inline"
+                                              onsubmit='return confirm(@json($optConfirm));'>
+                                            @csrf
+                                            <input type="hidden" name="filter" value="{{ $filter }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-primary"
+                                                    title="{{ __('Database optimize action') }}">
+                                                <i class="bi bi-lightning-charge" aria-hidden="true"></i>
+                                                <span class="d-none d-lg-inline ms-1">{{ __('Database optimize action') }}</span>
+                                            </button>
+                                        </form>
+                                    @endunless
                                     @if(isset($clearableTables[$t['name']]))
                                         @php
                                             $clearConfirm = __('Database clear table confirm', ['table' => $t['name']]);
@@ -266,7 +325,7 @@
                             </td>
                         </tr>
                         <tr class="db-preview-row d-none" id="{{ $previewId }}" data-preview-for="{{ $t['name'] }}">
-                            <td colspan="8" class="bg-body-tertiary p-3">
+                            <td colspan="9" class="bg-body-tertiary p-3">
                                 <div class="db-preview-panel small text-secondary">
                                     <span class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
                                     <span class="db-preview-placeholder">{{ __('Database preview click load') }}</span>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Database\DatabaseInventoryService;
+use App\Services\Database\TableOptimizeService;
 use App\Services\Database\TableRowPreviewService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -88,6 +89,29 @@ class DatabaseAdminController extends Controller
                 'table' => $result['table'],
                 'count' => $result['deleted'],
             ]));
+    }
+
+    public function optimizeTable(string $table, TableOptimizeService $optimizer, Request $request): RedirectResponse
+    {
+        set_time_limit(max(120, (int) config('cabinet-database-admin.optimize_lock_seconds', 7200)));
+
+        $filter = (string) $request->get('filter', 'all');
+
+        try {
+            $result = $optimizer->requestOptimize($table, 'ui');
+        } catch (\InvalidArgumentException $e) {
+            return redirect()
+                ->route('admin.database.index', ['filter' => $filter])
+                ->with('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            return redirect()
+                ->route('admin.database.index', ['filter' => $filter])
+                ->with('error', $e->getMessage());
+        }
+
+        return redirect()
+            ->route('admin.database.index', ['filter' => $filter, 'fresh' => 1])
+            ->with('success', $result['message']);
     }
 
     public function previewRows(string $table, TableRowPreviewService $preview): JsonResponse

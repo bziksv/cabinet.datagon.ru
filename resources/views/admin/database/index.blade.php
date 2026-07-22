@@ -340,6 +340,13 @@
 @endsection
 
 @section('js')
+    @php
+        $dbOptimizeDoneTpl = __('Database optimize done', [
+            'table' => ':table',
+            'freed' => ':freed',
+            'after' => ':after',
+        ]);
+    @endphp
     <script>
         (function () {
             var previewUrlTemplate = @json(route('admin.database.preview', ['table' => '__TABLE__']));
@@ -358,7 +365,7 @@
                 failed: @json(__('Database optimize status failed')),
                 reclaimable: @json(__('Database optimize reclaimable')),
                 optimizeError: @json(__('Database optimize status failed')),
-                optimizeDoneTpl: @json(__('Database optimize done', ['table' => ':table', 'freed' => ':freed', 'after' => ':after']))
+                optimizeDoneTpl: @json($dbOptimizeDoneTpl)
             };
             var pollTimers = {};
 

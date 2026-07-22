@@ -161,6 +161,7 @@ class SiteAuditCrawlEngine
         $processor = new SiteAuditPageProcessor();
         $i = 0;
         $expanded = 0;
+        $unchanged = 0;
 
         while ($i < count($queue)) {
             $url = $queue[$i];
@@ -174,13 +175,18 @@ class SiteAuditCrawlEngine
                     'url' => $url,
                     'error' => $e->getMessage(),
                 ]);
-                $out = ['internal_links' => []];
+                $out = ['internal_links' => [], 'content_unchanged' => false];
+            }
+
+            if (! empty($out['content_unchanged'])) {
+                $unchanged++;
             }
 
             $crawl->pages_fetched = $i;
             $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
             $progress['fetched'] = $i;
             $progress['total'] = count($queue);
+            $progress['pages_unchanged'] = $unchanged;
             $crawl->pages_total = count($queue);
             $crawl->progress_json = $progress;
             $crawl->save();

@@ -68,6 +68,7 @@ class SiteAuditPageProcessor
             'noindex' => false,
             'word_count' => null,
             'content_hash' => null,
+            'content_unchanged' => false,
             'simhash' => null,
             'out_links_json' => null,
             'img_count' => 0,
@@ -127,6 +128,12 @@ class SiteAuditPageProcessor
                 $pageData['word_count'] = $parsed['word_count'];
                 $pageData['text_len'] = $parsed['text_len'] ?? null;
                 $pageData['content_hash'] = $parsed['content_hash'];
+                $pageData['content_unchanged'] = $this->isContentUnchanged(
+                    $crawlId,
+                    $urlHash,
+                    (string) $parsed['content_hash'],
+                    (int) $code
+                );
                 $pageData['simhash'] = $parsed['simhash'] ?? null;
                 $pageData['img_count'] = $parsed['img_count'];
                 $pageData['img_without_alt'] = $parsed['img_without_alt'];
@@ -490,7 +497,10 @@ class SiteAuditPageProcessor
             SiteAuditFinding::query()->create($f + ['crawl_id' => $crawlId]);
         }
 
-        return ['internal_links' => $internalLinks];
+        return [
+            'internal_links' => $internalLinks,
+            'content_unchanged' => ! empty($pageData['content_unchanged']),
+        ];
     }
 
     private function finding(string $code, string $url, string $urlHash, array $meta = []): array
@@ -504,6 +514,55 @@ class SiteAuditPageProcessor
             'url_hash' => $urlHash,
             'meta_json' => $meta ?: null,
         ];
+    }
+
+    /**
+     * Совпадение content_hash + status с прошлым done-краулом проекта.
+     */
+    private function isContentUnchanged(int $crawlId, string $urlHash, string $contentHash, int $statusCode): bool
+    {
+        if ($contentHash === '' || ! config('site_audit.incremental_by_content_hash', true)) {
+            return false;
+        }
+
+        $prevCrawlId = $this->previousDoneCrawlId($crawlId);
+        if (! $prevCrawlId) {
+            return false;
+        }
+
+        $prev = SiteAuditPage::query()
+            ->where('crawl_id', $prevCrawlId)
+            ->where('url_hash', $urlHash)
+            ->first(['content_hash', 'status_code']);
+
+        if (! $prev || ! $prev->content_hash) {
+            return false;
+        }
+
+        return hash_equals((string) $prev->content_hash, $contentHash)
+            && (int) $prev->status_code === $statusCode;
+    }
+
+    private function previousDoneCrawlId(int $crawlId): ?int
+    {
+        static $cache = [];
+        if (array_key_exists($crawlId, $cache)) {
+            return $cache[$crawlId];
+        }
+
+        $projectId = \App\SiteAuditCrawl::query()->where('id', $crawlId)->value('project_id');
+        if (! $projectId) {
+            return $cache[$crawlId] = null;
+        }
+
+        $prevId = \App\SiteAuditCrawl::query()
+            ->where('project_id', $projectId)
+            ->where('status', \App\SiteAuditCrawl::STATUS_DONE)
+            ->where('id', '<', $crawlId)
+            ->orderByDesc('id')
+            ->value('id');
+
+        return $cache[$crawlId] = $prevId ? (int) $prevId : null;
     }
 
     /**

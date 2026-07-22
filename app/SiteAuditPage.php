@@ -48,6 +48,7 @@ class SiteAuditPage extends Model
         'top_bigram_count',
         'top_trigram',
         'top_trigram_count',
+        'content_unchanged',
         'noindex_text_len',
         'charset',
         'html_storage_key',
@@ -60,6 +61,7 @@ class SiteAuditPage extends Model
         'img_srcs_json' => 'array',
         'asset_srcs_json' => 'array',
         'noindex' => 'boolean',
+        'content_unchanged' => 'boolean',
     ];
 
     public function crawl()

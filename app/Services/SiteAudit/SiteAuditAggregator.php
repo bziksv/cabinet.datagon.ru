@@ -8,6 +8,7 @@ use App\SiteAuditFinding;
 use App\SiteAuditPage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class SiteAuditAggregator
 {
@@ -86,6 +87,7 @@ class SiteAuditAggregator
         $this->emitBrokenLinks($crawl);
         $this->emitImageAssets($crawl);
         $this->emitLostFiles($crawl);
+        $this->copyIncrementalHeadFindings($crawl);
         $this->emitErrorSpikes($crawl);
         $depthMeta = $this->emitClickDepth($crawl->id);
         $this->emitSitemapCoverage($crawl);
@@ -1035,7 +1037,7 @@ class SiteAuditAggregator
 
         $pages = SiteAuditPage::query()
             ->where('crawl_id', $crawl->id)
-            ->get(['id', 'url', 'url_hash', 'out_links_json', 'status_code']);
+            ->get(['id', 'url', 'url_hash', 'out_links_json', 'status_code', 'content_unchanged']);
 
         if ($pages->isEmpty()) {
             return;
@@ -1052,6 +1054,7 @@ class SiteAuditAggregator
         $checker = new SiteAuditLinkChecker();
         $headCache = [];
         $headBudget = $maxHead;
+        $skipUnchangedHead = config('site_audit.incremental_by_content_hash', true);
 
         $pageSev = config('site_audit.findings.page_has_broken_links.severity', 'warning');
         $linkSev = config('site_audit.findings.broken_internal_link.severity', 'critical');
@@ -1061,6 +1064,7 @@ class SiteAuditAggregator
             if (! $outs) {
                 continue;
             }
+            $pageUnchanged = $skipUnchangedHead && ! empty($page->content_unchanged);
 
             $brokenSamples = [];
             foreach ($outs as $out) {
@@ -1108,8 +1112,8 @@ class SiteAuditAggregator
                     continue;
                 }
 
-                // не в крауле — выборочный HEAD
-                if ($headBudget <= 0) {
+                // не в крауле — выборочный HEAD (не тратим бюджет на неизменённые страницы)
+                if ($pageUnchanged || $headBudget <= 0) {
                     continue;
                 }
                 if (! array_key_exists($out, $headCache)) {
@@ -1169,14 +1173,74 @@ class SiteAuditAggregator
     }
 
     /**
+     * Для страниц с тем же content_hash: переносим HEAD-findings с прошлого краула
+     * (бюджет HEAD на них не тратим).
+     */
+    private function copyIncrementalHeadFindings(SiteAuditCrawl $crawl): void
+    {
+        if (! config('site_audit.incremental_by_content_hash', true)) {
+            return;
+        }
+        if (! Schema::hasColumn('site_audit_pages', 'content_unchanged')) {
+            return;
+        }
+
+        $unchangedHashes = SiteAuditPage::query()
+            ->where('crawl_id', $crawl->id)
+            ->where('content_unchanged', true)
+            ->pluck('url_hash')
+            ->all();
+        if ($unchangedHashes === []) {
+            return;
+        }
+
+        $prevId = SiteAuditCrawl::query()
+            ->where('project_id', $crawl->project_id)
+            ->where('status', SiteAuditCrawl::STATUS_DONE)
+            ->where('id', '<', $crawl->id)
+            ->orderByDesc('id')
+            ->value('id');
+        if (! $prevId) {
+            return;
+        }
+
+        $codes = [
+            'broken_image',
+            'heavy_image',
+            'lost_file',
+        ];
+
+        $rows = SiteAuditFinding::query()
+            ->where('crawl_id', (int) $prevId)
+            ->whereIn('code', $codes)
+            ->whereIn('url_hash', $unchangedHashes)
+            ->get(['code', 'severity', 'url', 'url_hash', 'meta_json']);
+
+        foreach ($rows as $row) {
+            SiteAuditFinding::query()->create([
+                'crawl_id' => $crawl->id,
+                'code' => $row->code,
+                'severity' => $row->severity,
+                'url' => $row->url,
+                'url_hash' => $row->url_hash,
+                'meta_json' => $row->meta_json,
+            ]);
+        }
+    }
+
+    /**
      * Битые / тяжёлые изображения: HEAD-сэмпл по img_srcs_json (бюджет на краул).
      */
     private function emitImageAssets(SiteAuditCrawl $crawl): void
     {
-        $pages = SiteAuditPage::query()
+        $q = SiteAuditPage::query()
             ->where('crawl_id', $crawl->id)
-            ->whereNotNull('img_srcs_json')
-            ->get(['id', 'url', 'url_hash', 'img_srcs_json']);
+            ->whereNotNull('img_srcs_json');
+        if (config('site_audit.incremental_by_content_hash', true)
+            && Schema::hasColumn('site_audit_pages', 'content_unchanged')) {
+            $q->where('content_unchanged', false);
+        }
+        $pages = $q->get(['id', 'url', 'url_hash', 'img_srcs_json']);
 
         if ($pages->isEmpty()) {
             return;
@@ -1263,10 +1327,14 @@ class SiteAuditAggregator
      */
     private function emitLostFiles(SiteAuditCrawl $crawl): void
     {
-        $pages = SiteAuditPage::query()
+        $q = SiteAuditPage::query()
             ->where('crawl_id', $crawl->id)
-            ->whereNotNull('asset_srcs_json')
-            ->get(['id', 'url', 'url_hash', 'asset_srcs_json']);
+            ->whereNotNull('asset_srcs_json');
+        if (config('site_audit.incremental_by_content_hash', true)
+            && Schema::hasColumn('site_audit_pages', 'content_unchanged')) {
+            $q->where('content_unchanged', false);
+        }
+        $pages = $q->get(['id', 'url', 'url_hash', 'asset_srcs_json']);
 
         if ($pages->isEmpty()) {
             return;

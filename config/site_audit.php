@@ -25,6 +25,8 @@ return [
     'description_max' => (int) env('SITE_AUDIT_DESC_MAX', 160),
     // сколько детальных краулов хранить на проект (старше — prune)
     'history_keep_per_project' => (int) env('SITE_AUDIT_HISTORY_KEEP', 200),
+    // Повторный краул: если content_hash+status совпали с прошлым done — пропускаем HEAD картинок/ассетов
+    'incremental_by_content_hash' => (bool) env('SITE_AUDIT_INCREMENTAL', true),
     'robots_max_bytes' => (int) env('SITE_AUDIT_ROBOTS_MAX_BYTES', 512000),
     'simhash_hamming_max' => (int) env('SITE_AUDIT_SIMHASH_HAMMING', 6),
     'simhash_max_pairs' => (int) env('SITE_AUDIT_SIMHASH_MAX_PAIRS', 200),

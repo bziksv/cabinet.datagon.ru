@@ -243,6 +243,7 @@
                     <section>
                         <h5 class="mb-3">Сводный тех. аудит</h5>
                         <p class="text-secondary small">HTTP, редиректы, robots, разметка, размер страниц.</p>
+                        @include('pages.partials.site-audit-module-links', ['linkGroup' => 'tech'])
                         @include('pages.partials.site-audit-hot-table', ['counts' => $counts, 'findingsCatalog' => $findingsCatalog, 'crawl' => $crawl, 'group' => 'tech'])
                     </section>
                 </div>
@@ -279,28 +280,7 @@
                     <section>
                         <h5 class="mb-3">Сводный SEO-аудит</h5>
                         <p class="text-secondary small">Title/Description, H1, canonical, noindex, дубли, похожие страницы, thin content.</p>
-                        <div class="alert alert-light border cabinet-sa-module-link mb-3">
-                            <div class="d-flex flex-wrap align-items-center justify-content-between" style="gap:8px">
-                                <div>
-                                    <strong>Конкуренты сайта</strong>
-                                    <div class="small text-muted mb-0">Сравнение с ТОП выдачи — в модуле «Анализ конкурентов», без повторного краула.</div>
-                                </div>
-                                <a class="btn btn-sm btn-outline-primary" href="{{ route('competitor.analysis') }}" target="_blank" rel="noopener">
-                                    Открыть анализ конкурентов <i class="fa fa-external-link" aria-hidden="true"></i>
-                                </a>
-                            </div>
-                        </div>
-                        <div class="alert alert-light border cabinet-sa-module-link mb-3">
-                            <div class="d-flex flex-wrap align-items-center justify-content-between" style="gap:8px">
-                                <div>
-                                    <strong>Проверка индексации</strong>
-                                    <div class="small text-muted mb-0">Сниппеты и статус в индексе по URL — модуль «Проверка индексации». В аудите уже есть lite-отчёты по индексу/SERP.</div>
-                                </div>
-                                <a class="btn btn-sm btn-outline-primary" href="{{ route('pages.index-check') }}" target="_blank" rel="noopener">
-                                    Открыть проверку индексации <i class="fa fa-external-link" aria-hidden="true"></i>
-                                </a>
-                            </div>
-                        </div>
+                        @include('pages.partials.site-audit-module-links', ['linkGroup' => 'seo'])
                         @include('pages.partials.site-audit-hot-table', ['counts' => $counts, 'findingsCatalog' => $findingsCatalog, 'crawl' => $crawl, 'group' => 'seo'])
                     </section>
                 </div>
@@ -315,7 +295,7 @@
                             <tr>
                                 <th>Краул</th>
                                 <th>Дата</th>
-                                <th>URL</th>
+                                <th>Страниц</th>
                                 @foreach($bucketLabels as $label)
                                     <th>{{ $label }}</th>
                                 @endforeach
@@ -350,7 +330,7 @@
                             <tr>
                                 <th>Краул</th>
                                 <th>Дата</th>
-                                <th>URL</th>
+                                <th>Страниц</th>
                                 @foreach($bucketLabels as $label)
                                     <th>{{ $label }}</th>
                                 @endforeach

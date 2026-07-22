@@ -9,17 +9,20 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * OPTIMIZE TABLE — только очередь db-optimize (1 supervisor-воркер), без stampede на default.
+ */
 class OptimizeDatabaseTableJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /** Крупные таблицы (search_indices и т.п.) могут идти часами. */
+    /** Крупные таблицы могут идти часами. */
     public $timeout = 14400;
 
-    /** Ждём освобождения lock: 720 × 20с ≈ 4 часа */
-    public $tries = 720;
+    public $tries = 3;
 
     /** @var int */
     private $runId;
@@ -27,6 +30,7 @@ class OptimizeDatabaseTableJob implements ShouldQueue
     public function __construct(int $runId)
     {
         $this->runId = $runId;
+        $this->onQueue((string) config('cabinet-database-admin.optimize_queue', 'db-optimize'));
     }
 
     public function handle(TableOptimizeService $optimizer): void
@@ -42,18 +46,17 @@ class OptimizeDatabaseTableJob implements ShouldQueue
 
         try {
             set_time_limit(0);
-            $done = $optimizer->tryExecuteRun($run);
-            if (! $done) {
-                // Другой OPTIMIZE ещё идёт — остаёмся в очереди и пробуем позже
-                $run->status = 'queued';
-                $run->message = __('Database optimize waiting', [
-                    'table' => (string) \Illuminate\Support\Facades\Cache::get('cabinet.db-optimize.lock', '—'),
-                ]);
-                $run->finished_at = null;
-                $run->save();
-                $this->release(20);
+            try {
+                $optimizer->executeRun($run);
+            } catch (\Throwable $e) {
+                // Зависший lock после kill воркера — сбросить и один раз повторить
+                if (strpos($e->getMessage(), 'OPTIMIZE_BUSY:') === 0) {
+                    Cache::forget('cabinet.db-optimize.lock');
+                    $optimizer->executeRun($run);
 
-                return;
+                    return;
+                }
+                throw $e;
             }
         } catch (\Throwable $e) {
             Log::error('OptimizeDatabaseTableJob failed', [

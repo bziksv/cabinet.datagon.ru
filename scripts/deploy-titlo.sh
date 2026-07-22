@@ -39,6 +39,7 @@ sudo -u "$USER" "$PHP" artisan queue:restart
 
 SUPERVISOR_GROUPS=(
   cabinet-titlo-default
+  cabinet-titlo-db-optimize
   cabinet-titlo-cluster-child
   cabinet-titlo-cluster-main
   cabinet-titlo-cluster-wait
@@ -50,6 +51,7 @@ SUPERVISOR_GROUPS=(
   cabinet-titlo-monitoring-competitors-stat
   cabinet-titlo-competitor-analyse
   cabinet-titlo-ai-generation
+  cabinet-titlo-site-audit
 )
 
 for group in "${SUPERVISOR_GROUPS[@]}"; do

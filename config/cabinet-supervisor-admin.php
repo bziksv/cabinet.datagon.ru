@@ -42,6 +42,7 @@ return [
      */
     'program_modules' => [
         'cabinet-titlo-default' => ['label' => 'Queue management', 'route' => 'admin.queue.index'],
+        'cabinet-titlo-db-optimize' => ['label' => 'Database management', 'route' => 'admin.database.index'],
         'cabinet-titlo-cluster-child' => ['label' => 'Cluster', 'route' => 'cluster'],
         'cabinet-titlo-cluster-main' => ['label' => 'Cluster', 'route' => 'cluster'],
         'cabinet-titlo-cluster-wait' => ['label' => 'Cluster', 'route' => 'cluster'],
@@ -53,6 +54,7 @@ return [
         'cabinet-titlo-monitoring-competitors-stat' => ['label' => 'Position monitoring', 'route' => 'monitoring.v2'],
         'cabinet-titlo-competitor-analyse' => ['label' => 'Competitor analysis', 'route' => 'competitor.analysis'],
         'cabinet-titlo-ai-generation' => ['label' => 'Supervisor module ai generation', 'route' => 'ai.generation.story'],
+        'cabinet-titlo-site-audit' => ['label' => 'Site audit', 'route' => 'pages.site-audit'],
         'cabinet-titlo-websockets' => ['label' => 'Supervisor module websockets', 'route' => null],
     ],
 
@@ -64,6 +66,10 @@ return [
         'cabinet-titlo-default' => [
             'queues' => ['default', 'cluster_high', 'high', 'medium'],
             'numprocs_lk' => 6,
+        ],
+        'cabinet-titlo-db-optimize' => [
+            'queues' => ['db-optimize'],
+            'numprocs_lk' => 1,
         ],
         'cabinet-titlo-cluster-child' => [
             'queues' => ['child_cluster'],
@@ -109,6 +115,10 @@ return [
             'queues' => ['ai_generation'],
             'numprocs_lk' => 5,
         ],
+        'cabinet-titlo-site-audit' => [
+            'queues' => ['site_audit'],
+            'numprocs_lk' => 2,
+        ],
         'cabinet-titlo-websockets' => [
             'queues' => [],
             'numprocs_lk' => 1,
@@ -118,6 +128,7 @@ return [
     /** Логи воркеров относительно корня проекта (storage/logs/...) */
     'log_files' => [
         'cabinet-titlo-default' => 'storage/logs/supervisor-default.log',
+        'cabinet-titlo-db-optimize' => 'storage/logs/supervisor-db-optimize.log',
         'cabinet-titlo-cluster-child' => 'storage/logs/supervisor-cluster-child.log',
         'cabinet-titlo-cluster-main' => 'storage/logs/supervisor-cluster-main.log',
         'cabinet-titlo-cluster-wait' => 'storage/logs/supervisor-cluster-wait.log',

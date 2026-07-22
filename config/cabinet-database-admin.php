@@ -6,7 +6,7 @@
  * @see App\Services\Database\DatabaseInventoryService
  */
 return [
-    'version' => '1.2.2s',
+    'version' => '1.2.3s',
 
     /** Таймаут AJAX-превью строк, секунды */
     'row_preview_timeout_seconds' => 15,
@@ -36,8 +36,8 @@ return [
      */
     'optimize_sync_max_mb' => (int) env('CABINET_DB_OPTIMIZE_SYNC_MB', 500),
 
-    /** Очередь для фонового OPTIMIZE */
-    'optimize_queue' => env('CABINET_DB_OPTIMIZE_QUEUE', 'default'),
+    /** Очередь для фонового OPTIMIZE (отдельный supervisor, 1 воркер) */
+    'optimize_queue' => env('CABINET_DB_OPTIMIZE_QUEUE', 'db-optimize'),
 
     /** TTL глобального lock на время OPTIMIZE, секунды */
     'optimize_lock_seconds' => (int) env('CABINET_DB_OPTIMIZE_LOCK', 7200),

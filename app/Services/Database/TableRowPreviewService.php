@@ -26,10 +26,6 @@ class TableRowPreviewService
             return $this->previewFailedJobs($limit);
         }
 
-        if ($table === 'search_indices') {
-            return $this->previewSearchIndices($limit);
-        }
-
         return $this->previewGeneric($table, $limit);
     }
 
@@ -91,39 +87,6 @@ class TableRowPreviewService
     /**
      * @return array{table: string, limit: int, order_column: string, columns: list<string>, rows: list<array<string, mixed>>, note: ?string}
      */
-    private function previewSearchIndices(int $limit): array
-    {
-        $columns = [
-            'id', 'source', 'lr', 'url', 'position', 'title', 'snippet', 'query', 'created_at', 'updated_at',
-        ];
-
-        $rows = DB::table('search_indices')
-            ->orderByDesc('id')
-            ->limit($limit)
-            ->get($columns);
-
-        $out = [];
-        foreach ($rows as $row) {
-            $item = [];
-            foreach ($columns as $col) {
-                $item[$col] = $this->formatCellValue($row->{$col} ?? null);
-            }
-            $out[] = $item;
-        }
-
-        return [
-            'table' => 'search_indices',
-            'limit' => $limit,
-            'order_column' => 'id DESC',
-            'columns' => $columns,
-            'rows' => $out,
-            'note' => __('Database preview search indices note'),
-        ];
-    }
-
-    /**
-     * @return array{table: string, limit: int, order_column: string, columns: list<string>, rows: list<array<string, mixed>>, note: ?string}
-     */
     private function previewGeneric(string $table, int $limit): array
     {
         $schema = (string) config('database.connections.mysql.database');
@@ -137,9 +100,9 @@ class TableRowPreviewService
             throw new \InvalidArgumentException(__('Database preview table not found'));
         }
 
-        $exclude = array_flip(config('cabinet-database-admin.row_preview_exclude_columns.' . $table, []));
+        // Только секреты — все остальные колонки показываем (TEXT/BLOB обрезаются LEFT).
         $globalExclude = array_flip(config('cabinet-database-admin.row_preview_exclude_columns_global', [
-            'password', 'remember_token', 'payload', 'exception',
+            'password', 'remember_token',
         ]));
 
         $orderCol = $this->resolveOrderColumn($meta->pluck('column_name')->all(), $table);
@@ -147,9 +110,11 @@ class TableRowPreviewService
 
         $selectParts = [];
         $columns = [];
+        $hiddenSecrets = [];
         foreach ($meta as $col) {
             $name = (string) $col->column_name;
-            if (isset($exclude[$name]) || isset($globalExclude[$name])) {
+            if (isset($globalExclude[$name])) {
+                $hiddenSecrets[] = $name;
                 continue;
             }
             $columns[] = $name;
@@ -158,9 +123,6 @@ class TableRowPreviewService
                 $selectParts[] = "LEFT(`{$name}`, {$maxChars}) AS `{$name}`";
             } else {
                 $selectParts[] = "`{$name}`";
-            }
-            if (count($columns) >= 12) {
-                break;
             }
         }
 
@@ -185,8 +147,13 @@ class TableRowPreviewService
         }
 
         $note = null;
-        if (count($meta) > count($columns)) {
-            $note = __('Database preview columns truncated');
+        $byId = array_flip(config('cabinet-database-admin.row_preview_order_by_id_tables', []));
+        if (isset($byId[$table])) {
+            $note = __('Database preview order by id note');
+        }
+        if ($hiddenSecrets !== []) {
+            $secretNote = __('Database preview secrets hidden', ['columns' => implode(', ', $hiddenSecrets)]);
+            $note = $note !== null ? $note . ' ' . $secretNote : $secretNote;
         }
 
         return [

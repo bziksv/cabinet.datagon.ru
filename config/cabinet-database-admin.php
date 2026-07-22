@@ -6,14 +6,13 @@
  * @see App\Services\Database\DatabaseInventoryService
  */
 return [
-    'version' => '1.1.3s',
+    'version' => '1.1.4s',
 
     /** Таймаут AJAX-превью строк, секунды */
     'row_preview_timeout_seconds' => 15,
 
     /**
-     * Превью: ORDER BY id DESC (PK), не created_at — иначе на search_indices (17M+) минуты.
-     * Совпадает с date_probe_light_tables + типичные гигантские таблицы.
+     * Превью: ORDER BY id DESC (PK), не created_at — иначе на крупных таблицах минуты.
      */
     'row_preview_order_by_id_tables' => [
         'search_indices',
@@ -57,23 +56,14 @@ return [
     /** Последние N строк в превью таблицы */
     'row_preview_limit' => 10,
 
-    /** Обрезка длинных полей в generic-превью */
+    /** Обрезка длинных полей в превью (LEFT в SQL + truncate в PHP) */
     'row_preview_max_cell_chars' => 400,
 
-    /** Не показывать в generic-превью (по имени колонки) */
+    /** Не показывать в превью (секреты). Остальные колонки — все. */
     'row_preview_exclude_columns_global' => ['password', 'remember_token'],
 
-    /** Не показывать тяжёлые колонки по таблицам */
-    'row_preview_exclude_columns' => [
-        'relevance_history' => ['html_main_page', 'sites', 'request'],
-        'relevance_history_result' => [
-            'clouds_competitors', 'clouds_main_page', 'avg', 'main_page', 'unigram_table',
-            'sites', 'tf_comp_clouds', 'phrases', 'avg_coverage_percent', 'recommendations',
-        ],
-        'sessions' => ['payload'],
-        'jobs' => ['payload'],
-        'failed_jobs' => [],
-    ],
+    /** @deprecated больше не используется — все колонки показываются */
+    'row_preview_exclude_columns' => [],
 
     /** Кэш снимка (information_schema + маппинг), секунды */
     'snapshot_cache_seconds' => (int) env('CABINET_DB_INVENTORY_CACHE', 3600),

@@ -66,7 +66,22 @@ class DataBaseOptimize extends Command
                     'triggered_by' => $triggeredBy,
                     'started_at' => now(),
                 ]);
-                $optimizer->executeRun($run, false);
+
+                $attempts = 0;
+                while (! $optimizer->tryExecuteRun($run, false)) {
+                    $attempts++;
+                    if ($attempts > 180) { // ~30 мин ожидания
+                        $run->status = 'failed';
+                        $run->message = __('Database optimize busy', ['table' => (string) \Illuminate\Support\Facades\Cache::get('cabinet.db-optimize.lock', '—')]);
+                        $run->finished_at = now();
+                        $run->save();
+                        throw new \RuntimeException($run->message);
+                    }
+                    $run->status = 'queued';
+                    $run->save();
+                    sleep(10);
+                    $run = $run->fresh() ?: $run;
+                }
                 $this->progress->advance();
             } catch (\Throwable $e) {
                 $this->error(" {$table}: " . $e->getMessage());

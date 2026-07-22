@@ -261,7 +261,10 @@
                                 @elseif($opt && in_array($opt['status'] ?? '', ['queued', 'running'], true))
                                     <span class="badge text-bg-info">{{ $opt['status'] === 'queued' ? __('Database optimize status queued') : __('Database optimize status running') }}</span>
                                 @elseif($opt && ($opt['status'] ?? '') === 'failed')
-                                    <div class="text-danger" title="{{ $opt['message'] ?? '' }}">{{ __('Database optimize status failed') }}</div>
+                                    <div class="text-danger">{{ __('Database optimize status failed') }}</div>
+                                    @if(!empty($opt['message']))
+                                        <div class="small text-danger text-break" style="max-width:14rem;">{{ $opt['message'] }}</div>
+                                    @endif
                                 @else
                                     <span class="text-secondary">—</span>
                                 @endif
@@ -405,7 +408,10 @@
                 } else if (opt && (opt.status === 'queued' || opt.status === 'running')) {
                     html += '<span class="badge text-bg-info">' + escapeHtml(opt.status === 'queued' ? labels.queued : labels.running) + '</span>';
                 } else if (opt && opt.status === 'failed') {
-                    html += '<div class="text-danger" title="' + escapeHtml(opt.message || '') + '">' + escapeHtml(labels.failed) + '</div>';
+                    html += '<div class="text-danger">' + escapeHtml(labels.failed) + '</div>';
+                    if (opt.message) {
+                        html += '<div class="small text-danger text-break" style="max-width:14rem;">' + escapeHtml(opt.message) + '</div>';
+                    }
                 } else {
                     html += '<span class="text-secondary">—</span>';
                 }

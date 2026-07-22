@@ -5209,5 +5209,8 @@
     "Database optimize status running": "Идёт…",
     "Database optimize status failed": "Ошибка",
     "Database optimize reclaimable": "дырок",
-    "Database optimize data free hint": "DATA_FREE — место, которое InnoDB держит после DELETE; OPTIMIZE может вернуть его ОС."
+    "Database optimize data free hint": "DATA_FREE — место, которое InnoDB держит после DELETE; OPTIMIZE может вернуть его ОС.",
+    "Database optimize already queued": "Таблица :table уже в очереди или оптимизируется.",
+    "Database optimize queued busy": "Таблица :table поставлена в очередь (сейчас идёт OPTIMIZE :busy).",
+    "Database optimize waiting": "Ожидание: идёт OPTIMIZE (:table)."
 }

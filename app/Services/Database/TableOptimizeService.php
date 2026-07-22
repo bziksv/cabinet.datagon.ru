@@ -34,13 +34,23 @@ class TableOptimizeService
             throw new \InvalidArgumentException(__('Database optimize not allowed'));
         }
 
-        if ($this->isBusy()) {
-            $busy = (string) Cache::get(self::LOCK_KEY, '');
-            throw new \RuntimeException(__('Database optimize busy', ['table' => $busy !== '' ? $busy : '—']));
+        // Уже в очереди / выполняется — не плодим дубли
+        $existing = DatabaseTableOptimizeRun::query()
+            ->where('table_name', $table)
+            ->whereIn('status', ['queued', 'running'])
+            ->orderByDesc('id')
+            ->first();
+        if ($existing !== null) {
+            return [
+                'queued' => true,
+                'run' => $existing,
+                'message' => __('Database optimize already queued', ['table' => $table]),
+            ];
         }
 
         $stats = $this->measureTable($table);
         $syncMaxMb = (float) config('cabinet-database-admin.optimize_sync_max_mb', 500);
+        // UI (forceQueue) и крупные таблицы — всегда в очередь; несколько подряд OK (jobs ждут lock)
         $useQueue = $forceQueue || $stats['size_mb'] >= $syncMaxMb;
 
         $run = DatabaseTableOptimizeRun::query()->create([
@@ -68,6 +78,26 @@ class TableOptimizeService
             ];
         }
 
+        // sync: если сейчас занято другим OPTIMIZE — тоже в очередь
+        if ($this->isBusy()) {
+            $run->status = 'queued';
+            $run->mode = 'queue';
+            $run->started_at = null;
+            $run->save();
+            OptimizeDatabaseTableJob::dispatch($run->id)->onQueue(
+                (string) config('cabinet-database-admin.optimize_queue', 'default')
+            );
+
+            return [
+                'queued' => true,
+                'run' => $run,
+                'message' => __('Database optimize queued busy', [
+                    'table' => $table,
+                    'busy' => (string) Cache::get(self::LOCK_KEY, '—'),
+                ]),
+            ];
+        }
+
         $this->executeRun($run);
 
         $run = $run->fresh();
@@ -82,18 +112,46 @@ class TableOptimizeService
         ];
     }
 
+    /**
+     * @return bool true если lock взят и OPTIMIZE выполнен (или failed по ошибке MySQL)
+     *              false если сейчас занято — вызывающий должен retry
+     */
+    public function tryExecuteRun(DatabaseTableOptimizeRun $run, bool $refreshInventory = true): bool
+    {
+        $table = $this->sanitizeTableName((string) $run->table_name);
+
+        if (! Cache::add(self::LOCK_KEY, $table, (int) config('cabinet-database-admin.optimize_lock_seconds', 7200))) {
+            return false;
+        }
+
+        try {
+            $this->performOptimize($run, $refreshInventory);
+
+            return true;
+        } finally {
+            Cache::forget(self::LOCK_KEY);
+        }
+    }
+
     public function executeRun(DatabaseTableOptimizeRun $run, bool $refreshInventory = true): DatabaseTableOptimizeRun
     {
         $table = $this->sanitizeTableName((string) $run->table_name);
 
         if (! Cache::add(self::LOCK_KEY, $table, (int) config('cabinet-database-admin.optimize_lock_seconds', 7200))) {
-            $run->status = 'failed';
-            $run->message = __('Database optimize busy', ['table' => (string) Cache::get(self::LOCK_KEY, '—')]);
-            $run->finished_at = now();
-            $run->save();
-
-            return $run;
+            // Для sync/cron: не помечаем failed — пусть caller решит
+            throw new \RuntimeException('OPTIMIZE_BUSY:' . (string) Cache::get(self::LOCK_KEY, '—'));
         }
+
+        try {
+            return $this->performOptimize($run, $refreshInventory);
+        } finally {
+            Cache::forget(self::LOCK_KEY);
+        }
+    }
+
+    private function performOptimize(DatabaseTableOptimizeRun $run, bool $refreshInventory = true): DatabaseTableOptimizeRun
+    {
+        $table = $this->sanitizeTableName((string) $run->table_name);
 
         try {
             $before = $this->measureTable($table);
@@ -101,6 +159,7 @@ class TableOptimizeService
             $run->started_at = $run->started_at ?: now();
             $run->size_before_mb = $before['size_mb'];
             $run->data_free_before_mb = $before['data_free_mb'];
+            $run->message = null;
             $run->save();
 
             DB::statement('OPTIMIZE TABLE `' . str_replace('`', '', $table) . '`');
@@ -131,8 +190,6 @@ class TableOptimizeService
             $run->save();
 
             throw $e;
-        } finally {
-            Cache::forget(self::LOCK_KEY);
         }
     }
 

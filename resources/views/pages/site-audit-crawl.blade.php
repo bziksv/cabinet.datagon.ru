@@ -171,6 +171,10 @@
                     <a class="nav-link" id="sa-tab-plagiarism" data-bs-toggle="tab" href="#sa-pane-plagiarism" role="tab"
                        title="Выборочная проверка уникальности текста vs интернет">Антиплагиат</a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" id="sa-tab-relevance" data-bs-toggle="tab" href="#sa-pane-relevance" role="tab"
+                       title="Посадочные мониторинга ↔ анализатор релевантности">Релевантность</a>
+                </li>
             @endif
             @if(!empty($historyRows) && count($historyRows) > 1)
                 <li class="nav-item">
@@ -294,6 +298,7 @@
 
             @if($crawl->status === 'done')
                 @include('pages.partials.site-audit-plagiarism-tab')
+                @include('pages.partials.site-audit-relevance-tab')
             @endif
 
             @if(!empty($historyRows) && count($historyRows) > 1)

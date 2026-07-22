@@ -27,7 +27,7 @@ class RelevanceController extends Controller
     /**
      * @return View|RedirectResponse
      */
-    public function index()
+    public function index(Request $request)
     {
         // В демо сразу открываем готовый снимок — на пустой форме данных нет.
         if (DemoCabinet::isCurrentUser()) {
@@ -40,7 +40,18 @@ class RelevanceController extends Controller
         $admin = User::isUserAdmin();
         $config = RelevanceAnalysisConfig::first();
 
-        return view('relevance-analysis.index', ['admin' => $admin, 'config' => $config]);
+        $prefillLink = trim((string) $request->query('link', ''));
+        $prefillPhrase = trim((string) $request->query('phrase', ''));
+        if (mb_strlen($prefillPhrase) > 50) {
+            $prefillPhrase = mb_substr($prefillPhrase, 0, 50);
+        }
+
+        return view('relevance-analysis.index', [
+            'admin' => $admin,
+            'config' => $config,
+            'prefillLink' => $prefillLink !== '' ? $prefillLink : null,
+            'prefillPhrase' => $prefillPhrase !== '' ? $prefillPhrase : null,
+        ]);
     }
 
     public function analyse(Request $request): JsonResponse

@@ -20,7 +20,7 @@ use App\SiteAuditIgnore;
 use App\SiteAuditPage;
 use App\SiteAuditProject;
 use App\SiteAuditSchedule;
-use App\Services\SiteAudit\SiteAuditExternalPlagiarismRunner;
+use App\Services\SiteAudit\SiteAuditRelevanceBridge;
 use App\Support\TextUniquenessLimits;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -178,6 +178,9 @@ class SiteAuditController extends Controller
             'plagiarismLimit' => Auth::user()
                 ? TextUniquenessLimits::limitForUser(Auth::user())
                 : null,
+            'relevanceRows' => $crawl->status === SiteAuditCrawl::STATUS_DONE
+                ? (new SiteAuditRelevanceBridge())->rowsForCrawl($crawl)
+                : [],
         ]);
     }
 

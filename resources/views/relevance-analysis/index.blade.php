@@ -111,7 +111,7 @@
                     <div class="col-5 pb-3">
                         <div class="form-group required">
                             <label>{{ __('Your landing page') }}</label>
-                            {!! Form::text("link", null ,["class" => "form-control link", "required"]) !!}
+                            {!! Form::text("link", $prefillLink ?? null ,["class" => "form-control link", "required"]) !!}
                         </div>
 
                         <div class="form-group required">
@@ -124,7 +124,7 @@
 
                         <div class="form-group required">
                             <label>{{ __('Keyword') }}</label>
-                            {!! Form::text("phrase", null ,["class" => "form-control phrase", "required"]) !!}
+                            {!! Form::text("phrase", $prefillPhrase ?? null ,["class" => "form-control phrase", "required"]) !!}
                         </div>
 
                         <div class="form-group required">

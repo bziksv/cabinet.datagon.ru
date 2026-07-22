@@ -231,6 +231,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('site-audit/crawl/{id}/share/revoke', 'SiteAuditController@revokeShare')->name('pages.site-audit.share.revoke')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/action-plan', 'SiteAuditController@generateActionPlan')->name('pages.site-audit.action-plan.generate')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/action-plan/toggle', 'SiteAuditController@toggleActionPlanItem')->name('pages.site-audit.action-plan.toggle')->middleware('permission:Site audit');
+    Route::post('site-audit/crawl/{id}/plagiarism/start', 'SiteAuditController@startExternalPlagiarism')->name('pages.site-audit.plagiarism.start')->middleware('permission:Site audit');
+    Route::get('site-audit/crawl/{id}/plagiarism/status', 'SiteAuditController@externalPlagiarismStatus')->name('pages.site-audit.plagiarism.status')->middleware('permission:Site audit');
     Route::get('site-audit/crawl/{id}/status', 'SiteAuditController@crawlStatus')->name('pages.site-audit.crawl.status')->middleware('permission:Site audit');
     Route::get('site-audit/crawl/{id}/report/{code}', 'SiteAuditController@showReport')->name('pages.site-audit.report.show')->middleware('permission:Site audit');
     Route::get('site-audit/crawl/{id}/report/{code}/csv', 'SiteAuditController@exportReportCsv')->name('pages.site-audit.report.csv')->middleware('permission:Site audit');

@@ -403,6 +403,12 @@ class SiteAuditHtmlParser
         return $issues;
     }
 
+    /** Видимый текст страницы (без script/style) — для антиплагиата и метрик. */
+    public function extractVisibleText(string $html): string
+    {
+        return $this->visibleText($html);
+    }
+
     private function visibleText(string $html): string
     {
         $html = preg_replace('/<script\b[^>]*>.*?<\/script>/is', ' ', $html);

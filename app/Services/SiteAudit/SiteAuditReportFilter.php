@@ -90,6 +90,7 @@ class SiteAuditReportFilter
             'negative_content' => ['details'],
             'word_repeat_in_sentence' => ['details'],
             'landing_plagiarism_suspect' => ['details'],
+            'landing_plagiarism_external' => ['details'],
             'landing_no_inbound_internal' => ['details'],
             'keyword_cannibalization' => ['details'],
             'ad_cannibalization' => ['details'],

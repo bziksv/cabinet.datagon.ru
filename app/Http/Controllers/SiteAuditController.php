@@ -20,8 +20,8 @@ use App\SiteAuditIgnore;
 use App\SiteAuditPage;
 use App\SiteAuditProject;
 use App\SiteAuditSchedule;
-use App\Support\DemoCabinet;
-use App\Support\SiteAuditLimits;
+use App\Services\SiteAudit\SiteAuditExternalPlagiarismRunner;
+use App\Support\TextUniquenessLimits;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -166,6 +166,72 @@ class SiteAuditController extends Controller
                 : null,
             'canActionPlanAi' => (bool) config('deepseek.token')
                 && (bool) config('site_audit.action_plan_ai_enabled', true),
+            'plagiarismCandidates' => $crawl->status === SiteAuditCrawl::STATUS_DONE
+                ? (new SiteAuditExternalPlagiarismRunner())->candidates($crawl)
+                : [],
+            'plagiarismState' => (new SiteAuditExternalPlagiarismRunner())->state($crawl),
+            'plagiarismMaxUrls' => max(1, (int) config('site_audit.plagiarism_external_max_urls', 10)),
+            'plagiarismWarnBelow' => (float) config('site_audit.plagiarism_external_warn_below', 70),
+            'plagiarismRemaining' => Auth::user()
+                ? TextUniquenessLimits::remainingForUser(Auth::user())
+                : null,
+            'plagiarismLimit' => Auth::user()
+                ? TextUniquenessLimits::limitForUser(Auth::user())
+                : null,
+        ]);
+    }
+
+    public function startExternalPlagiarism(Request $request, int $id): JsonResponse
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            return response()->json(['error' => 'demo', 'message' => 'В демо недоступно'], 403);
+        }
+
+        $crawl = $this->ownedCrawl($id);
+        if ($crawl->status !== SiteAuditCrawl::STATUS_DONE) {
+            return response()->json(['error' => 'status', 'message' => 'Только для готового краула'], 422);
+        }
+
+        $urls = $request->input('urls', []);
+        if (! is_array($urls)) {
+            $urls = preg_split('/\R+/', (string) $urls) ?: [];
+        }
+
+        try {
+            $state = (new SiteAuditExternalPlagiarismRunner())->start($crawl, Auth::user(), $urls);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['error' => 'validation', 'message' => $e->getMessage()], 422);
+        } catch (\RuntimeException $e) {
+            return response()->json(['error' => 'busy', 'message' => $e->getMessage()], 409);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'state' => $state,
+            'remaining' => TextUniquenessLimits::remainingForUser(Auth::user()),
+            'limit' => TextUniquenessLimits::limitForUser(Auth::user()),
+        ]);
+    }
+
+    public function externalPlagiarismStatus(int $id): JsonResponse
+    {
+        $crawl = $this->ownedCrawl($id);
+        $runner = new SiteAuditExternalPlagiarismRunner();
+
+        return response()->json([
+            'ok' => true,
+            'state' => $runner->state($crawl),
+            'finding_count' => (int) SiteAuditFinding::query()
+                ->where('crawl_id', $crawl->id)
+                ->where('code', SiteAuditExternalPlagiarismRunner::FINDING_CODE)
+                ->count(),
+            'remaining' => Auth::user()
+                ? TextUniquenessLimits::remainingForUser(Auth::user())
+                : null,
+            'report_url' => route('pages.site-audit.report.show', [
+                'id' => $crawl->id,
+                'code' => SiteAuditExternalPlagiarismRunner::FINDING_CODE,
+            ]),
         ]);
     }
 

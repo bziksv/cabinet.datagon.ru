@@ -491,6 +491,14 @@ class SiteAuditFindingPresenter
 
                 return $peer !== '' ? ($src . ' · ' . $peer) : $src;
 
+            case 'landing_plagiarism_external':
+                $u = isset($meta['uniqueness_pct']) ? ((float) $meta['uniqueness_pct'] . '%') : '';
+                $top = ! empty($meta['sources'][0]['url'])
+                    ? self::clip((string) $meta['sources'][0]['url'], 40)
+                    : '';
+
+                return trim($u . ($top !== '' ? (' · ' . $top) : ''));
+
             case 'landing_no_inbound_internal':
                 return 'входящих внутренних: 0';
 

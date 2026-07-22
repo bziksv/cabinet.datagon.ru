@@ -166,6 +166,12 @@
                 <a class="nav-link" id="sa-tab-seo" data-bs-toggle="tab" href="#sa-pane-seo" role="tab"
                    title="SEO: title, описание, H1, дубли, посадочные">SEO-аудит</a>
             </li>
+            @if($crawl->status === 'done')
+                <li class="nav-item">
+                    <a class="nav-link" id="sa-tab-plagiarism" data-bs-toggle="tab" href="#sa-pane-plagiarism" role="tab"
+                       title="Выборочная проверка уникальности текста vs интернет">Антиплагиат</a>
+                </li>
+            @endif
             @if(!empty($historyRows) && count($historyRows) > 1)
                 <li class="nav-item">
                     <a class="nav-link" id="sa-tab-dynamics" data-bs-toggle="tab" href="#sa-pane-dynamics" role="tab"
@@ -285,6 +291,10 @@
                     </section>
                 </div>
             </div>
+
+            @if($crawl->status === 'done')
+                @include('pages.partials.site-audit-plagiarism-tab')
+            @endif
 
             @if(!empty($historyRows) && count($historyRows) > 1)
                 <div class="tab-pane fade" id="sa-pane-dynamics" role="tabpanel">
@@ -649,6 +659,185 @@
                           });
                     });
                 }
+
+                (function initPlagiarismTab() {
+                    var pane = document.getElementById('sa-pane-plagiarism');
+                    if (!pane) return;
+                    var max = parseInt(pane.getAttribute('data-max') || '10', 10) || 10;
+                    var warn = parseFloat(pane.getAttribute('data-warn') || '70') || 70;
+                    var startUrl = pane.getAttribute('data-start-url');
+                    var statusUrl = pane.getAttribute('data-status-url');
+                    var csrf = pane.getAttribute('data-csrf');
+                    var runBtn = document.getElementById('sa-plag-run');
+                    var landBtn = document.getElementById('sa-plag-landings');
+                    var clearBtn = document.getElementById('sa-plag-clear');
+                    var selectedEl = document.getElementById('sa-plag-selected');
+                    var progressWrap = document.getElementById('sa-plag-progress');
+                    var progressLabel = document.getElementById('sa-plag-progress-label');
+                    var progressBar = document.getElementById('sa-plag-progress-bar');
+                    var statusEl = document.getElementById('sa-plag-status');
+                    var errorEl = document.getElementById('sa-plag-error');
+                    var resultsBody = document.getElementById('sa-plag-results');
+                    var costEl = document.getElementById('sa-plag-cost');
+                    var remainingEl = document.getElementById('sa-plag-remaining');
+                    var reportLink = document.getElementById('sa-plag-report-link');
+                    var pollTimer = null;
+
+                    function cbs() {
+                        return Array.prototype.slice.call(document.querySelectorAll('.sa-plag-cb'));
+                    }
+                    function selectedUrls() {
+                        return cbs().filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
+                    }
+                    function updateSelected() {
+                        var n = selectedUrls().length;
+                        if (selectedEl) selectedEl.textContent = 'Выбрано: ' + n + ' / ' + max;
+                        cbs().forEach(function (c) {
+                            if (!c.checked && n >= max) c.disabled = true;
+                            else if (!runBtn || !runBtn.disabled) c.disabled = false;
+                        });
+                    }
+                    function setRunning(on) {
+                        if (runBtn) {
+                            runBtn.disabled = !!on;
+                            runBtn.textContent = on ? 'Проверка…' : 'Проверить выбранные';
+                        }
+                        cbs().forEach(function (c) { c.disabled = !!on; });
+                        if (progressWrap) progressWrap.style.display = on ? '' : 'none';
+                    }
+                    function renderState(state, meta) {
+                        state = state || {};
+                        var st = state.status || 'idle';
+                        var running = st === 'queued' || st === 'running';
+                        setRunning(running);
+                        if (statusEl) statusEl.textContent = st;
+                        var done = parseInt(state.done || 0, 10);
+                        var total = parseInt(state.total || 0, 10) || 1;
+                        if (progressLabel) progressLabel.textContent = done + ' / ' + (state.total || 0);
+                        if (progressBar) progressBar.style.width = Math.min(100, Math.round(100 * done / total)) + '%';
+                        if (errorEl) {
+                            if (state.error) {
+                                errorEl.style.display = '';
+                                errorEl.textContent = state.error;
+                            } else {
+                                errorEl.style.display = 'none';
+                                errorEl.textContent = '';
+                            }
+                        }
+                        if (costEl) {
+                            costEl.textContent = state.cost_spent
+                                ? ('Списано зондов: ' + state.cost_spent)
+                                : '';
+                        }
+                        if (remainingEl && meta && meta.remaining != null) {
+                            remainingEl.textContent = meta.remaining;
+                        }
+                        if (reportLink && (state.rows || []).length) {
+                            reportLink.style.display = '';
+                            if (meta && meta.report_url) reportLink.setAttribute('href', meta.report_url);
+                        }
+                        if (resultsBody) {
+                            var rows = state.rows || [];
+                            if (!rows.length) {
+                                resultsBody.innerHTML = '<tr id="sa-plag-empty"><td colspan="5" class="text-muted small">Ещё не запускали</td></tr>';
+                            } else {
+                                resultsBody.innerHTML = rows.map(function (row) {
+                                    var low = row.uniqueness_pct != null && row.uniqueness_pct < warn;
+                                    var src = (row.sources || []).slice(0, 2).map(function (s) {
+                                        return '<div><a href="' + (s.url || '#') + '" target="_blank" rel="noopener">' +
+                                            String(s.url || '').slice(0, 40) + '</a> (' + (s.overlap_pct || 0) + '%)</div>';
+                                    }).join('') || '—';
+                                    return '<tr class="' + (low ? 'table-warning' : '') + '">' +
+                                        '<td class="small"><a href="' + (row.url || '#') + '" target="_blank" rel="noopener">' +
+                                        String(row.url || '').slice(0, 60) + '</a></td>' +
+                                        '<td>' + (row.uniqueness_pct != null ? row.uniqueness_pct + '%' : '—') + '</td>' +
+                                        '<td>' + (row.matched_pct != null ? row.matched_pct + '%' : '—') + '</td>' +
+                                        '<td class="small">' + src + '</td>' +
+                                        '<td class="small text-danger">' + (row.error || '') + '</td>' +
+                                        '</tr>';
+                                }).join('');
+                            }
+                        }
+                        if (running) {
+                            if (!pollTimer) pollTimer = setInterval(poll, 2500);
+                        } else if (pollTimer) {
+                            clearInterval(pollTimer);
+                            pollTimer = null;
+                        }
+                    }
+                    function poll() {
+                        fetch(statusUrl, { headers: { Accept: 'application/json' } })
+                            .then(function (r) { return r.json(); })
+                            .then(function (j) {
+                                if (!j || !j.ok) return;
+                                renderState(j.state, j);
+                            })
+                            .catch(function () {});
+                    }
+                    cbs().forEach(function (c) {
+                        c.addEventListener('change', function () {
+                            var n = selectedUrls().length;
+                            if (c.checked && n > max) {
+                                c.checked = false;
+                            }
+                            updateSelected();
+                        });
+                    });
+                    if (landBtn) {
+                        landBtn.addEventListener('click', function () {
+                            var n = 0;
+                            cbs().forEach(function (c) {
+                                var want = c.getAttribute('data-landing') === '1' && n < max;
+                                c.checked = want;
+                                if (want) n++;
+                            });
+                            updateSelected();
+                        });
+                    }
+                    if (clearBtn) {
+                        clearBtn.addEventListener('click', function () {
+                            cbs().forEach(function (c) { c.checked = false; });
+                            updateSelected();
+                        });
+                    }
+                    if (runBtn) {
+                        runBtn.addEventListener('click', function () {
+                            var urls = selectedUrls();
+                            if (!urls.length) {
+                                alert('Выберите URL');
+                                return;
+                            }
+                            setRunning(true);
+                            fetch(startUrl, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': csrf
+                                },
+                                body: JSON.stringify({ urls: urls })
+                            })
+                                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                                .then(function (pack) {
+                                    if (!pack.ok) {
+                                        setRunning(false);
+                                        alert((pack.j && pack.j.message) ? pack.j.message : 'Не удалось запустить');
+                                        return;
+                                    }
+                                    renderState(pack.j.state, pack.j);
+                                    poll();
+                                })
+                                .catch(function () {
+                                    setRunning(false);
+                                    alert('Ошибка сети');
+                                });
+                        });
+                    }
+                    updateSelected();
+                    @if(!empty($plagiarismState['status']) && in_array($plagiarismState['status'], ['queued', 'running'], true))
+                    poll();
+                    @endif
+                })();
 
                 var root = document.getElementById('sa-crawl-root');
                 if (!root || root.getAttribute('data-finished') === '1') return;

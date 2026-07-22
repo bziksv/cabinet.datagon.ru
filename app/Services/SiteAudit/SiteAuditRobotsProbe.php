@@ -7,13 +7,22 @@ use App\SiteAuditFinding;
 
 /**
  * Прогон robots.txt в начале краула: findings + rules в progress_json.
+ * По умолчанию — живой /robots.txt; если задан virtual_robots — он вместо файла на сайте.
  */
 class SiteAuditRobotsProbe
 {
     public function run(SiteAuditCrawl $crawl, string $domain): void
     {
+        $settings = array_merge(
+            is_array(optional($crawl->project)->settings_json) ? $crawl->project->settings_json : [],
+            is_array($crawl->progress_json['settings'] ?? null) ? $crawl->progress_json['settings'] : []
+        );
+        $virtual = trim((string) ($settings['virtual_robots'] ?? ''));
+
         $robots = new SiteAuditRobotsTxt();
-        $analysis = $robots->analyze($domain);
+        $analysis = $virtual !== ''
+            ? $robots->analyzeBody($virtual, $domain)
+            : $robots->analyze($domain);
 
         $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
         $progress['robots'] = [
@@ -23,6 +32,7 @@ class SiteAuditRobotsProbe
             'sitemaps' => $analysis['sitemaps'],
             'groups' => $analysis['groups'],
             'error' => $analysis['error'],
+            'virtual' => ! empty($analysis['virtual']) || $virtual !== '',
         ];
         $crawl->progress_json = $progress;
         $crawl->save();

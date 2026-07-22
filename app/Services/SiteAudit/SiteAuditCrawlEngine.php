@@ -72,6 +72,20 @@ class SiteAuditCrawlEngine
             $seed[$home] = true;
         }
 
+        $extraHosts = SiteAuditUrlNormalizer::parseExtraHosts($settings['extra_hosts'] ?? []);
+        foreach ($extraHosts as $extraHost) {
+            $extraHome = SiteAuditUrlNormalizer::normalize('https://' . $extraHost . '/', $extraHost, $urlOpts);
+            if ($extraHome) {
+                $seed[$extraHome] = true;
+            }
+        }
+        if ($extraHosts !== []) {
+            $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+            $progress['extra_hosts'] = $extraHosts;
+            $crawl->progress_json = $progress;
+            $crawl->save();
+        }
+
         try {
             $discovered = (new SiteAuditSitemapProbe())->run($crawl, $project->domain, $limit);
             $crawl->refresh();
@@ -96,6 +110,24 @@ class SiteAuditCrawlEngine
             $queue = SiteAuditUrlFilter::filterList($queue, $patterns);
             $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
             $progress['excluded'] = max(0, $before - count($queue));
+            $crawl->progress_json = $progress;
+        }
+
+        // По умолчанию (и при виртуальном robots) не ставим в очередь Disallow-URL,
+        // кроме корня — чтобы увидеть закрытие сайта и сводку.
+        $groups = $crawl->progress_json['robots']['groups'] ?? null;
+        if (is_array($groups) && $groups !== []) {
+            $robotsTxt = new SiteAuditRobotsTxt();
+            $before = count($queue);
+            $queue = array_values(array_filter($queue, function ($u) use ($robotsTxt, $groups, $home) {
+                if ($home && $u === $home) {
+                    return true;
+                }
+
+                return $robotsTxt->isPathAllowed($groups, $u);
+            }));
+            $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+            $progress['robots_skipped'] = max(0, $before - count($queue));
             $crawl->progress_json = $progress;
         }
 

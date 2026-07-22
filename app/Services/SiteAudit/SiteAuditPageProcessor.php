@@ -156,6 +156,81 @@ class SiteAuditPageProcessor
                 $internalLinks = $links['internal'];
                 // URL-строки (не только hash) — для orphan + broken links
                 $pageData['out_links_json'] = array_slice($internalLinks, 0, 150) ?: null;
+                $pageData['img_srcs_json'] = ! empty($links['img_srcs'])
+                    ? array_slice($links['img_srcs'], 0, 40)
+                    : null;
+                $pageData['asset_srcs_json'] = ! empty($links['asset_srcs'])
+                    ? array_slice($links['asset_srcs'], 0, 40)
+                    : null;
+
+                if (! empty($links['bad_links'])) {
+                    $findings[] = $this->finding('page_has_bad_links', $url, $urlHash, [
+                        'count' => count($links['bad_links']),
+                        'samples' => array_slice($links['bad_links'], 0, 10),
+                    ]);
+                }
+
+                $htmlErrMin = max(1, (int) config('site_audit.html_critical_min', 1));
+                if (! empty($parsed['html_error_count']) && (int) $parsed['html_error_count'] >= $htmlErrMin) {
+                    $findings[] = $this->finding('html_critical_errors', $url, $urlHash, [
+                        'count' => (int) $parsed['html_error_count'],
+                        'samples' => array_slice($parsed['html_error_samples'] ?? [], 0, 8),
+                    ]);
+                }
+
+                $risk = is_array($parsed['content_risk'] ?? null) ? $parsed['content_risk'] : [];
+                if (! empty($risk['adult'])) {
+                    $findings[] = $this->finding('adult_content', $url, $urlHash, [
+                        'score' => (int) ($risk['adult_score'] ?? 0),
+                        'hits' => $risk['adult_hits'] ?? [],
+                    ]);
+                }
+                if (! empty($risk['negative'])) {
+                    $findings[] = $this->finding('negative_content', $url, $urlHash, [
+                        'score' => (int) ($risk['negative_score'] ?? 0),
+                        'hits' => $risk['negative_hits'] ?? [],
+                    ]);
+                }
+                if (! empty($risk['word_repeat'])) {
+                    $findings[] = $this->finding('word_repeat_in_sentence', $url, $urlHash, [
+                        'count' => count($risk['word_repeat_samples'] ?? []),
+                        'samples' => $risk['word_repeat_samples'] ?? [],
+                    ]);
+                }
+
+                $contacts = is_array($parsed['contacts'] ?? null) ? $parsed['contacts'] : [];
+                if (! empty($contacts['commercial']) && (int) ($pageData['word_count'] ?? 0) >= 40) {
+                    $missing = [];
+                    if (empty($contacts['has_phone'])) {
+                        $missing[] = 'phone';
+                    }
+                    if (empty($contacts['has_address'])) {
+                        $missing[] = 'address';
+                    }
+                    if ($missing !== []) {
+                        $findings[] = $this->finding('commercial_missing_contacts', $url, $urlHash, [
+                            'missing' => $missing,
+                        ]);
+                    }
+                    if (empty($contacts['has_price'])) {
+                        $findings[] = $this->finding('commercial_missing_price', $url, $urlHash);
+                    }
+                    if (empty($contacts['has_cta'])) {
+                        $findings[] = $this->finding('commercial_missing_cta', $url, $urlHash);
+                    }
+                    if (empty($contacts['has_delivery'])) {
+                        $findings[] = $this->finding('commercial_missing_delivery', $url, $urlHash);
+                    }
+                    if (empty($contacts['has_payment'])) {
+                        $findings[] = $this->finding('commercial_missing_payment', $url, $urlHash);
+                    }
+                    if (empty($contacts['has_stock'])) {
+                        $findings[] = $this->finding('commercial_missing_stock', $url, $urlHash);
+                    }
+                    if (empty($contacts['has_reviews'])) {
+                        $findings[] = $this->finding('commercial_missing_reviews', $url, $urlHash);
+                    }
+                }
 
                 if ($links['meta_nofollow'] || ($result['x_robots'] && preg_match('/\bnofollow\b/i', $result['x_robots']))) {
                     $findings[] = $this->finding('meta_nofollow', $url, $urlHash, [
@@ -179,6 +254,10 @@ class SiteAuditPageProcessor
                         'count' => count($links['external']),
                         'samples' => array_slice($links['external'], 0, 5),
                     ]);
+                    $aff = SiteAuditAffiliateDetector::fromExternalUrls($links['external']);
+                    if ($aff) {
+                        $findings[] = $this->finding('probable_affiliate', $url, $urlHash, $aff);
+                    }
                 }
                 if (! empty($links['duplicate_links_count'])) {
                     $findings[] = $this->finding('duplicate_links', $url, $urlHash, [
@@ -308,6 +387,24 @@ class SiteAuditPageProcessor
                     if (empty($sec['x_content_type'])) {
                         $findings[] = $this->finding('missing_x_content_type_options', $url, $urlHash);
                     }
+                    if (empty($sec['csp'])) {
+                        $findings[] = $this->finding('missing_csp', $url, $urlHash);
+                    }
+                    if (empty($sec['referrer_policy'])) {
+                        $findings[] = $this->finding('missing_referrer_policy', $url, $urlHash);
+                    }
+                    if (empty($sec['permissions_policy'])) {
+                        $findings[] = $this->finding('missing_permissions_policy', $url, $urlHash);
+                    }
+                    if (empty($sec['coop'])) {
+                        $findings[] = $this->finding('missing_coop', $url, $urlHash);
+                    }
+                    if (empty($sec['coep'])) {
+                        $findings[] = $this->finding('missing_coep', $url, $urlHash);
+                    }
+                    if (empty($sec['corp'])) {
+                        $findings[] = $this->finding('missing_corp', $url, $urlHash);
+                    }
                 }
             }
         }
@@ -332,6 +429,10 @@ class SiteAuditPageProcessor
                 'duplicate_url_variants',
                 'page_has_broken_links',
                 'broken_internal_link',
+                'lost_file',
+                'broken_image',
+                'heavy_image',
+                'error_spike',
                 'deep_pages',
                 'thin_content',
                 'title_too_short',
@@ -356,6 +457,17 @@ class SiteAuditPageProcessor
                 'landing_url_changed',
                 'site_availability',
                 'index_count_mismatch',
+                'serp_snippets',
+                'serp_title_mismatch',
+                'serp_not_indexed',
+                'serp_snippet_source',
+                'psi_mobile',
+                'psi_desktop',
+                'landing_plagiarism_suspect',
+                'landing_no_inbound_internal',
+                'keyword_cannibalization',
+                'ad_cannibalization',
+                'landing_query_mismatch',
                 'no_outbound_internal',
                 'risky_query_params',
                 'pagination_param',

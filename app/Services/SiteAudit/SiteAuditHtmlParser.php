@@ -39,6 +39,24 @@ class SiteAuditHtmlParser
         $wordCount = is_array($words) ? count($words) : 0;
         $textMetrics = SiteAuditTextMetrics::analyze($text);
         $noindexText = SiteAuditTextMetrics::noindexText($html);
+        $contentRisk = config('site_audit.content_risk_enabled', true)
+            ? SiteAuditContentRisk::analyze($text)
+            : [
+                'adult' => false,
+                'adult_score' => 0,
+                'adult_hits' => [],
+                'negative' => false,
+                'negative_score' => 0,
+                'negative_hits' => [],
+                'word_repeat' => false,
+                'word_repeat_samples' => [],
+            ];
+        $contacts = SiteAuditContacts::detect($text);
+        $signals = SiteAuditContacts::detectSignals($text);
+        $looksCommercial = SiteAuditContacts::looksCommercial($finalUrl, [
+            'title' => $title,
+            'h1' => $h1s[0] ?? null,
+        ], $text);
 
         $imgCount = preg_match_all('/<img\b/i', $html) ?: 0;
         $imgWithoutAlt = 0;
@@ -110,6 +128,7 @@ class SiteAuditHtmlParser
         }
 
         $insecureForms = $isHttps ? $this->insecureFormActions($html) : [];
+        $htmlErrors = $this->collectHtmlErrors($html);
 
         return [
             'title' => $title !== '' ? $title : null,
@@ -148,9 +167,85 @@ class SiteAuditHtmlParser
             'mixed_content_samples' => $mixedSamples,
             'insecure_form_count' => count($insecureForms),
             'insecure_form_samples' => $insecureForms,
+            'html_error_count' => count($htmlErrors),
+            'html_error_samples' => $htmlErrors,
+            'content_risk' => $contentRisk,
+            'contacts' => $contacts + $signals + ['commercial' => $looksCommercial],
             'simhash' => SiteAuditSimhash::fromText($text),
             'final_url' => $finalUrl,
         ];
+    }
+
+    /**
+     * Критические ошибки разметки: libxml ERROR/FATAL + грубые эвристики (сэмпл).
+     *
+     * @return list<array{line:?int, level:string, message:string}>
+     */
+    private function collectHtmlErrors(string $html): array
+    {
+        $out = [];
+        $push = function (string $level, string $message, ?int $line = null) use (&$out) {
+            $message = trim(preg_replace('/\s+/', ' ', $message) ?: $message);
+            if ($message === '') {
+                return;
+            }
+            $key = mb_strtolower($message);
+            foreach ($out as $row) {
+                if (mb_strtolower($row['message']) === $key) {
+                    return;
+                }
+            }
+            $out[] = [
+                'line' => $line,
+                'level' => $level,
+                'message' => mb_substr($message, 0, 200),
+            ];
+        };
+
+        // эвристики без DOM
+        if (substr_count(mb_strtolower($html), '</html>') > 1) {
+            $push('error', 'Несколько закрывающих тегов </html>');
+        }
+        if (substr_count(mb_strtolower($html), '</body>') > 1) {
+            $push('error', 'Несколько закрывающих тегов </body>');
+        }
+        $openComments = preg_match_all('/<!--/', $html) ?: 0;
+        $closeComments = preg_match_all('/-->/', $html) ?: 0;
+        if ($openComments > $closeComments) {
+            $push('error', 'Незакрытый HTML-комментарий <!--');
+        }
+
+        if (! class_exists(\DOMDocument::class)) {
+            return array_slice($out, 0, 10);
+        }
+
+        $prev = libxml_use_internal_errors(true);
+        libxml_clear_errors();
+        $dom = new \DOMDocument();
+        $wrapped = '<?xml encoding="UTF-8">' . $html;
+        @$dom->loadHTML($wrapped);
+        foreach (libxml_get_errors() as $err) {
+            if ((int) $err->level < LIBXML_ERR_ERROR) {
+                continue;
+            }
+            $msg = trim($err->message);
+            // шум HTML5 / entities
+            if (preg_match('/htmlParseEntityRef|htmlParseCharRef|Unexpected end tag : (html|body|head)/i', $msg)) {
+                continue;
+            }
+            if (preg_match('/Tag (nav|section|article|header|footer|main|figure|figcaption|aside|svg|path|source|picture|template) invalid/i', $msg)) {
+                continue;
+            }
+            $level = ((int) $err->level >= LIBXML_ERR_FATAL) ? 'fatal' : 'error';
+            $push($level, $msg, $err->line > 0 ? (int) $err->line : null);
+            if (count($out) >= 10) {
+                break;
+            }
+        }
+        libxml_clear_errors();
+        libxml_use_internal_errors($prev);
+
+        return array_slice($out, 0, 10);
     }
 
     private function metaContents(string $html, string $name): array

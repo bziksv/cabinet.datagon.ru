@@ -44,6 +44,7 @@ class InactiveUsersPurge
         'search_suggestions_usages',
         'sessions',
         'site_audit_ignores',
+        'site_audit_finding_notes',
         'site_audit_schedules',
         'site_types_histories',
         'site_types_usages',
@@ -372,6 +373,9 @@ class InactiveUsersPurge
         }
         if (Schema::hasTable('site_audit_ignores')) {
             DB::table('site_audit_ignores')->where('user_id', $userId)->delete();
+        }
+        if (Schema::hasTable('site_audit_finding_notes')) {
+            DB::table('site_audit_finding_notes')->where('user_id', $userId)->delete();
         }
         DB::table('site_audit_projects')->where('user_id', $userId)->delete();
     }

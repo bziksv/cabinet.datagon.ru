@@ -7,9 +7,15 @@
 @endsection
 
 @section('content')
-    <div class="alert alert-info mb-3">
-        <div class="fw-semibold mb-1">Публичный доступ</div>
-        <div class="small mb-0">Только просмотр сводки аудита, без регистрации.</div>
+    <div class="alert {{ !empty($whiteLabel) ? 'alert-secondary' : 'alert-info' }} mb-3">
+        <div class="fw-semibold mb-1">{{ !empty($whiteLabel) ? 'Клиентский отчёт' : 'Публичный доступ' }}</div>
+        <div class="small mb-0">
+            @if(!empty($whiteLabel))
+                Только просмотр сводки аудита.
+            @else
+                Только просмотр сводки аудита, без регистрации.
+            @endif
+        </div>
     </div>
 
     <div class="card shadow-sm">
@@ -53,14 +59,14 @@
                             @foreach($bucketLabels as $sev => $label)
                                 <div class="cabinet-sa-tree__group-title">{{ $label }}</div>
                                 @foreach(($treeAll[$sev] ?? []) as $item)
-                                    <a class="cabinet-sa-tree__item {{ $item['count'] ? '' : 'is-empty' }}"
-                                       href="{{ route('site-audit.public.share.report', [$token, $item['code']]) }}">
-                                        <span>
-                                            {{ $item['title'] }}
-                                            <span class="cabinet-sa-group-tag cabinet-sa-group-tag--{{ $item['group'] ?? 'tech' }}">{{ ($item['group'] ?? '') === 'seo' ? 'SEO' : 'тех' }}</span>
-                                        </span>
-                                        <span class="cabinet-sa-badge cabinet-sa-badge--{{ $item['count'] > 0 ? $sev : 'zero' }}">{{ $item['count'] }}</span>
-                                    </a>
+                                    @include('pages.partials.site-audit-tree-item', [
+                                        'item' => $item,
+                                        'sev' => $sev,
+                                        'crawl' => $crawl,
+                                        'showGroup' => true,
+                                        'isPublic' => true,
+                                        'token' => $token,
+                                    ])
                                 @endforeach
                             @endforeach
                         </aside>
@@ -93,11 +99,13 @@
                             @foreach($bucketLabels as $sev => $label)
                                 <div class="cabinet-sa-tree__group-title">{{ $label }}</div>
                                 @foreach(($tree[$sev] ?? []) as $item)
-                                    <a class="cabinet-sa-tree__item {{ $item['count'] ? '' : 'is-empty' }}"
-                                       href="{{ route('site-audit.public.share.report', [$token, $item['code']]) }}">
-                                        <span>{{ $item['title'] }}</span>
-                                        <span class="cabinet-sa-badge cabinet-sa-badge--{{ $item['count'] > 0 ? $sev : 'zero' }}">{{ $item['count'] }}</span>
-                                    </a>
+                                    @include('pages.partials.site-audit-tree-item', [
+                                        'item' => $item,
+                                        'sev' => $sev,
+                                        'crawl' => $crawl,
+                                        'isPublic' => true,
+                                        'token' => $token,
+                                    ])
                                 @endforeach
                             @endforeach
                         </aside>
@@ -130,11 +138,13 @@
                             @foreach($bucketLabels as $sev => $label)
                                 <div class="cabinet-sa-tree__group-title">{{ $label }}</div>
                                 @foreach(($treeSeo[$sev] ?? []) as $item)
-                                    <a class="cabinet-sa-tree__item {{ $item['count'] ? '' : 'is-empty' }}"
-                                       href="{{ route('site-audit.public.share.report', [$token, $item['code']]) }}">
-                                        <span>{{ $item['title'] }}</span>
-                                        <span class="cabinet-sa-badge cabinet-sa-badge--{{ $item['count'] > 0 ? $sev : 'zero' }}">{{ $item['count'] }}</span>
-                                    </a>
+                                    @include('pages.partials.site-audit-tree-item', [
+                                        'item' => $item,
+                                        'sev' => $sev,
+                                        'crawl' => $crawl,
+                                        'isPublic' => true,
+                                        'token' => $token,
+                                    ])
                                 @endforeach
                             @endforeach
                         </aside>

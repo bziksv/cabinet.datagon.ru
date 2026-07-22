@@ -22,6 +22,10 @@ class SiteAuditAggregator
         'duplicate_url_variants',
         'page_has_broken_links',
         'broken_internal_link',
+        'broken_image',
+        'heavy_image',
+        'lost_file',
+        'error_spike',
         'deep_pages',
         'thin_content',
         'title_too_short',
@@ -44,8 +48,19 @@ class SiteAuditAggregator
         'landing_not_in_sitemap',
         'landing_not_crawled',
         'landing_url_changed',
+        'landing_plagiarism_suspect',
+        'landing_no_inbound_internal',
+        'keyword_cannibalization',
+        'ad_cannibalization',
+        'landing_query_mismatch',
         'site_availability',
         'index_count_mismatch',
+        'serp_snippets',
+        'serp_title_mismatch',
+        'serp_not_indexed',
+        'serp_snippet_source',
+        'psi_mobile',
+        'psi_desktop',
         'no_outbound_internal',
         'risky_query_params',
         'pagination_param',
@@ -68,11 +83,21 @@ class SiteAuditAggregator
         $this->emitNoOutboundInternal($crawl->id);
         $this->emitUrlParamRisks($crawl->id);
         $this->emitBrokenLinks($crawl);
+        $this->emitImageAssets($crawl);
+        $this->emitLostFiles($crawl);
+        $this->emitErrorSpikes($crawl);
         $depthMeta = $this->emitClickDepth($crawl->id);
         $this->emitSitemapCoverage($crawl);
         $this->emitLandingCoverage($crawl);
+        $this->emitLandingPlagiarismLite($crawl);
+        $this->emitLandingNoInbound($crawl);
+        (new SiteAuditCannibalizationProbe())->run($crawl);
+        (new SiteAuditAdCannibalizationProbe())->run($crawl);
+        (new SiteAuditLandingQueryMatchProbe())->run($crawl);
         (new SiteAuditAvailabilityProbe())->run($crawl);
         (new SiteAuditSerpIndexProbe())->run($crawl);
+        (new SiteAuditSerpSnippetsProbe())->run($crawl);
+        (new SiteAuditPsiProbe())->run($crawl);
 
         $buckets = [
             'critical' => 0,
@@ -489,6 +514,171 @@ class SiteAuditAggregator
                     $notCrawled++;
                 }
             }
+        }
+    }
+
+    /**
+     * Lite «плагиат» на посадочных: внутренний duplicate_content / similar_pages.
+     * Внешний антиплагиат API — вне скоупа.
+     */
+    private function emitLandingPlagiarismLite(SiteAuditCrawl $crawl): void
+    {
+        $resolved = (new SiteAuditLandingResolver())->forCrawl($crawl);
+        $landings = $resolved['urls'];
+        if ($landings === []) {
+            return;
+        }
+
+        $max = (int) config('site_audit.landing_plagiarism_max', 200);
+        $cfg = config('site_audit.findings.landing_plagiarism_suspect', []);
+        $severity = $cfg['severity'] ?? 'warning';
+        $emitted = 0;
+
+        $landingHashes = [];
+        foreach ($landings as $url) {
+            $landingHashes[SiteAuditUrlNormalizer::hash($url)] = $url;
+        }
+
+        $suspectHashes = SiteAuditFinding::query()
+            ->where('crawl_id', $crawl->id)
+            ->whereIn('code', ['duplicate_content', 'similar_pages'])
+            ->whereIn('url_hash', array_keys($landingHashes))
+            ->get(['url', 'url_hash', 'code', 'meta_json']);
+
+        $seen = [];
+        foreach ($suspectHashes as $row) {
+            if ($emitted >= $max) {
+                break;
+            }
+            $hash = (string) $row->url_hash;
+            if (isset($seen[$hash])) {
+                continue;
+            }
+            $meta = is_array($row->meta_json) ? $row->meta_json : [];
+            $peer = (string) ($meta['similar_url'] ?? $meta['duplicate_url'] ?? $meta['peer_url'] ?? '');
+            if ($peer === '' && (string) $row->code === 'duplicate_content') {
+                $page = SiteAuditPage::query()
+                    ->where('crawl_id', $crawl->id)
+                    ->where('url_hash', $hash)
+                    ->first(['content_hash']);
+                if ($page && $page->content_hash) {
+                    $peer = (string) (SiteAuditPage::query()
+                        ->where('crawl_id', $crawl->id)
+                        ->where('content_hash', $page->content_hash)
+                        ->where('url_hash', '!=', $hash)
+                        ->value('url') ?: '');
+                }
+            }
+
+            SiteAuditFinding::query()->create([
+                'crawl_id' => $crawl->id,
+                'code' => 'landing_plagiarism_suspect',
+                'severity' => $severity,
+                'url' => $row->url ?: ($landingHashes[$hash] ?? ''),
+                'url_hash' => $hash,
+                'meta_json' => [
+                    'source' => (string) $row->code,
+                    'peer_url' => $peer !== '' ? $peer : null,
+                    'note' => 'internal_only',
+                ],
+            ]);
+            $seen[$hash] = true;
+            $emitted++;
+        }
+    }
+
+    /**
+     * Посадочные без входящих внутренних ссылок из краула (кроме главной).
+     */
+    private function emitLandingNoInbound(SiteAuditCrawl $crawl): void
+    {
+        $resolved = (new SiteAuditLandingResolver())->forCrawl($crawl);
+        $landings = $resolved['urls'];
+        if ($landings === []) {
+            return;
+        }
+
+        $pages = SiteAuditPage::query()
+            ->where('crawl_id', $crawl->id)
+            ->get(['url', 'url_hash', 'out_links_json', 'status_code']);
+        if ($pages->count() < 2) {
+            return;
+        }
+
+        $byHash = [];
+        $byUrl = [];
+        foreach ($pages as $page) {
+            $byHash[$page->url_hash] = $page;
+            $byUrl[$page->url] = $page;
+        }
+
+        $inbound = [];
+        foreach ($pages as $page) {
+            $outs = is_array($page->out_links_json) ? $page->out_links_json : [];
+            foreach ($outs as $out) {
+                $out = (string) $out;
+                if ($out === '') {
+                    continue;
+                }
+                if (isset($byHash[$out])) {
+                    if ($out !== $page->url_hash) {
+                        $inbound[$out] = ($inbound[$out] ?? 0) + 1;
+                    }
+                    continue;
+                }
+                if (isset($byUrl[$out])) {
+                    $h = $byUrl[$out]->url_hash;
+                    if ($h !== $page->url_hash) {
+                        $inbound[$h] = ($inbound[$h] ?? 0) + 1;
+                    }
+                    continue;
+                }
+                $h = SiteAuditUrlNormalizer::hash($out);
+                if (isset($byHash[$h]) && $h !== $page->url_hash) {
+                    $inbound[$h] = ($inbound[$h] ?? 0) + 1;
+                }
+            }
+        }
+
+        $max = (int) config('site_audit.landing_findings_max', 300);
+        $cfg = config('site_audit.findings.landing_no_inbound_internal', []);
+        $severity = $cfg['severity'] ?? 'warning';
+        $emitted = 0;
+
+        foreach ($landings as $url) {
+            if ($emitted >= $max) {
+                break;
+            }
+            $hash = SiteAuditUrlNormalizer::hash($url);
+            if (! isset($byHash[$hash])) {
+                continue;
+            }
+            $page = $byHash[$hash];
+            $path = parse_url($url, PHP_URL_PATH);
+            if ($path === '/' || $path === '' || $path === null) {
+                continue;
+            }
+            $code = (int) $page->status_code;
+            if ($code && ($code < 200 || $code >= 400)) {
+                continue;
+            }
+            if (! empty($inbound[$hash])) {
+                continue;
+            }
+
+            SiteAuditFinding::query()->create([
+                'crawl_id' => $crawl->id,
+                'code' => 'landing_no_inbound_internal',
+                'severity' => $severity,
+                'url' => $url,
+                'url_hash' => $hash,
+                'meta_json' => [
+                    'source' => 'monitoring',
+                    'inbound' => 0,
+                    'monitoring_project_ids' => $resolved['project_ids'],
+                ],
+            ]);
+            $emitted++;
         }
     }
 
@@ -959,6 +1149,399 @@ class SiteAuditAggregator
                 ]);
             }
         }
+    }
+
+    /**
+     * Битые / тяжёлые изображения: HEAD-сэмпл по img_srcs_json (бюджет на краул).
+     */
+    private function emitImageAssets(SiteAuditCrawl $crawl): void
+    {
+        $pages = SiteAuditPage::query()
+            ->where('crawl_id', $crawl->id)
+            ->whereNotNull('img_srcs_json')
+            ->get(['id', 'url', 'url_hash', 'img_srcs_json']);
+
+        if ($pages->isEmpty()) {
+            return;
+        }
+
+        $maxHead = (int) config('site_audit.broken_image_head_max', 50);
+        $heavyBytes = (int) config('site_audit.heavy_image_bytes', 500_000);
+        $checker = new SiteAuditLinkChecker();
+        $cache = [];
+        $budget = $maxHead;
+
+        $brokenSev = config('site_audit.findings.broken_image.severity', 'warning');
+        $heavySev = config('site_audit.findings.heavy_image.severity', 'info');
+
+        foreach ($pages as $page) {
+            $srcs = is_array($page->img_srcs_json) ? $page->img_srcs_json : [];
+            if ($srcs === []) {
+                continue;
+            }
+
+            $brokenSamples = [];
+            $heavySamples = [];
+
+            foreach (array_slice($srcs, 0, 15) as $src) {
+                $src = (string) $src;
+                if ($src === '') {
+                    continue;
+                }
+                if (! isset($cache[$src])) {
+                    if ($budget <= 0) {
+                        break;
+                    }
+                    $cache[$src] = $checker->check($src);
+                    $budget--;
+                }
+                $res = $cache[$src];
+                if (! $res['ok']) {
+                    $brokenSamples[] = [
+                        'img' => $src,
+                        'status' => $res['status'] ?? null,
+                        'error' => $res['error'] ?? null,
+                    ];
+                } elseif (! empty($res['size_bytes']) && (int) $res['size_bytes'] >= $heavyBytes) {
+                    $heavySamples[] = [
+                        'img' => $src,
+                        'size_bytes' => (int) $res['size_bytes'],
+                        'threshold' => $heavyBytes,
+                    ];
+                }
+            }
+
+            if ($brokenSamples) {
+                SiteAuditFinding::query()->create([
+                    'crawl_id' => $crawl->id,
+                    'code' => 'broken_image',
+                    'severity' => $brokenSev,
+                    'url' => $page->url,
+                    'url_hash' => $page->url_hash,
+                    'meta_json' => [
+                        'count' => count($brokenSamples),
+                        'samples' => array_slice($brokenSamples, 0, 8),
+                    ],
+                ]);
+            }
+            if ($heavySamples) {
+                SiteAuditFinding::query()->create([
+                    'crawl_id' => $crawl->id,
+                    'code' => 'heavy_image',
+                    'severity' => $heavySev,
+                    'url' => $page->url,
+                    'url_hash' => $page->url_hash,
+                    'meta_json' => [
+                        'count' => count($heavySamples),
+                        'samples' => array_slice($heavySamples, 0, 8),
+                        'threshold' => $heavyBytes,
+                    ],
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Потерянные файлы: CSS/JS (asset_srcs_json) с 404/ошибкой HEAD + referrer=страница.
+     */
+    private function emitLostFiles(SiteAuditCrawl $crawl): void
+    {
+        $pages = SiteAuditPage::query()
+            ->where('crawl_id', $crawl->id)
+            ->whereNotNull('asset_srcs_json')
+            ->get(['id', 'url', 'url_hash', 'asset_srcs_json']);
+
+        if ($pages->isEmpty()) {
+            return;
+        }
+
+        $maxHead = (int) config('site_audit.lost_file_head_max', 40);
+        $checker = new SiteAuditLinkChecker();
+        $cache = [];
+        $budget = $maxHead;
+        $sev = config('site_audit.findings.lost_file.severity', 'warning');
+
+        // asset URL → list of referrer pages
+        $assetPages = [];
+        foreach ($pages as $page) {
+            $srcs = is_array($page->asset_srcs_json) ? $page->asset_srcs_json : [];
+            foreach (array_slice($srcs, 0, 20) as $src) {
+                $src = (string) $src;
+                if ($src === '') {
+                    continue;
+                }
+                if (! isset($assetPages[$src])) {
+                    $assetPages[$src] = [];
+                }
+                if (count($assetPages[$src]) < 5) {
+                    $assetPages[$src][] = [
+                        'url' => $page->url,
+                        'url_hash' => $page->url_hash,
+                    ];
+                }
+            }
+        }
+
+        $emitted = 0;
+        $maxFindings = (int) config('site_audit.lost_file_max_findings', 80);
+        foreach ($assetPages as $src => $referrers) {
+            if ($emitted >= $maxFindings) {
+                break;
+            }
+            if (! isset($cache[$src])) {
+                if ($budget <= 0) {
+                    break;
+                }
+                $cache[$src] = $checker->check($src);
+                $budget--;
+            }
+            $res = $cache[$src];
+            if ($res['ok']) {
+                continue;
+            }
+            $from = $referrers[0];
+            SiteAuditFinding::query()->create([
+                'crawl_id' => $crawl->id,
+                'code' => 'lost_file',
+                'severity' => $sev,
+                'url' => $from['url'],
+                'url_hash' => $from['url_hash'],
+                'meta_json' => [
+                    'asset' => $src,
+                    'status' => $res['status'] ?? null,
+                    'error' => $res['error'] ?? null,
+                    'referrers' => array_column($referrers, 'url'),
+                    'referrer_count' => count($referrers),
+                ],
+            ]);
+            $emitted++;
+        }
+    }
+
+    /**
+     * Выбросы ошибок: кластеры по коду/префиксу пути и скачок vs прошлый краул.
+     */
+    private function emitErrorSpikes(SiteAuditCrawl $crawl): void
+    {
+        $pages = SiteAuditPage::query()
+            ->where('crawl_id', $crawl->id)
+            ->get(['url', 'url_hash', 'status_code']);
+
+        $total = $pages->count();
+        if ($total < 1) {
+            return;
+        }
+
+        $minCount = max(3, (int) config('site_audit.error_spike_min_count', 5));
+        $statusShare = (float) config('site_audit.error_spike_status_share', 0.4);
+        $pathMin = max(3, (int) config('site_audit.error_spike_path_min', 5));
+        $pathRate = (float) config('site_audit.error_spike_path_rate', 0.5);
+        $deltaMin = max(3, (int) config('site_audit.error_spike_delta_min', 5));
+        $deltaRatio = (float) config('site_audit.error_spike_delta_ratio', 2.0);
+
+        $errors = [];
+        $byStatus = [];
+        $byPrefix = [];
+        $prefixTotals = [];
+
+        foreach ($pages as $page) {
+            $url = (string) $page->url;
+            $code = $page->status_code;
+            $isErr = $code === null || (int) $code >= 400;
+            $prefix = $this->errorSpikePathPrefix($url);
+            $prefixTotals[$prefix] = ($prefixTotals[$prefix] ?? 0) + 1;
+
+            if (! $isErr) {
+                continue;
+            }
+
+            $statusKey = $code === null ? 'unreachable' : (string) (int) $code;
+            $errors[] = [
+                'url' => $url,
+                'url_hash' => $page->url_hash,
+                'status' => $code === null ? null : (int) $code,
+                'status_key' => $statusKey,
+                'prefix' => $prefix,
+            ];
+            $byStatus[$statusKey] = ($byStatus[$statusKey] ?? 0) + 1;
+            $byPrefix[$prefix] = ($byPrefix[$prefix] ?? 0) + 1;
+        }
+
+        $errorCount = count($errors);
+        if ($errorCount < $minCount) {
+            // всё равно проверим delta vs прошлый краул
+            $this->emitErrorSpikeDelta($crawl, $errorCount, $deltaMin, $deltaRatio);
+
+            return;
+        }
+
+        $sev = config('site_audit.findings.error_spike.severity', 'warning');
+        $domain = optional($crawl->project)->domain
+            ? preg_replace('#^https?://#i', '', rtrim((string) $crawl->project->domain, '/'))
+            : '';
+        $rootUrl = $domain !== '' ? ('https://' . $domain . '/') : ($errors[0]['url'] ?? 'https://example.invalid/');
+
+        // 1) доминантный статус среди ошибок
+        arsort($byStatus);
+        foreach ($byStatus as $statusKey => $cnt) {
+            if ($cnt < $minCount) {
+                break;
+            }
+            $share = $errorCount > 0 ? ($cnt / $errorCount) : 0;
+            if ($share < $statusShare) {
+                break;
+            }
+            $samples = [];
+            foreach ($errors as $e) {
+                if ($e['status_key'] !== $statusKey) {
+                    continue;
+                }
+                $samples[] = ['url' => $e['url'], 'status' => $e['status']];
+                if (count($samples) >= 8) {
+                    break;
+                }
+            }
+            SiteAuditFinding::query()->create([
+                'crawl_id' => $crawl->id,
+                'code' => 'error_spike',
+                'severity' => $sev,
+                'url' => $rootUrl,
+                'url_hash' => SiteAuditUrlNormalizer::hash($rootUrl),
+                'meta_json' => [
+                    'kind' => 'status_cluster',
+                    'status' => $statusKey,
+                    'count' => $cnt,
+                    'error_total' => $errorCount,
+                    'pages_total' => $total,
+                    'share' => round($share, 3),
+                    'samples' => $samples,
+                ],
+            ]);
+            break; // один главный статусный выброс
+        }
+
+        // 2) префиксы путей с высокой долей ошибок
+        $emittedPrefixes = 0;
+        arsort($byPrefix);
+        foreach ($byPrefix as $prefix => $cnt) {
+            if ($emittedPrefixes >= 8) {
+                break;
+            }
+            if ($cnt < $pathMin) {
+                continue;
+            }
+            $inPrefix = (int) ($prefixTotals[$prefix] ?? 0);
+            if ($inPrefix < $pathMin) {
+                continue;
+            }
+            $rate = $cnt / $inPrefix;
+            if ($rate < $pathRate) {
+                continue;
+            }
+            $prefixUrl = $domain !== ''
+                ? ('https://' . $domain . ($prefix === '/' ? '/' : rtrim($prefix, '/') . '/'))
+                : $rootUrl;
+            $samples = [];
+            foreach ($errors as $e) {
+                if ($e['prefix'] !== $prefix) {
+                    continue;
+                }
+                $samples[] = ['url' => $e['url'], 'status' => $e['status']];
+                if (count($samples) >= 8) {
+                    break;
+                }
+            }
+            SiteAuditFinding::query()->create([
+                'crawl_id' => $crawl->id,
+                'code' => 'error_spike',
+                'severity' => $sev,
+                'url' => $prefixUrl,
+                'url_hash' => SiteAuditUrlNormalizer::hash($prefixUrl),
+                'meta_json' => [
+                    'kind' => 'path_cluster',
+                    'path_prefix' => $prefix,
+                    'count' => $cnt,
+                    'prefix_total' => $inPrefix,
+                    'rate' => round($rate, 3),
+                    'error_total' => $errorCount,
+                    'pages_total' => $total,
+                    'samples' => $samples,
+                ],
+            ]);
+            $emittedPrefixes++;
+        }
+
+        $this->emitErrorSpikeDelta($crawl, $errorCount, $deltaMin, $deltaRatio);
+    }
+
+    private function emitErrorSpikeDelta(SiteAuditCrawl $crawl, int $errorCount, int $deltaMin, float $deltaRatio): void
+    {
+        $prev = SiteAuditCrawl::query()
+            ->where('project_id', $crawl->project_id)
+            ->where('id', '<', $crawl->id)
+            ->where('status', SiteAuditCrawl::STATUS_DONE)
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $prev) {
+            return;
+        }
+
+        $prevErrors = (int) SiteAuditPage::query()
+            ->where('crawl_id', $prev->id)
+            ->where(function ($q) {
+                $q->whereNull('status_code')->orWhere('status_code', '>=', 400);
+            })
+            ->count();
+
+        $grew = $errorCount >= $deltaMin
+            && (
+                ($prevErrors === 0 && $errorCount >= $deltaMin)
+                || ($prevErrors > 0 && $errorCount >= (int) ceil($prevErrors * $deltaRatio) && ($errorCount - $prevErrors) >= $deltaMin)
+            );
+
+        if (! $grew) {
+            return;
+        }
+
+        $domain = optional($crawl->project)->domain
+            ? preg_replace('#^https?://#i', '', rtrim((string) $crawl->project->domain, '/'))
+            : '';
+        $rootUrl = $domain !== '' ? ('https://' . $domain . '/') : 'https://example.invalid/';
+        $sev = config('site_audit.findings.error_spike.severity', 'warning');
+
+        SiteAuditFinding::query()->create([
+            'crawl_id' => $crawl->id,
+            'code' => 'error_spike',
+            'severity' => $sev,
+            'url' => $rootUrl,
+            'url_hash' => SiteAuditUrlNormalizer::hash($rootUrl),
+            'meta_json' => [
+                'kind' => 'crawl_delta',
+                'count' => $errorCount,
+                'prev_count' => $prevErrors,
+                'prev_crawl_id' => $prev->id,
+                'delta' => $errorCount - $prevErrors,
+                'ratio' => $prevErrors > 0 ? round($errorCount / $prevErrors, 2) : null,
+            ],
+        ]);
+    }
+
+    private function errorSpikePathPrefix(string $url): string
+    {
+        $path = parse_url($url, PHP_URL_PATH);
+        if (! is_string($path) || $path === '' || $path === '/') {
+            return '/';
+        }
+        $parts = array_values(array_filter(explode('/', $path), static function ($p) {
+            return $p !== '';
+        }));
+        if ($parts === []) {
+            return '/';
+        }
+        $take = array_slice($parts, 0, min(2, count($parts)));
+
+        return '/' . implode('/', $take);
     }
 
     /**

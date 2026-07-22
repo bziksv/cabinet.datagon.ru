@@ -229,6 +229,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('site-audit/crawl/{id}', 'SiteAuditController@destroyCrawl')->name('pages.site-audit.crawl.destroy')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/share', 'SiteAuditController@createShare')->name('pages.site-audit.share.create')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/share/revoke', 'SiteAuditController@revokeShare')->name('pages.site-audit.share.revoke')->middleware('permission:Site audit');
+    Route::post('site-audit/crawl/{id}/action-plan', 'SiteAuditController@generateActionPlan')->name('pages.site-audit.action-plan.generate')->middleware('permission:Site audit');
+    Route::post('site-audit/crawl/{id}/action-plan/toggle', 'SiteAuditController@toggleActionPlanItem')->name('pages.site-audit.action-plan.toggle')->middleware('permission:Site audit');
     Route::get('site-audit/crawl/{id}/status', 'SiteAuditController@crawlStatus')->name('pages.site-audit.crawl.status')->middleware('permission:Site audit');
     Route::get('site-audit/crawl/{id}/report/{code}', 'SiteAuditController@showReport')->name('pages.site-audit.report.show')->middleware('permission:Site audit');
     Route::get('site-audit/crawl/{id}/report/{code}/csv', 'SiteAuditController@exportReportCsv')->name('pages.site-audit.report.csv')->middleware('permission:Site audit');
@@ -238,6 +240,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('site-audit/crawl/{id}/diff', 'SiteAuditController@showDiff')->name('pages.site-audit.crawl.diff')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/ignore', 'SiteAuditController@ignoreFinding')->name('pages.site-audit.ignore')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/ignore/restore', 'SiteAuditController@restoreIgnore')->name('pages.site-audit.ignore.restore')->middleware('permission:Site audit');
+    Route::post('site-audit/crawl/{id}/note', 'SiteAuditController@saveFindingNote')->name('pages.site-audit.note')->middleware('permission:Site audit');
+    Route::post('site-audit/crawl/{id}/note/clear', 'SiteAuditController@clearFindingNote')->name('pages.site-audit.note.clear')->middleware('permission:Site audit');
 
     Route::get('search-suggestions', 'SearchSuggestionsController@index')->name('pages.search-suggestions')->middleware('permission:Search suggestions');
     Route::post('search-suggestions/collect', 'SearchSuggestionsController@collect')->name('pages.search-suggestions.collect')->middleware('permission:Search suggestions');

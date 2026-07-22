@@ -30,6 +30,9 @@ class SiteAuditCrawl extends Model
         'save_html',
         'share_token',
         'share_enabled_at',
+        'share_white_label',
+        'share_brand_name',
+        'share_brand_url',
         'started_at',
         'finished_at',
     ];
@@ -41,6 +44,7 @@ class SiteAuditCrawl extends Model
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
         'share_enabled_at' => 'datetime',
+        'share_white_label' => 'boolean',
     ];
 
     public function project()
@@ -112,6 +116,29 @@ class SiteAuditCrawl extends Model
         }
 
         return route('site-audit.public.share.view', $this->share_token);
+    }
+
+    public function isWhiteLabelShare(): bool
+    {
+        return (bool) $this->share_white_label;
+    }
+
+    /**
+     * @return array{enabled:bool,brand_name:?string,brand_url:?string}
+     */
+    public function whiteLabelMeta(): array
+    {
+        $name = is_string($this->share_brand_name) ? trim($this->share_brand_name) : '';
+        $url = is_string($this->share_brand_url) ? trim($this->share_brand_url) : '';
+        if ($url !== '' && ! preg_match('#^https?://#i', $url)) {
+            $url = 'https://' . $url;
+        }
+
+        return [
+            'enabled' => $this->isWhiteLabelShare(),
+            'brand_name' => $name !== '' ? mb_substr($name, 0, 120) : null,
+            'brand_url' => $url !== '' ? mb_substr($url, 0, 255) : null,
+        ];
     }
 
     /**

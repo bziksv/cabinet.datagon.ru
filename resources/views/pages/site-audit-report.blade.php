@@ -34,9 +34,18 @@
             </span>
             <span class="ms-auto d-flex flex-wrap" style="gap:6px">
                 @if(!empty($showIgnored))
-                    <a class="btn btn-sm btn-outline-secondary" href="{{ request()->fullUrlWithQuery(['ignored' => null, 'page' => 1]) }}">Скрыть игнор</a>
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ request()->fullUrlWithQuery(['ignored' => null, 'page' => 1]) }}"
+                       title="Спрятать строки, которые вы пометили «Игнор»">Скрыть игнор</a>
                 @else
-                    <a class="btn btn-sm btn-outline-secondary" href="{{ request()->fullUrlWithQuery(['ignored' => 1, 'page' => 1]) }}">Показать игнор</a>
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ request()->fullUrlWithQuery(['ignored' => 1, 'page' => 1]) }}"
+                       title="Показать и те URL, которые вы раньше скрыли игнором">Показать игнор</a>
+                @endif
+                @if(!empty($showFixed))
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ request()->fullUrlWithQuery(['fixed' => null, 'page' => 1]) }}"
+                       title="Спрятать строки со статусом «Исправлено»">Скрыть исправленные</a>
+                @else
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ request()->fullUrlWithQuery(['fixed' => 1, 'page' => 1]) }}"
+                       title="Показать URL, которые вы пометили «Исправлено» (они не в счётчиках)">Показать исправленные</a>
                 @endif
                 @if(!empty($canIgnore))
                     @if(!empty($codeWideIgnored))
@@ -63,13 +72,16 @@
 
         <ul class="nav nav-tabs mb-3" id="sa-audit-tabs" role="tablist">
             <li class="nav-item">
-                <a class="nav-link {{ $activeGroup === 'all' ? 'active' : '' }}" id="sa-tab-all" data-bs-toggle="tab" href="#sa-pane-all" role="tab">Сводка</a>
+                <a class="nav-link {{ $activeGroup === 'all' ? 'active' : '' }}" id="sa-tab-all" data-bs-toggle="tab" href="#sa-pane-all" role="tab"
+                   title="Всё вместе: тех. и SEO-проблемы">Сводка</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {{ $activeGroup === 'tech' ? 'active' : '' }}" id="sa-tab-tech" data-bs-toggle="tab" href="#sa-pane-tech" role="tab">Тех. аудит</a>
+                <a class="nav-link {{ $activeGroup === 'tech' ? 'active' : '' }}" id="sa-tab-tech" data-bs-toggle="tab" href="#sa-pane-tech" role="tab"
+                   title="Техника: коды ответа, редиректы, скорость, заголовки безопасности">Тех. аудит</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {{ $activeGroup === 'seo' ? 'active' : '' }}" id="sa-tab-seo" data-bs-toggle="tab" href="#sa-pane-seo" role="tab">SEO-аудит</a>
+                <a class="nav-link {{ $activeGroup === 'seo' ? 'active' : '' }}" id="sa-tab-seo" data-bs-toggle="tab" href="#sa-pane-seo" role="tab"
+                   title="SEO: title, описание, H1, дубли, посадочные, контент">SEO-аудит</a>
             </li>
         </ul>
 
@@ -77,7 +89,8 @@
             <div class="tab-pane fade {{ $activeGroup === 'all' ? 'show active' : '' }}" id="sa-pane-all" role="tabpanel">
                 <div class="cabinet-sa-buckets mb-4">
                     @foreach($bucketLabels as $key => $label)
-                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}" title="Показать отчёты: {{ $label }}">
+                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}"
+                             title="@if($key === 'critical')Самые срочные ошибки — чинить первыми@elseif($key === 'other')Средняя срочность@elseif($key === 'warning')Желательно починить@elseПросто знать, не всегда срочно@endif. Клик — отфильтровать меню слева.">
                             <div class="cabinet-sa-bucket__label">{{ $label }}</div>
                             <div class="cabinet-sa-bucket__value">{{ (int) (($bucketsAll ?? [])[$key] ?? 0) }}</div>
                         </div>
@@ -102,7 +115,8 @@
             <div class="tab-pane fade {{ $activeGroup === 'tech' ? 'show active' : '' }}" id="sa-pane-tech" role="tabpanel">
                 <div class="cabinet-sa-buckets mb-4">
                     @foreach($bucketLabels as $key => $label)
-                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}" title="Показать отчёты: {{ $label }}">
+                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}"
+                             title="@if($key === 'critical')Самые срочные ошибки — чинить первыми@elseif($key === 'other')Средняя срочность@elseif($key === 'warning')Желательно починить@elseПросто знать, не всегда срочно@endif. Клик — отфильтровать меню слева.">
                             <div class="cabinet-sa-bucket__label">{{ $label }}</div>
                             <div class="cabinet-sa-bucket__value">{{ (int) (($buckets ?? [])[$key] ?? 0) }}</div>
                         </div>
@@ -130,7 +144,8 @@
             <div class="tab-pane fade {{ $activeGroup === 'seo' ? 'show active' : '' }}" id="sa-pane-seo" role="tabpanel">
                 <div class="cabinet-sa-buckets mb-4">
                     @foreach($bucketLabels as $key => $label)
-                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}" title="Показать отчёты: {{ $label }}">
+                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}"
+                             title="@if($key === 'critical')Самые срочные ошибки — чинить первыми@elseif($key === 'other')Средняя срочность@elseif($key === 'warning')Желательно починить@elseПросто знать, не всегда срочно@endif. Клик — отфильтровать меню слева.">
                             <div class="cabinet-sa-bucket__label">{{ $label }}</div>
                             <div class="cabinet-sa-bucket__value">{{ (int) (($bucketsSeo ?? [])[$key] ?? 0) }}</div>
                         </div>

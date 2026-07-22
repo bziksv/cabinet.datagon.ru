@@ -5,14 +5,17 @@ namespace App\Http\Controllers;
 use App\Exports\SiteAuditCanonicalSheet;
 use App\Exports\SiteAuditCrawlSummaryExport;
 use App\Exports\SiteAuditFindingsExport;
+use App\Services\SiteAudit\SiteAuditActionPlanBuilder;
 use App\Services\SiteAudit\SiteAuditCrawlStarter;
 use App\Services\SiteAudit\SiteAuditCrawlStorage;
 use App\Services\SiteAudit\SiteAuditDuplicateGrouper;
+use App\Services\SiteAudit\SiteAuditFindingNoteService;
 use App\Services\SiteAudit\SiteAuditIgnoreService;
 use App\Services\SiteAudit\SiteAuditPruner;
 use App\Services\SiteAudit\SiteAuditReportFilter;
 use App\SiteAuditCrawl;
 use App\SiteAuditFinding;
+use App\SiteAuditFindingNote;
 use App\SiteAuditIgnore;
 use App\SiteAuditPage;
 use App\SiteAuditProject;
@@ -100,6 +103,7 @@ class SiteAuditController extends Controller
             ->pluck('c', 'code')
             ->all();
         $counts = (new SiteAuditIgnoreService())->applyToCounts((array) $counts, $crawl);
+        $counts = (new SiteAuditFindingNoteService())->applyFixedToCounts($counts, $crawl);
 
         $tree = $this->buildReportTree($counts, 'tech');
         $treeSeo = $this->buildReportTree($counts, 'seo');
@@ -154,10 +158,18 @@ class SiteAuditController extends Controller
             'archiveCrawls' => $archiveCrawls,
             'compareCandidates' => $history->where('id', '!=', $crawl->id)->values(),
             'shareUrl' => $crawl->publicShareUrl(),
+            'shareWhiteLabel' => $crawl->whiteLabelMeta(),
+            'canWhiteLabel' => Auth::user() && ! DemoCabinet::isCurrentUser()
+                && SiteAuditSchedule::allowedForUser(Auth::user()),
+            'actionPlan' => is_array($crawl->progress_json['action_plan'] ?? null)
+                ? $crawl->progress_json['action_plan']
+                : null,
+            'canActionPlanAi' => (bool) config('deepseek.token')
+                && (bool) config('site_audit.action_plan_ai_enabled', true),
         ]);
     }
 
-    public function showReport(Request $request, int $id, string $code): View
+    public function showReport(Request $request, int $id, string $code)
     {
         $crawl = $this->ownedCrawl($id);
         $crawl->load('project');
@@ -165,6 +177,14 @@ class SiteAuditController extends Controller
         $meta = config('site_audit.findings.' . $code);
         if (! $meta) {
             abort(404);
+        }
+
+        // Deep-link в другой модуль (конкуренты и т.п.) — не таблица findings.
+        if (! empty($meta['external'])) {
+            $routeName = $meta['route'] ?? null;
+            abort_unless(is_string($routeName) && $routeName !== '', 404);
+
+            return redirect()->route($routeName, $meta['route_params'] ?? []);
         }
 
         $page = max(1, (int) $request->input('page', 1));
@@ -178,9 +198,12 @@ class SiteAuditController extends Controller
         }
 
         $showIgnored = in_array((string) $request->input('ignored', ''), ['1', 'true', 'yes'], true);
+        $showFixed = in_array((string) $request->input('fixed', ''), ['1', 'true', 'yes'], true);
         $ignoreSvc = new SiteAuditIgnoreService();
+        $noteSvc = new SiteAuditFindingNoteService();
         $projectId = (int) $crawl->project_id;
         $ignoredMap = [];
+        $notesMap = [];
         $codeWideIgnored = SiteAuditIgnore::query()
             ->where('project_id', $projectId)
             ->where('code', $code)
@@ -219,6 +242,9 @@ class SiteAuditController extends Controller
             if (! $showIgnored) {
                 $ignoreSvc->excludeIgnored($query, $projectId);
             }
+            if (! $showFixed) {
+                $noteSvc->excludeFixed($query, $projectId);
+            }
 
             $total = (clone $query)->count();
 
@@ -234,10 +260,12 @@ class SiteAuditController extends Controller
                 if ($showIgnored) {
                     $ignoredMap = $ignoreSvc->ignoredMapForFindings($projectId, $allRows);
                 }
+                $notesMap = $noteSvc->mapForFindings($projectId, $allRows);
             } else {
                 $rows = $query->forPage($page, $perPage)->get();
                 $pages = max(1, (int) ceil($total / $perPage));
                 $ignoredMap = $ignoreSvc->ignoredMapForFindings($projectId, $rows);
+                $notesMap = $noteSvc->mapForFindings($projectId, $rows);
             }
         }
 
@@ -248,9 +276,13 @@ class SiteAuditController extends Controller
         if ($showIgnored) {
             $filterParams['ignored'] = 1;
         }
+        if ($showFixed) {
+            $filterParams['fixed'] = 1;
+        }
 
         $sideCounts = (array) ($crawl->counts_json ?: []);
         $sideCounts = $ignoreSvc->applyToCounts($sideCounts, $crawl);
+        $sideCounts = $noteSvc->applyFixedToCounts($sideCounts, $crawl);
 
         $tree = $this->buildReportTree($sideCounts, 'tech');
         $treeSeo = $this->buildReportTree($sideCounts, 'seo');
@@ -286,7 +318,9 @@ class SiteAuditController extends Controller
             'filterClearUrl' => route('pages.site-audit.report.show', [$crawl->id, $code]),
             'filterParams' => $filterParams,
             'showIgnored' => $showIgnored,
+            'showFixed' => $showFixed,
             'ignoredMap' => $ignoredMap,
+            'notesMap' => $notesMap,
             'codeWideIgnored' => $codeWideIgnored,
             'sideCounts' => $sideCounts,
             'tree' => $tree,
@@ -298,6 +332,7 @@ class SiteAuditController extends Controller
             'activeGroup' => $activeGroup,
             'itemGroup' => $itemGroup,
             'canIgnore' => ! DemoCabinet::isCurrentUser() && ($meta['source'] ?? '') !== 'pages_canonical',
+            'canNote' => ! DemoCabinet::isCurrentUser() && ($meta['source'] ?? '') !== 'pages_canonical',
         ]);
     }
 
@@ -422,7 +457,7 @@ class SiteAuditController extends Controller
         return redirect()->route('pages.site-audit')->with('status', 'Расписание сохранено');
     }
 
-    public function createShare(int $id): JsonResponse
+    public function createShare(Request $request, int $id): JsonResponse
     {
         if (DemoCabinet::isCurrentUser()) {
             return response()->json(['error' => 'demo'], 403);
@@ -433,16 +468,42 @@ class SiteAuditController extends Controller
             return response()->json(['error' => 'status', 'message' => 'Шаринг только для готового краула'], 422);
         }
 
+        $wantWhite = $request->boolean('white_label');
+        $brandName = trim((string) $request->input('brand_name', ''));
+        $brandUrl = trim((string) $request->input('brand_url', ''));
+
+        if ($wantWhite) {
+            $user = Auth::user();
+            if (! SiteAuditSchedule::allowedForUser($user)) {
+                return response()->json([
+                    'error' => 'tariff',
+                    'message' => 'White-label доступен только на платных тарифах',
+                ], 422);
+            }
+            $crawl->share_white_label = true;
+            $crawl->share_brand_name = $brandName !== '' ? mb_substr($brandName, 0, 120) : null;
+            $crawl->share_brand_url = $brandUrl !== '' ? mb_substr($brandUrl, 0, 255) : null;
+        } else {
+            $crawl->share_white_label = false;
+            $crawl->share_brand_name = null;
+            $crawl->share_brand_url = null;
+        }
+
         if (! $crawl->share_token) {
             $crawl->share_token = bin2hex(random_bytes(24));
         }
         $crawl->share_enabled_at = now();
         $crawl->save();
 
+        $wl = $crawl->whiteLabelMeta();
+
         return response()->json([
             'ok' => true,
             'url' => $crawl->publicShareUrl(),
             'token' => $crawl->share_token,
+            'white_label' => $wl['enabled'],
+            'brand_name' => $wl['brand_name'],
+            'brand_url' => $wl['brand_url'],
         ]);
     }
 
@@ -454,10 +515,71 @@ class SiteAuditController extends Controller
 
         $crawl = $this->ownedCrawl($id);
         $crawl->share_enabled_at = null;
-        // token оставляем — можно снова включить ту же ссылку
+        // token и white-label настройки оставляем — можно снова включить ту же ссылку
         $crawl->save();
 
         return response()->json(['ok' => true]);
+    }
+
+    public function generateActionPlan(Request $request, int $id): JsonResponse
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            return response()->json(['error' => 'demo', 'message' => 'В демо недоступно'], 403);
+        }
+
+        $crawl = $this->ownedCrawl($id);
+        if ($crawl->status !== SiteAuditCrawl::STATUS_DONE) {
+            return response()->json(['error' => 'status', 'message' => 'План только для готового краула'], 422);
+        }
+
+        $withAi = $request->boolean('ai');
+        if ($withAi && ! SiteAuditSchedule::allowedForUser(Auth::user())) {
+            return response()->json([
+                'error' => 'tariff',
+                'message' => 'ИИ-резюме плана доступно на платных тарифах',
+            ], 422);
+        }
+
+        $builder = new SiteAuditActionPlanBuilder();
+        $plan = $builder->build($crawl, $withAi);
+
+        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+        $progress['action_plan'] = $plan;
+        $crawl->progress_json = $progress;
+        $crawl->save();
+
+        return response()->json([
+            'ok' => true,
+            'plan' => $plan,
+        ]);
+    }
+
+    public function toggleActionPlanItem(Request $request, int $id): JsonResponse
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            return response()->json(['error' => 'demo'], 403);
+        }
+
+        $crawl = $this->ownedCrawl($id);
+        $code = trim((string) $request->input('code', ''));
+        if ($code === '') {
+            return response()->json(['error' => 'code'], 422);
+        }
+        $done = $request->boolean('done');
+
+        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+        $plan = is_array($progress['action_plan'] ?? null) ? $progress['action_plan'] : null;
+        if (! $plan) {
+            return response()->json(['error' => 'no_plan', 'message' => 'Сначала сформируйте план'], 422);
+        }
+
+        $builder = new SiteAuditActionPlanBuilder();
+        $plan = $builder->toggleDone($plan, $code, $done);
+        $progress['action_plan'] = $plan;
+        $crawl->progress_json = $progress;
+        $crawl->save();
+
+        return response()->json(['ok' => true, 'plan' => $plan]);
     }
 
     public function start(Request $request): JsonResponse
@@ -470,7 +592,11 @@ class SiteAuditController extends Controller
             return response()->json(['error' => 'demo', 'message' => 'В демо кабинете запуск аудита недоступен'], 403);
         }
 
-        $domain = trim((string) $request->input('domain', ''));
+        $domains = $this->parseSiteAuditDomains($request->input('domain', ''));
+        if ($domains === []) {
+            return response()->json(['error' => 'domain', 'message' => 'Укажите хотя бы один домен (каждый с новой строки)'], 422);
+        }
+
         $seed = trim((string) $request->input('seed_urls', ''));
         $seedUrls = [];
         if ($seed !== '') {
@@ -486,11 +612,15 @@ class SiteAuditController extends Controller
             'seed_urls' => $seedUrls,
             'save_html' => 'off',
             'crawl_speed' => (string) $request->input('crawl_speed', 'normal'),
-            'exclude_patterns' => (string) $request->input('exclude_patterns', ''),
+            'exclude_patterns' => '',
+            'virtual_robots' => (string) $request->input('virtual_robots', ''),
             'unify_www' => true,
             'force_https' => true,
             'strip_trailing_slash' => true,
             'check_broken_links' => true,
+            'extra_hosts' => count($domains) === 1
+                ? \App\Services\SiteAudit\SiteAuditUrlNormalizer::parseExtraHosts($request->input('extra_hosts', ''))
+                : [],
         ];
 
         if (app()->environment('local') && $request->filled('pages_limit')) {
@@ -500,40 +630,100 @@ class SiteAuditController extends Controller
         $runSync = app()->environment('local')
             && in_array((string) $request->input('sync', ''), ['1', 'true', 'yes', 'on'], true);
 
-        try {
-            $crawl = (new SiteAuditCrawlStarter())->start(
-                Auth::user(),
-                $domain,
-                $settings,
-                ! $runSync
-            );
-            if (! empty($settings['pages_limit'])) {
-                $crawl->pages_limit = (int) $settings['pages_limit'];
-                $crawl->save();
+        $starter = new SiteAuditCrawlStarter();
+        $user = Auth::user();
+        $started = [];
+        $errors = [];
+
+        foreach ($domains as $index => $domain) {
+            try {
+                $crawl = $starter->start(
+                    $user,
+                    $domain,
+                    $settings,
+                    ! $runSync,
+                    false,
+                    $index > 0 // пакет: не блокировать 2-й+ из‑за «уже идёт краул»
+                );
+                if (! empty($settings['pages_limit'])) {
+                    $crawl->pages_limit = (int) $settings['pages_limit'];
+                    $crawl->save();
+                }
+                if ($runSync) {
+                    $crawl = (new \App\Services\SiteAudit\SiteAuditSyncRunner())->run($crawl);
+                }
+                $started[] = [
+                    'crawl_id' => $crawl->id,
+                    'domain' => $domain,
+                    'status' => $crawl->status,
+                ];
+            } catch (\Throwable $e) {
+                $errors[] = $domain . ': ' . $e->getMessage();
+                // Лимит месяца — дальше смысла нет; «уже идёт» на первом домене — тоже стоп.
+                if ($index === 0 || strpos($e->getMessage(), 'лимит') !== false) {
+                    break;
+                }
             }
-            if ($runSync) {
-                $crawl = (new \App\Services\SiteAudit\SiteAuditSyncRunner())->run($crawl);
-            }
-        } catch (\Throwable $e) {
-            return response()->json(['error' => 'limit', 'message' => $e->getMessage()], 422);
+        }
+
+        if ($started === []) {
+            return response()->json([
+                'error' => 'limit',
+                'message' => $errors[0] ?? 'Не удалось запустить краул',
+            ], 422);
+        }
+
+        $first = $started[0];
+        $n = count($started);
+        $msg = $runSync
+            ? ($n === 1 ? 'Краул выполнен. Смотрите историю ниже.' : "Выполнено краулов: {$n}. Смотрите историю ниже.")
+            : ($n === 1
+                ? 'Краул запущен. Прогресс — в истории краулов.'
+                : "Запущено краулов: {$n}. Прогресс — в истории краулов.");
+        if ($errors !== []) {
+            $msg .= ' Не запущено: ' . implode('; ', $errors);
         }
 
         return response()->json([
             'ok' => true,
-            'crawl_id' => $crawl->id,
-            'status' => $crawl->status,
-            'status_label' => $crawl->statusLabelRu(),
-            'pages_fetched' => (int) $crawl->pages_fetched,
-            'pages_total' => (int) $crawl->pages_total,
-            'finished' => $crawl->isFinished(),
-            'status_url' => route('pages.site-audit.crawl.status', $crawl->id),
-            // Остаёмся в списке «История краулов» — прогресс там, не на сводке.
+            'crawl_id' => $first['crawl_id'],
+            'crawl_ids' => array_column($started, 'crawl_id'),
+            'started' => $started,
+            'errors' => $errors,
+            'status' => $first['status'],
+            'status_url' => route('pages.site-audit.crawl.status', $first['crawl_id']),
             'redirect' => route('pages.site-audit'),
-            'message' => $runSync
-                ? 'Краул выполнен. Смотрите историю ниже.'
-                : 'Краул запущен. Прогресс — в истории краулов.',
-            'settings' => $crawl->progress_json['settings'] ?? null,
+            'message' => $msg,
         ]);
+    }
+
+    /**
+     * Домены из textarea: один на строку, без дублей; допускаются URL с протоколом/путём.
+     *
+     * @param  mixed  $raw
+     * @return string[]
+     */
+    private function parseSiteAuditDomains($raw): array
+    {
+        $out = [];
+        $seen = [];
+        foreach (preg_split('/\R+/', (string) $raw) as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+            $line = preg_replace('#^https?://#i', '', $line);
+            $line = preg_replace('#/.*$#', '', $line);
+            $line = strtolower(rtrim((string) $line, '/'));
+            $line = preg_replace('/:\d+$/', '', $line);
+            if ($line === '' || isset($seen[$line])) {
+                continue;
+            }
+            $seen[$line] = true;
+            $out[] = $line;
+        }
+
+        return $out;
     }
 
     /**
@@ -682,9 +872,10 @@ class SiteAuditController extends Controller
 
         $codes = $this->reportCodes($code, $meta);
         $includeIgnored = in_array((string) $request->input('ignored', ''), ['1', 'true', 'yes'], true);
+        $includeFixed = in_array((string) $request->input('fixed', ''), ['1', 'true', 'yes'], true);
         $projectId = (int) $crawl->project_id;
 
-        return response()->streamDownload(function () use ($crawl, $codes, $filterValues, $includeIgnored, $projectId) {
+        return response()->streamDownload(function () use ($crawl, $codes, $filterValues, $includeIgnored, $includeFixed, $projectId) {
             $out = fopen('php://output', 'w');
             fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
             fputcsv($out, ['url', 'code', 'severity', 'meta'], ';');
@@ -696,6 +887,9 @@ class SiteAuditController extends Controller
             SiteAuditReportFilter::applyToFindings($query, $crawl->id, $filterValues);
             if (! $includeIgnored) {
                 (new SiteAuditIgnoreService())->excludeIgnored($query, $projectId);
+            }
+            if (! $includeFixed) {
+                (new SiteAuditFindingNoteService())->excludeFixed($query, $projectId);
             }
             $query->chunk(200, function ($rows) use ($out) {
                 foreach ($rows as $row) {
@@ -732,9 +926,10 @@ class SiteAuditController extends Controller
 
         $codes = $this->reportCodes($code, $meta);
         $includeIgnored = in_array((string) $request->input('ignored', ''), ['1', 'true', 'yes'], true);
+        $includeFixed = in_array((string) $request->input('fixed', ''), ['1', 'true', 'yes'], true);
 
         return Excel::download(
-            new SiteAuditFindingsExport($crawl->id, $codes, $title, $filterValues, $includeIgnored),
+            new SiteAuditFindingsExport($crawl->id, $codes, $title, $filterValues, $includeIgnored, $includeFixed),
             $filename
         );
     }
@@ -881,6 +1076,78 @@ class SiteAuditController extends Controller
             ->with('status', 'Игнор снят');
     }
 
+    public function saveFindingNote(Request $request, int $id)
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            return $this->ignoreJsonOrRedirect($request, 403, 'demo');
+        }
+
+        $crawl = $this->ownedCrawl($id);
+        $findingId = (int) $request->input('finding_id', 0);
+        $finding = SiteAuditFinding::query()
+            ->where('id', $findingId)
+            ->where('crawl_id', $crawl->id)
+            ->first();
+        if (! $finding) {
+            return $this->ignoreJsonOrRedirect($request, 404, 'not_found');
+        }
+
+        $status = (string) $request->input('status', SiteAuditFindingNote::STATUS_OPEN);
+        $comment = $request->input('comment');
+        $comment = is_string($comment) ? $comment : null;
+
+        (new SiteAuditFindingNoteService())->upsertForFinding(
+            $finding,
+            (int) $crawl->project_id,
+            (int) Auth::id(),
+            $status,
+            $comment
+        );
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'code' => $finding->code, 'status' => $status]);
+        }
+
+        $msg = $status === SiteAuditFindingNote::STATUS_FIXED
+            ? 'Помечено как исправлено'
+            : 'Комментарий сохранён';
+
+        return redirect()
+            ->route('pages.site-audit.report.show', [$crawl->id, $finding->code])
+            ->with('status', $msg);
+    }
+
+    public function clearFindingNote(Request $request, int $id)
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            return $this->ignoreJsonOrRedirect($request, 403, 'demo');
+        }
+
+        $crawl = $this->ownedCrawl($id);
+        $findingId = (int) $request->input('finding_id', 0);
+        $finding = SiteAuditFinding::query()
+            ->where('id', $findingId)
+            ->where('crawl_id', $crawl->id)
+            ->first();
+        if (! $finding) {
+            return $this->ignoreJsonOrRedirect($request, 404, 'not_found');
+        }
+
+        (new SiteAuditFindingNoteService())->delete(
+            (int) $crawl->project_id,
+            $finding->code,
+            (string) ($finding->url_hash ?: '')
+        );
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'code' => $finding->code]);
+        }
+
+        return redirect()
+            ->to(route('pages.site-audit.report.show', [$crawl->id, $finding->code]) . '?fixed=1')
+            ->with('status', 'Статус/комментарий сброшен');
+    }
+
     private function ignoreJsonOrRedirect(Request $request, int $status, string $error)
     {
         if ($request->expectsJson()) {
@@ -931,7 +1198,8 @@ class SiteAuditController extends Controller
 
         foreach ($catalog as $code => $meta) {
             $phase = $meta['phase'] ?? '';
-            if (! in_array($phase, ['A', 'B'], true)) {
+            // Волна 5: в меню все фазы A–D (раньше только A/B — C/D-находки пропадали из дерева и корзин UI).
+            if (! in_array($phase, ['A', 'B', 'C', 'D'], true)) {
                 continue;
             }
 
@@ -945,7 +1213,10 @@ class SiteAuditController extends Controller
                 $severity = 'info';
             }
 
-            if (! empty($meta['virtual']) && ! empty($meta['codes']) && is_array($meta['codes'])) {
+            $isExternal = ! empty($meta['external']);
+            if ($isExternal) {
+                $count = 0;
+            } elseif (! empty($meta['virtual']) && ! empty($meta['codes']) && is_array($meta['codes'])) {
                 $count = 0;
                 foreach ($meta['codes'] as $c) {
                     $count += (int) ($counts[$c] ?? 0);
@@ -956,6 +1227,19 @@ class SiteAuditController extends Controller
                 $count = (int) ($counts[$code] ?? 0);
             }
 
+            $href = null;
+            if ($isExternal && ! empty($meta['route'])) {
+                try {
+                    $href = route($meta['route'], $meta['route_params'] ?? []);
+                } catch (\Throwable $e) {
+                    $href = null;
+                }
+            }
+            // Без рабочего URL не показываем пункт (на public share external тоже отфильтруем отдельно).
+            if ($isExternal && $href === null) {
+                continue;
+            }
+
             $bySeverity[$severity][] = [
                 'code' => $code,
                 'title' => $meta['title'] ?? $code,
@@ -963,6 +1247,8 @@ class SiteAuditController extends Controller
                 'count' => $count,
                 'phase' => $phase,
                 'group' => $itemGroup,
+                'external' => $isExternal,
+                'href' => $href,
             ];
         }
 

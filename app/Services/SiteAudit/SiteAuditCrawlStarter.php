@@ -11,25 +11,34 @@ use RuntimeException;
 
 class SiteAuditCrawlStarter
 {
-    public function start(User $user, string $domain, array $settings = [], bool $dispatch = true, bool $force = false): SiteAuditCrawl
-    {
+    /**
+     * @param  bool  $skipActiveCheck  при пакетном запуске нескольких доменов — не блокировать 2-й+ краул
+     */
+    public function start(
+        User $user,
+        string $domain,
+        array $settings = [],
+        bool $dispatch = true,
+        bool $force = false,
+        bool $skipActiveCheck = false
+    ): SiteAuditCrawl {
         // Пока модуль в локальной отладке — не упираемся в тариф (UI ещё сырой).
         $bypassLimits = $force
             || app()->environment('local')
             || (bool) config('site_audit.bypass_limits', false);
 
         if (! $bypassLimits && ! SiteAuditLimits::canStartCrawl($user)) {
-            throw new RuntimeException('Site audit crawl monthly limit reached');
+            throw new RuntimeException('Исчерпан месячный лимит краулов аудита сайта');
         }
 
-        if (! $bypassLimits && SiteAuditLimits::hasActiveCrawl($user)) {
-            throw new RuntimeException('Another site audit crawl is already running');
+        if (! $bypassLimits && ! $skipActiveCheck && SiteAuditLimits::hasActiveCrawl($user)) {
+            throw new RuntimeException('Уже выполняется другой краул аудита — дождитесь завершения или запустите пакетно несколько доменов сразу');
         }
 
         $domain = preg_replace('#^https?://#i', '', trim($domain));
         $domain = rtrim($domain, '/');
         if ($domain === '') {
-            throw new RuntimeException('Domain is required');
+            throw new RuntimeException('Укажите домен');
         }
 
         $settings = SiteAuditCrawlOptions::normalize($settings);
@@ -65,6 +74,7 @@ class SiteAuditCrawlStarter
                     'crawl_speed' => $settings['crawl_speed'],
                     'rps' => $settings['rps'],
                     'exclude_patterns' => $settings['exclude_patterns'] ?? [],
+                    'virtual_robots' => $settings['virtual_robots'] ?? '',
                     'unify_www' => true,
                     'force_https' => true,
                     'strip_trailing_slash' => true,

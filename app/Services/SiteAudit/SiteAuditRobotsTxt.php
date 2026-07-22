@@ -28,6 +28,91 @@ class SiteAuditRobotsTxt
     }
 
     /**
+     * Разбор готового тела robots.txt (виртуальный / загруженный), без HTTP.
+     *
+     * @return array{
+     *   url:string,
+     *   status_code:?int,
+     *   ok:bool,
+     *   closed:bool,
+     *   sitemaps:array,
+     *   groups:array,
+     *   findings:array<int,array{code:string,meta:array}>,
+     *   error:?string,
+     *   virtual:bool
+     * }
+     */
+    public function analyzeBody(string $body, string $domain): array
+    {
+        $host = preg_replace('#^https?://#i', '', trim($domain));
+        $host = rtrim((string) $host, '/');
+        $url = 'https://' . $host . '/robots.txt';
+
+        $result = [
+            'url' => $url,
+            'status_code' => 200,
+            'ok' => false,
+            'closed' => false,
+            'sitemaps' => [],
+            'groups' => [],
+            'findings' => [],
+            'error' => null,
+            'virtual' => true,
+        ];
+
+        $maxBytes = (int) config('site_audit.robots_max_bytes', 512000);
+        if (strlen($body) > $maxBytes) {
+            $result['findings'][] = [
+                'code' => 'robots_txt_error',
+                'meta' => ['reason' => 'too_large', 'size' => strlen($body), 'max' => $maxBytes, 'virtual' => true],
+            ];
+            $body = substr($body, 0, $maxBytes);
+        }
+
+        if (trim($body) === '') {
+            $result['ok'] = true;
+            $result['findings'][] = [
+                'code' => 'robots_txt_error',
+                'meta' => ['reason' => 'empty', 'virtual' => true],
+            ];
+
+            return $result;
+        }
+
+        $parsed = $this->parse($body);
+        $result['sitemaps'] = $parsed['sitemaps'];
+        $result['groups'] = $parsed['groups'];
+        $result['ok'] = true;
+
+        foreach ($parsed['line_errors'] as $err) {
+            $err['virtual'] = true;
+            $result['findings'][] = [
+                'code' => 'robots_txt_error',
+                'meta' => $err,
+            ];
+        }
+
+        foreach ($parsed['sitemaps'] as $sm) {
+            if (! filter_var($sm, FILTER_VALIDATE_URL)) {
+                $result['findings'][] = [
+                    'code' => 'robots_txt_error',
+                    'meta' => ['reason' => 'bad_sitemap', 'sitemap' => $sm, 'virtual' => true],
+                ];
+            }
+        }
+
+        if ($this->isSiteClosed($parsed['groups'])) {
+            $result['closed'] = true;
+            $result['findings'][] = [
+                'code' => 'robots_txt_closed',
+                'meta' => ['reason' => 'disallow_all', 'agent' => '*', 'virtual' => true],
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
      * @return array{
      *   url:string,
      *   status_code:?int,
@@ -54,6 +139,7 @@ class SiteAuditRobotsTxt
             'groups' => [],
             'findings' => [],
             'error' => null,
+            'virtual' => false,
         ];
 
         try {
@@ -79,52 +165,19 @@ class SiteAuditRobotsTxt
                 return $result;
             }
 
-            $maxBytes = (int) config('site_audit.robots_max_bytes', 512000);
-            if (strlen($body) > $maxBytes) {
-                $result['findings'][] = [
-                    'code' => 'robots_txt_error',
-                    'meta' => ['reason' => 'too_large', 'size' => strlen($body), 'max' => $maxBytes],
-                ];
-            }
-
-            if ($body === '' || trim($body) === '') {
-                $result['findings'][] = [
-                    'code' => 'robots_txt_error',
-                    'meta' => ['reason' => 'empty'],
-                ];
-                $result['ok'] = true;
-
-                return $result;
-            }
-
-            $parsed = $this->parse($body);
-            $result['sitemaps'] = $parsed['sitemaps'];
-            $result['groups'] = $parsed['groups'];
-            $result['ok'] = true;
-
-            foreach ($parsed['line_errors'] as $err) {
-                $result['findings'][] = [
-                    'code' => 'robots_txt_error',
-                    'meta' => $err,
-                ];
-            }
-
-            foreach ($parsed['sitemaps'] as $sm) {
-                if (! filter_var($sm, FILTER_VALIDATE_URL)) {
-                    $result['findings'][] = [
-                        'code' => 'robots_txt_error',
-                        'meta' => ['reason' => 'bad_sitemap', 'sitemap' => $sm],
-                    ];
+            $parsedResult = $this->analyzeBody($body, $domain);
+            $parsedResult['url'] = $url;
+            $parsedResult['status_code'] = $code;
+            $parsedResult['virtual'] = false;
+            // analyzeBody помечает findings virtual — снимем для живого файла
+            foreach ($parsedResult['findings'] as &$f) {
+                if (isset($f['meta']['virtual'])) {
+                    unset($f['meta']['virtual']);
                 }
             }
+            unset($f);
 
-            if ($this->isSiteClosed($parsed['groups'])) {
-                $result['closed'] = true;
-                $result['findings'][] = [
-                    'code' => 'robots_txt_closed',
-                    'meta' => ['reason' => 'disallow_all', 'agent' => '*'],
-                ];
-            }
+            return $parsedResult;
         } catch (\Throwable $e) {
             $result['error'] = $e->getMessage();
             $result['findings'][] = [

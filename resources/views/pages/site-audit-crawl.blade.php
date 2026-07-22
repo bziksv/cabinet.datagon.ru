@@ -26,6 +26,13 @@
                     data-url="{{ $shareUrl ?? '' }}">
                 {{ !empty($shareUrl) ? 'Ссылка шаринга' : 'Поделиться' }}
             </button>
+            <button type="button" class="btn btn-sm btn-outline-dark" id="sa-plan-btn"
+                    data-bs-toggle="modal" data-bs-target="#sa-plan-modal"
+                    data-generate="{{ route('pages.site-audit.action-plan.generate', $crawl->id) }}"
+                    data-toggle="{{ route('pages.site-audit.action-plan.toggle', $crawl->id) }}"
+                    data-has-ai="{{ !empty($canActionPlanAi) ? '1' : '0' }}">
+                План работ
+            </button>
         @endif
         @if($crawl->isFinished())
             <form method="POST" action="{{ route('pages.site-audit.crawl.repeat', $crawl->id) }}" class="d-inline"
@@ -86,28 +93,61 @@
 
         <div id="sa-share-box" class="alert alert-light border mb-3" style="{{ empty($shareUrl) ? 'display:none' : '' }}">
             <div class="small text-muted mb-1">Публичная ссылка (только просмотр):</div>
-            <div class="input-group input-group-sm">
+            <div class="input-group input-group-sm mb-2">
                 <input type="text" class="form-control" id="sa-share-url" readonly value="{{ $shareUrl ?? '' }}">
                 <div class="input-group-append">
                     <button type="button" class="btn btn-outline-secondary" id="sa-share-copy">Копировать</button>
                     <button type="button" class="btn btn-outline-danger" id="sa-share-revoke">Отключить</button>
                 </div>
             </div>
+            @if(!empty($canWhiteLabel))
+                @php $swl = is_array($shareWhiteLabel ?? null) ? $shareWhiteLabel : []; @endphp
+                <div class="border-top pt-2 mt-1">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="sa-share-wl"
+                               {{ !empty($swl['enabled']) ? 'checked' : '' }}>
+                        <label class="form-check-label small" for="sa-share-wl">
+                            White-label: без бренда Titlo (для клиента)
+                        </label>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <input type="text" class="form-control form-control-sm" id="sa-share-brand"
+                                   maxlength="120" placeholder="Название агентства / компании"
+                                   value="{{ $swl['brand_name'] ?? '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <input type="url" class="form-control form-control-sm" id="sa-share-brand-url"
+                                   maxlength="255" placeholder="https://сайт-агентства (необяз.)"
+                                   value="{{ $swl['brand_url'] ?? '' }}">
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="sa-share-save-wl">
+                        Сохранить оформление ссылки
+                    </button>
+                </div>
+            @else
+                <div class="small text-muted mt-1">White-label (без бренда Titlo) — на платных тарифах.</div>
+            @endif
         </div>
 
         <ul class="nav nav-tabs mb-3" id="sa-audit-tabs" role="tablist">
             <li class="nav-item">
-                <a class="nav-link active" id="sa-tab-all" data-bs-toggle="tab" href="#sa-pane-all" role="tab">Сводка</a>
+                <a class="nav-link active" id="sa-tab-all" data-bs-toggle="tab" href="#sa-pane-all" role="tab"
+                   title="Всё вместе: тех. и SEO-проблемы">Сводка</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="sa-tab-tech" data-bs-toggle="tab" href="#sa-pane-tech" role="tab">Тех. аудит</a>
+                <a class="nav-link" id="sa-tab-tech" data-bs-toggle="tab" href="#sa-pane-tech" role="tab"
+                   title="Техника: коды ответа, редиректы, скорость, безопасность">Тех. аудит</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" id="sa-tab-seo" data-bs-toggle="tab" href="#sa-pane-seo" role="tab">SEO-аудит</a>
+                <a class="nav-link" id="sa-tab-seo" data-bs-toggle="tab" href="#sa-pane-seo" role="tab"
+                   title="SEO: title, описание, H1, дубли, посадочные">SEO-аудит</a>
             </li>
             @if(!empty($historyRows) && count($historyRows) > 1)
                 <li class="nav-item">
-                    <a class="nav-link" id="sa-tab-dynamics" data-bs-toggle="tab" href="#sa-pane-dynamics" role="tab">Динамика</a>
+                    <a class="nav-link" id="sa-tab-dynamics" data-bs-toggle="tab" href="#sa-pane-dynamics" role="tab"
+                       title="Как менялось число ошибок от краула к краулу">Динамика</a>
                 </li>
             @endif
         </ul>
@@ -116,7 +156,8 @@
             <div class="tab-pane fade show active" id="sa-pane-all" role="tabpanel">
                 <div class="cabinet-sa-buckets mb-4" id="sa-buckets">
                     @foreach($bucketLabels as $key => $label)
-                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}" title="Показать отчёты: {{ $label }}">
+                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}"
+                             title="@if($key === 'critical')Самые срочные ошибки — чинить первыми@elseif($key === 'other')Средняя срочность@elseif($key === 'warning')Желательно починить@elseПросто знать, не всегда срочно@endif. Клик — отфильтровать меню слева.">
                             <div class="cabinet-sa-bucket__label">{{ $label }}</div>
                             <div class="cabinet-sa-bucket__value" data-bucket="{{ $key }}">{{ (int) (($bucketsAll ?? $buckets)[$key] ?? 0) }}</div>
                         </div>
@@ -131,18 +172,12 @@
                             <div class="cabinet-sa-tree__group" data-severity-group="{{ $sev }}">
                                 <div class="cabinet-sa-tree__group-title">{{ $label }}</div>
                                 @foreach(($treeAll[$sev] ?? []) as $item)
-                                    <a class="cabinet-sa-tree__item {{ $item['count'] ? '' : 'is-empty' }}"
-                                       href="{{ route('pages.site-audit.report.show', [$crawl->id, $item['code']]) }}"
-                                       data-title="{{ $item['title'] }}"
-                                       data-severity="{{ $sev }}"
-                                       data-count="{{ (int) $item['count'] }}">
-                                        <span>
-                                            {{ $item['title'] }}
-                                            <span class="cabinet-sa-sev">({{ \App\Services\SiteAudit\SiteAuditFindingPresenter::severityTag($sev) }})</span>
-                                            <span class="cabinet-sa-group-tag cabinet-sa-group-tag--{{ $item['group'] ?? 'tech' }}">{{ ($item['group'] ?? '') === 'seo' ? 'SEO' : 'тех' }}</span>
-                                        </span>
-                                        <span class="cabinet-sa-badge cabinet-sa-badge--{{ $item['count'] > 0 ? $sev : 'zero' }}">{{ $item['count'] }}</span>
-                                    </a>
+                                    @include('pages.partials.site-audit-tree-item', [
+                                        'item' => $item,
+                                        'sev' => $sev,
+                                        'crawl' => $crawl,
+                                        'showGroup' => true,
+                                    ])
                                 @endforeach
                             </div>
                         @endforeach
@@ -158,7 +193,8 @@
             <div class="tab-pane fade" id="sa-pane-tech" role="tabpanel">
                 <div class="cabinet-sa-buckets mb-4">
                     @foreach($bucketLabels as $key => $label)
-                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}" title="Показать отчёты: {{ $label }}">
+                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}"
+                             title="@if($key === 'critical')Самые срочные ошибки — чинить первыми@elseif($key === 'other')Средняя срочность@elseif($key === 'warning')Желательно починить@elseПросто знать, не всегда срочно@endif. Клик — отфильтровать меню слева.">
                             <div class="cabinet-sa-bucket__label">{{ $label }}</div>
                             <div class="cabinet-sa-bucket__value">{{ (int) ($buckets[$key] ?? 0) }}</div>
                         </div>
@@ -173,14 +209,11 @@
                             <div class="cabinet-sa-tree__group" data-severity-group="{{ $sev }}">
                                 <div class="cabinet-sa-tree__group-title">{{ $label }}</div>
                                 @foreach(($tree[$sev] ?? []) as $item)
-                                    <a class="cabinet-sa-tree__item {{ $item['count'] ? '' : 'is-empty' }}"
-                                       href="{{ route('pages.site-audit.report.show', [$crawl->id, $item['code']]) }}"
-                                       data-title="{{ $item['title'] }}"
-                                       data-severity="{{ $sev }}"
-                                       data-count="{{ (int) $item['count'] }}">
-                                        <span>{{ $item['title'] }} <span class="cabinet-sa-sev">({{ \App\Services\SiteAudit\SiteAuditFindingPresenter::severityTag($sev) }})</span></span>
-                                        <span class="cabinet-sa-badge cabinet-sa-badge--{{ $item['count'] > 0 ? $sev : 'zero' }}">{{ $item['count'] }}</span>
-                                    </a>
+                                    @include('pages.partials.site-audit-tree-item', [
+                                        'item' => $item,
+                                        'sev' => $sev,
+                                        'crawl' => $crawl,
+                                    ])
                                 @endforeach
                             </div>
                         @endforeach
@@ -196,7 +229,8 @@
             <div class="tab-pane fade" id="sa-pane-seo" role="tabpanel">
                 <div class="cabinet-sa-buckets mb-4">
                     @foreach($bucketLabels as $key => $label)
-                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}" title="Показать отчёты: {{ $label }}">
+                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}"
+                             title="@if($key === 'critical')Самые срочные ошибки — чинить первыми@elseif($key === 'other')Средняя срочность@elseif($key === 'warning')Желательно починить@elseПросто знать, не всегда срочно@endif. Клик — отфильтровать меню слева.">
                             <div class="cabinet-sa-bucket__label">{{ $label }}</div>
                             <div class="cabinet-sa-bucket__value">{{ (int) (($bucketsSeo ?? [])[$key] ?? 0) }}</div>
                         </div>
@@ -211,14 +245,11 @@
                             <div class="cabinet-sa-tree__group" data-severity-group="{{ $sev }}">
                                 <div class="cabinet-sa-tree__group-title">{{ $label }}</div>
                                 @foreach(($treeSeo[$sev] ?? []) as $item)
-                                    <a class="cabinet-sa-tree__item {{ $item['count'] ? '' : 'is-empty' }}"
-                                       href="{{ route('pages.site-audit.report.show', [$crawl->id, $item['code']]) }}"
-                                       data-title="{{ $item['title'] }}"
-                                       data-severity="{{ $sev }}"
-                                       data-count="{{ (int) $item['count'] }}">
-                                        <span>{{ $item['title'] }} <span class="cabinet-sa-sev">({{ \App\Services\SiteAudit\SiteAuditFindingPresenter::severityTag($sev) }})</span></span>
-                                        <span class="cabinet-sa-badge cabinet-sa-badge--{{ $item['count'] > 0 ? $sev : 'zero' }}">{{ $item['count'] }}</span>
-                                    </a>
+                                    @include('pages.partials.site-audit-tree-item', [
+                                        'item' => $item,
+                                        'sev' => $sev,
+                                        'crawl' => $crawl,
+                                    ])
                                 @endforeach
                             </div>
                         @endforeach
@@ -226,6 +257,17 @@
                     <section>
                         <h5 class="mb-3">Сводный SEO-аудит</h5>
                         <p class="text-secondary small">Title/Description, H1, canonical, noindex, дубли, похожие страницы, thin content.</p>
+                        <div class="alert alert-light border cabinet-sa-module-link mb-3">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between" style="gap:8px">
+                                <div>
+                                    <strong>Конкуренты сайта</strong>
+                                    <div class="small text-muted mb-0">Сравнение с ТОП выдачи — в модуле «Анализ конкурентов», без повторного краула.</div>
+                                </div>
+                                <a class="btn btn-sm btn-outline-primary" href="{{ route('competitor.analysis') }}" target="_blank" rel="noopener">
+                                    Открыть анализ конкурентов <i class="fa fa-external-link" aria-hidden="true"></i>
+                                </a>
+                            </div>
+                        </div>
                         @include('pages.partials.site-audit-hot-table', ['counts' => $counts, 'findingsCatalog' => $findingsCatalog, 'crawl' => $crawl, 'group' => 'seo'])
                     </section>
                 </div>
@@ -233,7 +275,7 @@
 
             @if(!empty($historyRows) && count($historyRows) > 1)
                 <div class="tab-pane fade" id="sa-pane-dynamics" role="tabpanel">
-                    <h6 class="mb-2">Динамика tech по краулам</h6>
+                    <h6 class="mb-2">Динамика тех. аудита по краулам</h6>
                     <div class="cabinet-sa-table-wrap mb-4">
                         <table class="table table-sm mb-0">
                             <thead class="thead-light">
@@ -309,8 +351,186 @@
 
     @include('pages.partials.site-audit-archive')
 
+    <div class="modal fade" id="sa-plan-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">План работ по аудиту</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <button type="button" class="btn btn-sm btn-primary" id="sa-plan-gen">Сформировать</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="sa-plan-gen-ai"
+                                style="{{ empty($canActionPlanAi) ? 'display:none' : '' }}">
+                            Сформировать + ИИ-резюме
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="sa-plan-copy">Копировать Markdown</button>
+                    </div>
+                    <div id="sa-plan-empty" class="text-muted small" style="{{ !empty($actionPlan['items']) ? 'display:none' : '' }}">
+                        Нажмите «Сформировать» — задачи из findings (по приоритету) с подсказками «как исправить».
+                    </div>
+                    <div id="sa-plan-ai" class="alert alert-light border small mb-3" style="{{ empty($actionPlan['ai_summary']) ? 'display:none' : '' }}">
+                        <div class="fw-semibold mb-1">Резюме ИИ</div>
+                        <div id="sa-plan-ai-text" style="white-space:pre-wrap">{{ $actionPlan['ai_summary'] ?? '' }}</div>
+                    </div>
+                    <ol id="sa-plan-list" class="list-group list-group-numbered">
+                        @foreach(($actionPlan['items'] ?? []) as $it)
+                            <li class="list-group-item d-flex gap-2 align-items-start" data-code="{{ $it['code'] }}">
+                                <input type="checkbox" class="form-check-input mt-1 sa-plan-done" {{ !empty($it['done']) ? 'checked' : '' }}>
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">
+                                        {{ $it['title'] }}
+                                        <span class="badge text-bg-secondary">{{ $it['severity'] }}</span>
+                                        <span class="badge text-bg-light text-dark">{{ (int) $it['count'] }}</span>
+                                    </div>
+                                    <div class="small text-muted">{{ $it['how'] }}</div>
+                                    @if(!empty($it['sample_urls']))
+                                        <div class="small mt-1">
+                                            @foreach(array_slice($it['sample_urls'], 0, 2) as $u)
+                                                <div class="text-truncate"><a href="{{ $u }}" target="_blank" rel="noopener">{{ $u }}</a></div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                            </li>
+                        @endforeach
+                    </ol>
+                    <textarea id="sa-plan-md" class="d-none">{{ $actionPlan['markdown'] ?? '' }}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
     @slot('js')
         @include('pages.partials.site-audit-tree-nav-js')
+        <script>
+            (function () {
+                var tokenMeta = document.querySelector('meta[name="csrf-token"]');
+                var csrf = tokenMeta ? tokenMeta.getAttribute('content') : '';
+                var planBtn = document.getElementById('sa-plan-btn');
+                var planGen = document.getElementById('sa-plan-gen');
+                var planGenAi = document.getElementById('sa-plan-gen-ai');
+                var planCopy = document.getElementById('sa-plan-copy');
+                var planList = document.getElementById('sa-plan-list');
+                var planEmpty = document.getElementById('sa-plan-empty');
+                var planAi = document.getElementById('sa-plan-ai');
+                var planAiText = document.getElementById('sa-plan-ai-text');
+                var planMd = document.getElementById('sa-plan-md');
+
+                function renderPlan(plan) {
+                    if (!planList) return;
+                    planList.innerHTML = '';
+                    var items = (plan && plan.items) ? plan.items : [];
+                    if (planEmpty) planEmpty.style.display = items.length ? 'none' : '';
+                    if (planMd) planMd.value = (plan && plan.markdown) ? plan.markdown : '';
+                    if (planAi && planAiText) {
+                        if (plan && plan.ai_summary) {
+                            planAi.style.display = '';
+                            planAiText.textContent = plan.ai_summary;
+                        } else {
+                            planAi.style.display = 'none';
+                            planAiText.textContent = '';
+                        }
+                    }
+                    items.forEach(function (it) {
+                        var li = document.createElement('li');
+                        li.className = 'list-group-item d-flex gap-2 align-items-start';
+                        li.setAttribute('data-code', it.code || '');
+                        var cb = document.createElement('input');
+                        cb.type = 'checkbox';
+                        cb.className = 'form-check-input mt-1 sa-plan-done';
+                        cb.checked = !!it.done;
+                        var box = document.createElement('div');
+                        box.className = 'flex-grow-1';
+                        var title = document.createElement('div');
+                        title.className = 'fw-semibold';
+                        title.appendChild(document.createTextNode((it.title || it.code || '') + ' '));
+                        var b1 = document.createElement('span');
+                        b1.className = 'badge text-bg-secondary';
+                        b1.textContent = it.severity || '';
+                        var b2 = document.createElement('span');
+                        b2.className = 'badge text-bg-light text-dark ms-1';
+                        b2.textContent = String(it.count || 0);
+                        title.appendChild(b1);
+                        title.appendChild(b2);
+                        var how = document.createElement('div');
+                        how.className = 'small text-muted';
+                        how.textContent = it.how || '';
+                        box.appendChild(title);
+                        box.appendChild(how);
+                        if (it.sample_urls && it.sample_urls.length) {
+                            var samples = document.createElement('div');
+                            samples.className = 'small mt-1';
+                            it.sample_urls.slice(0, 2).forEach(function (u) {
+                                var row = document.createElement('div');
+                                row.className = 'text-truncate';
+                                var a = document.createElement('a');
+                                a.href = u; a.target = '_blank'; a.rel = 'noopener'; a.textContent = u;
+                                row.appendChild(a);
+                                samples.appendChild(row);
+                            });
+                            box.appendChild(samples);
+                        }
+                        li.appendChild(cb);
+                        li.appendChild(box);
+                        planList.appendChild(li);
+                    });
+                }
+
+                function generatePlan(withAi) {
+                    if (!planBtn) return;
+                    var fd = new FormData();
+                    fd.append('ai', withAi ? '1' : '0');
+                    if (planGen) planGen.disabled = true;
+                    if (planGenAi) planGenAi.disabled = true;
+                    fetch(planBtn.getAttribute('data-generate'), {
+                        method: 'POST',
+                        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+                        body: fd
+                    }).then(function (r) { return r.json(); })
+                      .then(function (j) {
+                          if (j.ok && j.plan) renderPlan(j.plan);
+                          else alert((j && j.message) ? j.message : 'Не удалось сформировать план');
+                      })
+                      .finally(function () {
+                          if (planGen) planGen.disabled = false;
+                          if (planGenAi) planGenAi.disabled = false;
+                      });
+                }
+
+                if (planGen) planGen.addEventListener('click', function () { generatePlan(false); });
+                if (planGenAi) planGenAi.addEventListener('click', function () { generatePlan(true); });
+                if (planCopy) {
+                    planCopy.addEventListener('click', function () {
+                        if (!planMd || !planMd.value) { alert('Сначала сформируйте план'); return; }
+                        planMd.classList.remove('d-none');
+                        planMd.select();
+                        document.execCommand('copy');
+                        planMd.classList.add('d-none');
+                    });
+                }
+                if (planList && planBtn) {
+                    planList.addEventListener('change', function (e) {
+                        var t = e.target;
+                        if (!t || !t.classList.contains('sa-plan-done')) return;
+                        var li = t.closest('[data-code]');
+                        if (!li) return;
+                        var fd = new FormData();
+                        fd.append('code', li.getAttribute('data-code') || '');
+                        fd.append('done', t.checked ? '1' : '0');
+                        fetch(planBtn.getAttribute('data-toggle'), {
+                            method: 'POST',
+                            headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+                            body: fd
+                        }).then(function (r) { return r.json(); })
+                          .then(function (j) {
+                              if (j.ok && j.plan && planMd) planMd.value = j.plan.markdown || '';
+                          });
+                    });
+                }
+            })();
+        </script>
         <script>
             (function () {
                 var tokenMeta = document.querySelector('meta[name="csrf-token"]');
@@ -320,6 +540,10 @@
                 var shareUrl = document.getElementById('sa-share-url');
                 var shareCopy = document.getElementById('sa-share-copy');
                 var shareRevoke = document.getElementById('sa-share-revoke');
+                var shareWl = document.getElementById('sa-share-wl');
+                var shareBrand = document.getElementById('sa-share-brand');
+                var shareBrandUrl = document.getElementById('sa-share-brand-url');
+                var shareSaveWl = document.getElementById('sa-share-save-wl');
 
                 if (window.location.hash === '#sa-archive') {
                     var arch = document.getElementById('sa-archive-modal');
@@ -336,6 +560,24 @@
                     if (shareBtn) shareBtn.textContent = url ? 'Ссылка шаринга' : 'Поделиться';
                 }
 
+                function sharePayload() {
+                    var fd = new FormData();
+                    fd.append('white_label', (shareWl && shareWl.checked) ? '1' : '0');
+                    if (shareBrand) fd.append('brand_name', shareBrand.value || '');
+                    if (shareBrandUrl) fd.append('brand_url', shareBrandUrl.value || '');
+                    return fd;
+                }
+
+                function postShare(url, body) {
+                    var headers = {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrf
+                    };
+                    var opts = { method: 'POST', headers: headers };
+                    if (body) opts.body = body;
+                    return fetch(url, opts).then(function (r) { return r.json(); });
+                }
+
                 if (shareBtn) {
                     shareBtn.addEventListener('click', function () {
                         var existing = shareBtn.getAttribute('data-url');
@@ -343,19 +585,28 @@
                             showShare(existing);
                             return;
                         }
-                        fetch(shareBtn.getAttribute('data-create'), {
-                            method: 'POST',
-                            headers: {
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': csrf
-                            }
-                        }).then(function (r) { return r.json(); })
+                        postShare(shareBtn.getAttribute('data-create'), sharePayload())
                           .then(function (j) {
                               if (j.ok && j.url) {
                                   shareBtn.setAttribute('data-url', j.url);
                                   showShare(j.url);
                               } else {
                                   alert((j && j.message) ? j.message : 'Не удалось создать ссылку');
+                              }
+                          });
+                    });
+                }
+                if (shareSaveWl) {
+                    shareSaveWl.addEventListener('click', function () {
+                        if (!shareBtn) return;
+                        postShare(shareBtn.getAttribute('data-create'), sharePayload())
+                          .then(function (j) {
+                              if (j.ok && j.url) {
+                                  shareBtn.setAttribute('data-url', j.url);
+                                  showShare(j.url);
+                                  alert('Оформление ссылки сохранено');
+                              } else {
+                                  alert((j && j.message) ? j.message : 'Не удалось сохранить');
                               }
                           });
                     });
@@ -370,13 +621,7 @@
                 if (shareRevoke) {
                     shareRevoke.addEventListener('click', function () {
                         if (!shareBtn) return;
-                        fetch(shareBtn.getAttribute('data-revoke'), {
-                            method: 'POST',
-                            headers: {
-                                'Accept': 'application/json',
-                                'X-CSRF-TOKEN': csrf
-                            }
-                        }).then(function (r) { return r.json(); })
+                        postShare(shareBtn.getAttribute('data-revoke'))
                           .then(function (j) {
                               if (j.ok) {
                                   shareBtn.setAttribute('data-url', '');

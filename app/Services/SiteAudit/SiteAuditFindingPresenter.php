@@ -406,6 +406,174 @@ class SiteAuditFindingPresenter
 
                 return $bits ? implode(' · ', $bits) : 'битая ссылка';
 
+            case 'page_has_bad_links':
+                $n = (int) ($meta['count'] ?? 0);
+                $reason = ! empty($meta['samples'][0]['reason'])
+                    ? (string) $meta['samples'][0]['reason']
+                    : '';
+                $href = ! empty($meta['samples'][0]['href'])
+                    ? self::clip((string) $meta['samples'][0]['href'], 40)
+                    : '';
+
+                return $n
+                    ? ('плохих: ' . $n . ($reason !== '' ? ' · ' . $reason : '') . ($href !== '' ? ' · ' . $href : ''))
+                    : 'плохие ссылки';
+
+            case 'html_critical_errors':
+                $n = (int) ($meta['count'] ?? 0);
+                $msg = ! empty($meta['samples'][0]['message'])
+                    ? self::clip((string) $meta['samples'][0]['message'], 70)
+                    : '';
+
+                return $n ? ('ошибок: ' . $n . ($msg !== '' ? ' · ' . $msg : '')) : 'ошибки HTML';
+
+            case 'lost_file':
+                $asset = ! empty($meta['asset']) ? self::clip((string) $meta['asset'], 55) : '';
+                $st = isset($meta['status']) ? ('HTTP ' . (int) $meta['status']) : 'unreachable';
+
+                return $asset !== '' ? ($st . ' · ' . $asset) : $st;
+
+            case 'adult_content':
+                $hits = isset($meta['hits']) && is_array($meta['hits'])
+                    ? implode(', ', array_slice($meta['hits'], 0, 4))
+                    : '';
+
+                return $hits !== '' ? ('hits: ' . $hits) : ('score ' . (int) ($meta['score'] ?? 0));
+
+            case 'negative_content':
+                $hits = isset($meta['hits']) && is_array($meta['hits'])
+                    ? implode(', ', array_slice($meta['hits'], 0, 4))
+                    : '';
+
+                return $hits !== '' ? ('hits: ' . $hits) : ('score ' . (int) ($meta['score'] ?? 0));
+
+            case 'word_repeat_in_sentence':
+                $w = ! empty($meta['samples'][0]['word'])
+                    ? (string) $meta['samples'][0]['word']
+                    : '';
+                $c = (int) ($meta['samples'][0]['count'] ?? $meta['count'] ?? 0);
+
+                return $w !== '' ? ($w . ' ×' . $c) : ('повторов: ' . (int) ($meta['count'] ?? 0));
+
+            case 'landing_plagiarism_suspect':
+                $src = (string) ($meta['source'] ?? 'internal');
+                $peer = ! empty($meta['peer_url']) ? self::clip((string) $meta['peer_url'], 45) : '';
+
+                return $peer !== '' ? ($src . ' · ' . $peer) : $src;
+
+            case 'landing_no_inbound_internal':
+                return 'входящих внутренних: 0';
+
+            case 'keyword_cannibalization':
+                $q = ! empty($meta['query']) ? self::clip((string) $meta['query'], 40) : '';
+                $land = ! empty($meta['landing_url']) ? self::clip((string) $meta['landing_url'], 35) : '';
+
+                return ($q !== '' ? ('«' . $q . '»') : 'запрос')
+                    . ($land !== '' ? (' · посадочная: ' . $land) : '');
+
+            case 'ad_cannibalization':
+                $q = ! empty($meta['query']) ? self::clip((string) $meta['query'], 36) : '';
+                $hint = ! empty($meta['ad_hint']) ? (string) $meta['ad_hint'] : '';
+                $land = ! empty($meta['landing_url']) ? self::clip((string) $meta['landing_url'], 30) : '';
+
+                return ($q !== '' ? ('«' . $q . '»') : 'запрос')
+                    . ($hint !== '' ? (' · ' . $hint) : '')
+                    . ($land !== '' ? (' · SEO: ' . $land) : '');
+
+            case 'landing_query_mismatch':
+                $q = ! empty($meta['query']) ? self::clip((string) $meta['query'], 40) : '';
+                $hits = isset($meta['hits_any'], $meta['token_count'])
+                    ? ((int) $meta['hits_any'] . '/' . (int) $meta['token_count'] . ' токенов')
+                    : '';
+
+                return ($q !== '' ? ('«' . $q . '»') : 'запрос')
+                    . ($hits !== '' ? (' · ' . $hits) : '');
+
+            case 'commercial_missing_contacts':
+                $miss = isset($meta['missing']) && is_array($meta['missing'])
+                    ? implode(', ', $meta['missing'])
+                    : '';
+
+                return $miss !== '' ? ('нет: ' . $miss) : 'нет контактов';
+
+            case 'commercial_missing_price':
+                return 'нет цены';
+
+            case 'commercial_missing_cta':
+                return 'нет CTA';
+
+            case 'commercial_missing_delivery':
+                return 'нет доставки';
+
+            case 'commercial_missing_payment':
+                return 'нет оплаты';
+
+            case 'commercial_missing_stock':
+                return 'нет наличия';
+
+            case 'commercial_missing_reviews':
+                return 'нет отзывов';
+
+            case 'broken_image':
+                $n = (int) ($meta['count'] ?? 0);
+                $img = ! empty($meta['samples'][0]['img'])
+                    ? self::clip((string) $meta['samples'][0]['img'], 50)
+                    : '';
+
+                return $n ? ('битых img: ' . $n . ($img !== '' ? ' · ' . $img : '')) : 'битое изображение';
+
+            case 'heavy_image':
+                $n = (int) ($meta['count'] ?? 0);
+                $sz = ! empty($meta['samples'][0]['size_bytes'])
+                    ? round(((int) $meta['samples'][0]['size_bytes']) / 1024) . ' KB'
+                    : '';
+
+                return $n ? ('тяжёлых: ' . $n . ($sz !== '' ? ' · ' . $sz : '')) : 'тяжёлое изображение';
+
+            case 'error_spike':
+                $kind = (string) ($meta['kind'] ?? '');
+                if ($kind === 'status_cluster') {
+                    return 'код ' . ($meta['status'] ?? '?')
+                        . ': ' . (int) ($meta['count'] ?? 0)
+                        . ' из ' . (int) ($meta['error_total'] ?? 0)
+                        . ' ошибок';
+                }
+                if ($kind === 'path_cluster') {
+                    return ($meta['path_prefix'] ?? '/')
+                        . ' · ' . (int) ($meta['count'] ?? 0)
+                        . '/' . (int) ($meta['prefix_total'] ?? 0)
+                        . ' ошибок ('
+                        . (isset($meta['rate']) ? round(((float) $meta['rate']) * 100) . '%' : '?')
+                        . ')';
+                }
+                if ($kind === 'crawl_delta') {
+                    return 'было ' . (int) ($meta['prev_count'] ?? 0)
+                        . ' → стало ' . (int) ($meta['count'] ?? 0)
+                        . (isset($meta['ratio']) ? (' (×' . $meta['ratio'] . ')') : '');
+                }
+
+                return 'выброс ошибок';
+
+            case 'psi_mobile':
+            case 'psi_desktop':
+                $bits = [];
+                if (isset($meta['score_pct'])) {
+                    $bits[] = 'Perf ' . (int) $meta['score_pct'];
+                } elseif (isset($meta['score'])) {
+                    $bits[] = 'Perf ' . (int) round(((float) $meta['score']) * 100);
+                }
+                if (isset($meta['lcp_ms'])) {
+                    $bits[] = 'LCP ' . round(((float) $meta['lcp_ms']) / 1000, 1) . 's';
+                }
+                if (isset($meta['cls'])) {
+                    $bits[] = 'CLS ' . round((float) $meta['cls'], 3);
+                }
+                if (isset($meta['tbt_ms'])) {
+                    $bits[] = 'TBT ' . (int) round((float) $meta['tbt_ms']) . 'ms';
+                }
+
+                return $bits ? implode(' · ', $bits) : 'PSI';
+
             case 'deep_pages':
                 return isset($meta['depth'])
                     ? ('глубина: ' . (int) $meta['depth'] . ' (порог ' . (int) ($meta['threshold'] ?? 0) . ')')
@@ -443,6 +611,87 @@ class SiteAuditFindingPresenter
                 }
 
                 return $bits ? implode(' · ', $bits) : 'расхождение индекса и краула';
+
+            case 'serp_snippets':
+                $bits = [];
+                if (! empty($meta['page_title'])) {
+                    $bits[] = 'title: ' . self::clip((string) $meta['page_title'], 40);
+                }
+                foreach ((array) ($meta['engines'] ?? []) as $eng => $block) {
+                    if (! is_array($block)) {
+                        continue;
+                    }
+                    $label = $eng === 'yandex' ? 'Я' : ($eng === 'google' ? 'G' : (string) $eng);
+                    if (! empty($block['error'])) {
+                        $bits[] = $label . ': ошибка';
+                        continue;
+                    }
+                    if (empty($block['indexed'])) {
+                        $bits[] = $label . ': нет в индексе';
+                        continue;
+                    }
+                    $snip = ! empty($block['snippet'])
+                        ? self::clip((string) $block['snippet'], 60)
+                        : (! empty($block['title']) ? self::clip((string) $block['title'], 40) : 'есть');
+                    $bits[] = $label . ': ' . $snip;
+                }
+
+                return $bits ? implode(' · ', $bits) : 'сниппет ПС';
+
+            case 'serp_title_mismatch':
+                $bits = [];
+                if (! empty($meta['engine'])) {
+                    $bits[] = (string) $meta['engine'];
+                }
+                if (! empty($meta['page_title'])) {
+                    $bits[] = 'стр: ' . self::clip((string) $meta['page_title'], 35);
+                }
+                if (! empty($meta['serp_title'])) {
+                    $bits[] = 'выдача: ' . self::clip((string) $meta['serp_title'], 35);
+                }
+
+                return $bits ? implode(' · ', $bits) : 'title ≠ выдача';
+
+            case 'serp_not_indexed':
+                return ! empty($meta['engine'])
+                    ? ('нет в индексе: ' . (string) $meta['engine'])
+                    : 'нет в индексе ПС';
+
+            case 'serp_snippet_source':
+                $bits = [];
+                if (! empty($meta['engine'])) {
+                    $bits[] = (string) $meta['engine'];
+                }
+                if (! empty($meta['title_source'])) {
+                    $bits[] = 'title←' . (string) $meta['title_source'];
+                }
+                if (! empty($meta['snippet_source'])) {
+                    $bits[] = 'snippet←' . (string) $meta['snippet_source'];
+                }
+
+                return $bits ? implode(' · ', $bits) : 'источник сниппета';
+
+            case 'probable_affiliate':
+                $n = (int) ($meta['count'] ?? 0);
+                $net = ! empty($meta['samples'][0]['network'])
+                    ? (string) $meta['samples'][0]['network']
+                    : '';
+
+                return $n
+                    ? ('affiliate: ' . $n . ($net !== '' ? ' · ' . $net : ''))
+                    : 'affiliate-ссылки';
+
+            case 'missing_permissions_policy':
+                return 'нет Permissions-Policy';
+
+            case 'missing_coop':
+                return 'нет COOP';
+
+            case 'missing_coep':
+                return 'нет COEP';
+
+            case 'missing_corp':
+                return 'нет CORP';
 
             case 'multiple_canonical':
                 return isset($meta['count'])
@@ -488,6 +737,12 @@ class SiteAuditFindingPresenter
 
             case 'missing_x_content_type_options':
                 return 'нет X-Content-Type-Options';
+
+            case 'missing_csp':
+                return 'нет Content-Security-Policy';
+
+            case 'missing_referrer_policy':
+                return 'нет Referrer-Policy';
 
             case 'missing_charset':
                 return 'charset не объявлен';

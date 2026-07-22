@@ -931,6 +931,54 @@
   opacity: 1;
 }
 
+.cabinet-sa-row--fixed td {
+  background: rgba(22, 163, 74, 0.06);
+}
+
+.cabinet-sa-note-cell .cabinet-sa-note-form textarea {
+  font-size: 12px;
+  min-height: 42px;
+}
+
+.cabinet-sa-note-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.cabinet-sa-note-legend {
+  line-height: 1.45;
+}
+
+.cabinet-sa-table-wrap thead th .cabinet-sa-tip {
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+/* Правые колонки: якорь справа, чтобы тултип не уезжал за край экрана */
+.cabinet-sa-table-wrap thead th:last-child .cabinet-sa-tip .ui_tooltip,
+.cabinet-sa-table-wrap thead th:nth-last-child(2) .cabinet-sa-tip .ui_tooltip {
+  left: auto;
+  right: 0;
+  width: min(260px, 68vw);
+}
+
+.cabinet-sa-tree__item--external .fa-external-link {
+  margin-left: 4px;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.cabinet-sa-module-link {
+  background: #f8fafc;
+}
+
+.cabinet-sa-tree-controls__hint {
+  line-height: 1.35;
+  padding: 0 2px;
+}
+
 /* Печать сводки / отчёта */
 @media print {
   .main-sidebar,

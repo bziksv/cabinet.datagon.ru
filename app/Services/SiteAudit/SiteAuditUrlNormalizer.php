@@ -32,15 +32,15 @@ class SiteAuditUrlNormalizer
         }
 
         $host = strtolower($parts['host']);
-        if ($baseHost !== null) {
+        $allowedBares = self::allowedBareHosts($baseHost, $opts);
+        if ($allowedBares !== []) {
             $bare = preg_replace('/^www\./', '', $host);
-            $baseBare = preg_replace('/^www\./', '', strtolower($baseHost));
-            if ($bare !== $baseBare) {
+            if (! in_array($bare, $allowedBares, true)) {
                 return null;
             }
         }
 
-        if (! empty($opts['prefer_host'])) {
+        if (! empty($opts['prefer_host']) && empty($opts['allowed_hosts'])) {
             $host = strtolower((string) $opts['prefer_host']);
         } elseif (! empty($opts['strip_www'])) {
             $host = preg_replace('/^www\./', '', $host);
@@ -137,21 +137,82 @@ class SiteAuditUrlNormalizer
     public static function optionsFromSettings(array $settings, string $domain): array
     {
         $prefer = self::preferHostFromDomain($domain);
+        $extra = self::parseExtraHosts($settings['extra_hosts'] ?? []);
+        $hasExtra = $extra !== [];
+
+        $allowed = array_values(array_unique(array_merge(
+            [preg_replace('/^www\./', '', strtolower($prefer))],
+            $extra
+        )));
 
         return [
             'force_https' => array_key_exists('force_https', $settings)
                 ? (bool) $settings['force_https']
                 : true,
-            'prefer_host' => ! empty($settings['unify_www']) ? $prefer : null,
+            // prefer_host ломает доп. хосты — только без extra_hosts
+            'prefer_host' => (! empty($settings['unify_www']) && ! $hasExtra) ? $prefer : null,
             'strip_www' => empty($settings['unify_www']) && ! empty($settings['strip_www']),
             'strip_trailing_slash' => array_key_exists('strip_trailing_slash', $settings)
                 ? (bool) $settings['strip_trailing_slash']
                 : true,
+            'allowed_hosts' => $hasExtra ? $allowed : [],
         ];
     }
 
     /**
-     * Абсолютизация href/src относительно base URL; при $baseHost — только same-host.
+     * @param mixed $raw
+     * @return string[] bare hosts
+     */
+    public static function parseExtraHosts($raw): array
+    {
+        if (is_string($raw)) {
+            $raw = preg_split('/[\s,;]+/', $raw) ?: [];
+        }
+        if (! is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $h) {
+            $h = trim((string) $h);
+            if ($h === '') {
+                continue;
+            }
+            $h = preg_replace('#^https?://#i', '', $h);
+            $h = rtrim((string) $h, '/');
+            $host = parse_url('https://' . $h, PHP_URL_HOST) ?: $h;
+            $bare = preg_replace('/^www\./', '', strtolower((string) $host));
+            if ($bare !== '') {
+                $out[$bare] = true;
+            }
+        }
+
+        return array_keys($out);
+    }
+
+    /**
+     * @param array $opts
+     * @return string[]
+     */
+    private static function allowedBareHosts(?string $baseHost, array $opts): array
+    {
+        // baseHost === null → «любой хост» (external assets/links); не режем allowed_hosts
+        if ($baseHost === null || $baseHost === '') {
+            return [];
+        }
+
+        $list = [preg_replace('/^www\./', '', strtolower($baseHost))];
+        foreach ((array) ($opts['allowed_hosts'] ?? []) as $h) {
+            $h = preg_replace('/^www\./', '', strtolower(trim((string) $h)));
+            if ($h !== '') {
+                $list[] = $h;
+            }
+        }
+
+        return array_values(array_unique($list));
+    }
+
+    /**
+     * Абсолютизация href/src относительно base URL; при $baseHost / allowed_hosts — только эти хосты.
      *
      * @param array $opts
      */

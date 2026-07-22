@@ -40,10 +40,18 @@
 
                         <div class="mb-3 cabinet-sa-field">
                             <label class="form-label fw-medium" for="sa-domain">
-                                Домен
-                                @include('pages.partials.site-audit-tip', ['tip' => "Сайт для проверки без https:// — например titlo.ru.\nСтартуем с sitemap и главной, затем добираем страницы по внутренним ссылкам до лимита тарифа (или тестового лимита)."])
+                                Домены
+                                @include('pages.partials.site-audit-tip', ['tip' => "Один или несколько сайтов — каждый домен с новой строки.\nМожно без https://: titlo.ru\nИли целиком URL: https://titlo.ru/ — возьмём только хост.\nДля каждого домена создаётся свой проект и краул (лимит — по тарифу). Доп. URL и исключения применяются ко всем."])
                             </label>
-                            <input type="text" class="form-control" id="sa-domain" placeholder="example.com" autocomplete="off">
+                            <textarea class="form-control" id="sa-domain" rows="3" placeholder="example.com&#10;shop.example.com&#10;https://another.ru/" autocomplete="off"></textarea>
+                        </div>
+
+                        <div class="mb-3 cabinet-sa-field">
+                            <label class="form-label fw-medium" for="sa-extra-hosts">
+                                Доп. хосты в одном project <span class="text-secondary fw-normal">(опционально)</span>
+                                @include('pages.partials.site-audit-tip', ['tip' => "Только если выше указан один основной домен.\nПоддомены (shop.example.com, blog.example.com) войдут в тот же краул как внутренние.\nНесколько доменов в поле «Домены» — по-прежнему отдельные проекты."])
+                            </label>
+                            <textarea class="form-control" id="sa-extra-hosts" rows="2" placeholder="shop.example.com&#10;blog.example.com" autocomplete="off"></textarea>
                         </div>
 
                         <div class="mb-3 cabinet-sa-field">
@@ -55,12 +63,12 @@
                         </div>
 
                         <div class="mb-3 cabinet-sa-field">
-                            <label class="form-label fw-medium" for="sa-exclude">
-                                Исключить URL <span class="text-secondary fw-normal">(опционально)</span>
-                                @include('pages.partials.site-audit-tip', ['tip' => "Что не обходить и не анализировать.\n• подстрока: /admin — всё, где встречается /admin\n• glob: */cart* — маска со звёздочкой\n• regex:~pattern~i — регулярное выражение\nПо одному правилу на строку. Типично: корзина, ЛК, фильтры, служебные разделы."])
+                            <label class="form-label fw-medium" for="sa-robots">
+                                Виртуальный robots.txt <span class="text-secondary fw-normal">(опционально)</span>
+                                @include('pages.partials.site-audit-tip', ['tip' => "По умолчанию краул читает живой /robots.txt сайта и не ходит по Disallow (корень оставляем для диагностики).\nЕсли вставить сюда свой robots.txt — он подменит файл на сайте: теми же правилами режем обход и пишем findings.\nУдобно закрыть /cart, /admin, utm без отдельного списка исключений.\nПример:\nUser-agent: *\nDisallow: /cart\nDisallow: /admin\nAllow: /"])
                             </label>
-                            <textarea class="form-control" id="sa-exclude" rows="2"
-                                      placeholder="/admin&#10;*/cart*&#10;regex:~[?&]utm_~i"></textarea>
+                            <textarea class="form-control font-monospace" id="sa-robots" rows="5"
+                                      placeholder="User-agent: *&#10;Disallow: /cart&#10;Disallow: /admin&#10;Allow: /"></textarea>
                         </div>
 
                         <div class="mb-3 cabinet-sa-field">
@@ -489,7 +497,8 @@
                         var body = {
                             domain: document.getElementById('sa-domain').value,
                             seed_urls: document.getElementById('sa-seeds').value,
-                            exclude_patterns: document.getElementById('sa-exclude').value,
+                            extra_hosts: (document.getElementById('sa-extra-hosts') || {}).value || '',
+                            virtual_robots: document.getElementById('sa-robots').value,
                             crawl_speed: document.getElementById('sa-speed').value,
                             unify_www: true,
                             force_https: true,

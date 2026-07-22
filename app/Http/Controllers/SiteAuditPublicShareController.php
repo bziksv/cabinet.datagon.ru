@@ -54,6 +54,8 @@ class SiteAuditPublicShareController extends Controller
             'treeAll' => $treeAll,
             'findingsCatalog' => config('site_audit.findings', []),
             'isPublic' => true,
+            'whiteLabel' => $crawl->isWhiteLabelShare(),
+            'whiteLabelBrand' => $crawl->whiteLabelMeta(),
         ]);
     }
 
@@ -66,6 +68,7 @@ class SiteAuditPublicShareController extends Controller
         if (! $meta) {
             abort(404);
         }
+        abort_if(! empty($meta['external']), 404);
 
         $page = max(1, (int) $request->input('page', 1));
         $perPage = 50;
@@ -122,6 +125,8 @@ class SiteAuditPublicShareController extends Controller
             'filterAction' => route('site-audit.public.share.report', [$token, $code]),
             'filterClearUrl' => route('site-audit.public.share.report', [$token, $code]),
             'filterParams' => $filterParams,
+            'whiteLabel' => $crawl->isWhiteLabelShare(),
+            'whiteLabelBrand' => $crawl->whiteLabelMeta(),
         ]);
     }
 
@@ -255,7 +260,11 @@ class SiteAuditPublicShareController extends Controller
 
         foreach ($catalog as $code => $meta) {
             $phase = $meta['phase'] ?? '';
-            if (! in_array($phase, ['A', 'B'], true)) {
+            if (! in_array($phase, ['A', 'B', 'C', 'D'], true)) {
+                continue;
+            }
+            // Публичный share: без логина в другие модули не ведём.
+            if (! empty($meta['external'])) {
                 continue;
             }
             $itemGroup = $meta['group'] ?? (in_array($code, config('site_audit.seo_codes', []), true) ? 'seo' : 'tech');
@@ -283,6 +292,8 @@ class SiteAuditPublicShareController extends Controller
                 'count' => $count,
                 'phase' => $phase,
                 'group' => $itemGroup,
+                'external' => false,
+                'href' => null,
             ];
         }
 

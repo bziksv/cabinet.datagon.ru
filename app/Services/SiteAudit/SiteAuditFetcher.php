@@ -36,7 +36,7 @@ class SiteAuditFetcher
     }
 
     /**
-     * @return array{ok:bool,status_code:?int,final_url:string,redirect_chain:array,body:?string,size_bytes:int,content_type:?string,x_robots:?string,sec_headers:array{hsts:bool,x_frame:bool,x_content_type:bool},error:?string,user_agent:?string,ua_rotated:bool}
+     * @return array{ok:bool,status_code:?int,final_url:string,redirect_chain:array,body:?string,size_bytes:int,content_type:?string,x_robots:?string,sec_headers:array{hsts:bool,x_frame:bool,x_content_type:bool,csp:bool,referrer_policy:bool,permissions_policy:bool,coop:bool,coep:bool,corp:bool},error:?string,user_agent:?string,ua_rotated:bool}
      */
     public function fetch(string $url): array
     {
@@ -116,6 +116,13 @@ class SiteAuditFetcher
                     'hsts' => $response->getHeaderLine('Strict-Transport-Security') !== '',
                     'x_frame' => $response->getHeaderLine('X-Frame-Options') !== '',
                     'x_content_type' => $response->getHeaderLine('X-Content-Type-Options') !== '',
+                    'csp' => $response->getHeaderLine('Content-Security-Policy') !== '',
+                    'referrer_policy' => $response->getHeaderLine('Referrer-Policy') !== '',
+                    'permissions_policy' => $response->getHeaderLine('Permissions-Policy') !== ''
+                        || $response->getHeaderLine('Feature-Policy') !== '',
+                    'coop' => $response->getHeaderLine('Cross-Origin-Opener-Policy') !== '',
+                    'coep' => $response->getHeaderLine('Cross-Origin-Embedder-Policy') !== '',
+                    'corp' => $response->getHeaderLine('Cross-Origin-Resource-Policy') !== '',
                 ],
                 'error' => null,
                 'user_agent' => $ua,
@@ -145,6 +152,12 @@ class SiteAuditFetcher
                 'hsts' => false,
                 'x_frame' => false,
                 'x_content_type' => false,
+                'csp' => false,
+                'referrer_policy' => false,
+                'permissions_policy' => false,
+                'coop' => false,
+                'coep' => false,
+                'corp' => false,
             ],
             'error' => $error,
             'user_agent' => $ua,

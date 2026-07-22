@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Services\SiteAudit\SiteAuditFindingNoteService;
 use App\Services\SiteAudit\SiteAuditFindingPresenter;
 use App\Services\SiteAudit\SiteAuditIgnoreService;
 use App\Services\SiteAudit\SiteAuditReportFilter;
@@ -28,13 +29,23 @@ class SiteAuditFindingsExport implements FromCollection, WithHeadings, WithTitle
     /** @var bool */
     private $includeIgnored;
 
-    public function __construct(int $crawlId, array $codes, string $title = 'Findings', array $filters = [], bool $includeIgnored = false)
-    {
+    /** @var bool */
+    private $includeFixed;
+
+    public function __construct(
+        int $crawlId,
+        array $codes,
+        string $title = 'Findings',
+        array $filters = [],
+        bool $includeIgnored = false,
+        bool $includeFixed = false
+    ) {
         $this->crawlId = $crawlId;
         $this->codes = $codes;
         $this->title = mb_substr($title, 0, 31);
         $this->filters = $filters;
         $this->includeIgnored = $includeIgnored;
+        $this->includeFixed = $includeFixed;
     }
 
     public function title(): string
@@ -55,10 +66,13 @@ class SiteAuditFindingsExport implements FromCollection, WithHeadings, WithTitle
             ->whereIn('code', $this->codes)
             ->orderBy('id');
         SiteAuditReportFilter::applyToFindings($query, $this->crawlId, $this->filters);
-        if (! $this->includeIgnored) {
-            $projectId = (int) SiteAuditCrawl::query()->where('id', $this->crawlId)->value('project_id');
-            if ($projectId > 0) {
+        $projectId = (int) SiteAuditCrawl::query()->where('id', $this->crawlId)->value('project_id');
+        if ($projectId > 0) {
+            if (! $this->includeIgnored) {
                 (new SiteAuditIgnoreService())->excludeIgnored($query, $projectId);
+            }
+            if (! $this->includeFixed) {
+                (new SiteAuditFindingNoteService())->excludeFixed($query, $projectId);
             }
         }
         $query->chunk(200, function ($chunk) use (&$rows) {

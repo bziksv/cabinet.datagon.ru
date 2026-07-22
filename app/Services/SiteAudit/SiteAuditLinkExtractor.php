@@ -24,6 +24,7 @@ class SiteAuditLinkExtractor
         $external = [];
         $nofollowLinks = 0;
         $externalAssets = [];
+        $badLinks = [];
 
         $robots = [];
         if (preg_match_all('/<meta\b[^>]*\bname\s*=\s*["\']robots["\'][^>]*>/i', $html, $mt)) {
@@ -43,12 +44,28 @@ class SiteAuditLinkExtractor
 
         if (preg_match_all('/<a\b([^>]*)>/i', $html, $anchors)) {
             foreach ($anchors[1] as $attrs) {
-                if (! preg_match('/\bhref\s*=\s*("([^"]*)"|\'([^\']*)\')/i', $attrs, $hm)) {
+                if (! preg_match('/\bhref\s*=\s*("([^"]*)"|\'([^\']*)\'|([^\s>]+))/i', $attrs, $hm)) {
+                    if (count($badLinks) < 15) {
+                        $badLinks[] = ['href' => null, 'reason' => 'missing_href'];
+                    }
                     continue;
                 }
-                $hrefRaw = (isset($hm[2]) && $hm[2] !== '') ? $hm[2] : ($hm[3] ?? '');
+                $hrefRaw = (isset($hm[2]) && $hm[2] !== '') ? $hm[2]
+                    : ((isset($hm[3]) && $hm[3] !== '') ? $hm[3] : ($hm[4] ?? ''));
                 $href = html_entity_decode(trim($hrefRaw), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-                if ($href === '' || $href[0] === '#' || stripos($href, 'javascript:') === 0 || stripos($href, 'mailto:') === 0) {
+
+                $badReason = $this->badHrefReason($href);
+                if ($badReason !== null) {
+                    if (count($badLinks) < 15) {
+                        $badLinks[] = [
+                            'href' => mb_substr($href, 0, 200),
+                            'reason' => $badReason,
+                        ];
+                    }
+                    continue;
+                }
+
+                if ($href === '' || $href[0] === '#' || stripos($href, 'mailto:') === 0 || stripos($href, 'tel:') === 0) {
                     continue;
                 }
 
@@ -65,17 +82,71 @@ class SiteAuditLinkExtractor
                     $any = SiteAuditUrlNormalizer::resolve($href, $baseUrl, null, $opts);
                     if ($any) {
                         $external[$any] = true;
+                    } elseif (count($badLinks) < 15) {
+                        $badLinks[] = [
+                            'href' => mb_substr($href, 0, 200),
+                            'reason' => 'unresolvable',
+                        ];
                     }
+                }
+            }
+        }
+
+        $imgSrcs = [];
+        if (preg_match_all('/<img\b([^>]*)>/i', $html, $imgTags)) {
+            foreach ($imgTags[1] as $attrs) {
+                if (! preg_match('/\bsrc\s*=\s*("([^"]*)"|\'([^\']*)\')/i', $attrs, $sm)) {
+                    continue;
+                }
+                $src = html_entity_decode(trim(
+                    (isset($sm[2]) && $sm[2] !== '') ? $sm[2] : ($sm[3] ?? '')
+                ), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                if ($src === '' || stripos($src, 'data:') === 0) {
+                    continue;
+                }
+                $abs = SiteAuditUrlNormalizer::resolve($src, $baseUrl, null, $opts);
+                if (! $abs) {
+                    continue;
+                }
+                $imgSrcs[$abs] = true;
+                if (count($imgSrcs) >= 40) {
+                    break;
                 }
             }
         }
 
         $patterns = [
             '/<script\b[^>]*\bsrc\s*=\s*["\']([^"\']+)["\']/i',
-            '/<link\b[^>]*\bhref\s*=\s*["\']([^"\']+)["\']/i',
-            '/<img\b[^>]*\bsrc\s*=\s*["\']([^"\']+)["\']/i',
+            '/<link\b[^>]*\brel\s*=\s*["\'][^"\']*stylesheet[^"\']*["\'][^>]*\bhref\s*=\s*["\']([^"\']+)["\']/i',
+            '/<link\b[^>]*\bhref\s*=\s*["\']([^"\']+)["\'][^>]*\brel\s*=\s*["\'][^"\']*stylesheet[^"\']*["\']/i',
         ];
+        $assetSrcs = [];
         foreach ($patterns as $re) {
+            if (! preg_match_all($re, $html, $mm)) {
+                continue;
+            }
+            $group = isset($mm[1]) ? $mm[1] : [];
+            foreach ($group as $src) {
+                $src = html_entity_decode(trim($src), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                if ($src === '' || strpos($src, 'data:') === 0) {
+                    continue;
+                }
+                $abs = SiteAuditUrlNormalizer::resolve($src, $baseUrl, null, $opts);
+                if (! $abs) {
+                    continue;
+                }
+                $assetSrcs[$abs] = true;
+                if (count($assetSrcs) >= 40) {
+                    break 2;
+                }
+            }
+        }
+
+        $patternsExt = [
+            '/<script\b[^>]*\bsrc\s*=\s*["\']([^"\']+)["\']/i',
+            '/<link\b[^>]*\bhref\s*=\s*["\']([^"\']+)["\']/i',
+        ];
+        foreach ($patternsExt as $re) {
             if (! preg_match_all($re, $html, $mm)) {
                 continue;
             }
@@ -123,6 +194,32 @@ class SiteAuditLinkExtractor
             'duplicate_links_count' => count(array_filter($internalCounts, function ($c) {
                 return $c > 1;
             })),
+            'bad_links' => $badLinks,
+            'img_srcs' => array_keys($imgSrcs),
+            'asset_srcs' => array_keys($assetSrcs),
         ];
+    }
+
+    /**
+     * «Плохие» href (не HTTP-битые): пустые, #, javascript:, около-мусор.
+     * Нормальные #якорь и mailto/tel сюда не входят.
+     */
+    private function badHrefReason(string $href): ?string
+    {
+        if ($href === '' || $href === '#' || preg_match('/^#\s*$/', $href)) {
+            return 'empty_or_hash';
+        }
+        if (stripos($href, 'javascript:') === 0) {
+            return 'javascript';
+        }
+        if (preg_match('/^\s*javascript\s*:/i', $href)) {
+            return 'javascript';
+        }
+        // пробел / кавычки в «сыром» виде
+        if (preg_match('/\s/', $href) && ! preg_match('#^https?://#i', $href)) {
+            return 'whitespace';
+        }
+
+        return null;
     }
 }

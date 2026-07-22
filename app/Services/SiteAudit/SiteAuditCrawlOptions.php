@@ -20,6 +20,7 @@ class SiteAuditCrawlOptions
             'rps' => $rps,
             'save_html' => $input['save_html'] ?? 'off',
             'exclude_patterns' => SiteAuditUrlFilter::parsePatterns($input['exclude_patterns'] ?? []),
+            'virtual_robots' => self::normalizeVirtualRobots($input['virtual_robots'] ?? ''),
             // URL-нормализация всегда включена (не опция UI).
             'unify_www' => true,
             'force_https' => true,
@@ -27,5 +28,16 @@ class SiteAuditCrawlOptions
             // Битые ссылки всегда проверяем (не опция UI).
             'check_broken_links' => true,
         ]);
+    }
+
+    private static function normalizeVirtualRobots($raw): string
+    {
+        $text = trim((string) $raw);
+        if ($text === '') {
+            return '';
+        }
+        $max = (int) config('site_audit.robots_max_bytes', 512000);
+
+        return strlen($text) > $max ? substr($text, 0, $max) : $text;
     }
 }

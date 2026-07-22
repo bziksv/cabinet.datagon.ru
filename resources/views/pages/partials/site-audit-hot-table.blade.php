@@ -33,9 +33,18 @@
         <table class="table table-sm mb-0">
             <thead class="thead-light">
             <tr>
-                <th>Фактор</th>
-                <th>Приоритет</th>
-                <th class="text-right">Находок</th>
+                <th title="Название проверки. Нажмите — открыть список URL.">
+                    Фактор
+                    @include('pages.partials.site-audit-tip', ['tip' => "Название проверки.\nКлик по названию или «Показать» — список страниц с этой проблемой."])
+                </th>
+                <th title="Срочность: грубые важнее инфо.">
+                    Приоритет
+                    @include('pages.partials.site-audit-tip', ['tip' => "Насколько срочно.\nГрубые — сначала, Инфо — можно позже."])
+                </th>
+                <th class="text-right" title="Сколько страниц с этой проблемой.">
+                    Находок
+                    @include('pages.partials.site-audit-tip', ['tip' => "Сколько URL попало в эту проверку."])
+                </th>
                 <th class="text-right" style="width:1%"></th>
             </tr>
             </thead>
@@ -58,7 +67,8 @@
                         <span class="cabinet-sa-badge cabinet-sa-badge--{{ $sev }}">{{ $cnt }}</span>
                     </td>
                     <td class="text-right text-nowrap">
-                        <a class="btn btn-sm btn-outline-primary py-0 px-2" href="{{ $reportRoute($code) }}">Показать</a>
+                        <a class="btn btn-sm btn-outline-primary py-0 px-2" href="{{ $reportRoute($code) }}"
+                           title="Открыть список страниц с этой проблемой">Показать</a>
                     </td>
                 </tr>
             @endforeach

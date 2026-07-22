@@ -443,6 +443,54 @@ class DemoCabinet
     }
 
     /**
+     * Готовый краул аудита сайта: /site-audit/crawl/{id}
+     */
+    public static function siteAuditShowcasePath(?User $user = null): ?string
+    {
+        $user = $user ?: Auth::user() ?: self::findUser();
+        if (! $user) {
+            return null;
+        }
+
+        $crawlId = \App\SiteAuditCrawl::query()
+            ->where('user_id', $user->id)
+            ->where('status', \App\SiteAuditCrawl::STATUS_DONE)
+            ->orderByDesc('id')
+            ->value('id');
+
+        if (! $crawlId) {
+            return null;
+        }
+
+        return '/site-audit/crawl/' . (int) $crawlId;
+    }
+
+    /**
+     * Публичный share демо-краула (фиксированный token из seeder).
+     */
+    public static function siteAuditPublicSharePath(?User $user = null): ?string
+    {
+        $user = $user ?: Auth::user() ?: self::findUser();
+        if (! $user) {
+            return null;
+        }
+
+        $token = \App\SiteAuditCrawl::query()
+            ->where('user_id', $user->id)
+            ->where('status', \App\SiteAuditCrawl::STATUS_DONE)
+            ->whereNotNull('share_token')
+            ->whereNotNull('share_enabled_at')
+            ->orderByDesc('id')
+            ->value('share_token');
+
+        if (! $token) {
+            return null;
+        }
+
+        return '/public/share/site-audit/' . $token;
+    }
+
+    /**
      * Куда вести после входа в демо.
      */
     public static function homePath(?User $user = null): string

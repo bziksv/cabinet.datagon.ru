@@ -186,8 +186,61 @@ class IndexCheckService
     }
 
     /**
-     * @return list<array{url: string, title: ?string, snippet: ?string}>
+     * Поиск по запросу: документы ТОП-N с title/snippet.
+     *
+     * @return list<array{url: string, title: ?string, snippet: ?string, position: int}>
      */
+    public static function searchQuery(
+        string $query,
+        string $engine = 'yandex',
+        string $lr = '213',
+        int $depth = 20
+    ): array {
+        $query = trim($query);
+        if ($query === '') {
+            return [];
+        }
+        $engine = strtolower($engine) === 'google' ? 'google' : 'yandex';
+        $depth = max(1, min(50, $depth));
+        $hadError = false;
+        $docs = self::fetchSerpDocuments($engine, $lr, $query, $depth, $hadError);
+        $docs = self::uniqueDocumentsByUrl($docs);
+        $out = [];
+        foreach ($docs as $i => $doc) {
+            if (! is_array($doc)) {
+                continue;
+            }
+            $url = (string) ($doc['url'] ?? '');
+            if ($url === '') {
+                continue;
+            }
+            $out[] = [
+                'url' => $url,
+                'title' => isset($doc['title']) ? (string) $doc['title'] : null,
+                'snippet' => isset($doc['snippet']) ? (string) $doc['snippet'] : null,
+                'position' => $i + 1,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Хост URL совпадает с доменом проекта (www-insensitive).
+     */
+    public static function urlBelongsToHost(string $url, string $hostOrDomain, bool $ignoreWww = true): bool
+    {
+        $hostOrDomain = trim($hostOrDomain);
+        if ($hostOrDomain === '') {
+            return false;
+        }
+        if (! preg_match('#^https?://#i', $hostOrDomain)) {
+            $hostOrDomain = 'https://' . preg_replace('#^//#', '', $hostOrDomain);
+        }
+
+        return self::hostsEqual($url, $hostOrDomain, $ignoreWww);
+    }
+
     private static function fetchSerpDocuments(string $engine, string $lr, string $query, int $depth, bool &$hadError): array
     {
         try {

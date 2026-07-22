@@ -61,6 +61,7 @@ class SiteAuditAggregator
         'serp_title_mismatch',
         'serp_not_indexed',
         'serp_snippet_source',
+        'serp_snippet_cannibalization',
         'psi_mobile',
         'psi_desktop',
         'no_outbound_internal',
@@ -100,6 +101,7 @@ class SiteAuditAggregator
         (new SiteAuditAvailabilityProbe())->run($crawl);
         (new SiteAuditSerpIndexProbe())->run($crawl);
         (new SiteAuditSerpSnippetsProbe())->run($crawl);
+        (new SiteAuditSerpCannibalizationProbe())->run($crawl);
         (new SiteAuditPsiProbe())->run($crawl);
 
         $buckets = [

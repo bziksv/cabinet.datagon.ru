@@ -518,6 +518,17 @@ class SiteAuditFindingPresenter
                     . ($hint !== '' ? (' · ' . $hint) : '')
                     . ($land !== '' ? (' · SEO: ' . $land) : '');
 
+            case 'serp_snippet_cannibalization':
+                $q = ! empty($meta['query']) ? self::clip((string) $meta['query'], 36) : '';
+                $eng = ! empty($meta['engine']) ? (string) $meta['engine'] : '';
+                $pos = isset($meta['position']) ? ('#' . (int) $meta['position']) : '';
+                $n = (int) ($meta['own_count'] ?? 0);
+
+                return trim(($q !== '' ? ('«' . $q . '»') : 'запрос')
+                    . ($eng !== '' ? (' · ' . $eng) : '')
+                    . ($pos !== '' ? (' · ' . $pos) : '')
+                    . ($n > 0 ? (' · своих в ТОП: ' . $n) : ''));
+
             case 'landing_query_mismatch':
                 $q = ! empty($meta['query']) ? self::clip((string) $meta['query'], 40) : '';
                 $hits = isset($meta['hits_any'], $meta['token_count'])

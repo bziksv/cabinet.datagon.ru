@@ -68,6 +68,15 @@ return [
     'serp_snippets_enabled' => (bool) env('SITE_AUDIT_SERP_SNIPPETS', false),
     'serp_snippets_engines' => ['yandex', 'google'],
     'serp_snippets_max_urls' => (int) env('SITE_AUDIT_SERP_SNIPPETS_MAX', 12),
+    // Каннибализация по живым сниппетам (по умолчанию тот же gate, что SERP-сниппеты)
+    'serp_cannibalization_enabled' => (bool) env(
+        'SITE_AUDIT_SERP_CANNIBALIZATION',
+        env('SITE_AUDIT_SERP_SNIPPETS', false)
+    ),
+    'serp_cannibalization_max_queries' => (int) env('SITE_AUDIT_SERP_CANNIBAL_MAX', 20),
+    'serp_cannibalization_depth' => (int) env('SITE_AUDIT_SERP_CANNIBAL_DEPTH', 20),
+    'serp_cannibalization_engines' => ['yandex'],
+    'serp_cannibalization_yandex_lr' => env('SITE_AUDIT_SERP_CANNIBAL_LR', '213'),
 
     // PSI (PageSpeed Insights v5). Дорого по времени — выкл. по умолчанию.
     'psi_enabled' => (bool) env('SITE_AUDIT_PSI', false),
@@ -196,6 +205,7 @@ return [
         'landing_no_inbound_internal',
         'keyword_cannibalization',
         'ad_cannibalization',
+        'serp_snippet_cannibalization',
         'landing_query_mismatch',
         'commercial_missing_contacts',
         'commercial_missing_price',
@@ -224,6 +234,7 @@ return [
         'serp_title_mismatch',
         'serp_not_indexed',
         'serp_snippet_source',
+        'serp_snippet_cannibalization',
         'probable_affiliate',
         'seo_meta_errors',
         'multiple_canonical',
@@ -778,6 +789,13 @@ return [
             'severity' => 'warning',
             'title' => 'Каннибализация рекламой',
             'description' => 'Запрос из мониторинга в title/h1 у promo/PPC-подобной страницы, отличной от SEO-посадочной (lite без Директа).',
+            'group' => 'seo',
+        ],
+        'serp_snippet_cannibalization' => [
+            'phase' => 'B',
+            'severity' => 'warning',
+            'title' => 'Каннибализация по сниппетам (SERP)',
+            'description' => 'По запросу мониторинга в ТОП выдачи ≥2 URL вашего сайта (живые сниппеты). Gate SITE_AUDIT_SERP_CANNIBALIZATION / SERP_SNIPPETS.',
             'group' => 'seo',
         ],
         'landing_query_mismatch' => [

@@ -94,6 +94,7 @@ class SiteAuditReportFilter
             'landing_no_inbound_internal' => ['details'],
             'keyword_cannibalization' => ['details'],
             'ad_cannibalization' => ['details'],
+            'serp_snippet_cannibalization' => ['details'],
             'landing_query_mismatch' => ['details'],
             'commercial_missing_contacts' => ['details'],
             'commercial_missing_price' => ['details'],

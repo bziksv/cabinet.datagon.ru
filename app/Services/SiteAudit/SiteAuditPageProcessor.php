@@ -480,6 +480,7 @@ class SiteAuditPageProcessor
                 'serp_title_mismatch',
                 'serp_not_indexed',
                 'serp_snippet_source',
+                'serp_snippet_cannibalization',
                 'psi_mobile',
                 'psi_desktop',
                 'landing_plagiarism_suspect',

@@ -53,6 +53,7 @@ class AggregateSiteAuditCrawlJob implements ShouldQueue
                 $crawl->error = 'Aggregate failed: ' . mb_substr($e->getMessage(), 0, 500);
                 $crawl->finished_at = now();
                 $crawl->save();
+                \App\Services\SiteAudit\SiteAuditGlobalCap::promoteWaiting();
             }
             throw $e;
         } finally {

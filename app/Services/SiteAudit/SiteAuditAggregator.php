@@ -161,6 +161,8 @@ class SiteAuditAggregator
         if ($notify) {
             $this->notifyOwner($crawl);
         }
+
+        SiteAuditGlobalCap::promoteWaiting();
     }
 
     private function emitFromPages(int $crawlId): void

@@ -22,6 +22,8 @@ return [
     'body_temp_max_total_bytes' => (int) env('SITE_AUDIT_BODY_TEMP_MAX_BYTES', 200_000_000), // 200 MB
     'body_temp_max_files' => (int) env('SITE_AUDIT_BODY_TEMP_MAX_FILES', 200),
     'max_active_crawls_per_user' => 1,
+    // Глобально на сервер (cabinet=1; на proxy2 поднять SITE_AUDIT_GLOBAL_MAX_ACTIVE)
+    'global_max_active_crawls' => (int) env('SITE_AUDIT_GLOBAL_MAX_ACTIVE', 1),
     // local/тесты: не резать по тарифу, пока UI/модуль сырые
     'bypass_limits' => (bool) env('SITE_AUDIT_BYPASS_LIMITS', false),
     'thin_words' => (int) env('SITE_AUDIT_THIN_WORDS', 150),

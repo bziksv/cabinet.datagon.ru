@@ -2,7 +2,6 @@
 
 namespace App\Services\SiteAudit;
 
-use App\Jobs\SiteAudit\DiscoverSiteAuditUrlsJob;
 use App\SiteAuditCrawl;
 use App\SiteAuditProject;
 use App\Support\SiteAuditLimits;
@@ -12,7 +11,8 @@ use RuntimeException;
 class SiteAuditCrawlStarter
 {
     /**
-     * @param  bool  $skipActiveCheck  при пакетном запуске нескольких доменов — не блокировать 2-й+ краул
+     * @param  bool  $skipActiveCheck  при пакетном запуске нескольких доменов — не блокировать 2-й+ краул у пользователя
+     *                                 (глобальный cap всё равно ставит лишние в queued_wait)
      */
     public function start(
         User $user,
@@ -22,7 +22,6 @@ class SiteAuditCrawlStarter
         bool $force = false,
         bool $skipActiveCheck = false
     ): SiteAuditCrawl {
-        // Пока модуль в локальной отладке — не упираемся в тариф (UI ещё сырой).
         $bypassLimits = $force
             || app()->environment('local')
             || (bool) config('site_audit.bypass_limits', false);
@@ -32,7 +31,7 @@ class SiteAuditCrawlStarter
         }
 
         if (! $bypassLimits && ! $skipActiveCheck && SiteAuditLimits::hasActiveCrawl($user)) {
-            throw new RuntimeException('Уже выполняется другой краул аудита — дождитесь завершения или запустите пакетно несколько доменов сразу');
+            throw new RuntimeException('Уже выполняется или ждёт другой краул аудита — дождитесь завершения или запустите пакетно несколько доменов сразу');
         }
 
         $domain = preg_replace('#^https?://#i', '', trim($domain));
@@ -63,10 +62,11 @@ class SiteAuditCrawlStarter
             }
         }
 
+        // Сначала в глобальную очередь ожидания; tryDispatch поднимет, если слот свободен.
         $crawl = SiteAuditCrawl::query()->create([
             'project_id' => $project->id,
             'user_id' => $user->id,
-            'status' => SiteAuditCrawl::STATUS_QUEUED,
+            'status' => SiteAuditCrawl::STATUS_QUEUED_WAIT,
             'pages_limit' => $pagesLimit,
             'save_html' => $settings['save_html'] ?? 'off',
             'progress_json' => [
@@ -79,13 +79,15 @@ class SiteAuditCrawlStarter
                     'force_https' => true,
                     'strip_trailing_slash' => true,
                     'check_broken_links' => true,
+                    'extra_hosts' => $settings['extra_hosts'] ?? [],
                 ],
             ],
-            'started_at' => now(),
+            'started_at' => null,
         ]);
 
         if ($dispatch) {
-            DiscoverSiteAuditUrlsJob::dispatch($crawl->id);
+            SiteAuditGlobalCap::tryDispatch($crawl);
+            $crawl->refresh();
         }
 
         return $crawl;

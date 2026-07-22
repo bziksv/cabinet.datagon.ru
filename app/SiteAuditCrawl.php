@@ -76,13 +76,13 @@ class SiteAuditCrawl extends Model
     public static function statusLabel(?string $status): string
     {
         $map = [
-            self::STATUS_QUEUED => 'В очереди',
+            self::STATUS_QUEUED => 'Запуск',
             self::STATUS_DISCOVERING => 'Сбор URL',
             self::STATUS_FETCHING => 'Сканирование',
             self::STATUS_AGGREGATING => 'Агрегация',
             self::STATUS_DONE => 'Готово',
             self::STATUS_FAILED => 'Ошибка',
-            self::STATUS_QUEUED_WAIT => 'Ожидание',
+            self::STATUS_QUEUED_WAIT => 'В очереди (ждёт слот)',
         ];
 
         return $map[$status] ?? (string) $status;

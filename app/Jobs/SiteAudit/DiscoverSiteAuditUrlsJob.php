@@ -36,6 +36,10 @@ class DiscoverSiteAuditUrlsJob implements ShouldQueue
         if (! $crawl || $crawl->isFinished()) {
             return;
         }
+        // Ещё ждёт глобальный слот — не стартуем discover
+        if ($crawl->status === SiteAuditCrawl::STATUS_QUEUED_WAIT) {
+            return;
+        }
 
         (new SiteAuditCrawlEngine())->run($crawl);
     }

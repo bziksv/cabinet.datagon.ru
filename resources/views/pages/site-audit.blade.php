@@ -273,9 +273,11 @@
                                             $fillPct = max(0, (int) $pct);
                                             $labelText = $fetchedN . '/' . $totalN;
                                         }
-                                        $hint = $c->status === 'queued' || $c->status === 'queued_wait'
-                                            ? 'ждёт воркер'
-                                            : ($c->status === 'discovering' ? 'сбор URL' : ($c->status === 'aggregating' ? 'агрегация' : ($isFailed ? 'ошибка' : ($finished ? 'готово' : 'сканирование'))));
+                                        $hint = $c->status === 'queued_wait'
+                                            ? 'ждёт свободный слот на сервере'
+                                            : ($c->status === 'queued'
+                                                ? 'запуск'
+                                                : ($c->status === 'discovering' ? 'сбор URL' : ($c->status === 'aggregating' ? 'агрегация' : ($isFailed ? 'ошибка' : ($finished ? 'готово' : 'сканирование')))));
                                     @endphp
                                     <div class="progress"
                                          role="progressbar"
@@ -400,7 +402,9 @@
                             barClass = 'progress-bar progress-bar-striped progress-bar-animated bg-warning';
                             fill = 100;
                             label = total > 0 ? (fetched + '/' + total) : '…';
-                            hint = (st === 'queued' || st === 'queued_wait') ? 'ждёт воркер' : (st === 'discovering' ? 'сбор URL' : 'ожидание');
+                            hint = (st === 'queued_wait')
+                                ? 'ждёт свободный слот на сервере'
+                                : ((st === 'queued') ? 'запуск' : (st === 'discovering' ? 'сбор URL' : 'ожидание'));
                         } else {
                             barClass = 'progress-bar progress-bar-striped progress-bar-animated bg-info';
                             fill = pct;

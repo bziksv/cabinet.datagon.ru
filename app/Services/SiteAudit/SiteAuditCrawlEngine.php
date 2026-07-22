@@ -19,6 +19,7 @@ class SiteAuditCrawlEngine
             $crawl->error = 'Project not found';
             $crawl->finished_at = now();
             $crawl->save();
+            SiteAuditGlobalCap::promoteWaiting();
 
             return $crawl;
         }
@@ -99,6 +100,7 @@ class SiteAuditCrawlEngine
                 $crawl->error = 'Discovery failed: ' . $e->getMessage();
                 $crawl->finished_at = now();
                 $crawl->save();
+                SiteAuditGlobalCap::promoteWaiting();
 
                 return $crawl;
             }
@@ -154,6 +156,7 @@ class SiteAuditCrawlEngine
             $crawl->error = 'No URLs discovered';
             $crawl->finished_at = now();
             $crawl->save();
+            SiteAuditGlobalCap::promoteWaiting();
 
             return $crawl;
         }

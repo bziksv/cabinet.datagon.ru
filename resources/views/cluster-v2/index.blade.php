@@ -337,7 +337,7 @@
                     copyUrls: @json('Копировать URL'),
                     viewLinks: @json(__('View links phrases')),
                     resultsMeta: @json('Кластеров: :clusters · Фраз: :phrases'),
-                    freqZeroHint: @json('Частотность 0: проверьте локальный queue worker (scripts/dev-cluster-queue.sh) и Wordstat New в XMLRiver. Перезапустите анализ после правки.'),
+                    freqZeroHint: @json('Частотность 0: проверьте локальный queue worker (scripts/dev-cluster-queue.sh) и сбор частотности. Перезапустите анализ после правки.'),
                     presetApplied: @json('Пресет Демо применён'),
                     projectLoaded: @json('Параметры сохранённого проекта подставлены в форму'),
                 },

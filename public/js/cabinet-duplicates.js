@@ -43,7 +43,17 @@
     }
 
     function splitLines(text) {
-        return String(text).split(/[\r\n]+/);
+        // Нельзя /[\r\n]+/ — иначе пустые строки между контентом исчезают
+        // и «убрать пустые» всегда даёт emptyRemoved=0.
+        return String(text).replace(/\r\n|\r/g, '\n').split('\n');
+    }
+
+    function countAllLines(text) {
+        var value = String(text);
+        if (value === '') {
+            return 0;
+        }
+        return splitLines(value).length;
     }
 
     function countNonEmptyLines(text) {
@@ -52,10 +62,8 @@
         }).length;
     }
 
-    function countEmptyLines(text) {
-        return splitLines(text).filter(function (line) {
-            return line.trim() === '';
-        }).length;
+    function isBlankLine(line) {
+        return String(line).trim() === '';
     }
 
     function isCaseInsensitiveDedup() {
@@ -183,7 +191,7 @@
             removeEmptyRows: function (text) {
                 var lines = splitLines(text);
                 var filtered = lines.filter(function (line) {
-                    return line.trim() !== '';
+                    return !isBlankLine(line);
                 });
                 metrics.emptyRemoved += Math.max(0, lines.length - filtered.length);
                 return filtered.join('\n');
@@ -214,6 +222,11 @@
                 var caseInsensitive = isCaseInsensitiveDedup();
 
                 lines.forEach(function (line) {
+                    // Пустые не считаем дублями — их убирает опция removeEmptyRows.
+                    if (isBlankLine(line)) {
+                        unique.push(line);
+                        return;
+                    }
                     var key = caseInsensitive ? line.toLowerCase() : line;
                     if (!Object.prototype.hasOwnProperty.call(seen, key)) {
                         seen[key] = true;
@@ -232,20 +245,26 @@
                 if (!isSortEnabled()) {
                     return text;
                 }
-                var lines = splitLines(text).filter(function (line) {
-                    return line.trim() !== '';
+                var lines = splitLines(text);
+                var nonEmpty = [];
+                lines.forEach(function (line) {
+                    if (isBlankLine(line)) {
+                        metrics.emptyRemoved += 1;
+                    } else {
+                        nonEmpty.push(line);
+                    }
                 });
-                lines.sort(function (a, b) {
+                nonEmpty.sort(function (a, b) {
                     return a.localeCompare(b, 'ru', { sensitivity: 'base' });
                 });
-                return lines.join('\n');
+                return nonEmpty.join('\n');
             },
         };
     }
 
     function processText() {
         var beforeText = textEl.value;
-        var before = countNonEmptyLines(beforeText);
+        var before = countAllLines(beforeText);
         var text = beforeText;
         var metrics = { dupRemoved: 0, emptyRemoved: 0 };
         var ops = processors(metrics);
@@ -268,7 +287,7 @@
         });
 
         textEl.value = text;
-        var after = countNonEmptyLines(text);
+        var after = countAllLines(text);
         updateLineCount();
         setKpi(before, after, metrics.dupRemoved, metrics.emptyRemoved);
         updateSplitLayout();

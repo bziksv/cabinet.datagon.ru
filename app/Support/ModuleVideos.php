@@ -106,7 +106,7 @@ class ModuleVideos
         ) ?? $html;
 
         $html = preg_replace_callback(
-            '#<iframe[^>]+src=["\']https?://(?:www\.)?youtube\.com/embed/([a-zA-Z0-9_-]{11})[^"\']*["\'][^>]*>\s*</iframe>#i',
+            '#(?:<p>\s*)?<iframe[^>]+src=["\']https?://(?:www\.)?youtube\.com/embed/([a-zA-Z0-9_-]{11})[^"\']*["\'][^>]*>\s*</iframe>(?:\s*</p>)?#i',
             static function (array $m): string {
                 $url = self::videoUrl($m[1]);
                 if ($url === null) {
@@ -115,9 +115,12 @@ class ModuleVideos
 
                 $poster = self::posterUrl($m[1]) ?? '';
 
-                return '<video class="w-100 module-video-selfhosted" controls playsinline preload="metadata"'
+                return '<div class="video-course" data-id="' . htmlspecialchars($m[1], ENT_QUOTES, 'UTF-8') . '"'
+                    . ' data-local="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">'
+                    . '<video class="module-video-selfhosted" controls playsinline preload="metadata"'
                     . ($poster !== '' ? ' poster="' . e($poster) . '"' : '')
-                    . ' src="' . e($url) . '"></video>';
+                    . ' src="' . e($url) . '"></video>'
+                    . '</div>';
             },
             $html
         ) ?? $html;

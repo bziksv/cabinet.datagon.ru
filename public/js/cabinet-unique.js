@@ -229,6 +229,7 @@
 
     function pushUndo() {
         undoState = {
+            content: contentEl ? contentEl.value : '',
             rows: allRows.map(function (row) {
                 return {
                     word: row.word,
@@ -237,8 +238,16 @@
                     keyPhrases: row.keyPhrases,
                 };
             }),
+            metrics: baseMetrics
+                ? {
+                    phrases: baseMetrics.phrases,
+                    uniqueWords: baseMetrics.uniqueWords,
+                    totalOccurrences: baseMetrics.totalOccurrences,
+                }
+                : null,
             rangeFrom: rangeFromEl ? rangeFromEl.value : '',
             rangeTo: rangeToEl ? rangeToEl.value : '',
+            search: searchEl ? searchEl.value : '',
         };
         if (undoBtn) {
             undoBtn.disabled = false;
@@ -249,23 +258,37 @@
         if (!undoState) {
             return;
         }
-        allRows = undoState.rows;
-        if (rangeFromEl) rangeFromEl.value = undoState.rangeFrom;
-        if (rangeToEl) rangeToEl.value = undoState.rangeTo;
+        var snap = undoState;
         undoState = null;
         if (undoBtn) {
             undoBtn.disabled = true;
         }
+        if (contentEl && snap.content !== undefined) {
+            contentEl.value = snap.content;
+            updatePhraseCount();
+        }
+        allRows = snap.rows || [];
+        baseMetrics = snap.metrics || null;
+        if (rangeFromEl) rangeFromEl.value = snap.rangeFrom || '';
+        if (rangeToEl) rangeToEl.value = snap.rangeTo || '';
+        if (searchEl) {
+            searchEl.value = snap.search || '';
+            searchQuery = snap.search || '';
+        }
         recalcKpi();
         renderTable();
+        scheduleSave();
     }
 
-    function setRows(newRows, metrics) {
+    function setRows(newRows, metrics, options) {
+        options = options || {};
         allRows = newRows || [];
         baseMetrics = metrics;
-        undoState = null;
-        if (undoBtn) {
-            undoBtn.disabled = true;
+        if (!options.keepUndo) {
+            undoState = null;
+            if (undoBtn) {
+                undoBtn.disabled = true;
+            }
         }
         recalcKpi();
         renderTable();
@@ -351,6 +374,9 @@
     function fillExample() {
         if (!contentEl || !config.exampleText) {
             return;
+        }
+        if (contentEl.value.trim() !== '' || allRows.length > 0) {
+            pushUndo();
         }
         contentEl.value = config.exampleText;
         updatePhraseCount();
@@ -465,7 +491,11 @@
                 }
                 if (rangeFromEl) rangeFromEl.value = '';
                 if (rangeToEl) rangeToEl.value = '';
-                setRows(data.rows || [], data.metrics || null);
+                var canUndo = allRows.length > 0;
+                if (canUndo) {
+                    pushUndo();
+                }
+                setRows(data.rows || [], data.metrics || null, { keepUndo: canUndo });
             })
             .catch(function () {
                 if (window.toastr) {
@@ -478,6 +508,10 @@
     }
 
     function clearAll() {
+        var canUndo = (contentEl && contentEl.value.trim() !== '') || allRows.length > 0;
+        if (canUndo) {
+            pushUndo();
+        }
         if (contentEl) {
             contentEl.value = '';
         }
@@ -487,8 +521,6 @@
         if (searchEl) searchEl.value = '';
         if (rangeFromEl) rangeFromEl.value = '';
         if (rangeToEl) rangeToEl.value = '';
-        undoState = null;
-        if (undoBtn) undoBtn.disabled = true;
         updatePhraseCount();
         updateKpi(null);
         renderTable();

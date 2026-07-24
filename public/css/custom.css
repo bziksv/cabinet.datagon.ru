@@ -514,8 +514,30 @@ body > .cabinet-admin-gear__menu.is-open::-webkit-scrollbar-thumb {
 .cabinet-module-description .card-body video,
 .cabinet-module-description .card-body embed,
 .cabinet-module-description .card-body object {
-    max-width: 100%;
-    height: auto;
+    display: block;
+    width: 500px !important;
+    max-width: 100% !important;
+    height: auto !important;
+    aspect-ratio: 16 / 9;
+    object-fit: contain;
+    background: #000;
+    border-radius: 10px;
+}
+
+/* Плеер внутри #video-course — на весь бокс 16:9 */
+.cabinet-module-description .card-body #video-course iframe,
+.cabinet-module-description .card-body #video-course video,
+.cabinet-module-description .card-body .video-course iframe,
+.cabinet-module-description .card-body .video-course video {
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    aspect-ratio: auto;
+    object-fit: contain;
+    background: #000;
+    border-radius: 0;
 }
 
 .cabinet-module-description .card-body img {
@@ -1271,11 +1293,23 @@ a.bg-purple-light:focus, a.bg-purple-light:hover, button.bg-purple-light:focus, 
 }
 
 #video-course, .video-course {
-    height: 300px !important;
+    position: relative;
     width: 500px;
+    max-width: 100%;
+    height: auto !important;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    background: #000;
+    border-radius: 10px;
 }
 
 #video-course > img, .video-course > img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100% !important;
+    max-width: none;
+    object-fit: cover;
     border-radius: 10px !important;
     filter: grayscale(45%) !important;
     transition: .3s !important;
@@ -1291,6 +1325,34 @@ a.bg-purple-light:focus, a.bg-purple-light:hover, button.bg-purple-light:focus, 
 
 #video-course > div, .video-course > div {
     position: absolute;
+    inset: 0;
+    margin: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+#video-course > div img, .video-course > div img {
+    position: static;
+    width: auto;
+    height: 44px !important;
+    max-width: none;
+    pointer-events: none;
+}
+
+#video-course video,
+#video-course iframe,
+.video-course video,
+.video-course iframe {
+    position: absolute;
+    inset: 0;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none;
+    border: 0;
+    object-fit: contain;
+    background: #000;
 }
 
 .user-panel .info {

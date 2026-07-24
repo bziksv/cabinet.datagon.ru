@@ -97,7 +97,7 @@
                 <button type="button" class="btn btn-outline-secondary" data-uw-clear>
                     <i class="bi bi-x-lg me-1" aria-hidden="true"></i>{{ __('Clear') }}
                 </button>
-                <span class="text-muted small align-self-center ms-sm-2">{{ __('Ctrl+Enter — process, Ctrl+Z — undo') }}</span>
+                <span class="text-muted small align-self-center ms-sm-2">{{ __('Ctrl+Enter — process, Ctrl+Z — undo last change') }}</span>
             </div>
         </section>
 

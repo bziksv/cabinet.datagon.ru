@@ -189,14 +189,13 @@
             var localSrc = $el.attr('data-local');
             if (localSrc) {
                 $el.html(
-                    '<video class="w-100 module-video-selfhosted" controls autoplay playsinline src="'
+                    '<video class="module-video-selfhosted" controls autoplay playsinline src="'
                     + localSrc.replace(/"/g, '&quot;') + '"></video>'
                 );
                 return;
             }
 
             var videoId = $el.attr('data-id');
-            var elementId = $el.attr('id') || 'video-course';
             if (!videoId) {
                 return;
             }
@@ -205,8 +204,15 @@
                 if (typeof YT === 'undefined' || typeof YT.Player === 'undefined') {
                     return;
                 }
-                new YT.Player(elementId, {
+                var box = $el[0];
+                var w = Math.max(320, Math.round(box.clientWidth || 500));
+                var h = Math.max(180, Math.round(box.clientHeight || (w * 9 / 16)));
+                var hostId = ($el.attr('id') || 'video-course') + '-yt';
+                $el.empty().append('<div id="' + hostId + '"></div>');
+                new YT.Player(hostId, {
                     videoId: videoId,
+                    width: w,
+                    height: h,
                     playerVars: {autoplay: 1},
                     events: {
                         onReady: function (event) {

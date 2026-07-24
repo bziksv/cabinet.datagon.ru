@@ -706,6 +706,7 @@
     "Ctrl+Enter — calculate": "Ctrl+Enter — посчитать",
     "Ctrl+Enter — process": "Ctrl+Enter — обработать",
     "Ctrl+Enter — process, Ctrl+Z — undo": "Ctrl+Enter — обработать, Ctrl+Z — отменить",
+    "Ctrl+Enter — process, Ctrl+Z — undo last change": "Ctrl+Enter — обработать, Ctrl+Z — отменить последнее действие",
     "Current Image": "Текущее изображение",
     "Current downtime": "Текущий простой",
     "Current uptime:": "Текущий uptime:",

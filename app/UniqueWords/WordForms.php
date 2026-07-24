@@ -45,7 +45,16 @@ class WordForms
 
     public function getAllWordForms(string $str)
     {
-        return $this->morphy->getAllForms($this->_toUpper($str));
+        $upper = $this->_toUpper($str);
+        $forms = $this->morphy->getAllForms($upper);
+
+        // Латиница / бренды / неизвестные слова: phpMorphy даёт false —
+        // иначе samsung и т.п. полностью пропадают из таблицы.
+        if (!$forms) {
+            return [$upper];
+        }
+
+        return $forms;
     }
 
     public function getCount(): int

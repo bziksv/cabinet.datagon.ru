@@ -17,6 +17,11 @@
     var submitBtn = document.getElementById('cabinetSsSubmit');
     var clearBtn = document.getElementById('cabinetSsClear');
     var statusEl = document.getElementById('cabinetSsStatus');
+    var progressEl = document.getElementById('cabinetSsProgress');
+    var progressTitle = document.getElementById('cabinetSsProgressTitle');
+    var progressSub = document.getElementById('cabinetSsProgressSub');
+    var progressTime = document.getElementById('cabinetSsProgressTime');
+    var progressBar = document.getElementById('cabinetSsProgressBar');
     var resultsWrap = document.getElementById('cabinetSsResultsWrap');
     var resultsBody = document.querySelector('#cabinetSsResults tbody');
     var resultsMeta = document.getElementById('cabinetSsResultsMeta');
@@ -32,6 +37,25 @@
     var engineGoogle = document.getElementById('engine_google');
 
     var lastResults = [];
+    var progressTimer = null;
+    var progressStartedAt = 0;
+    var progressExpectedMs = 15000;
+    var collectInFlight = false;
+    var titleFlashTimer = null;
+    var pageTitleBase = document.title;
+    var stopPresets = {};
+    try {
+        stopPresets = JSON.parse(root.getAttribute('data-stop-presets') || '{}') || {};
+    } catch (e) {
+        stopPresets = {};
+    }
+    var i18nNotify = {
+        keep: root.getAttribute('data-i18n-keep') || '',
+        doneTitle: root.getAttribute('data-i18n-notify-done-title') || 'Подсказки собраны',
+        doneBody: root.getAttribute('data-i18n-notify-done-body') || 'Готово: :count подсказок за :time',
+        errorTitle: root.getAttribute('data-i18n-notify-error-title') || 'Сбор подсказок не удался',
+        errorBody: root.getAttribute('data-i18n-notify-error-body') || 'Откройте вкладку и посмотрите сообщение об ошибке.',
+    };
 
     function initRegionSelect() {
         if (!regionSelect || typeof window.jQuery === 'undefined' || typeof window.jQuery.fn.select2 !== 'function') {
@@ -227,6 +251,71 @@
         });
     }
 
+    function parseStopWords(raw) {
+        return String(raw || '')
+            .split(/[\r\n,;]+/u)
+            .map(function (s) { return s.trim(); })
+            .filter(Boolean);
+    }
+
+    function stopWordKey(w) {
+        return String(w || '').toLowerCase().replace(/\s+/g, ' ');
+    }
+
+    function writeStopWords(list) {
+        var el = document.getElementById('cabinetSsStop');
+        if (!el) {
+            return;
+        }
+        el.value = list.join('\n');
+    }
+
+    function mergeStopPreset(key) {
+        var el = document.getElementById('cabinetSsStop');
+        if (!el) {
+            return;
+        }
+        if (key === 'clear') {
+            el.value = '';
+            document.querySelectorAll('.cabinet-ss-stop-presets__btn').forEach(function (b) {
+                b.classList.remove('is-active');
+            });
+            setStatus('Стоп-слова очищены', 'ok');
+            return;
+        }
+        var add = stopPresets[key];
+        if (!Array.isArray(add) || !add.length) {
+            return;
+        }
+        var seen = {};
+        var out = [];
+        parseStopWords(el.value).concat(add).forEach(function (w) {
+            var k = stopWordKey(w);
+            if (!k || seen[k]) {
+                return;
+            }
+            seen[k] = true;
+            out.push(w);
+        });
+        writeStopWords(out);
+        var btn = document.querySelector('.cabinet-ss-stop-presets__btn[data-stop-preset="' + key + '"]');
+        if (btn) {
+            btn.classList.add('is-active');
+        }
+        setStatus('Стоп-слова: +' + add.length + ' («' + ((btn && btn.textContent) || key).trim() + '»)', 'ok');
+    }
+
+    var stopPresetWrap = document.getElementById('cabinetSsStopPresets');
+    if (stopPresetWrap) {
+        stopPresetWrap.addEventListener('click', function (e) {
+            var btn = e.target.closest('.cabinet-ss-stop-presets__btn');
+            if (!btn) {
+                return;
+            }
+            mergeStopPreset(btn.getAttribute('data-stop-preset'));
+        });
+    }
+
     function updateHeaderRemaining(left) {
         var header = document.getElementById('cabinet-header-module-limit');
         if (!header || left == null) {
@@ -329,6 +418,209 @@
         statusEl.className = 'small ml-2' + (kind ? ' is-' + kind : '');
     }
 
+    function stopTitleFlash() {
+        if (titleFlashTimer) {
+            clearInterval(titleFlashTimer);
+            titleFlashTimer = null;
+        }
+        document.title = pageTitleBase;
+    }
+
+    function startTitleFlash(message) {
+        stopTitleFlash();
+        var on = true;
+        document.title = message;
+        titleFlashTimer = setInterval(function () {
+            on = !on;
+            document.title = on ? message : pageTitleBase;
+        }, 1200);
+    }
+
+    function ensureNotifyPermission() {
+        if (typeof Notification === 'undefined') {
+            return;
+        }
+        if (Notification.permission === 'default') {
+            try {
+                Notification.requestPermission();
+            } catch (e) {
+                // ignore
+            }
+        }
+    }
+
+    function showDesktopNotify(title, body) {
+        if (typeof Notification === 'undefined' || Notification.permission !== 'granted') {
+            return;
+        }
+        try {
+            var n = new Notification(title, {
+                body: body,
+                icon: '/img/favicon.svg',
+                tag: 'cabinet-search-suggestions',
+            });
+            n.onclick = function () {
+                try {
+                    window.focus();
+                } catch (e) {
+                    // ignore
+                }
+                n.close();
+            };
+            setTimeout(function () {
+                try {
+                    n.close();
+                } catch (e) {
+                    // ignore
+                }
+            }, 12000);
+        } catch (e) {
+            // ignore
+        }
+    }
+
+    function notifyCollectFinished(ok, count, elapsed) {
+        var title = ok ? i18nNotify.doneTitle : i18nNotify.errorTitle;
+        var body = ok
+            ? i18nNotify.doneBody
+                .replace(':count', String(count != null ? count : 0))
+                .replace(':time', String(elapsed || '0:00'))
+            : i18nNotify.errorBody;
+
+        // Всегда мигаем title, если вкладка в фоне; иначе разово меняем на секунду.
+        if (document.hidden) {
+            startTitleFlash(ok ? '✓ ' + title : '✗ ' + title);
+            showDesktopNotify(title, body);
+        } else {
+            var prev = document.title;
+            document.title = (ok ? '✓ ' : '✗ ') + title;
+            setTimeout(function () {
+                if (!titleFlashTimer) {
+                    document.title = prev;
+                }
+            }, 2500);
+        }
+    }
+
+    window.addEventListener('focus', stopTitleFlash);
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) {
+            stopTitleFlash();
+        }
+    });
+    window.addEventListener('beforeunload', function (e) {
+        if (!collectInFlight) {
+            return;
+        }
+        e.preventDefault();
+        e.returnValue = '';
+    });
+
+    function formatElapsed(ms) {
+        var sec = Math.max(0, Math.floor(ms / 1000));
+        var m = Math.floor(sec / 60);
+        var s = sec % 60;
+        return m + ':' + (s < 10 ? '0' : '') + s;
+    }
+
+    function countSeeds(raw) {
+        return String(raw || '')
+            .split(/\r\n|\r|\n/)
+            .map(function (s) { return s.trim(); })
+            .filter(Boolean).length;
+    }
+
+    function estimateVariants() {
+        var n = 0;
+        if (checked('mode_phrase')) n += 1;
+        if (checked('mode_space')) n += 1;
+        if (checked('mode_en')) n += 26;
+        if (checked('mode_ru')) n += 33;
+        if (checked('mode_digits')) n += 10;
+        if (checked('preset_local')) n += parseInt(root.getAttribute('data-preset-local') || '5', 10) || 5;
+        if (checked('preset_shopping')) n += parseInt(root.getAttribute('data-preset-shopping') || '6', 10) || 6;
+        if (checked('preset_questions')) n += parseInt(root.getAttribute('data-preset-questions') || '7', 10) || 7;
+        if (checked('preset_reviews')) n += parseInt(root.getAttribute('data-preset-reviews') || '3', 10) || 3;
+        return Math.max(1, n);
+    }
+
+    function estimateRequests() {
+        var seeds = countSeeds(document.getElementById('cabinetSsSeeds').value);
+        var engines = (checked('engine_yandex') ? 1 : 0) + (checked('engine_google') ? 1 : 0);
+        var depth = parseInt((document.getElementById('cabinetSsDepth') || {}).value || '1', 10) || 1;
+        var variants = estimateVariants();
+        var level1 = Math.max(1, seeds) * Math.max(1, engines) * variants;
+        // Глубина 2+ кормит найденные подсказки обратно в очередь — грубый множитель.
+        var depthFactor = depth <= 1 ? 1 : (depth === 2 ? 4.5 : 10);
+        return Math.max(1, Math.round(level1 * depthFactor));
+    }
+
+    function setProgressVisible(on) {
+        if (!progressEl) {
+            return;
+        }
+        progressEl.classList.toggle('d-none', !on);
+        if (!on && progressTimer) {
+            clearInterval(progressTimer);
+            progressTimer = null;
+        }
+    }
+
+    function paintProgress(pct, title, sub) {
+        var value = Math.max(0, Math.min(100, pct));
+        if (progressBar) {
+            progressBar.style.width = value + '%';
+            progressBar.setAttribute('aria-valuenow', String(value));
+        }
+        if (progressTitle && title) {
+            progressTitle.textContent = title;
+        }
+        if (progressSub && sub != null) {
+            progressSub.textContent = sub;
+        }
+        if (progressTime) {
+            progressTime.textContent = formatElapsed(Date.now() - progressStartedAt);
+        }
+    }
+
+    function startProgress(estimatedReqs) {
+        var pauseMs = parseInt(root.getAttribute('data-pause-ms') || '80', 10) || 80;
+        // pause + сеть ≈ 150–220 мс на запрос; при «Максимум» это легко минуты.
+        progressExpectedMs = Math.max(6000, Math.round(estimatedReqs * (pauseMs + 140)));
+        progressStartedAt = Date.now();
+        setProgressVisible(true);
+        paintProgress(
+            4,
+            'Сбор подсказок…',
+            '≈ ' + estimatedReqs + ' запросов · при полном наборе это может занять 1–2 минуты'
+        );
+        if (progressTimer) {
+            clearInterval(progressTimer);
+        }
+        progressTimer = setInterval(function () {
+            var elapsed = Date.now() - progressStartedAt;
+            // Асимптота к 92%: полоска живёт всё время запроса, не «зависает» на 0.
+            var pct = Math.min(92, Math.round(100 * (1 - Math.exp(-elapsed / (progressExpectedMs * 0.55)))));
+            var hint = elapsed < 15000
+                ? '≈ ' + estimatedReqs + ' запросов · идёт сбор, подождите'
+                : elapsed < 45000
+                    ? 'Ещё собираем — при алфавите и глубине 2 это нормально'
+                    : 'Долгий прогон · сервер всё ещё опрашивает подсказки';
+            paintProgress(Math.max(4, pct), 'Сбор подсказок…', hint);
+        }, 400);
+    }
+
+    function finishProgress(ok) {
+        if (progressTimer) {
+            clearInterval(progressTimer);
+            progressTimer = null;
+        }
+        paintProgress(100, ok ? 'Готово' : 'Ошибка', ok ? 'Результаты ниже' : '');
+        setTimeout(function () {
+            setProgressVisible(false);
+        }, ok ? 400 : 900);
+    }
+
     function checked(id) {
         var el = document.getElementById(id);
         return !!(el && el.checked);
@@ -395,7 +687,10 @@
     form.addEventListener('submit', function (e) {
         e.preventDefault();
         submitBtn.disabled = true;
+        collectInFlight = true;
         setStatus('Сбор…', 'busy');
+        ensureNotifyPermission();
+        startProgress(estimateRequests());
 
         fetch(collectUrl, {
             method: 'POST',
@@ -413,30 +708,42 @@
                 });
             })
             .then(function (res) {
+                collectInFlight = false;
                 submitBtn.disabled = false;
+                var elapsed = formatElapsed(Date.now() - progressStartedAt);
                 if (!res.ok) {
+                    finishProgress(false);
                     setStatus((res.data && res.data.message) || 'Ошибка', 'error');
                     if (res.data) {
                         updateCounters(res.data);
                     }
+                    notifyCollectFinished(false, 0, elapsed);
                     return;
                 }
+                finishProgress(true);
                 renderResults(res.data.results || []);
                 updateCounters(res.data);
-                var msg = 'Готово: ' + (res.data.results || []).length + ' подсказок, списано ' + (res.data.cost || 0);
+                var reqs = res.data.requests != null ? res.data.requests : null;
+                var count = (res.data.results || []).length;
+                var msg = 'Готово: ' + count + ' подсказок, списано ' + (res.data.cost || 0);
+                if (reqs != null) {
+                    msg += ', запросов ' + reqs;
+                }
+                msg += ' · ' + elapsed;
                 if (res.data.history_warning) {
                     msg += '. ' + res.data.history_warning;
                     setStatus(msg, 'error');
                 } else {
                     setStatus(msg, 'ok');
                 }
-                if (res.data.history_id) {
-                    // мягко обновим страницу истории при следующем заходе
-                }
+                notifyCollectFinished(true, count, elapsed);
             })
             .catch(function () {
+                collectInFlight = false;
                 submitBtn.disabled = false;
+                finishProgress(false);
                 setStatus('Сеть или сервер недоступны', 'error');
+                notifyCollectFinished(false, 0, formatElapsed(Date.now() - progressStartedAt));
             });
     });
 

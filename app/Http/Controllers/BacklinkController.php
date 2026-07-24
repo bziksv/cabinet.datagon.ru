@@ -3,15 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\BacklinkConfig;
-use App\Classes\SimpleHtmlDom\HtmlDocument;
+use App\Jobs\Backlink\CheckProjectBacklinksJob;
 use App\LinkTracking;
 use App\ProjectTracking;
+use App\Services\Backlink\BacklinkChecker;
 use App\Support\BacklinkAdminStats;
+use App\Support\BacklinkHtmlMatcher;
 use App\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Redirect;
 
 class BacklinkController extends Controller
@@ -41,6 +44,10 @@ class BacklinkController extends Controller
         }
 
         $backlinks = ProjectTracking::where('user_id', '=', Auth::id())->get();
+        foreach ($backlinks as $project) {
+            $count = BacklinkChecker::recountProject((int) $project->id);
+            $project->total_broken_link = $count;
+        }
         $user = Auth::user();
         $onFreeTariff = $user->onFreeTariff();
         $telegramConnected = $user->isTelegramConnected();
@@ -122,8 +129,18 @@ class BacklinkController extends Controller
         $user = Auth::user();
         $onFreeTariff = $user->onFreeTariff();
         $telegramConnected = $user->isTelegramConnected();
+        $checkProgress = CheckProjectBacklinksJob::progress((int) $project->id);
+        $schedule = config('cabinet-backlink.schedule', []);
+        $project->total_broken_link = BacklinkChecker::recountProject((int) $project->id);
 
-        return view('backlink.show', compact('project', 'monitoring', 'onFreeTariff', 'telegramConnected'));
+        return view('backlink.show', compact(
+            'project',
+            'monitoring',
+            'onFreeTariff',
+            'telegramConnected',
+            'checkProgress',
+            'schedule'
+        ));
     }
 
     public function storeLink(Request $request): RedirectResponse
@@ -139,19 +156,37 @@ class BacklinkController extends Controller
             }
             $this->expressCreate($request, $phrases);
         }
-        flash()->overlay(__('Tracking was successfully created'), ' ')->success();
+        flash()->overlay(__('Tracking was successfully created') . ' ' . __('Backlink schedule after upload'), ' ')->success();
 
         return Redirect::route('backlink');
     }
 
     public function editLink(Request $request): JsonResponse
     {
-        if (strlen($request->option) > 0) {
+        $allowed = ['site_donor', 'link', 'anchor', 'nofollow', 'noindex'];
+        $name = (string) $request->input('name', '');
+        if (! in_array($name, $allowed, true)) {
+            return response()->json([], 400);
+        }
+
+        $option = $request->input('option');
+        // Пустой анкор = безанкорная ссылка.
+        if ($name === 'anchor') {
             LinkTracking::where('id', $request->id)->update([
-                $request->name => $request->option,
+                'anchor' => (string) ($option ?? ''),
             ]);
+
             return response()->json([]);
         }
+
+        if (strlen((string) $option) > 0) {
+            LinkTracking::where('id', $request->id)->update([
+                $name => $option,
+            ]);
+
+            return response()->json([]);
+        }
+
         return response()->json([], 400);
     }
 
@@ -199,15 +234,16 @@ class BacklinkController extends Controller
     public function removeLink($id): RedirectResponse
     {
         $link = LinkTracking::findOrFail($id);
-        $project = ProjectTracking::findOrFail($link->project_tracking_id);
-        $project->decrement('total_link');
-        if ($link->broken) {
-            $project->decrement('total_broken_link');
+        $projectId = (int) $link->project_tracking_id;
+        $project = ProjectTracking::findOrFail($projectId);
+        if ($project->total_link > 0) {
+            $project->decrement('total_link');
         }
         LinkTracking::destroy($id);
+        BacklinkChecker::recountProject($projectId);
         flash()->overlay(__('Link was successfully deleted'), ' ')->success();
 
-        return Redirect::route('show.backlink', $link->project_tracking_id);
+        return Redirect::route('show.backlink', $projectId);
     }
 
     public function store(Request $request): RedirectResponse
@@ -233,7 +269,7 @@ class BacklinkController extends Controller
             $this->expressCreate($request, $phrases);
         }
 
-        flash()->overlay(__('Tracking was successfully created'), ' ')->success();
+        flash()->overlay(__('Tracking was successfully created') . ' ' . __('Backlink schedule after upload'), ' ')->success();
 
         return Redirect::route('backlink');
     }
@@ -275,13 +311,18 @@ class BacklinkController extends Controller
 
         foreach ($phrases as $phrase) {
             $params = explode("::", $phrase);
+            $anchor = (string) ($params[2] ?? '');
+            // «-» или «*» в экспресс-формате = безанкорная.
+            if ($anchor === '-' || $anchor === '*') {
+                $anchor = '';
+            }
             $tracking = new LinkTracking([
                 'project_tracking_id' => empty($request->id)
                     ? $projectTracking->id
                     : $request->id,
                 'site_donor' => $params[0],
                 'link' => $params[1],
-                'anchor' => $params[2],
+                'anchor' => $anchor,
                 'nofollow' => $params[3],
                 'noindex' => $params[4],
             ]);
@@ -305,13 +346,15 @@ class BacklinkController extends Controller
             $project->increment('total_link');
         }
         for ($i = 1; $i <= (integer)$request['countRows']; $i++) {
+            $anchorless = (string) ($request['anchorless_' . $i] ?? '0') === '1';
+            $anchor = $anchorless ? '' : (string) ($request['anchor_' . $i] ?? '');
             $tracking = new LinkTracking([
                 'project_tracking_id' => empty($request['id'])
                     ? $projectTracking->id
                     : $request['id'],
                 'site_donor' => $request['site_donor_' . $i],
                 'link' => $request['link_' . $i],
-                'anchor' => $request['anchor_' . $i],
+                'anchor' => $anchor,
                 'nofollow' => $request['nofollow_' . $i],
                 'noindex' => $request['noindex_' . $i],
             ]);
@@ -338,153 +381,90 @@ class BacklinkController extends Controller
 
     public function checkLink($id): RedirectResponse
     {
-        $site = LinkTracking::findOrFail($id);
-        $this->analyseLink($site);
-
-        if (isset($this->error)) {
-            $this->saveResult($site, true);
-        } else {
-            $this->saveResult($site, false);
+        $site = LinkTracking::with('project')->findOrFail($id);
+        if (! $site->project || ($site->project->user_id !== Auth::id() && ! User::isUserAdmin())) {
+            abort(403);
         }
+
+        app(BacklinkChecker::class)->checkAndSave($site);
 
         return Redirect::route('show.backlink', $site->project_tracking_id);
     }
 
+    /**
+     * Поставить в очередь проверку всех ссылок проекта.
+     */
+    public function checkProject($id): RedirectResponse
+    {
+        $project = ProjectTracking::findOrFail($id);
+        if ($project->user_id !== Auth::id() && ! User::isUserAdmin()) {
+            abort(403);
+        }
+
+        $progress = CheckProjectBacklinksJob::progress((int) $project->id);
+        $busy = in_array(($progress['status'] ?? ''), ['queued', 'running'], true);
+        if ($busy) {
+            flash()->overlay(__('Backlink check project already running'), ' ')->warning();
+
+            return Redirect::route('show.backlink', $project->id);
+        }
+
+        $total = LinkTracking::where('project_tracking_id', $project->id)->count();
+        if ($total === 0) {
+            flash()->overlay(__('Backlink empty links'), ' ')->error();
+
+            return Redirect::route('show.backlink', $project->id);
+        }
+
+        Cache::put(CheckProjectBacklinksJob::cacheKey((int) $project->id), [
+            'status' => 'queued',
+            'total' => $total,
+            'done' => 0,
+            'started_at' => date('Y-m-d H:i:s'),
+        ], 7200);
+
+        CheckProjectBacklinksJob::dispatch((int) $project->id);
+
+        flash()->overlay(__('Backlink check project queued', ['count' => $total]), ' ')->success();
+
+        return Redirect::route('show.backlink', $project->id);
+    }
+
+    public function checkProjectStatus($id): JsonResponse
+    {
+        $project = ProjectTracking::findOrFail($id);
+        if ($project->user_id !== Auth::id() && ! User::isUserAdmin()) {
+            abort(403);
+        }
+
+        $progress = CheckProjectBacklinksJob::progress((int) $project->id) ?: [
+            'status' => 'idle',
+            'total' => 0,
+            'done' => 0,
+        ];
+
+        return response()->json($progress);
+    }
+
     public function analyseLink($project)
     {
-        $html = $this->curlInit($project->site_donor);
-
-        if (!$html) {
-            $this->error = 'The donor site does not exist';
-        } else {
-            $this->searchLink($html, $project);
-        }
+        // Совместимость со старыми вызовами — делегируем в сервис.
+        app(BacklinkChecker::class)->checkAndSave($project);
     }
 
     private function searchLink($html, $project)
     {
-        $document = new HtmlDocument();
-        $document->load(mb_strtolower($html));
-
-        $this->searchNoIndex($document, $project);
-
-        if ($this->node === false) {
-            $elem = $document->find('a[href="' . $project->link . '"]');
-
-            if ($elem !== []) {
-                foreach ($elem as $node) {
-                    foreach ($node->_ as $text) {
-                        if ($text === mb_strtolower($project->anchor)) {
-                            $this->result = 'Link found, anchor matches.';
-                            $this->node = $node;
-                            break 2;
-                        }
-                    }
-
-                    foreach ($node->children as $child) {
-                        foreach ($child->_ as $text) {
-                            if ($text === mb_strtolower($project->anchor)) {
-                                $this->node = $child;
-                                $this->result = 'Link found, anchor matches.';
-                                break 3;
-                            }
-                        }
-                    }
-                }
-            } else {
-                $this->error = 'Link not found.';
-            }
-        }
-
-        $issetNofollow = false;
-        if ($project->nofollow && $this->node !== false) {
-            foreach ($this->node->attr as $attribute => $value) {
-                if ($attribute === 'rel' && $value === 'nofollow') {
-                    $issetNofollow = true;
-                    break;
-                }
-            }
-
-            if ($issetNofollow) {
-                $this->noFollow = 'Link have attribute nofollow.';
-            } else {
-                $this->noFollow = 'Link not have attribute nofollow.';
-            }
-        }
-    }
-
-    private function searchNoIndex($document, $project)
-    {
-        $elem = $document->find('noindex');
-
-        if ($elem !== []) {
-            foreach ($elem as $node) {
-                $this->searchNoIndexLink($node->children[0], $project);
-            }
-        }
-
-        if ($this->noIndex === null) {
-            $this->noIndex = 'Link not placed in noindex.';
-        }
-    }
-
-    private function searchNoIndexLink($node, $project)
-    {
-        if ($node->tag === 'a') {
-            foreach ($node->_ as $text) {
-                if ($text === mb_strtolower($project->anchor)) {
-                    $this->noIndex = $project->noindex ? 'Link found, anchor matches, link placed in noindex.' : 'Link found, anchor matches.';
-                    $this->node = $node;
-                    return;
-                }
-            }
-        } else {
-            $this->searchNoIndexLink($node->children[0], $project);
-        }
+        // unused — логика в BacklinkChecker
     }
 
     public function curlInit($page_url)
     {
-        $curl = curl_init();
-        curl_setopt($curl, CURLOPT_URL, $page_url);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($curl, CURLOPT_FOLLOWLOCATION, 1);
-        curl_setopt($curl, CURLOPT_USERAGENT, 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.121 Safari/537.36');
-        curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 30);
-        curl_setopt($curl, CURLOPT_TIMEOUT, 60);
-        curl_setopt($curl, CURLOPT_FAILONERROR, true);
-        $html = curl_exec($curl);
-        curl_close($curl);
-        if (!$html) {
-            return false;
-        }
-        return preg_replace('//i', '', $html);
+        return BacklinkHtmlMatcher::fetchHtml((string) $page_url);
     }
 
     public function saveResult($target, $broken)
     {
-        if (isset($this->error)) {
-            $target->status = $this->error;
-        } else {
-            $target->status = preg_replace('/\s+/u', ' ', "$this->result $this->noIndex $this->noFollow");
-        }
-
-        $target->last_check = date("Y-m-d H:i:s");
-        if ($target->broken == null) {
-            if ($broken) {
-                $this->increment($target->project_tracking_id);
-            } else {
-                $this->decrement($target->project_tracking_id);
-            }
-        } elseif ($target->broken != $broken) {
-            if ($broken) {
-                $this->increment($target->project_tracking_id);
-            } else {
-                $this->decrement($target->project_tracking_id);
-            }
-        }
-        $target->broken = $broken;
-        $target->save();
+        // unused — логика в BacklinkChecker
     }
 
     public function increment($project_tracking_id)

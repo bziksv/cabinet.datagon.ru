@@ -63,6 +63,7 @@
                     <tr>
                         <th class="cabinet-bl-col-wide">{{ __('Backlink col donor') }}</th>
                         <th class="cabinet-bl-col-wide">{{ __('Backlink col acceptor') }}</th>
+                        <th>{{ __('Backlink col anchorless short') }}</th>
                         <th>{{ __('Backlink col anchor short') }}</th>
                         <th>{{ __('Backlink col nofollow short') }}</th>
                         <th>{{ __('Backlink col noindex short') }}</th>
@@ -72,7 +73,8 @@
                     <tr id="cabinet-bl-row-1">
                         <td>{!! Form::text('site_donor_1', null, ['class' => 'form-control', 'required']) !!}</td>
                         <td>{!! Form::text('link_1', null, ['class' => 'form-control', 'required']) !!}</td>
-                        <td>{!! Form::text('anchor_1', null, ['class' => 'form-control', 'required']) !!}</td>
+                        <td>{!! Form::select('anchorless_1', ['0' => __('No'), '1' => __('Yes')], '0', ['class' => 'form-select cabinet-bl-anchorless-row']) !!}</td>
+                        <td>{!! Form::text('anchor_1', null, ['class' => 'form-control cabinet-bl-anchor-input', 'required', 'placeholder' => __('Backlink anchor placeholder')]) !!}</td>
                         <td>{!! Form::select('nofollow_1', ['1' => __('Yes'), '0' => __('No')], null, ['class' => 'form-select']) !!}</td>
                         <td>{!! Form::select('noindex_1', ['1' => __('Yes'), '0' => __('No')], null, ['class' => 'form-select']) !!}</td>
                     </tr>

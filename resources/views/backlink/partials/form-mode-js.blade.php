@@ -63,11 +63,23 @@
             '<tr id="cabinet-bl-row-' + countRows + '">' +
             '<td><input type="text" name="site_donor_' + countRows + '" class="form-control" required></td>' +
             '<td><input type="text" name="link_' + countRows + '" class="form-control" required></td>' +
-            '<td><input type="text" name="anchor_' + countRows + '" class="form-control" required></td>' +
+            '<td><select class="form-select cabinet-bl-anchorless-row" name="anchorless_' + countRows + '"><option value="0">{{ __("No") }}</option><option value="1">{{ __("Yes") }}</option></select></td>' +
+            '<td><input type="text" name="anchor_' + countRows + '" class="form-control cabinet-bl-anchor-input" required placeholder=' + @json(__('Backlink anchor placeholder')) + '></td>' +
             '<td><select class="form-select" name="nofollow_' + countRows + '"><option value="1">{{ __("Yes") }}</option><option value="0">{{ __("No") }}</option></select></td>' +
             '<td><select class="form-select" name="noindex_' + countRows + '"><option value="1">{{ __("Yes") }}</option><option value="0">{{ __("No") }}</option></select></td>' +
             '</tr>'
         );
+    });
+
+    $page.on('change', '.cabinet-bl-anchorless-row', function () {
+        var $row = $(this).closest('tr');
+        var $anchor = $row.find('.cabinet-bl-anchor-input');
+        var isAnchorless = $(this).val() === '1';
+        if (isAnchorless) {
+            $anchor.val('').prop('required', false).prop('disabled', true);
+        } else {
+            $anchor.prop('disabled', false).prop('required', true);
+        }
     });
 
     $page.on('click', '#cabinet-bl-remove-row', function () {

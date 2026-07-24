@@ -93,7 +93,7 @@
         {{ __('TF-IDF TOP') }}
         <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('Hybrid TF-IDF in the competitor corpus: frequency × corpus IDF × coverage across TOP sites.') }}</span>
             </span>
         </span>
@@ -102,7 +102,7 @@
         {{ __('TF-IDF your site') }}
         <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('Hybrid TF-IDF on your landing page using the same competitor IDF and coverage.') }}</span>
             </span>
         </span>
@@ -111,7 +111,7 @@
         {{ __('BM25 TOP') }}
         <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('BM25 weight in the aggregated competitor corpus.') }}</span>
             </span>
         </span>
@@ -120,7 +120,7 @@
         {{ __('BM25 your site') }}
         <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('BM25 weight on your landing page.') }}</span>
             </span>
         </span>
@@ -128,7 +128,7 @@
     <th class="unigram-th-narrow">{{ __('Intersection') }}
         <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('The number of sites in which the word is present.') }}</span>
             </span>
         </span>
@@ -136,7 +136,7 @@
     <th class="unigram-th-narrow">{{ __('Re - spam') }}
         <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('The maximum number of repetitions found on the competitors website.') }}</span>
             </span>
         </span>
@@ -144,7 +144,7 @@
     <th class="unigram-th-wide">{{ __('Average number of repetitions in the text and links') }}
         <span class="unigram-th-help __helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('The average value of the number of repetitions in the text and links of your competitors.') }}</span>
             </span>
         </span>
@@ -152,7 +152,7 @@
     <th class="unigram-th-wide">{{ __('The total number of repetitions in the text and links') }}
         <span class="unigram-th-help __helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('The total number of repetitions on your page in links and text.') }}</span>
             </span>
         </span>
@@ -160,7 +160,7 @@
     <th class="unigram-th-wide">{{ __('Average number of repetitions in the text') }}
         <span class="unigram-th-help __helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('The average value of the number of repetitions in the text of your competitors.') }}</span>
             </span>
         </span>
@@ -168,7 +168,7 @@
     <th class="unigram-th-wide">{{ __('Number of repetitions in text') }}
         <span class="unigram-th-help __helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('The number of repetitions in the text on your page') }}</span>
             </span>
         </span>
@@ -176,7 +176,7 @@
     <th class="unigram-th-wide">{{ __('Average number of repetitions in links') }}
         <span class="unigram-th-help __helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('The average value of the number of repetitions in the links of your competitors.') }}</span>
             </span>
         </span>
@@ -184,7 +184,7 @@
     <th class="unigram-th-wide">{{ __('Number of repetitions in links') }}
         <span class="unigram-th-help __helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('The number of repetitions in the links on your page.') }}</span>
             </span>
         </span>

@@ -203,7 +203,16 @@
             </div>
 
             <div class="cabinet-st-hosts-block mb-3 d-none" id="cabinetStHostsBlock">
-                <h5 class="h6 mb-2">{{ __('Site types frequent hosts title') }}</h5>
+                <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
+                    <h5 class="h6 mb-0">{{ __('Site types frequent hosts title') }}</h5>
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <select id="cabinetStHostsFilterType" class="form-control form-control-sm" style="width: auto; min-width: 10rem;"
+                                aria-label="{{ __('Site types filter all') }}">
+                            <option value="">{{ __('Site types filter all') }}</option>
+                        </select>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="cabinetStHostsExport">{{ __('Export') }} CSV</button>
+                    </div>
+                </div>
                 <div class="table-responsive">
                     <table class="table table-sm table-bordered cabinet-st-hosts mb-0" id="cabinetStFrequentHosts">
                         <thead>

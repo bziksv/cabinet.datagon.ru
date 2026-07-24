@@ -65,9 +65,15 @@
                     <div class="card-header"><h3 class="card-title mb-0">{{ __('How checks run') }}</h3></div>
                     <div class="card-body small text-secondary">
                         <p class="mb-2">{{ __('Backlink cron explain') }}</p>
+                        <ul class="mb-2 ps-3">
+                            <li>{{ __('Backlink schedule full scan', ['time' => config('cabinet-backlink.schedule.full_scan', '01:00')]) }}</li>
+                            <li>{{ __('Backlink schedule broken scan') }}</li>
+                            <li>{{ __('Backlink schedule after upload') }}</li>
+                            <li>{{ __('Backlink schedule manual') }}</li>
+                        </ul>
                         <ul class="mb-0 ps-3">
-                            <li><code>GET /api/backlink/scan-broken-links</code></li>
-                            <li><code>GET /api/backlink/scan-links</code></li>
+                            <li><code>GET /api/backlink/scan-broken-links</code> — {{ __('Backlink cron hourly label') }}</li>
+                            <li><code>GET /api/backlink/scan-links</code> — {{ config('cabinet-backlink.schedule.full_scan', '01:00') }}</li>
                         </ul>
                     </div>
                 </div>

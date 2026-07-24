@@ -361,6 +361,36 @@
     line-height: 1.35;
 }
 
+.cabinet-dr-neighbors-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.cabinet-dr-neighbors-actions .btn {
+    white-space: nowrap;
+}
+
+.cabinet-dr-neighbors-modal-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    gap: 0.35rem 0.75rem;
+    max-height: none;
+}
+
+.cabinet-dr-neighbors-modal-list a {
+    color: #0f172a;
+    font-size: 0.875rem;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    word-break: break-all;
+}
+
 .cabinet-dr-compare {
     border: 1px solid var(--dr-line);
     border-radius: 0.75rem;

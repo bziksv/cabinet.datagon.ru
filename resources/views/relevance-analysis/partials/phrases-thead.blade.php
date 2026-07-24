@@ -67,7 +67,7 @@
         {{ __('TF-IDF TOP') }}
         <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('Hybrid TF-IDF in the competitor corpus: frequency × corpus IDF × coverage across TOP sites.') }}</span>
             </span>
         </span>
@@ -76,7 +76,7 @@
         {{ __('TF-IDF your site') }}
         <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('Hybrid TF-IDF on your landing page using the same competitor IDF and coverage.') }}</span>
             </span>
         </span>
@@ -85,7 +85,7 @@
         {{ __('BM25 TOP') }}
         <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('BM25 weight in the aggregated competitor corpus.') }}</span>
             </span>
         </span>
@@ -94,7 +94,7 @@
         {{ __('BM25 your site') }}
         <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('BM25 weight on your landing page.') }}</span>
             </span>
         </span>
@@ -103,7 +103,7 @@
         {{ __('Number of sites') }}
         <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('The number of sites in which the phrase is present.') }}</span>
             </span>
         </span>
@@ -112,7 +112,7 @@
         {{ __('Median occurrence') }}
         <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('The median number of phrase repetitions across competitors.') }}</span>
             </span>
         </span>
@@ -121,7 +121,7 @@
         {{ __('Average') }}
         <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('The average number of phrase repetitions across competitors.') }}</span>
             </span>
         </span>
@@ -130,7 +130,7 @@
         {{ __('On our site') }}
         <span class="__helper-link ui_tooltip_w">
             <i class="fa fa-question-circle"></i>
-            <span class="ui_tooltip __left">
+            <span class="ui_tooltip __bottom relevance-tlp-col-tip">
                 <span class="ui_tooltip_content">{{ __('The number of phrase repetitions on your page.') }}</span>
             </span>
         </span>

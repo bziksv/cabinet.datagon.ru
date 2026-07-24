@@ -71,7 +71,8 @@
                             </div>
                         </div>
 
-                        <form id="cabinet-pw-form" action="{{ route('generate.password') }}" method="post">
+                        <form id="cabinet-pw-form" action="{{ route('generate.password') }}" method="post"
+                              data-options-required="{{ e(__('Password generator options required')) }}">
                             @csrf
                             <div class="cabinet-pw-options">
                                 <div class="form-check">
@@ -111,6 +112,9 @@
                             <button type="submit" class="btn btn-primary mt-4 click_tracking" data-click="Generate password">
                                 <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>{{ __('Generate password') }}
                             </button>
+                            <div id="cabinet-pw-form-alert"
+                                 class="alert alert-danger cabinet-pw-form-alert d-none mb-0"
+                                 role="alert"></div>
                         </form>
                     </div>
                 </div>

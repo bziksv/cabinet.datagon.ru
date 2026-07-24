@@ -62,7 +62,7 @@
             text-title="{{ __('Bulk check up to 500 pieces at a time') }}"
             timeout-title="{{ __('Timeout between requests in ms') }}"
             export-btn="{{ __('Export') }}"
-            open-new-page="{{ __('Open in a new window') }}"
+            open-new-page="{{ __('Http headers open details') }}"
             more="{{ __('More') }}"
             bulk-step-title="{{ __('Http headers bulk step title') }}"
             bulk-hint="{{ __('Http headers bulk hint') }}"

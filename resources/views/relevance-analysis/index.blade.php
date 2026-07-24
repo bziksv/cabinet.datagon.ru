@@ -1039,7 +1039,7 @@
                                         50,
                                         false,
                                         0,
-                                        result.sitesAVG,
+                                        result.average_values,
                                         id,
                                     );
                                     enableAnalyseButtons()

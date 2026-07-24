@@ -23,6 +23,12 @@
         neighborsSelf: root.getAttribute('data-i18n-neighbors-self') || 'На IP только этот домен (и www)',
         neighborsError: root.getAttribute('data-i18n-neighbors-error') || 'Не удалось получить список доменов на IP',
         neighborsLoading: root.getAttribute('data-i18n-neighbors-loading') || 'Ищем…',
+        neighborsViewAll: root.getAttribute('data-i18n-neighbors-view-all') || 'Посмотреть всех',
+        neighborsDownload: root.getAttribute('data-i18n-neighbors-download') || 'Скачать список',
+        neighborsModalTitle: root.getAttribute('data-i18n-neighbors-modal-title') || 'Сайты на IP :ip',
+        neighborsModalCount: root.getAttribute('data-i18n-neighbors-modal-count') || 'Показано :shown из :total',
+        neighborsModalSearch: root.getAttribute('data-i18n-neighbors-modal-search') || 'Фильтр по домену…',
+        neighborsMore: root.getAttribute('data-i18n-neighbors-more') || 'ещё :more (:total всего)',
         comparePick: root.getAttribute('data-i18n-compare-pick') || 'Выберите две проверки',
         compareTitle: root.getAttribute('data-i18n-compare-title') || 'Сравнение проверок',
     };
@@ -257,13 +263,113 @@
                 escapeHtml(d) + '</a></li>';
         });
         html += '</ul>';
+
+        var actions = '<div class="cabinet-dr-neighbors-actions">';
         if (domains.length > maxShow) {
             var more = domains.length - maxShow;
-            html += '<div class="text-muted small">ещё ' + more +
-                (more === 1 ? ' сайт' : (more < 5 ? ' сайта' : ' сайтов')) +
-                ' (всего ' + domains.length + ')</div>';
+            actions += '<span class="text-muted small cabinet-dr-neighbors-more">' +
+                escapeHtml(
+                    i18n.neighborsMore
+                        .replace(':more', String(more))
+                        .replace(':total', String(domains.length))
+                ) +
+                '</span>';
+            actions += '<button type="button" class="btn btn-sm btn-outline-secondary cabinet-dr-neighbors-view-all" data-ip="' +
+                escapeHtml(ip) + '">' + escapeHtml(i18n.neighborsViewAll) + '</button>';
         }
+        actions += '<button type="button" class="btn btn-sm btn-outline-secondary cabinet-dr-neighbors-download" data-ip="' +
+            escapeHtml(ip) + '"><i class="bi bi-download" aria-hidden="true"></i> ' +
+            escapeHtml(i18n.neighborsDownload) + '</button>';
+        actions += '</div>';
+        html += actions;
+
         return html;
+    }
+
+    function downloadNeighborsList(ip) {
+        var payload = neighborsCache[ip];
+        var domains = (payload && payload.domains) || [];
+        if (!domains.length) {
+            return;
+        }
+        var lines = domains.slice();
+        var blob = new Blob(['\uFEFF' + lines.join('\n') + '\n'], { type: 'text/plain;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'ip-neighbors-' + String(ip).replace(/[^\w.-]+/g, '_') + '.txt';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    function openNeighborsModal(ip) {
+        var payload = neighborsCache[ip];
+        var domains = (payload && payload.domains) || [];
+        if (!domains.length) {
+            return;
+        }
+
+        var modalEl = document.getElementById('cabinetDrNeighborsModal');
+        var titleEl = document.getElementById('cabinetDrNeighborsModalTitle');
+        var metaEl = document.getElementById('cabinetDrNeighborsModalMeta');
+        var listEl = document.getElementById('cabinetDrNeighborsModalList');
+        var searchEl = document.getElementById('cabinetDrNeighborsModalSearch');
+        var downloadEl = document.getElementById('cabinetDrNeighborsModalDownload');
+        if (!modalEl || !listEl) {
+            return;
+        }
+
+        if (titleEl) {
+            titleEl.textContent = i18n.neighborsModalTitle.replace(':ip', ip);
+        }
+        if (metaEl) {
+            metaEl.textContent = i18n.neighborsModalCount
+                .replace(':shown', String(domains.length))
+                .replace(':total', String((payload && payload.found_total) || domains.length));
+        }
+        if (searchEl) {
+            searchEl.value = '';
+        }
+
+        function paintList(filter) {
+            var q = String(filter || '').trim().toLowerCase();
+            var html = '';
+            var shown = 0;
+            domains.forEach(function (d) {
+                if (q && String(d).toLowerCase().indexOf(q) === -1) {
+                    return;
+                }
+                shown++;
+                html += '<li><a href="https://' + escapeHtml(d) + '" target="_blank" rel="noopener noreferrer">' +
+                    escapeHtml(d) + '</a></li>';
+            });
+            listEl.innerHTML = html || '<li class="text-muted small">—</li>';
+            if (metaEl) {
+                metaEl.textContent = i18n.neighborsModalCount
+                    .replace(':shown', String(shown))
+                    .replace(':total', String(domains.length));
+            }
+        }
+
+        paintList('');
+        if (searchEl) {
+            searchEl.oninput = function () {
+                paintList(searchEl.value);
+            };
+        }
+        if (downloadEl) {
+            downloadEl.onclick = function () {
+                downloadNeighborsList(ip);
+            };
+        }
+
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        } else if (window.jQuery) {
+            window.jQuery(modalEl).modal('show');
+        }
     }
 
     function renderIps(ips) {
@@ -287,6 +393,10 @@
                     domains: item.neighbors || [],
                     status: item.neighbors_status || 'ok',
                     message: item.neighbors_message || '',
+                    found_total: item.neighbors_count != null
+                        ? item.neighbors_count
+                        : ((item.neighbors && item.neighbors.length) || 0),
+                    truncated: !!item.neighbors_truncated,
                 }
                 : null;
             if (preloaded) {
@@ -338,6 +448,10 @@
                     domains: (res.data && res.data.domains) || [],
                     status: (res.data && res.data.status) || 'ok',
                     message: (res.data && res.data.message) || '',
+                    found_total: (res.data && res.data.found_total) != null
+                        ? res.data.found_total
+                        : (((res.data && res.data.domains) || []).length),
+                    truncated: !!(res.data && res.data.truncated),
                 };
                 neighborsCache[ip] = payload;
                 cell.innerHTML = renderNeighborsCell(ip, payload);
@@ -608,6 +722,18 @@
 
     if (ipsEl) {
         ipsEl.addEventListener('click', function (e) {
+            var viewAll = e.target.closest('.cabinet-dr-neighbors-view-all');
+            if (viewAll) {
+                e.preventDefault();
+                openNeighborsModal(viewAll.getAttribute('data-ip') || '');
+                return;
+            }
+            var downloadBtn = e.target.closest('.cabinet-dr-neighbors-download');
+            if (downloadBtn) {
+                e.preventDefault();
+                downloadNeighborsList(downloadBtn.getAttribute('data-ip') || '');
+                return;
+            }
             var btn = e.target.closest('.cabinet-dr-ip-btn');
             if (!btn) return;
             loadNeighbors(btn.getAttribute('data-ip') || '');

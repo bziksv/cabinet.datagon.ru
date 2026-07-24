@@ -52,7 +52,7 @@
                             id="cabinetSmResetAllStats"
                             @if(($countProjects ?? 0) < 1) disabled @endif
                             title="{{ __('Site monitoring reset all stats') }}">
-                        <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>{{ __('Site monitoring reset all stats') }}
+                        <i class="bi bi-eraser me-1" aria-hidden="true"></i>{{ __('Site monitoring reset all stats') }}
                     </button>
                     <button type="button" class="btn btn-outline-danger btn-sm" id="selectedProjects">
                         <i class="bi bi-trash me-1" aria-hidden="true"></i>{{ __('Delete selected projects') }}
@@ -94,7 +94,12 @@
                     __($project->status),
                 ]))));
             @endphp
-            <tr id="{{ $project->id }}" data-project-id="{{ $project->id }}" data-search="{{ e($smSearchBlob) }}">
+            <tr id="{{ $project->id }}"
+                data-project-id="{{ $project->id }}"
+                data-search="{{ e($smSearchBlob) }}"
+                data-sm-pending="{{ $project->isPendingResetStatus() ? '1' : '0' }}"
+                data-sm-broken="{{ (!$project->isPendingResetStatus() && $project->broken) ? '1' : '0' }}"
+                data-sm-uptime="{{ (!$project->isPendingResetStatus() && $project->last_check !== null && $project->uptime_percent !== null) ? $project->uptime_percent : '' }}">
                 <td class="cabinet-sm-td-check checbox-for-remove-project">
                     <input type="checkbox"
                            id="project-{{ $project->id }}"
@@ -189,24 +194,28 @@
                         <div class="btn-group btn-group-sm" role="group" aria-label="{{ __('Actions') }}">
                             <button class="btn btn-outline-secondary check" type="button"
                                     data-target="{{ $project->id }}"
-                                    title="{{ __('Run the check manually') }}">
+                                    data-sm-tip="{{ __('Run the check manually') }}"
+                                    aria-label="{{ __('Run the check manually') }}">
                                 <i class="bi bi-play-fill" aria-hidden="true"></i>
                             </button>
                             <button class="btn btn-outline-primary cabinet-sm-stats-log" type="button"
                                     data-project-id="{{ $project->id }}"
                                     data-project-name="{{ $project->project_name }}"
-                                    title="{{ __('Site monitoring stats log') }}">
+                                    data-sm-tip="{{ __('Site monitoring stats log') }}"
+                                    aria-label="{{ __('Site monitoring stats log') }}">
                                 <i class="bi bi-bar-chart-line" aria-hidden="true"></i>
                             </button>
                             <button class="btn btn-outline-warning cabinet-sm-stats-reset" type="button"
                                     data-project-id="{{ $project->id }}"
-                                    title="{{ __('Site monitoring reset stats') }}">
-                                <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+                                    data-sm-tip="{{ __('Site monitoring reset stats') }}"
+                                    aria-label="{{ __('Site monitoring reset stats') }}">
+                                <i class="bi bi-eraser" aria-hidden="true"></i>
                             </button>
                             <button class="btn btn-outline-danger" type="button"
                                     data-bs-toggle="modal"
                                     data-bs-target="#remove-project-id-{{ $project->id }}"
-                                    title="{{ __('Delete a project') }}">
+                                    data-sm-tip="{{ __('Delete a project') }}"
+                                    aria-label="{{ __('Delete a project') }}">
                                 <i class="bi bi-trash" aria-hidden="true"></i>
                             </button>
                         </div>
@@ -315,6 +324,7 @@
             const cabinetSmEmailAvailable = @json($siteMonitoringEmailAvailable ?? true);
 
             let statsModalProjectId = null;
+            let table = null;
 
             function renderCheckTypeCell(response) {
                 let inner = '<span class="text-secondary">—</span>'
@@ -354,11 +364,125 @@
                 return '<div class="cabinet-sm-cell"><div class="cabinet-sm-uptime small text-end text-nowrap">' + inner + '</div></div>'
             }
 
+            function cabinetSmInitActionTooltips(root) {
+                if (typeof bootstrap === 'undefined' || !bootstrap.Tooltip) {
+                    return
+                }
+                const $root = root ? $(root) : $(document)
+                $root.find('[data-sm-tip]').each(function () {
+                    const el = this
+                    const tip = el.getAttribute('data-sm-tip')
+                    if (!tip) {
+                        return
+                    }
+                    const existing = bootstrap.Tooltip.getInstance(el)
+                    if (existing) {
+                        existing.dispose()
+                    }
+                    new bootstrap.Tooltip(el, {
+                        container: 'body',
+                        trigger: 'hover focus',
+                        placement: el.getAttribute('data-bs-placement') || 'top',
+                        customClass: 'cabinet-sm-action-tooltip',
+                        title: tip,
+                    })
+                })
+            }
+
             function applyProjectRowCells($row, response) {
                 $row.children('td').eq(6).html(renderCheckTypeCell(response))
                 $row.children('td').eq(7).html(renderStatusCell(response))
                 $row.children('td').eq(8).html(renderUptimeCell(response))
+
+                const pending = !!response.pending
+                const broken = !pending && !!response.broken
+                $row.attr('data-sm-pending', pending ? '1' : '0')
+                $row.attr('data-sm-broken', broken ? '1' : '0')
+                if (!pending && response.uptime != null && response.uptime !== '') {
+                    $row.attr('data-sm-uptime', String(response.uptime))
+                } else {
+                    $row.attr('data-sm-uptime', '')
+                }
+
                 cabinetSmRefreshRowSearch($row)
+                refreshListKpiFromTable()
+            }
+
+            function cabinetSmAllProjectRows() {
+                if (table && typeof table.rows === 'function') {
+                    return $(table.rows({ page: 'all', search: 'none' }).nodes()).filter('[data-project-id]')
+                }
+                return $('#table tbody tr[data-project-id]')
+            }
+
+            function refreshListKpiFromTable() {
+                const $rows = cabinetSmAllProjectRows()
+                let total = 0
+                let available = 0
+                let withIssues = 0
+                let awaitingCheck = 0
+                let uptimeSum = 0
+                let uptimeCount = 0
+
+                $rows.each(function () {
+                    const $row = $(this)
+                    total++
+                    if ($row.attr('data-sm-pending') === '1') {
+                        awaitingCheck++
+                        return
+                    }
+                    if ($row.attr('data-sm-broken') === '1') {
+                        withIssues++
+                        return
+                    }
+                    available++
+                    const uptimeRaw = $row.attr('data-sm-uptime')
+                    if (uptimeRaw !== undefined && uptimeRaw !== null && String(uptimeRaw).trim() !== '') {
+                        const uptime = parseFloat(String(uptimeRaw).replace(',', '.'))
+                        if (!isNaN(uptime)) {
+                            uptimeSum += uptime
+                            uptimeCount++
+                        }
+                    }
+                })
+
+                const $kpi = $('[data-sm-list-kpi]')
+                if (!$kpi.length) {
+                    return
+                }
+
+                $kpi.find('[data-sm-kpi="total"]').text(String(total))
+
+                const $available = $kpi.find('[data-sm-kpi="available"]')
+                $available.text(String(available))
+                $available.toggleClass('text-success', available > 0)
+
+                const $issues = $kpi.find('[data-sm-kpi="issues"]')
+                $issues.text(String(withIssues))
+                $issues.toggleClass('text-danger', withIssues > 0)
+
+                const $uptime = $kpi.find('[data-sm-kpi="uptime"]')
+                if (uptimeCount > 0) {
+                    $uptime.text((Math.round((uptimeSum / uptimeCount) * 10) / 10).toFixed(1) + '%')
+                } else {
+                    $uptime.text('—')
+                }
+
+                const $awaiting = $('[data-sm-kpi-awaiting]')
+                if ($awaiting.length) {
+                    if (awaitingCheck > 0) {
+                        const template = $awaiting.attr('data-template') || ':count'
+                        $awaiting.find('[data-sm-kpi-awaiting-text]').text(template.replace(':count', String(awaitingCheck)))
+                        $awaiting.removeClass('d-none')
+                    } else {
+                        $awaiting.addClass('d-none')
+                    }
+                }
+
+                const $countProjects = $('#count-projects')
+                if ($countProjects.length) {
+                    $countProjects.text(String(total))
+                }
             }
 
             function escapeHtml(text) {
@@ -571,7 +695,6 @@
                 }
             })
 
-            let table
             $(document).ready(function () {
                 table = $('#table').DataTable({
                     dom: '<"row align-items-center g-2 cabinet-sm-dt-controls"<"col-sm-auto"l><"col-sm-auto ms-auto"f>>rt<"row align-items-center g-2 cabinet-sm-dt-footer"<"col-sm-auto"i><"col-sm-auto ms-auto"p>>',
@@ -599,6 +722,8 @@
                 $('#table tbody tr[data-project-id]').each(function () {
                     cabinetSmRefreshRowSearch($(this))
                 })
+
+                cabinetSmInitActionTooltips('#table')
 
                 search(table)
 
@@ -719,13 +844,20 @@
                         _token: $('meta[name="csrf-token"]').attr('content')
                     },
                     success: function () {
-                        let iterator = 0;
                         $('[data-select=true]').each(function () {
-                            iterator++
-                            $(this).remove();
+                            const $row = $(this)
+                            if (table) {
+                                table.row($row).remove()
+                            } else {
+                                $row.remove()
+                            }
                         })
-                        $('#count-projects').text($('#count-projects').text() - iterator)
-                        if ($('#count-projects').text() == 0) {
+                        if (table) {
+                            table.draw(false)
+                        }
+                        $('.checked-projects').text('')
+                        refreshListKpiFromTable()
+                        if (cabinetSmAllProjectRows().length === 0) {
                             window.location.replace('{{ route('add.site.monitoring.view') }}');
                         }
                         cabinetSmToastDeleteSuccess()

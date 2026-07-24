@@ -348,6 +348,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('show-backlink/{id}', 'BacklinkController@show')->name('show.backlink');
     Route::post('edit-backlink', 'BacklinkController@edit')->name('save.changes.backlink');
     Route::get('check-link/{id}', 'BacklinkController@checkLink')->name('check.link');
+    Route::post('check-project-links/{id}', 'BacklinkController@checkProject')->name('check.project.links');
+    Route::get('check-project-links/{id}/status', 'BacklinkController@checkProjectStatus')->name('check.project.links.status');
     Route::delete('delete-link/{id}', 'BacklinkController@removeLink')->name('delete.link');
     Route::post('edit-link', 'BacklinkController@editLink')->name('edit.link');
     Route::get('add-link/{id}', 'BacklinkController@addLinkView')->name('add.link.view');

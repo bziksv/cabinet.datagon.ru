@@ -6,6 +6,8 @@ use App\DomainInformation;
 use App\DomainMonitoring;
 use App\LinkTracking;
 use App\ProjectTracking;
+use App\Services\Backlink\BacklinkChecker;
+use App\Support\BacklinkHtmlMatcher;
 use App\User;
 use Illuminate\Support\Facades\Log;
 use PHPUnit\Exception;
@@ -52,30 +54,26 @@ class CroneController extends Controller
     public function scanBrokenLinks()
     {
         try {
-            $links = LinkTracking::with('project.user')->where('broken', '=', true)->get();
+            $checker = app(BacklinkChecker::class);
+            $links = LinkTracking::with('project.user')->where('broken', '=', 1)->get();
             $telegramByUserProject = [];
 
-            foreach ($links->chunk(5) as $links) {
-                foreach ($links as $link) {
-                    $this->result = [];
-                    $this->analyseLink(
-                        $link->site_donor,
-                        $link->link,
-                        $link->anchor,
-                        (boolean)$link->nofollow,
-                        (boolean)$link->noindex
-                    );
-                    if (isset($this->result['error'])) {
-                        if (!(boolean)$link->mail_sent) {
+            foreach ($links->chunk(5) as $chunk) {
+                foreach ($chunk as $link) {
+                    $stillBroken = $checker->checkAndSave($link);
+                    $link->refresh();
+
+                    if ($stillBroken) {
+                        if (! (bool) $link->mail_sent) {
                             $user = $link->project ? $link->project->user : null;
                             $project = $link->project;
                             if ($user && $project) {
                                 if ((bool) $project->notify_email) {
-                                    $user->sendBrokenLinkAlerts($this->result['error'], $link, $project);
+                                    $user->sendBrokenLinkAlerts((string) $link->status, $link, $project);
                                 }
                                 $projectId = $link->project_tracking_id;
                                 if ((bool) $project->notify_telegram) {
-                                    if (!isset($telegramByUserProject[$user->id][$projectId])) {
+                                    if (! isset($telegramByUserProject[$user->id][$projectId])) {
                                         $telegramByUserProject[$user->id][$projectId] = [
                                             'project' => $link->project,
                                             'count' => 0,
@@ -84,19 +82,21 @@ class CroneController extends Controller
                                     $telegramByUserProject[$user->id][$projectId]['count']++;
                                 }
                             }
-                            $this->saveResult($link, true, (bool) ($project && $project->notify_email));
-                        } else {
-                            $this->saveResult($link, true);
+                            $link->mail_sent = (bool) ($project && $project->notify_email);
+                            $link->save();
                         }
                     } else {
-                        $this->saveResult($link, false, false);
+                        if ((bool) $link->mail_sent) {
+                            $link->mail_sent = false;
+                            $link->save();
+                        }
                     }
                 }
             }
 
             foreach ($telegramByUserProject as $userId => $projects) {
                 $user = User::find($userId);
-                if (!$user) {
+                if (! $user) {
                     continue;
                 }
                 foreach ($projects as $data) {
@@ -117,21 +117,11 @@ class CroneController extends Controller
     public function scanLinks()
     {
         try {
-            $links = LinkTracking::all();
-            foreach ($links->chunk(5) as $links) {
-                foreach ($links as $link) {
-                    $this->analyseLink(
-                        $link->site_donor,
-                        $link->link,
-                        $link->anchor,
-                        (boolean)$link->nofollow,
-                        (boolean)$link->noindex
-                    );
-                    if (isset($this->result['error'])) {
-                        $this->saveResult($link, true);
-                    } else {
-                        $this->saveResult($link, false, false);
-                    }
+            $checker = app(BacklinkChecker::class);
+            $links = LinkTracking::query()->orderBy('id')->get();
+            foreach ($links->chunk(5) as $chunk) {
+                foreach ($chunk as $link) {
+                    $checker->checkAndSave($link);
                 }
             }
         } catch (\Exception $exception) {
@@ -149,20 +139,92 @@ class CroneController extends Controller
      */
     public function analyseLink($page_url, $link_url, $anchor, bool $nofollow = false, bool $noindex = false)
     {
+        $this->result = [];
         $html = $this->curlInit($page_url);
         if ($html == false) {
             $this->result['error'] = __('The donor site does not exist');
-        } else {
-            if ($noindex) {
-                $this->searchNoindex($html, $link_url, $anchor);
-            }
-            if (!isset($this->result['error'])) {
-                $link = $this->searchLinksOnPage($html, $link_url, $anchor);
-                if ($nofollow && isset($link)) {
-                    $this->searchNofollow($link[0]);
-                }
+
+            return;
+        }
+
+        $hit = BacklinkHtmlMatcher::find((string) $html, (string) $link_url, (string) $anchor);
+        if (! ($hit['found'] ?? false)) {
+            $this->result['error'] = __('link not found or anchor does not match');
+
+            return;
+        }
+
+        $this->result['link'] = ! empty($hit['anchorless'])
+            ? __('Link found (anchorless)')
+            : __('link found, anchor matches');
+
+        if ($noindex) {
+            if (! empty($hit['in_comment_noindex']) || $this->hasTagNoindexAround($html, $hit['node_html'] ?? '')) {
+                // Раньше писали в error и ломали счётчик — теперь только пометка в статусе.
+                $this->result['noindex'] = __('the link is placed in noindex');
+            } else {
+                $this->result['noindex'] = __('the link is not placed in noindex');
             }
         }
+
+        if ($nofollow) {
+            if (! empty($hit['has_nofollow'])) {
+                $this->result['nofollow'] = __('link have attribute nofollow');
+            } else {
+                $this->result['nofollow'] = __('link not have attribute nofollow');
+            }
+        }
+    }
+
+    private function hasTagNoindexAround(string $html, string $anchorHtml): bool
+    {
+        if ($anchorHtml === '') {
+            return false;
+        }
+        $pos = mb_stripos($html, $anchorHtml);
+        if ($pos === false) {
+            return false;
+        }
+        $before = mb_substr($html, max(0, $pos - 120), 120);
+        $after = mb_substr($html, $pos + mb_strlen($anchorHtml), 120);
+
+        return (bool) (
+            preg_match('#<noindex[^>]*>\s*$#iu', $before)
+            && preg_match('#^\s*</noindex>#iu', $after)
+        );
+    }
+
+    public function curlInit($page_url)
+    {
+        return BacklinkHtmlMatcher::fetchHtml((string) $page_url);
+    }
+
+    /**
+     * @deprecated логика в BacklinkHtmlMatcher::find — оставлено для совместимости вызовов
+     */
+    public function searchNoindex($html, $link_url, $anchor)
+    {
+        $hit = BacklinkHtmlMatcher::find((string) $html, (string) $link_url, (string) $anchor);
+        if (($hit['found'] ?? false) && ! empty($hit['in_comment_noindex'])) {
+            $this->result['error'] = __('the link is placed in noindex');
+        } elseif ($hit['found'] ?? false) {
+            $this->result['noindex'] = __('the link is not placed in noindex');
+        }
+    }
+
+    public function searchLinksOnPage($html, $link_url, $anchor): ?array
+    {
+        $hit = BacklinkHtmlMatcher::find((string) $html, (string) $link_url, (string) $anchor);
+        if ($hit['found'] ?? false) {
+            $this->result['link'] = ! empty($hit['anchorless'])
+                ? __('Link found (anchorless)')
+                : __('link found, anchor matches');
+
+            return [$hit];
+        }
+        $this->result['error'] = __('link not found or anchor does not match');
+
+        return null;
     }
 
     /**
@@ -173,25 +235,13 @@ class CroneController extends Controller
     public function saveResult($target, $broken, $sendMail = null)
     {
         $target->status = implode(', ', $this->result);
-        $target->last_check = date("Y-m-d H:i:s");
-        if ($target->broken == null) {
-            if ($broken) {
-                $this->increment($target->project_tracking_id);
-            } else {
-                $this->decrement($target->project_tracking_id);
-            }
-        } elseif ((boolean)$target->broken != $broken) {
-            if ($broken) {
-                $this->increment($target->project_tracking_id);
-            } else {
-                $this->decrement($target->project_tracking_id);
-            }
-        }
+        $target->last_check = date('Y-m-d H:i:s');
         if (isset($sendMail)) {
             $target->mail_sent = $sendMail;
         }
-        $target->broken = $broken;
+        $target->broken = $broken ? 1 : 0;
         $target->save();
+        BacklinkChecker::recountProject((int) $target->project_tracking_id);
     }
 
     /**
@@ -214,66 +264,6 @@ class CroneController extends Controller
         if ($article->total_broken_link != 0) {
             $article->decrement('total_broken_link');
         }
-    }
-
-    /**
-     * @param $page_url
-     * @return bool|string
-     */
-    public function curlInit($page_url)
-    {
-        $curl = curl_init();
-        curl_setopt($curl, CURLOPT_URL, $page_url);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
-        curl_setopt($curl, CURLOPT_FOLLOWLOCATION, 1);
-        curl_setopt($curl, CURLOPT_USERAGENT, 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/72.0.3626.121 Safari/537.36');
-        curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 30);
-        curl_setopt($curl, CURLOPT_TIMEOUT, 60);
-        curl_setopt($curl, CURLOPT_FAILONERROR, true);
-        $html = curl_exec($curl);
-        curl_close($curl);
-        if (!$html) {
-            return false;
-        }
-        return preg_replace('//i', '', $html);
-    }
-
-    /**
-     * @param $html
-     * @param $link_url
-     * @param $anchor
-     */
-    public function searchNoindex($html, $link_url, $anchor)
-    {
-        if (preg_match_all('(<!--noindex-->(<a *href=*["\']?(' . addslashes($link_url) . ')([\'"]+[^<>]*>' . addslashes($anchor) . '</a>))<!--/noindex-->)',
-            $html,
-            $matches,
-            PREG_SET_ORDER)) {
-            $this->result['error'] = __('the link is placed in noindex');
-        } elseif (preg_match_all('(<noindex>(<a *href=*["\']?(' . addslashes($link_url) . ')([\'"]+[^<>]*>' . addslashes($anchor) . '</a>))</noindex>)',
-            $html,
-            $matches,
-            PREG_SET_ORDER)) {
-            $this->result['error'] = __('the link is placed in noindex');
-        } else {
-            $this->result['noindex'] = __('the link is not placed in noindex');
-        }
-    }
-
-    /**
-     * @param $html
-     * @param $link_url
-     * @param $anchor
-     * @return null|array
-     */
-    public function searchLinksOnPage($html, $link_url, $anchor): ?array
-    {
-        if (preg_match_all('(<a *href=["\']?(' . addslashes($link_url) . ')([\'"]+[^<>]*>' . addslashes($anchor) . '</a>))', $html, $matches, PREG_SET_ORDER)) {
-            $this->result['link'] = __('link found, anchor matches');
-            return array_unique($matches, SORT_REGULAR);
-        }
-        $this->result['error'] = __('link not found or anchor does not match');
-        return null;
     }
 
     /**

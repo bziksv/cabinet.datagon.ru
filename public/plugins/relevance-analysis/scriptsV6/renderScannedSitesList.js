@@ -73,7 +73,7 @@ function renderScannedSitesList(words, sites, avgCoveragePercent, count, hide, b
             if (!value['inRelevance']) {
                 noTop = "<span class='text-muted'>(" + words.notTop + ")</span>"
             }
-            if (avg !== null) {
+            if (avg) {
                 color = true
             }
             className = 'bg-my-site'

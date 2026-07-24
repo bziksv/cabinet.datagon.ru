@@ -35,6 +35,14 @@ class PasswordsGenerator extends Model
         ];
 
         $i = 0;
+        $hasCharset = isset($request['enums'])
+            || isset($request['lowerCase'])
+            || isset($request['upperCase'])
+            || isset($request['specialSymbols']);
+        if (! $hasCharset || empty($request['countSymbols'])) {
+            return '';
+        }
+
         while ($i < $request['countSymbols']) {
             if (isset($request['enums'])) {
                 $password .= $enums[rand(0, count($enums) - 1)];

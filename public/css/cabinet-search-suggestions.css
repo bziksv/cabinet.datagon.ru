@@ -53,6 +53,17 @@
     color: #fff;
 }
 
+.cabinet-ss-stop-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.cabinet-ss-stop-presets__btn.is-active {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
 .cabinet-ss-save-check {
     display: inline-flex;
     align-items: center;
@@ -66,6 +77,76 @@
 .cabinet-ss-save-check input {
     flex: 0 0 auto;
     margin: 0;
+}
+
+.cabinet-ss-progress {
+    border: 1px solid #c7dbff;
+    background: #f0f6ff;
+    border-radius: 0.5rem;
+    padding: 0.75rem 0.9rem;
+}
+
+.cabinet-ss-progress__head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.55rem;
+}
+
+.cabinet-ss-progress__spinner {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 1.35rem;
+    height: 1.35rem;
+    margin-top: 0.15rem;
+    flex: 0 0 auto;
+    border: 2.5px solid rgba(13, 110, 253, 0.28);
+    border-top-color: #0d6efd;
+    border-radius: 50%;
+    animation: cabinet-ss-spin 0.7s linear infinite !important;
+}
+
+@keyframes cabinet-ss-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cabinet-ss-progress__spinner {
+        animation: cabinet-ss-spin 0.7s linear infinite !important;
+    }
+
+    .cabinet-ss-progress__bar .progress-bar {
+        animation-duration: 1s !important;
+        animation-iteration-count: infinite !important;
+    }
+}
+
+.cabinet-ss-progress__text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.cabinet-ss-progress__title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #1e3a5f;
+}
+
+.cabinet-ss-progress__bar {
+    height: 0.55rem;
+    border-radius: 999px;
+    background: #dbeafe;
+    overflow: hidden;
+}
+
+.cabinet-ss-progress__bar .progress-bar {
+    background-color: #0d6efd;
+}
+
+.cabinet-ss-progress__keep {
+    line-height: 1.35;
 }
 
 .cabinet-ss-results-scroll {

@@ -31,7 +31,7 @@ class PasswordGeneratorController extends Controller
     public function createPassword(Request $request): RedirectResponse
     {
         if (PasswordsGenerator::isErrors($request->all())) {
-            flash()->overlay(__('This combination of parameters is not allowed'), ' ')->error();
+            flash()->overlay(__('Password generator options required'), ' ')->error();
             return Redirect::back();
         }
         if (isset($request->savePassword)) {

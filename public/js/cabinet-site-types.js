@@ -51,6 +51,8 @@
     var yandexWrap = document.getElementById('cabinetStYandexRegionWrap');
     var googleWrap = document.getElementById('cabinetStGoogleRegionWrap');
     var filterSelect = document.getElementById('cabinetStFilterType');
+    var hostsFilterSelect = document.getElementById('cabinetStHostsFilterType');
+    var hostsExportBtn = document.getElementById('cabinetStHostsExport');
     var queryTabs = document.getElementById('cabinetStQueryTabs');
     var shortfallNote = document.getElementById('cabinetStShortfallNote');
     var mixEl = document.getElementById('cabinetStMix');
@@ -64,6 +66,12 @@
 
     var lastPayload = null;
     var activeQueryIndex = 0;
+    var hostsCsvHeaders = {
+        host: 'Хост / сайт',
+        count: 'Кол-во',
+        inCatalog: 'В базе',
+        type: 'Тип',
+    };
 
     var TYPE_ORDER = [
         'ecommerce',
@@ -281,16 +289,15 @@
         }
     }
 
-    function fillFilterOptions(cats) {
-        if (!filterSelect) {
+    function fillOneFilterSelect(selectEl, cats, current) {
+        if (!selectEl) {
             return;
         }
-        var current = filterSelect.value;
-        filterSelect.innerHTML = '';
+        selectEl.innerHTML = '';
         var all = document.createElement('option');
         all.value = '';
         all.textContent = 'Все типы';
-        filterSelect.appendChild(all);
+        selectEl.appendChild(all);
 
         var keys = (cats || []).map(function (c) {
             return c.key;
@@ -300,9 +307,20 @@
             var opt = document.createElement('option');
             opt.value = key;
             opt.textContent = meta.label || key;
-            filterSelect.appendChild(opt);
+            selectEl.appendChild(opt);
         });
-        filterSelect.value = current;
+        if (current && Array.prototype.some.call(selectEl.options, function (o) { return o.value === current; })) {
+            selectEl.value = current;
+        } else {
+            selectEl.value = '';
+        }
+    }
+
+    function fillFilterOptions(cats) {
+        var currentResults = filterSelect ? filterSelect.value : '';
+        var currentHosts = hostsFilterSelect ? hostsFilterSelect.value : '';
+        fillOneFilterSelect(filterSelect, cats, currentResults);
+        fillOneFilterSelect(hostsFilterSelect, cats, currentHosts);
     }
 
     function requestedDepth() {
@@ -527,9 +545,15 @@
             return;
         }
         hostsBlock.classList.remove('d-none');
+        var filter = hostsFilterSelect ? hostsFilterSelect.value : '';
         hosts.forEach(function (h) {
-            var meta = typeMeta(h.type || 'unknown');
+            var type = h.type || 'unknown';
+            var meta = typeMeta(type);
             var tr = document.createElement('tr');
+            tr.setAttribute('data-type', type);
+            if (filter && filter !== type) {
+                tr.classList.add('is-filtered-out');
+            }
 
             var tdHost = document.createElement('td');
             tdHost.textContent = h.host || '';
@@ -546,7 +570,7 @@
             var badge = document.createElement('span');
             badge.className = 'cabinet-st-type-badge';
             badge.style.setProperty('--st-cat', meta.color || '#64748b');
-            badge.textContent = meta.label || h.type || '';
+            badge.textContent = meta.label || type || '';
             tdType.appendChild(badge);
 
             tr.appendChild(tdHost);
@@ -566,6 +590,69 @@
             var type = tr.getAttribute('data-type') || 'unknown';
             tr.classList.toggle('is-filtered-out', !!(filter && filter !== type));
         });
+    }
+
+    function applyHostsFilter() {
+        if (!hostsBody) {
+            return;
+        }
+        var filter = hostsFilterSelect ? hostsFilterSelect.value : '';
+        Array.prototype.forEach.call(hostsBody.querySelectorAll('tr'), function (tr) {
+            var type = tr.getAttribute('data-type') || 'unknown';
+            tr.classList.toggle('is-filtered-out', !!(filter && filter !== type));
+        });
+    }
+
+    function csvEscape(value) {
+        var s = value == null ? '' : String(value);
+        if (/[";\n\r]/.test(s)) {
+            return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+    }
+
+    function downloadHostsCsv() {
+        var hosts = (lastPayload && lastPayload.frequent_hosts) || [];
+        if (!hosts.length) {
+            setStatus('Нет данных для экспорта хостов', true);
+            return;
+        }
+        var filter = hostsFilterSelect ? hostsFilterSelect.value : '';
+        var lines = [
+            [hostsCsvHeaders.host, hostsCsvHeaders.count, hostsCsvHeaders.inCatalog, hostsCsvHeaders.type]
+                .map(csvEscape)
+                .join(';'),
+        ];
+        hosts.forEach(function (h) {
+            var type = h.type || 'unknown';
+            if (filter && filter !== type) {
+                return;
+            }
+            var meta = typeMeta(type);
+            lines.push(
+                [
+                    h.host || '',
+                    h.count || 0,
+                    h.in_catalog ? 'Да' : '—',
+                    meta.label || type,
+                ]
+                    .map(csvEscape)
+                    .join(';')
+            );
+        });
+        if (lines.length < 2) {
+            setStatus('Нет строк для экспорта по выбранному фильтру', true);
+            return;
+        }
+        var blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'site-types-hosts.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
     }
 
     function showResults(payload) {
@@ -776,6 +863,12 @@
     }
     if (filterSelect) {
         filterSelect.addEventListener('change', applyFilter);
+    }
+    if (hostsFilterSelect) {
+        hostsFilterSelect.addEventListener('change', applyHostsFilter);
+    }
+    if (hostsExportBtn) {
+        hostsExportBtn.addEventListener('click', downloadHostsCsv);
     }
 
     if (exportBtn) {

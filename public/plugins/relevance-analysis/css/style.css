@@ -161,12 +161,19 @@ a.paginate_button.current {
 }
 
 #unigram > thead.unigram-thead .unigram-th-words,
-#phrases > thead.phrases-thead .phrases-th-words {
+#phrases > thead.phrases-thead .phrases-th-words,
+#unigram > thead.unigram-thead .unigram-th-metric,
+#unigram > thead.unigram-thead .unigram-th-narrow,
+#unigram > thead.unigram-thead .unigram-th-wide,
+#phrases > thead.phrases-thead .phrases-th-metric,
+#phrases > thead.phrases-thead .phrases-th-narrow {
     overflow: visible;
 }
 
 #unigram_wrapper .relevance-tlp-table-scroll .unigram-th-words .ui_tooltip_w,
-#phrases_wrapper .relevance-tlp-table-scroll .phrases-th-words .ui_tooltip_w {
+#phrases_wrapper .relevance-tlp-table-scroll .phrases-th-words .ui_tooltip_w,
+#unigram_wrapper .relevance-tlp-table-scroll thead tr.unigram-thead__titles th .ui_tooltip_w,
+#phrases_wrapper .relevance-tlp-table-scroll thead tr.phrases-thead__titles th .ui_tooltip_w {
     position: relative;
     overflow: visible;
 }
@@ -185,13 +192,17 @@ a.paginate_button.current {
     padding: 11px 0 0;
     transform: none;
     width: min(320px, calc(100vw - 2rem));
+    min-width: min(280px, calc(100vw - 2rem));
     max-width: min(320px, calc(100vw - 2rem));
     z-index: 40;
 }
 
 #unigram_wrapper .relevance-tlp-table-scroll .relevance-tlp-col-tip .ui_tooltip_content,
 #phrases_wrapper .relevance-tlp-table-scroll .relevance-tlp-col-tip .ui_tooltip_content {
+    display: block;
     white-space: normal;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 #unigram_wrapper .relevance-tlp-table-scroll .relevance-tlp-col-tip .ui_tooltip_content:before,

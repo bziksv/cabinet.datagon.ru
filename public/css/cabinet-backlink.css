@@ -203,6 +203,12 @@
     margin-top: 0.25rem;
 }
 
+.cabinet-bl-kpi__hint {
+    margin-top: 0.35rem;
+    max-width: 14rem;
+    line-height: 1.3;
+}
+
 .cabinet-bl-kpi--danger .cabinet-bl-kpi__value {
     color: var(--bs-danger);
 }

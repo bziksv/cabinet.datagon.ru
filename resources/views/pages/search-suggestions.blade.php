@@ -18,7 +18,18 @@
          data-limit="{{ $limit !== null ? (int) $limit : '' }}"
          data-remaining="{{ $remaining !== null ? (int) $remaining : '' }}"
          data-history-limit="{{ $historyLimit !== null ? (int) $historyLimit : '' }}"
-         data-saved-count="{{ (int) $savedCount }}">
+         data-saved-count="{{ (int) $savedCount }}"
+         data-pause-ms="{{ (int) config('cabinet-search-suggestions.request_pause_ms', 80) }}"
+         data-preset-local="{{ count(config('cabinet-search-suggestions.presets.local', [])) }}"
+         data-preset-shopping="{{ count(config('cabinet-search-suggestions.presets.shopping', [])) }}"
+         data-preset-questions="{{ count(config('cabinet-search-suggestions.presets.questions', [])) }}"
+         data-preset-reviews="{{ count(config('cabinet-search-suggestions.presets.reviews', [])) }}"
+         data-stop-presets='@json(collect(config("cabinet-search-suggestions.stop_word_presets", []))->mapWithKeys(function ($p, $k) { return [$k => array_values($p["words"] ?? [])]; }))'
+         data-i18n-keep="{{ e(__('Search suggestions keep tab hint')) }}"
+         data-i18n-notify-done-title="{{ e(__('Search suggestions notify done title')) }}"
+         data-i18n-notify-done-body="{{ e(__('Search suggestions notify done body')) }}"
+         data-i18n-notify-error-title="{{ e(__('Search suggestions notify error title')) }}"
+         data-i18n-notify-error-body="{{ e(__('Search suggestions notify error body')) }}">
 
         <div class="cabinet-ss-lead px-4 py-3 mb-3">
             <div class="d-flex gap-3 align-items-start">
@@ -41,8 +52,26 @@
                     </div>
                     <div class="form-group">
                         <label for="cabinetSsStop">{{ __('Search suggestions stop words') }}</label>
-                        <textarea id="cabinetSsStop" class="form-control" rows="3"
+                        <textarea id="cabinetSsStop" class="form-control" rows="8"
                                   placeholder="{{ __('Search suggestions stop words placeholder') }}"></textarea>
+                        <div class="cabinet-ss-stop-presets mt-2" id="cabinetSsStopPresets" role="group"
+                             aria-label="{{ __('Search suggestions stop presets') }}">
+                            @foreach(config('cabinet-search-suggestions.stop_word_presets', []) as $key => $preset)
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary cabinet-ss-stop-presets__btn"
+                                        data-stop-preset="{{ $key }}"
+                                        title="{{ $preset['hint'] ?? '' }}">
+                                    {{ $preset['label'] ?? $key }}
+                                </button>
+                            @endforeach
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger cabinet-ss-stop-presets__btn"
+                                    data-stop-preset="clear"
+                                    title="{{ __('Search suggestions stop presets clear hint') }}">
+                                {{ __('Search suggestions stop presets clear') }}
+                            </button>
+                        </div>
+                        <small class="form-text text-muted">{{ __('Search suggestions stop presets hint') }}</small>
                     </div>
                 </div>
                 <div class="col-lg-5">
@@ -150,6 +179,29 @@
                 <button type="submit" class="btn btn-primary" id="cabinetSsSubmit">{{ __('Search suggestions submit') }}</button>
                 <button type="button" class="btn btn-outline-secondary" id="cabinetSsClear">{{ __('Clear') }}</button>
                 <span class="small text-muted ml-2" id="cabinetSsStatus"></span>
+            </div>
+
+            <div class="cabinet-ss-progress d-none mb-3" id="cabinetSsProgress" aria-live="polite">
+                <div class="cabinet-ss-progress__head">
+                    <span class="cabinet-ss-progress__spinner" aria-hidden="true"></span>
+                    <div class="cabinet-ss-progress__text">
+                        <div class="cabinet-ss-progress__title" id="cabinetSsProgressTitle">Сбор подсказок…</div>
+                        <div class="cabinet-ss-progress__sub small text-secondary" id="cabinetSsProgressSub"></div>
+                    </div>
+                    <div class="cabinet-ss-progress__time small text-muted text-nowrap" id="cabinetSsProgressTime">0:00</div>
+                </div>
+                <div class="progress cabinet-ss-progress__bar">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                         id="cabinetSsProgressBar"
+                         role="progressbar"
+                         aria-valuemin="0"
+                         aria-valuemax="100"
+                         aria-valuenow="0"
+                         style="width: 0%"></div>
+                </div>
+                <p class="cabinet-ss-progress__keep small text-muted mb-0 mt-2" id="cabinetSsProgressKeep">
+                    {{ __('Search suggestions keep tab hint') }}
+                </p>
             </div>
         </form>
 

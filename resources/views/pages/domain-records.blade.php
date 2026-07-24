@@ -26,6 +26,12 @@
          data-i18n-neighbors-self="{{ e(__('Domain records ip neighbors self only')) }}"
          data-i18n-neighbors-error="{{ e(__('Domain records ip neighbors api error')) }}"
          data-i18n-neighbors-loading="{{ e(__('Domain records ip neighbors loading')) }}"
+         data-i18n-neighbors-view-all="{{ e(__('Domain records ip neighbors view all')) }}"
+         data-i18n-neighbors-download="{{ e(__('Domain records ip neighbors download')) }}"
+         data-i18n-neighbors-modal-title="{{ e(__('Domain records ip neighbors modal title')) }}"
+         data-i18n-neighbors-modal-count="{{ e(__('Domain records ip neighbors modal count')) }}"
+         data-i18n-neighbors-modal-search="{{ e(__('Domain records ip neighbors modal search')) }}"
+         data-i18n-neighbors-more="{{ e(__('Domain records ip neighbors more')) }}"
          data-i18n-compare-pick="{{ e(__('Domain records compare pick two')) }}"
          data-i18n-compare-title="{{ e(__('Domain records compare title')) }}">
 
@@ -144,7 +150,10 @@
                 <div class="col-lg-7 mb-3">
                     <section class="cabinet-dr-card">
                         <header class="cabinet-dr-card__head cabinet-dr-card__head--split">
-                            <h3>{{ __('Domain records dns title') }}</h3>
+                            <div>
+                                <h3>{{ __('Domain records dns title') }}</h3>
+                                <span class="small text-muted">{{ __('Domain records dns hint') }}</span>
+                            </div>
                             <div class="cabinet-dr-dns-tabs" id="cabinetDrDnsTabs"></div>
                         </header>
                         <div class="cabinet-dr-card__body cabinet-dr-dns-body" id="cabinetDrDns"></div>
@@ -159,6 +168,31 @@
                 </header>
                 <div class="cabinet-dr-card__body" id="cabinetDrIps"></div>
             </section>
+        </div>
+
+        <div class="modal fade" id="cabinetDrNeighborsModal" tabindex="-1" aria-labelledby="cabinetDrNeighborsModalTitle" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div>
+                            <h5 class="modal-title" id="cabinetDrNeighborsModalTitle">{{ __('Domain records ip neighbors') }}</h5>
+                            <div class="small text-muted" id="cabinetDrNeighborsModalMeta"></div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="search" class="form-control form-control-sm mb-3" id="cabinetDrNeighborsModalSearch"
+                               placeholder="{{ __('Domain records ip neighbors modal search') }}" autocomplete="off">
+                        <ul class="cabinet-dr-neighbors-modal-list" id="cabinetDrNeighborsModalList"></ul>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="cabinetDrNeighborsModalDownload">
+                            <i class="bi bi-download me-1" aria-hidden="true"></i>{{ __('Domain records ip neighbors download') }}
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

@@ -22,7 +22,7 @@ class DomainRecordsService
             ];
         }
 
-        @set_time_limit(60);
+        @set_time_limit(90);
 
         $whois = DomainInformation::probe($normalized);
         $dns = $this->fetchDnsRecords($normalized);
@@ -77,9 +77,14 @@ class DomainRecordsService
                 'neighbors' => $neighbors['domains'] ?? [],
                 'neighbors_status' => $neighbors['status'] ?? 'empty',
                 'neighbors_message' => $neighbors['message'] ?? null,
+                'neighbors_count' => (int) ($neighbors['found_total'] ?? count($neighbors['domains'] ?? [])),
+                'neighbors_truncated' => !empty($neighbors['truncated']),
                 'neighbors_loaded' => true,
             ];
         }
+
+        // Поддомены не отдаются запросом к корню зоны — добираем частые имена + *.domain с того же IP.
+        $dns = $this->enrichDnsWithSubdomains($normalized, $dns, $ipInfo);
 
         return [
             'ok' => true,
@@ -497,6 +502,172 @@ class DomainRecordsService
         }
 
         return true;
+    }
+
+    /**
+     * DNS-запрос к корню зоны не возвращает поддомены (нужен AXFR / CT / перебор).
+     * Добираем A/AAAA/CNAME для частых имён и хостов *.domain с того же IP.
+     *
+     * @param  array<string, array<int, array<string, mixed>>>  $dns
+     * @param  array<int, array<string, mixed>>  $ipInfo
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    private function enrichDnsWithSubdomains(string $domain, array $dns, array $ipInfo): array
+    {
+        $domain = strtolower(rtrim($domain, '.'));
+        $candidates = [];
+
+        foreach (config('cabinet-domain-records.subdomain_probes', []) as $label) {
+            $label = strtolower(trim((string) $label, ". \t"));
+            if ($label === '' || $label === '@' || strpos($label, '.') !== false) {
+                continue;
+            }
+            $candidates[$label . '.' . $domain] = true;
+        }
+
+        $suffix = '.' . $domain;
+        foreach ($ipInfo as $row) {
+            foreach (($row['neighbors'] ?? []) as $host) {
+                $host = strtolower(rtrim((string) $host, '.'));
+                if ($host === '' || $host === $domain) {
+                    continue;
+                }
+                if (substr($host, -strlen($suffix)) !== $suffix) {
+                    continue;
+                }
+                $candidates[$host] = true;
+            }
+        }
+
+        $max = max(0, (int) config('cabinet-domain-records.subdomain_probe_limit', 40));
+        $hosts = array_slice(array_keys($candidates), 0, $max);
+        if ($hosts === []) {
+            return $dns;
+        }
+
+        $seen = [];
+        foreach (['A', 'AAAA', 'CNAME'] as $type) {
+            foreach ($dns[$type] ?? [] as $row) {
+                $key = strtolower((string) ($row['host'] ?? '')) . '|' . $type . '|' . strtolower((string) ($row['value'] ?? ''));
+                $seen[$key] = true;
+            }
+        }
+
+        foreach ($hosts as $fqdn) {
+            // Сначала A; если пусто — CNAME (часто www). AAAA только при наличии A.
+            $aRows = $this->lookupHostRecords($fqdn, 'A');
+            $foundA = false;
+            foreach ($aRows as $row) {
+                $key = strtolower((string) ($row['host'] ?? '')) . '|A|' . strtolower((string) ($row['value'] ?? ''));
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $foundA = true;
+                if (! isset($dns['A'])) {
+                    $dns['A'] = [];
+                }
+                $dns['A'][] = $row;
+            }
+
+            if (! $foundA) {
+                foreach ($this->lookupHostRecords($fqdn, 'CNAME') as $row) {
+                    $key = strtolower((string) ($row['host'] ?? '')) . '|CNAME|' . strtolower((string) ($row['value'] ?? ''));
+                    if (isset($seen[$key])) {
+                        continue;
+                    }
+                    $seen[$key] = true;
+                    if (! isset($dns['CNAME'])) {
+                        $dns['CNAME'] = [];
+                    }
+                    $dns['CNAME'][] = $row;
+                }
+                continue;
+            }
+
+            foreach ($this->lookupHostRecords($fqdn, 'AAAA') as $row) {
+                $key = strtolower((string) ($row['host'] ?? '')) . '|AAAA|' . strtolower((string) ($row['value'] ?? ''));
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                if (! isset($dns['AAAA'])) {
+                    $dns['AAAA'] = [];
+                }
+                $dns['AAAA'][] = $row;
+            }
+        }
+
+        foreach (['A', 'AAAA', 'CNAME'] as $type) {
+            if (empty($dns[$type])) {
+                continue;
+            }
+            usort($dns[$type], function ($a, $b) use ($domain) {
+                $ha = strtolower((string) ($a['host'] ?? ''));
+                $hb = strtolower((string) ($b['host'] ?? ''));
+                $ra = $ha === $domain ? 0 : 1;
+                $rb = $hb === $domain ? 0 : 1;
+                if ($ra !== $rb) {
+                    return $ra - $rb;
+                }
+
+                return strcmp($ha, $hb);
+            });
+        }
+
+        return $dns;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function lookupHostRecords(string $fqdn, string $type): array
+    {
+        $fqdn = strtolower(rtrim($fqdn, '.'));
+        $lookupHost = $this->toAscii($fqdn) ?: $fqdn;
+        $out = [];
+        $localOk = false;
+
+        $const = $this->dnsTypeConstant($type);
+        if ($const !== null) {
+            $records = @dns_get_record($lookupHost, $const);
+            if (is_array($records)) {
+                $localOk = true;
+                foreach ($records as $rec) {
+                    $row = $this->normalizeDnsRow($type, $rec);
+                    if (($row['host'] ?? '') === '') {
+                        $row['host'] = $fqdn;
+                    } else {
+                        $row['host'] = DomainInformationDns::normalizeHost((string) $row['host']) ?: $fqdn;
+                    }
+                    if (($row['value'] ?? '') !== '') {
+                        $out[] = $row;
+                    }
+                }
+            }
+        }
+
+        if ($localOk) {
+            return $out;
+        }
+
+        $typeCodes = ['A' => 1, 'AAAA' => 28, 'CNAME' => 5];
+        $code = $typeCodes[$type] ?? null;
+        if ($code === null) {
+            return [];
+        }
+        $payload = $this->dohQuery($lookupHost, $code);
+        foreach ($payload['Answer'] ?? [] as $ans) {
+            if (! is_array($ans) || (int) ($ans['type'] ?? 0) !== $code) {
+                continue;
+            }
+            $row = $this->normalizeDohAnswer($type, $fqdn, $ans);
+            if (($row['value'] ?? '') !== '') {
+                $out[] = $row;
+            }
+        }
+
+        return $out;
     }
 
     /**

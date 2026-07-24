@@ -149,8 +149,9 @@
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end shadow-sm">
                                         <li>
-                                            <a class="dropdown-item" :href="detailHref(item.url)" target="_blank" rel="noopener">
-                                                <i class="bi bi-box-arrow-up-right me-2" aria-hidden="true"></i>{{ openNewPage }}
+                                            <a class="dropdown-item" :href="detailHref(item.url)" target="_blank" rel="noopener"
+                                               :title="openNewPage">
+                                                <i class="bi bi-file-earmark-text me-2" aria-hidden="true"></i>{{ openNewPage }}
                                             </a>
                                         </li>
                                     </ul>

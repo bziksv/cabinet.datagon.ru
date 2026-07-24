@@ -33,9 +33,7 @@ class BacklinkDemoService
         if ($link === '') {
             return self::fail(422, 'validation', 'Укажите ссылку, которую нужно найти на странице');
         }
-        if ($anchor === '') {
-            return self::fail(422, 'validation', 'Укажите текст анкора');
-        }
+        // Пустой анкор допустим — безанкорная проверка (только наличие href).
 
         if (!preg_match('#^https?://#i', $donor)) {
             $donor = 'https://' . $donor;

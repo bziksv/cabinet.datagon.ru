@@ -1717,6 +1717,97 @@
         updateMonScrollNavState();
     }
 
+    /**
+     * Лупа в шапке «Запрос»: открывает фильтр фраз.
+     *
+     * FixedColumns клонирует th вместе с click.DT (сортировка). Делегирование на
+     * wrapper в bubble-фазе срабатывает ПОСЛЕ th → сорт уже ушёл. Нужен capture.
+     */
+    function wireQueryColumnHeaderSearch(api) {
+        if (!api || !window.jQuery) {
+            return;
+        }
+        var $wrapper = jQuery(api.table().container());
+        var wrapperEl = $wrapper[0];
+        if (!wrapperEl) {
+            return;
+        }
+
+        if (wrapperEl._monQueryHeaderSearchBound) {
+            wrapperEl.removeEventListener('click', wrapperEl._monQueryHeaderSearchBound, true);
+            wrapperEl.removeEventListener('mousedown', wrapperEl._monQueryHeaderSearchBound, true);
+        }
+        $wrapper.off('.monQueryHeaderSearch');
+
+        function openQueryFilter(btn) {
+            var $a = jQuery(btn);
+            var $span = $a.parent();
+            var $b = $span.find('b');
+            var $input = $span.find('input');
+            var hide = 'd-none';
+
+            $a.addClass(hide);
+            $b.addClass(hide);
+            $input.off('blur.monQueryHeaderSearch');
+            $input.removeClass(hide).trigger('focus');
+            $input.on('blur.monQueryHeaderSearch', function () {
+                jQuery(this).addClass(hide);
+                $a.removeClass(hide);
+                $b.removeClass(hide);
+            });
+        }
+
+        function onCapture(e) {
+            var target = e.target;
+            if (!target || !target.closest) {
+                return;
+            }
+
+            var btn = target.closest('.search-button');
+            if (btn && wrapperEl.contains(btn)) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (typeof e.stopImmediatePropagation === 'function') {
+                    e.stopImmediatePropagation();
+                }
+                if (e.type === 'click') {
+                    openQueryFilter(btn);
+                }
+                return;
+            }
+
+            var input = target.closest('th input.form-control-border, th .form-control-border');
+            if (input && wrapperEl.contains(input)) {
+                e.stopPropagation();
+                if (typeof e.stopImmediatePropagation === 'function') {
+                    e.stopImmediatePropagation();
+                }
+            }
+        }
+
+        wrapperEl._monQueryHeaderSearchBound = onCapture;
+        wrapperEl.addEventListener('mousedown', onCapture, true);
+        wrapperEl.addEventListener('click', onCapture, true);
+
+        $wrapper.on('keyup.monQueryHeaderSearch change.monQueryHeaderSearch', 'th input.form-control-border', function () {
+            var col = api.column('query:name');
+            if (!col || !col.length) {
+                return;
+            }
+            var value = this.value;
+            if (window.cabinetMonitoringSearch && window.cabinetMonitoringSearch.toDataTableRegex) {
+                var regex = window.cabinetMonitoringSearch.toDataTableRegex(value);
+                if (col.search() !== regex) {
+                    col.search(regex, true, false).draw();
+                }
+                return;
+            }
+            if (col.search() !== value) {
+                col.search(value).draw();
+            }
+        });
+    }
+
     wireCabinetMonScrollNav();
 
     window.cabinetMonitoringShowChrome = {
@@ -1740,6 +1831,7 @@
         enforceMonColumnWidths: enforceMonColumnWidths,
         ensureFixedColumns: ensureFixedColumns,
         relayoutFixedColumns: relayoutFixedColumns,
+        wireQueryColumnHeaderSearch: wireQueryColumnHeaderSearch,
         afterMonTableDraw: afterMonTableDraw,
         clearMonTableRowHover: function () {
             if (!window.jQuery) {
@@ -1755,6 +1847,7 @@
             window.__cabinetMonKeywordsTableApi = api;
             wireMonTableDataRefresh(api);
             wireMonTableRowHover(api);
+            wireQueryColumnHeaderSearch(api);
             if (!monTableInitialLayoutDone) {
                 var waitForRows = function (attempts) {
                     if (monTableRenderedRowCount(api) > 0 || attempts <= 0) {

@@ -1,12 +1,24 @@
 <?php
 
 return [
-    'version' => '1.1.0s',
+    'version' => '1.3.1',
 
     /** Демо на titlo.ru/otslezhivanie-ssylok/ — POST api/demo/otslezhivanie-ssylok/run */
     'demo' => [
         'module' => 'otslezhivanie-ssylok',
         'max_runs_per_day' => 5,
+    ],
+
+    /** Очередь для кнопки «Проверить все» (supervisor default). */
+    'check_queue' => env('BACKLINK_CHECK_QUEUE', 'default'),
+
+    /**
+     * Расписание cron на prod (для подсказок в UI).
+     * Фактически: curl GET /api/backlink/scan-links и scan-broken-links.
+     */
+    'schedule' => [
+        'full_scan' => '01:00',
+        'broken_scan' => 'hourly',
     ],
 
     'notifications' => [

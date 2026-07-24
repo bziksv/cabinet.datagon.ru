@@ -339,6 +339,10 @@
     display: none;
 }
 
+#cabinetStFrequentHosts tbody tr.is-filtered-out {
+    display: none;
+}
+
 .cabinet-st-matrix-scroll {
     overflow-x: auto;
     border: 1px solid #e2e8f0;

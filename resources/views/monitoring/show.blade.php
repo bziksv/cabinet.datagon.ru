@@ -175,7 +175,7 @@
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/datatables-fixedcolumns/js/dataTables.fixedColumns.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables-fixedcolumns/js/fixedColumns.bootstrap4.min.js') }}"></script>
-        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time()) . '-fc47' }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-show-chrome.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-show-chrome.js')) ?: time()) . '-fc49' }}"></script>
         <!-- Select2 -->
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script src="{{ asset('js/cabinet-select2-defaults.js') }}?v={{ @filemtime(public_path('js/cabinet-select2-defaults.js')) ?: time() }}"></script>
@@ -1654,42 +1654,9 @@
                                 }
                             });
 
-                        $('.search-button').click(function () {
-                            let a = $(this);
-                            let span = a.parent();
-                            let b = span.find('b');
-                            let input = span.find('input');
-
-                            let toggleClass = 'd-none';
-
-                            a.addClass(toggleClass);
-                            b.addClass(toggleClass);
-
-                            input.unbind("blur");
-
-                            input.removeClass(toggleClass).focus().blur(function () {
-                                $(this).addClass(toggleClass);
-                                a.removeClass(toggleClass);
-                                b.removeClass(toggleClass);
-                            });
-                        });
-
-                        api.columns().every(function () {
-                            let that = this;
-
-                            $('input', this.header()).each(function () {
-                                let $input = $(this);
-                                if (window.cabinetMonitoringSearch) {
-                                    window.cabinetMonitoringSearch.wireColumnDataTableSearch(that, $input);
-                                    return;
-                                }
-                                $input.on('keyup change', function () {
-                                    if (that.search() !== this.value) {
-                                        that.search(this.value).draw();
-                                    }
-                                });
-                            });
-                        });
+                        if (window.cabinetMonitoringShowChrome && window.cabinetMonitoringShowChrome.wireQueryColumnHeaderSearch) {
+                            window.cabinetMonitoringShowChrome.wireQueryColumnHeaderSearch(api);
+                        }
 
                         let filter = $('#filter');
                         filter.unbind('filtered');

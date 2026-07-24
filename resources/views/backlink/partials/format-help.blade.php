@@ -23,6 +23,8 @@
                     <dd>{{ __('Backlink format field target hint') }}</dd>
                     <dt>{{ __('Backlink format field anchor') }}</dt>
                     <dd>{{ __('Backlink format field anchor hint') }}</dd>
+                    <dt>{{ __('Backlink format field anchorless') }}</dt>
+                    <dd>{{ __('Backlink format field anchorless hint') }}</dd>
                     <dt>{{ __('Backlink format field nofollow') }}</dt>
                     <dd>{{ __('Backlink format field nofollow hint') }}</dd>
                     <dt>{{ __('Backlink format field noindex') }}</dt>

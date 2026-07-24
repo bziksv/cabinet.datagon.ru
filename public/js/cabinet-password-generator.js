@@ -22,11 +22,25 @@
             msgEl.textContent = message;
         }
         wrap.hidden = false;
+        wrap.classList.add('is-visible');
         wrap.style.display = 'block';
-        setTimeout(function () {
+        if (showToast._timer) {
+            clearTimeout(showToast._timer);
+        }
+        showToast._timer = setTimeout(function () {
             wrap.hidden = true;
+            wrap.classList.remove('is-visible');
             wrap.style.display = 'none';
-        }, 4500);
+        }, 5000);
+    }
+
+    function showFormAlert(message) {
+        var alertEl = qs('#cabinet-pw-form-alert');
+        if (!alertEl) {
+            return;
+        }
+        alertEl.textContent = message || '';
+        alertEl.classList.toggle('d-none', !message);
     }
 
     function copyText(text) {
@@ -394,14 +408,37 @@
         });
     }
 
+    function hasCharsetSelected(form) {
+        return ['enums', 'upperCase', 'lowerCase', 'specialSymbols'].some(function (name) {
+            var el = form.elements[name];
+            return el && el.checked;
+        });
+    }
+
     function bindForm() {
         var form = qs('#cabinet-pw-form');
         if (!form) {
             return;
         }
-        form.addEventListener('submit', saveState);
+        form.addEventListener('submit', function (event) {
+            if (!hasCharsetSelected(form)) {
+                event.preventDefault();
+                var msg = form.getAttribute('data-options-required')
+                    || 'Выберите хотя бы один тип символов: цифры, буквы или спецсимволы.';
+                showToast('error', msg);
+                showFormAlert(msg);
+                return;
+            }
+            showFormAlert('');
+            saveState();
+        });
         qsa('.cabinet-pw-option', form).forEach(function (el) {
-            el.addEventListener('change', saveState);
+            el.addEventListener('change', function () {
+                if (hasCharsetSelected(form)) {
+                    showFormAlert('');
+                }
+                saveState();
+            });
         });
     }
 

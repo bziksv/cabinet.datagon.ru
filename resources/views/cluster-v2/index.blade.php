@@ -199,8 +199,9 @@
                                         <label class="form-label" for="clv2-save">{{ __('Save results') }}</label>
                                         {!! Form::select('save', ['1'=>__('Save'),'0'=>__('Do not save')], $config_classic->save_results, ['class'=>'form-select','id'=>'clv2-save']) !!}
                                         <div class="mt-2" id="clv2-telegram-block">
-                                            <label class="form-label" for="clv2-send-message">{{ __('Notify in a telegram upon completion') }}</label>
+                                            <label class="form-label" for="clv2-send-message">{{ __('Notify on cluster completion') }}</label>
                                             {!! Form::select('sendMessage', ['0' => __('No'), '1' => __('Yes')], $config_classic->send_message ? '1' : '0', ['class' => 'form-select form-select-sm', 'id' => 'clv2-send-message']) !!}
+                                            <div class="form-text small">{{ __('Notify on cluster completion hint') }}</div>
                                             <div id="clv2-telegram-hint" class="alert alert-warning py-2 px-3 mt-2 mb-0 small{{ ($telegramConnected ?? false) ? ' d-none' : '' }}">
                                                 {{ __('Subscribe to notifications in Telegram first.') }}
                                                 <a href="{{ route('profile.index') }}" target="_blank" class="alert-link">{{ __('Connect Telegram bot') }}</a>
@@ -240,10 +241,12 @@
                                     <div class="progress" role="progressbar">
                                         <div id="clv2-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" style="width:12%"></div>
                                     </div>
+                                    <p class="small text-muted mt-2 mb-0" id="clv2-progress-hint">{{ __('Cluster analysis long process hint') }}</p>
                                     <span id="rendered-clusters" class="visually-hidden">0</span>
                                 </div>
                                 <button type="button" class="btn btn-primary btn-lg w-100" id="clv2-start">{{ __('Analyse') }}</button>
-                                <p class="form-text mt-2 mb-0">{{ __('Analysis runs in the background; keep this tab open for instant results.') }}</p>
+                                <p class="form-text mt-2 mb-0">{{ __('Cluster analysis long process hint') }}</p>
+                                <p class="form-text mt-1 mb-0 small text-muted">{{ __('Cluster analysis notify channels hint') }}</p>
                             </aside>
                         </div>
                     </div>
@@ -317,10 +320,14 @@
                     genericError: @json(__('An unexpected error has occurred, please contact the administrator')),
                     progressError: @json(__('Progress polling failed')),
                     started: @json(__('Analysis started…')),
+                    preparing: @json('Подготовка очереди'),
+                    processed: @json('Обработано'),
                     queue: @json(__('In queue')),
                     waitingQueue: @json('Ожидание воркера'),
                     rendering: @json(__('Render data')),
                     historyHint: @json(__('The analysis has been successfully launched, the results will be automatically added to the table')),
+                    longProcessHint: @json(__('Cluster analysis long process hint')),
+                    notifyChannelsHint: @json(__('Cluster analysis notify channels hint')),
                     telegramRequired: @json(__('Subscribe to notifications in Telegram first.')),
                     connectTelegram: @json(__('Connect Telegram bot')),
                     regionPlaceholder: @json(__('Search city or region')),

@@ -4,11 +4,13 @@ namespace App\Services;
 
 use App\Notifications\BrokenDomainNotification;
 use App\Notifications\BrokenLinkNotification;
+use App\Notifications\ClusterCompletedNotification;
 use App\Notifications\MonitoringLimitExhaustedNotification;
 use App\Notifications\RegisterPasswordEmail;
 use App\Notifications\RepairDomainNotification;
 use App\Notifications\sendNotificationAboutChangeDNS;
 use App\Notifications\sendNotificationAboutExpirationRegistrationPeriod;
+use App\ClusterResults;
 use App\ProjectTracking;
 use App\Support\NotificationLocale;
 use App\TelegramBot;
@@ -43,6 +45,7 @@ class NotificationAdminTestService
         'domain-expiration',
         'monitoring-limit-exhausted',
         'auth-verify-email',
+        'cluster-done',
     ];
 
     private const MODAL_EVENTS = [
@@ -277,6 +280,13 @@ class NotificationAdminTestService
                     $user->notify(new VerifyEmail());
                     break;
 
+                case 'cluster-done':
+                    $user->notify(new ClusterCompletedNotification(
+                        $this->mockClusterResult(),
+                        $this->mockClusterRequest()
+                    ));
+                    break;
+
                 default:
                     return ['ok' => false, 'message' => __('Users notify test unsupported')];
             }
@@ -337,6 +347,13 @@ class NotificationAdminTestService
 
             case 'auth-verify-email':
                 $mail = (new VerifyEmail())->toMail($user);
+                break;
+
+            case 'cluster-done':
+                $mail = (new ClusterCompletedNotification(
+                    $this->mockClusterResult(),
+                    $this->mockClusterRequest()
+                ))->toMail($user);
                 break;
 
             default:
@@ -465,6 +482,33 @@ class NotificationAdminTestService
         $project->project_name = 'demo-test.example.ru';
 
         return $project;
+    }
+
+    private function mockClusterResult(): ClusterResults
+    {
+        $cluster = new ClusterResults();
+        $cluster->id = 12345;
+        $cluster->domain = 'demo-test.example.ru';
+        $cluster->comment = 'DEMO';
+        $cluster->count_phrases = 61;
+        $cluster->count_clusters = 12;
+        $cluster->top = 10;
+        $cluster->clustering_level = 'hard';
+
+        return $cluster;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mockClusterRequest(): array
+    {
+        return [
+            'domain' => 'https://demo-test.example.ru',
+            'comment' => 'DEMO',
+            'region' => '213',
+            'clusteringLevel' => 'hard',
+        ];
     }
 
     private function clusterDoneMessage(?string $locale = null): string

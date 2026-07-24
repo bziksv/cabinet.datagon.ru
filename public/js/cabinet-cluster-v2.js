@@ -10,6 +10,7 @@
   let clusterLastDebugState = null;
   const clusterAdminDebug = !!cfg.adminDebug;
   let activeProgressId = null;
+  let knownTotalPhrases = 0;
 
   function clusterDebugLine(level, message, context) {
     if (!clusterAdminDebug) return;
@@ -642,21 +643,30 @@
         }
 
         const q = response.count || 0;
-        const total = response.phrases_total || (response.debug_state && response.debug_state.phrases_total) || 0;
+        const total = response.phrases_total
+          || (response.debug_state && response.debug_state.phrases_total)
+          || knownTotalPhrases
+          || 0;
         const pending = response.phrases_pending || (response.debug_state && response.debug_state.phrases_pending) || 0;
+        const starting = !!(response.starting || (response.debug_state && response.debug_state.starting));
         let pct;
         let label;
         if (total > 0) {
-          pct = Math.min(90, 12 + Math.round((q / total) * 78));
-          if (q === 0 && pending > 0) {
-            label = cfg.i18n.waitingQueue + ' ' + pending + ' / ' + total;
+          if (starting || (q === 0 && pending === 0)) {
+            pct = 12;
+            label = (cfg.i18n.preparing || cfg.i18n.started) + ' 0 / ' + total;
+          } else if (q === 0 && pending > 0) {
+            pct = Math.min(90, 12 + Math.round((1 / total) * 8));
+            label = (cfg.i18n.processed || cfg.i18n.waitingQueue) + ' 0 / ' + total;
           } else {
-            label = cfg.i18n.queue + ' ' + q + ' / ' + total;
+            pct = Math.min(90, 12 + Math.round((q / total) * 78));
+            label = (cfg.i18n.processed || cfg.i18n.queue) + ' ' + q + ' / ' + total;
           }
         } else {
           pct = Math.min(90, 12 + q * 4);
-          label = cfg.i18n.queue + ' ' + q;
+          label = (cfg.i18n.processed || cfg.i18n.queue) + ' ' + q;
         }
+        $('#clv2-total-phrases').text('');
         setProgress(pct, label);
       },
       error: function () {
@@ -704,6 +714,7 @@
         }
 
         $('#clv2-progress-wrap').removeClass('d-none');
+        knownTotalPhrases = 0;
         setProgress(12, cfg.i18n.started);
         $('#clv2-total-phrases').text('');
 
@@ -723,13 +734,19 @@
             }
 
             if (resp.totalPhrases) {
-              $('#clv2-total-phrases').text('(' + resp.totalPhrases + ')');
+              knownTotalPhrases = parseInt(resp.totalPhrases, 10) || 0;
+              setProgress(12, (cfg.i18n.preparing || cfg.i18n.started) + ' 0 / ' + knownTotalPhrases);
             }
             if ($('#clv2-save').val() === '1') {
               $('.history-notification').show(300);
               setTimeout(function () {
                 $('.history-notification').hide(300);
               }, 12000);
+            }
+            if ($('#clv2-send-message').val() === '1') {
+              showToast('success', cfg.i18n.notifyChannelsHint || cfg.i18n.longProcessHint);
+            } else {
+              showToast('success', cfg.i18n.longProcessHint || cfg.i18n.historyHint);
             }
           },
           error: function (xhr) {

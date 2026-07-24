@@ -288,8 +288,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('esenin-text-check/public-share', 'EseninTextCheckController@createPublicShare')->name('pages.esenin-text-check.public.share.create')->middleware('permission:Esenin text check');
     Route::post('esenin-text-check/public-share/revoke', 'EseninTextCheckController@revokePublicShare')->name('pages.esenin-text-check.public.share.revoke')->middleware('permission:Esenin text check');
 
+    Route::get('/generate-password', function () {
+        return redirect()->route('pages.password');
+    });
     Route::post('/generate-password', 'PasswordGeneratorController@createPassword')->name('generate.password');
     Route::get('/password-generator', 'PasswordGeneratorController@index')->name('pages.password');
+    Route::post('/save-generated-password', 'PasswordGeneratorController@saveGenerated')->name('save.generated.password');
     Route::post('/edit-password-comment', 'PasswordGeneratorController@editComment')->name('edit.password.comment');
     Route::post('/remove-password', 'PasswordGeneratorController@remove')->name('remove.password');
 

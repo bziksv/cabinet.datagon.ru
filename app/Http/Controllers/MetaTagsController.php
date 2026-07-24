@@ -188,6 +188,7 @@ class MetaTagsController extends Controller
             'filter' => __('Filter'),
             'all' => __('All'),
             'done' => __('Done'),
+            'checking' => __('Meta tags checking'),
             'text_analysis' => __('Text analysis'),
             'save_as_project' => __('Save as project'),
             'check_interval_every' => __('Check interval every'),

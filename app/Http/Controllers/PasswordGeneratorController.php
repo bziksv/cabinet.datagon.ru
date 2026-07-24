@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\PasswordsGenerator;
-use Faker\Factory;
-use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,19 +16,19 @@ class PasswordGeneratorController extends Controller
         $this->middleware(['permission:Password generator']);
     }
 
-    /**
-     * @return Factory|View
-     */
     public function index(): View
     {
-        return view('pages.password', ['user' => Auth::user()]);
+        return view('pages.password', [
+            'user' => Auth::user(),
+            'passwords' => session('generated_passwords'),
+        ]);
     }
 
     /**
      * @param Request $request
-     * @return array|Application|\Illuminate\Contracts\View\Factory|RedirectResponse|View|mixed
+     * @return RedirectResponse
      */
-    public function createPassword(Request $request)
+    public function createPassword(Request $request): RedirectResponse
     {
         if (PasswordsGenerator::isErrors($request->all())) {
             flash()->overlay(__('This combination of parameters is not allowed'), ' ')->error();
@@ -41,14 +39,51 @@ class PasswordGeneratorController extends Controller
             $userPassword->password = PasswordsGenerator::generatePassword($request->all());
             $userPassword->user_id = Auth::id();
             $userPassword->save();
-        } else {
-            $passwords = array();
-            for ($i = 0; $i < 5; $i++) {
-                $passwords[] = PasswordsGenerator::generatePassword($request->all());
-            }
-            return view('pages.password', ['user' => Auth::user(), 'passwords' => $passwords]);
+
+            return Redirect::route('pages.password');
         }
-        return Redirect::route('pages.password');
+
+        $passwords = [];
+        for ($i = 0; $i < 5; $i++) {
+            $passwords[] = PasswordsGenerator::generatePassword($request->all());
+        }
+
+        // PRG: иначе после POST Ctrl+R / Reload просят повтор формы и «не работают».
+        return Redirect::route('pages.password')->with('generated_passwords', $passwords);
+    }
+
+    public function saveGenerated(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $password = (string) $request->input('password', '');
+        $password = trim($password);
+
+        if ($password === '' || mb_strlen($password) > 100) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Error'),
+            ], 422);
+        }
+
+        $row = new PasswordsGenerator();
+        $row->password = $password;
+        $row->user_id = Auth::id();
+        $row->comment = '';
+        $row->save();
+
+        return response()->json([
+            'success' => true,
+            'id' => $row->id,
+            'password' => $row->password,
+            'created_at' => $row->created_at ? $row->created_at->format('d.m.Y H:i') : '—',
+            'comment_url' => route('edit.password.comment'),
+            'comment_placeholder' => __('Password generator comment placeholder'),
+            'comment_success' => __('Comment successfully changed'),
+            'comment_error' => __('Error'),
+            'copy_msg' => __('Successfully copied'),
+            'copy_title' => __('Copy to Clipboard'),
+            'remove_title' => __('Remove'),
+            'saved_msg' => __('Password generator saved ok'),
+        ]);
     }
 
     public function editComment(Request $request): \Illuminate\Http\JsonResponse

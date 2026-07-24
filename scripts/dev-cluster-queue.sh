@@ -63,13 +63,37 @@ start_workers() {
   : >"$LOG_FILE"
   local i pid
   for i in $(seq 1 "$WORKERS"); do
-    nohup php artisan queue:work database \
-      --queue="$QUEUES" \
-      --sleep=1 \
-      --tries=2 \
-      --timeout=600 \
-      >>"$LOG_FILE" 2>&1 &
-    pid=$!
+    # Отдельная session: иначе Cursor/IDE убивает воркеры вместе с shell после команды.
+    # macOS часто без setsid — используем Python start_new_session.
+    pid="$(
+      PATH="/opt/homebrew/opt/php@7.4/bin:${PATH}" \
+      QUEUE_LIST="$QUEUES" \
+      LOG_FILE="$LOG_FILE" \
+      ROOT="$ROOT" \
+      python3 - <<'PY'
+import os, subprocess
+root = os.environ["ROOT"]
+queues = os.environ["QUEUE_LIST"]
+log_path = os.environ["LOG_FILE"]
+os.chdir(root)
+log = open(log_path, "a")
+proc = subprocess.Popen(
+    [
+        "php", "artisan", "queue:work", "database",
+        "--queue=" + queues,
+        "--sleep=1",
+        "--tries=2",
+        "--timeout=600",
+    ],
+    stdout=log,
+    stderr=log,
+    stdin=subprocess.DEVNULL,
+    start_new_session=True,
+    env=os.environ.copy(),
+)
+print(proc.pid)
+PY
+    )"
     echo "$pid" >"$PID_DIR/worker-${i}.pid"
     echo "Worker $i PID $pid"
   done

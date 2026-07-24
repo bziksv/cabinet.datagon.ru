@@ -89,10 +89,28 @@
                 </div>
             </div>
 
-            <div class="progress rounded-0" role="progressbar" :aria-valuenow="loading" aria-valuemin="0" aria-valuemax="100">
-                <div class="progress-bar" :style="'width: '+ loading +'%;'">
-                    <span v-if="loading === 100">{{ lang.done }}</span>
-                    <span v-else>{{ loading }}%</span>
+            <div class="cabinet-mt-progress"
+                 :class="{ 'cabinet-mt-progress--done': loading >= 100 }"
+                 role="status"
+                 aria-live="polite">
+                <div class="cabinet-mt-progress__head">
+                    <span class="cabinet-mt-progress__label">
+                        <template v-if="loading >= 100">{{ lang.done }}</template>
+                        <template v-else>{{ lang.checking || 'Проверка…' }}</template>
+                    </span>
+                    <span class="cabinet-mt-progress__pct">{{ loading }}%</span>
+                </div>
+                <div class="progress cabinet-mt-progress__bar"
+                     role="progressbar"
+                     :aria-valuenow="loading"
+                     aria-valuemin="0"
+                     aria-valuemax="100"
+                     :aria-label="loading >= 100 ? lang.done : ((lang.checking || 'Проверка…') + ' ' + loading + '%')">
+                    <div class="progress-bar"
+                         :class="loading >= 100
+                            ? 'bg-success'
+                            : 'progress-bar-striped progress-bar-animated bg-primary'"
+                         :style="{ width: Math.min(100, Math.max(0, loading)) + '%' }"></div>
                 </div>
             </div>
 

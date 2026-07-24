@@ -5,12 +5,13 @@ namespace App;
 use App\Classes\Xml\SimplifiedXmlFacade;
 use App\Jobs\Cluster\ClusterQueue;
 use App\Jobs\Cluster\WaitClusterAnalyseQueue;
+use App\Notifications\ClusterCompletedNotification;
+use App\Services\TelegramBotService;
 use App\Support\ClusterAnalysisDebugLog;
 use App\Support\ClusterQueues;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use App\Services\TelegramBotService;
 
 class Cluster
 {
@@ -853,11 +854,28 @@ class Cluster
 
     protected function sendNotification()
     {
+        if (!empty($this->user->email)) {
+            try {
+                $this->user->notify(new ClusterCompletedNotification($this->newCluster, $this->request));
+            } catch (\Throwable $e) {
+                Log::warning('[cluster] email.notify.failed', [
+                    'progress_id' => $this->progressId,
+                    'cluster_id' => $this->newCluster->id ?? null,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
+
         if (!$this->user->telegram_bot_active) {
             return;
         }
 
-        $message = "Модуль: <a href='https://lk.redbox.su/cluster'>Кластеризатор</a>
+        $viewUrl = route('show.cluster.result', $this->newCluster->id);
+        $csvUrl = route('download.cluster.result', ['cluster' => $this->newCluster->id, 'type' => 'csv']);
+        $xlsUrl = route('download.cluster.result', ['cluster' => $this->newCluster->id, 'type' => 'xls']);
+        $moduleUrl = route('cluster');
+
+        $message = "Модуль: <a href='{$moduleUrl}'>Кластеризатор</a>
 Выполнена задача № " . $this->newCluster->id . "
 Домен: " . $this->request['domain'] . "
 Комментарий: " . $this->request['comment'] . "
@@ -866,9 +884,9 @@ class Cluster
 Топ: $this->count
 Режим: " . $this->request['clusteringLevel'] . "
 Регион: " . Common::getRegionName($this->request['region']) . "
-<a href='https://lk.redbox.su/show-cluster-result/" . $this->newCluster->id . "'>Просмотр результатов</a>
-<a href='https://lk.redbox.su/download-cluster-result/" . $this->newCluster->id . "/csv'>Скачать CSV</a>
-<a href='https://lk.redbox.su/download-cluster-result/" . $this->newCluster->id . "/xls'>Скачать XLS</a>";
+<a href='{$viewUrl}'>Просмотр результатов</a>
+<a href='{$csvUrl}'>Скачать CSV</a>
+<a href='{$xlsUrl}'>Скачать XLS</a>";
 
         (new TelegramBotService($this->user->chat_id))->sendMsg($message, null, [
             'event_id' => 'cluster-done',

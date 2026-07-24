@@ -11,9 +11,57 @@ use Illuminate\Support\Facades\DB;
 class ClusterProgress
 {
     private const FAILED_CACHE_PREFIX = 'cluster_progress_failed:';
+    private const EXPECTED_CACHE_PREFIX = 'cluster_progress_expected:';
+    private const ACTIVE_CACHE_PREFIX = 'cluster_progress_active_user:';
+
+    public static function rememberExpectedTotal(string $progressId, int $total): void
+    {
+        if ($progressId === '' || $total < 1) {
+            return;
+        }
+
+        Cache::put(self::EXPECTED_CACHE_PREFIX . md5($progressId), $total, now()->addHours(12));
+    }
+
+    public static function expectedTotal(string $progressId): int
+    {
+        if ($progressId === '') {
+            return 0;
+        }
+
+        return (int) Cache::get(self::EXPECTED_CACHE_PREFIX . md5($progressId), 0);
+    }
 
     /**
-     * @return array{queue_count:int,phrases_done:int,phrases_pending:int,phrases_total:int,waiting_in_queue:bool}
+     * Новый запуск отменяет незавершённый предыдущий у того же пользователя,
+     * иначе UI показывает 0/N, пока воркеры дожимают старый progress_id.
+     */
+    public static function claimActiveForUser(int $userId, string $progressId): ?string
+    {
+        if ($userId < 1 || $progressId === '') {
+            return null;
+        }
+
+        $key = self::ACTIVE_CACHE_PREFIX . $userId;
+        $previous = (string) Cache::get($key, '');
+        Cache::put($key, $progressId, now()->addHours(12));
+
+        if ($previous === '' || $previous === $progressId) {
+            return null;
+        }
+
+        if (self::isComplete($previous) || self::getFailed($previous)) {
+            return null;
+        }
+
+        self::cancelProgress($previous, 'Заменён новым запуском анализа');
+        self::removeJobsForProgress(ClusterQueues::name('main'), $previous);
+
+        return $previous;
+    }
+
+    /**
+     * @return array{queue_count:int,phrases_done:int,phrases_pending:int,phrases_total:int,waiting_in_queue:bool,starting:bool}
      */
     public static function snapshot(string $progressId): array
     {
@@ -22,7 +70,9 @@ class ClusterProgress
             ->where('queue', ClusterQueues::name('child'))
             ->where('payload', 'like', '%' . $progressId . '%')
             ->count();
-        $total = max($done + $pending, $done);
+        $expected = self::expectedTotal($progressId);
+        $total = max($done + $pending, $done, $expected);
+        $starting = $done === 0 && $pending === 0 && $expected > 0;
 
         return [
             'queue_count' => $done,
@@ -30,6 +80,7 @@ class ClusterProgress
             'phrases_pending' => $pending,
             'phrases_total' => $total,
             'waiting_in_queue' => $done === 0 && $pending > 0,
+            'starting' => $starting,
         ];
     }
 

@@ -40,7 +40,7 @@
                     </span>
                     <div class="info-box-content">
                         <span class="info-box-text">{{ __('Password generator saved count') }}</span>
-                        <span class="info-box-number">{{ number_format($savedCount, 0, ',', ' ') }}</span>
+                        <span class="info-box-number" data-pw-saved-count>{{ number_format($savedCount, 0, ',', ' ') }}</span>
                     </div>
                 </div>
             </div>
@@ -127,14 +127,34 @@
                                 @foreach($passwords as $password)
                                     <li>
                                         <code>{{ $password }}</code>
-                                        <button type="button"
-                                                class="btn btn-outline-secondary btn-sm"
-                                                data-pw-copy="{{ $password }}"
-                                                data-pw-copy-msg="{{ __('Successfully copied') }}"
-                                                title="{{ __('Copy to Clipboard') }}">
-                                            <i class="bi bi-clipboard" aria-hidden="true"></i>
-                                            <span class="visually-hidden">{{ __('Copy to Clipboard') }}</span>
-                                        </button>
+                                        <div class="cabinet-pw-result-actions">
+                                            <button type="button"
+                                                    class="btn btn-outline-secondary btn-sm"
+                                                    data-pw-copy="{{ $password }}"
+                                                    data-pw-copy-msg="{{ __('Successfully copied') }}"
+                                                    data-bs-toggle="tooltip"
+                                                    data-bs-placement="top"
+                                                    data-bs-custom-class="cabinet-pw-tooltip"
+                                                    title="{{ __('Copy to Clipboard') }}">
+                                                <i class="bi bi-clipboard" aria-hidden="true"></i>
+                                                <span class="visually-hidden">{{ __('Copy to Clipboard') }}</span>
+                                            </button>
+                                            <button type="button"
+                                                    class="btn btn-outline-primary btn-sm click_tracking"
+                                                    data-click="Save generated password"
+                                                    data-pw-save="{{ $password }}"
+                                                    data-pw-save-url="{{ route('save.generated.password') }}"
+                                                    data-pw-save-msg="{{ __('Password generator saved ok') }}"
+                                                    data-pw-save-err="{{ __('Error') }}"
+                                                    data-pw-saved-label="{{ __('Password generator already saved') }}"
+                                                    data-bs-toggle="tooltip"
+                                                    data-bs-placement="top"
+                                                    data-bs-custom-class="cabinet-pw-tooltip"
+                                                    title="{{ __('Save password') }}">
+                                                <i class="bi bi-bookmark-plus" aria-hidden="true"></i>
+                                                <span class="visually-hidden">{{ __('Save password') }}</span>
+                                            </button>
+                                        </div>
                                     </li>
                                 @endforeach
                             </ul>
@@ -153,73 +173,73 @@
         <div class="card shadow-sm cabinet-pw-saved-card">
             <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
                 <h2 class="card-title mb-0">{{ __('Your generated passwords') }}</h2>
-                @if($savedCount > 0)
-                    <span class="badge text-bg-light border">{{ $savedCount }}</span>
-                @endif
+                    <span class="badge text-bg-light border" data-pw-saved-badge @if($savedCount === 0) hidden @endif>{{ $savedCount }}</span>
             </div>
             <div class="card-body p-0">
                 <p class="cabinet-pw-comment-hint small text-secondary mb-0 px-3 py-2 border-bottom bg-body-tertiary">
                     <i class="bi bi-lightbulb me-1" aria-hidden="true"></i>{{ __('Password generator comment hint') }}
                 </p>
-                @if($savedCount > 0)
-                    <div class="table-responsive">
-                        <table id="me-passwords-table" class="table table-sm table-hover table-striped align-middle mb-0">
-                            <thead class="table-light">
-                            <tr>
-                                <th scope="col">{{ __('Password') }}</th>
-                                <th scope="col">{{ __('Comment') }}</th>
-                                <th scope="col" class="text-nowrap">{{ __('Created at') }}</th>
-                                <th scope="col" class="text-end">{{ __('Actions') }}</th>
+                <div class="cabinet-pw-saved-empty" data-pw-saved-empty @if($savedCount > 0) hidden @endif>
+                    <i class="bi bi-inbox fs-2 d-block mb-2 opacity-50" aria-hidden="true"></i>
+                    <p class="mb-0">{{ __('Password generator saved empty') }}</p>
+                </div>
+                <div class="table-responsive" data-pw-saved-wrap @if($savedCount === 0) hidden @endif>
+                    <table id="me-passwords-table" class="table table-sm table-hover table-striped align-middle mb-0">
+                        <thead class="table-light">
+                        <tr>
+                            <th scope="col">{{ __('Password') }}</th>
+                            <th scope="col">{{ __('Comment') }}</th>
+                            <th scope="col" class="text-nowrap">{{ __('Created at') }}</th>
+                            <th scope="col" class="text-end">{{ __('Actions') }}</th>
+                        </tr>
+                        </thead>
+                        <tbody data-pw-saved-tbody>
+                        @foreach($savedPasswords as $password)
+                            <tr id="tr-{{ $password->id }}">
+                                <td class="cabinet-pw-password-cell align-middle">{{ $password->password }}</td>
+                                <td class="align-middle">
+                                    <textarea class="form-control password-comment"
+                                              name="comment"
+                                              id="{{ $password->id }}"
+                                              rows="2"
+                                              placeholder="{{ __('Password generator comment placeholder') }}"
+                                              data-comment-url="{{ route('edit.password.comment') }}"
+                                              data-comment-success="{{ __('Comment successfully changed') }}"
+                                              data-comment-error="{{ __('Error') }}">{{ $password->comment }}</textarea>
+                                </td>
+                                <td class="align-middle text-nowrap small text-secondary">
+                                    {{ $password->created_at ? $password->created_at->format('d.m.Y H:i') : '—' }}
+                                </td>
+                                <td class="align-middle">
+                                    <div class="cabinet-pw-actions">
+                                        <button type="button"
+                                                class="btn btn-outline-secondary btn-sm"
+                                                data-pw-copy="{{ $password->password }}"
+                                                data-pw-copy-msg="{{ __('Successfully copied') }}"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                data-bs-custom-class="cabinet-pw-tooltip"
+                                                title="{{ __('Copy to Clipboard') }}">
+                                            <i class="bi bi-clipboard" aria-hidden="true"></i>
+                                        </button>
+                                        <button type="button"
+                                                class="btn btn-outline-danger btn-sm remove-password click_tracking"
+                                                data-click="Remove"
+                                                data-order="{{ $password->id }}"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#removePasswordWindow"
+                                                data-bs-title="{{ __('Remove') }}"
+                                                data-pw-tip="{{ __('Remove') }}"
+                                                title="{{ __('Remove') }}">
+                                            <i class="bi bi-trash" aria-hidden="true"></i>
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
-                            </thead>
-                            <tbody>
-                            @foreach($savedPasswords as $password)
-                                <tr id="tr-{{ $password->id }}">
-                                    <td class="cabinet-pw-password-cell align-middle">{{ $password->password }}</td>
-                                    <td class="align-middle">
-                                        <textarea class="form-control password-comment"
-                                                  name="comment"
-                                                  id="{{ $password->id }}"
-                                                  rows="2"
-                                                  placeholder="{{ __('Password generator comment placeholder') }}"
-                                                  data-comment-url="{{ route('edit.password.comment') }}"
-                                                  data-comment-success="{{ __('Comment successfully changed') }}"
-                                                  data-comment-error="{{ __('Error') }}">{{ $password->comment }}</textarea>
-                                    </td>
-                                    <td class="align-middle text-nowrap small text-secondary">
-                                        {{ $password->created_at ? $password->created_at->format('d.m.Y H:i') : '—' }}
-                                    </td>
-                                    <td class="align-middle">
-                                        <div class="cabinet-pw-actions">
-                                            <button type="button"
-                                                    class="btn btn-outline-secondary btn-sm"
-                                                    data-pw-copy="{{ $password->password }}"
-                                                    data-pw-copy-msg="{{ __('Successfully copied') }}"
-                                                    title="{{ __('Copy to Clipboard') }}">
-                                                <i class="bi bi-clipboard" aria-hidden="true"></i>
-                                            </button>
-                                            <button type="button"
-                                                    class="btn btn-outline-danger btn-sm remove-password click_tracking"
-                                                    data-click="Remove"
-                                                    data-order="{{ $password->id }}"
-                                                    data-bs-toggle="modal"
-                                                    data-bs-target="#removePasswordWindow"
-                                                    title="{{ __('Remove') }}">
-                                                <i class="bi bi-trash" aria-hidden="true"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <div class="cabinet-pw-saved-empty">
-                        <i class="bi bi-inbox fs-2 d-block mb-2 opacity-50" aria-hidden="true"></i>
-                        <p class="mb-0">{{ __('Password generator saved empty') }}</p>
-                    </div>
-                @endif
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>

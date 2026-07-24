@@ -2,6 +2,7 @@
     'use strict';
 
     var STORAGE_PREFIX = 'cabinetPwGen_';
+    var bound = false;
 
     function qs(sel, root) {
         return (root || document).querySelector(sel);
@@ -39,6 +40,15 @@
         document.execCommand('copy');
         document.body.removeChild(textarea);
         return Promise.resolve();
+    }
+
+    function escapeHtml(text) {
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     function saveState() {
@@ -127,6 +137,198 @@
         saveState();
     }
 
+    function updateSavedCount(delta) {
+        var countEl = qs('[data-pw-saved-count]');
+        var badge = qs('[data-pw-saved-badge]');
+        var current = 0;
+        if (countEl) {
+            current = parseInt(String(countEl.textContent).replace(/\s/g, ''), 10) || 0;
+        }
+        var next = Math.max(0, current + delta);
+        var formatted = String(next).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        if (countEl) {
+            countEl.textContent = formatted;
+        }
+        if (badge) {
+            badge.textContent = String(next);
+            badge.hidden = next === 0;
+        }
+    }
+
+    function initTooltip(el) {
+        if (!el || !window.bootstrap || !window.bootstrap.Tooltip) {
+            return;
+        }
+        var existing = window.bootstrap.Tooltip.getInstance(el);
+        if (existing) {
+            existing.dispose();
+        }
+        // У modal-кнопки уже data-bs-toggle=modal — tooltip только через API.
+        var opts = {
+            container: 'body',
+            trigger: 'hover focus',
+            customClass: 'cabinet-pw-tooltip',
+            placement: el.getAttribute('data-bs-placement') || 'top',
+        };
+        if (el.getAttribute('data-pw-tip')) {
+            opts.title = el.getAttribute('data-pw-tip');
+        }
+        new window.bootstrap.Tooltip(el, opts);
+    }
+
+    function initTooltips(root) {
+        if (!window.bootstrap || !window.bootstrap.Tooltip) {
+            return;
+        }
+        qsa('[data-bs-toggle="tooltip"], [data-pw-tip]', root || document).forEach(initTooltip);
+    }
+
+    function hideTooltip(el) {
+        if (!el || !window.bootstrap || !window.bootstrap.Tooltip) {
+            return;
+        }
+        var tip = window.bootstrap.Tooltip.getInstance(el);
+        if (tip) {
+            tip.hide();
+        }
+    }
+
+    function csrfToken() {
+        var token = qs('meta[name="csrf-token"]');
+        return token ? token.getAttribute('content') : '';
+    }
+
+    function bindDelegatedActions() {
+        if (bound) {
+            return;
+        }
+        bound = true;
+
+        document.addEventListener('click', function (event) {
+            var copyBtn = event.target.closest('[data-pw-copy]');
+            if (copyBtn && document.querySelector('.cabinet-pw-page')) {
+                event.preventDefault();
+                hideTooltip(copyBtn);
+                var text = copyBtn.getAttribute('data-pw-copy') || '';
+                copyText(text.trim()).then(function () {
+                    showToast('success', copyBtn.getAttribute('data-pw-copy-msg') || 'Copied');
+                });
+                return;
+            }
+
+            var saveBtn = event.target.closest('[data-pw-save]');
+            if (saveBtn && document.querySelector('.cabinet-pw-page')) {
+                event.preventDefault();
+                hideTooltip(saveBtn);
+                if (saveBtn.disabled || saveBtn.classList.contains('is-saved') || !window.jQuery) {
+                    return;
+                }
+                var password = saveBtn.getAttribute('data-pw-save') || '';
+                var url = saveBtn.getAttribute('data-pw-save-url') || '';
+                saveBtn.disabled = true;
+                window.jQuery.ajax({
+                    type: 'POST',
+                    dataType: 'json',
+                    url: url,
+                    data: {
+                        _token: csrfToken(),
+                        password: password,
+                    },
+                    success: function (data) {
+                        if (!data || !data.success) {
+                            saveBtn.disabled = false;
+                            showToast('error', saveBtn.getAttribute('data-pw-save-err') || 'Error');
+                            return;
+                        }
+                        var empty = qs('[data-pw-saved-empty]');
+                        var wrap = qs('[data-pw-saved-wrap]');
+                        var tbody = qs('[data-pw-saved-tbody]');
+                        if (empty) {
+                            empty.hidden = true;
+                        }
+                        if (wrap) {
+                            wrap.hidden = false;
+                        }
+                        if (tbody) {
+                            var tr = document.createElement('tr');
+                            tr.id = 'tr-' + data.id;
+                            tr.innerHTML =
+                                '<td class="cabinet-pw-password-cell align-middle">' + escapeHtml(data.password) + '</td>' +
+                                '<td class="align-middle">' +
+                                    '<textarea class="form-control password-comment" name="comment" id="' + data.id + '" rows="2"' +
+                                    ' placeholder="' + escapeHtml(data.comment_placeholder || '') + '"' +
+                                    ' data-comment-url="' + escapeHtml(data.comment_url || '') + '"' +
+                                    ' data-comment-success="' + escapeHtml(data.comment_success || '') + '"' +
+                                    ' data-comment-error="' + escapeHtml(data.comment_error || '') + '"></textarea>' +
+                                '</td>' +
+                                '<td class="align-middle text-nowrap small text-secondary">' + escapeHtml(data.created_at || '—') + '</td>' +
+                                '<td class="align-middle"><div class="cabinet-pw-actions">' +
+                                    '<button type="button" class="btn btn-outline-secondary btn-sm" data-pw-copy="' + escapeHtml(data.password) + '"' +
+                                    ' data-pw-copy-msg="' + escapeHtml(data.copy_msg || '') + '"' +
+                                    ' data-bs-toggle="tooltip" data-bs-placement="top" data-bs-custom-class="cabinet-pw-tooltip"' +
+                                    ' title="' + escapeHtml(data.copy_title || '') + '">' +
+                                    '<i class="bi bi-clipboard" aria-hidden="true"></i></button>' +
+                                    '<button type="button" class="btn btn-outline-danger btn-sm remove-password click_tracking" data-click="Remove"' +
+                                    ' data-order="' + data.id + '" data-bs-toggle="modal" data-bs-target="#removePasswordWindow"' +
+                                    ' data-pw-tip="' + escapeHtml(data.remove_title || '') + '" title="' + escapeHtml(data.remove_title || '') + '">' +
+                                    '<i class="bi bi-trash" aria-hidden="true"></i></button>' +
+                                '</div></td>';
+                            tbody.insertBefore(tr, tbody.firstChild);
+                            initTooltips(tr);
+                        }
+                        updateSavedCount(1);
+                        saveBtn.classList.add('is-saved');
+                        var savedLabel = saveBtn.getAttribute('data-pw-saved-label') || 'Saved';
+                        saveBtn.title = savedLabel;
+                        saveBtn.setAttribute('data-bs-original-title', savedLabel);
+                        var icon = qs('i', saveBtn);
+                        if (icon) {
+                            icon.className = 'bi bi-bookmark-check';
+                        }
+                        initTooltip(saveBtn);
+                        showToast('success', data.saved_msg || saveBtn.getAttribute('data-pw-save-msg') || 'OK');
+                    },
+                    error: function () {
+                        saveBtn.disabled = false;
+                        showToast('error', saveBtn.getAttribute('data-pw-save-err') || 'Error');
+                    },
+                });
+                return;
+            }
+
+            var removeBtn = event.target.closest('.remove-password');
+            if (removeBtn && document.querySelector('.cabinet-pw-page')) {
+                var passwordId = qs('#passwordId');
+                if (passwordId) {
+                    passwordId.value = removeBtn.getAttribute('data-order') || '';
+                }
+            }
+        });
+
+        document.addEventListener('change', function (event) {
+            var textarea = event.target.closest('.password-comment');
+            if (!textarea || !document.querySelector('.cabinet-pw-page') || !window.jQuery) {
+                return;
+            }
+            window.jQuery.ajax({
+                type: 'POST',
+                dataType: 'json',
+                url: textarea.getAttribute('data-comment-url'),
+                data: {
+                    _token: csrfToken(),
+                    id: textarea.getAttribute('id'),
+                    comment: textarea.value,
+                },
+                success: function () {
+                    showToast('success', textarea.getAttribute('data-comment-success') || 'OK');
+                },
+                error: function () {
+                    showToast('error', textarea.getAttribute('data-comment-error') || 'Error');
+                },
+            });
+        });
+    }
+
     function bindPresets() {
         qsa('[data-pw-preset]').forEach(function (btn) {
             btn.addEventListener('click', function () {
@@ -153,65 +355,19 @@
         syncLengthUi();
     }
 
-    function bindCopyButtons() {
-        qsa('[data-pw-copy]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var text = btn.getAttribute('data-pw-copy') || '';
-                copyText(text.trim()).then(function () {
-                    showToast('success', btn.getAttribute('data-pw-copy-msg') || 'Copied');
-                });
-            });
-        });
-    }
-
-    function bindComments() {
-        var token = qs('meta[name="csrf-token"]');
-        qsa('.password-comment').forEach(function (textarea) {
-            textarea.addEventListener('change', function () {
-                if (!window.jQuery || !token) {
-                    return;
-                }
-                window.jQuery.ajax({
-                    type: 'POST',
-                    dataType: 'json',
-                    url: textarea.getAttribute('data-comment-url'),
-                    data: {
-                        _token: token.getAttribute('content'),
-                        id: textarea.getAttribute('id'),
-                        comment: textarea.value,
-                    },
-                    success: function () {
-                        showToast('success', textarea.getAttribute('data-comment-success') || 'OK');
-                    },
-                    error: function () {
-                        showToast('error', textarea.getAttribute('data-comment-error') || 'Error');
-                    },
-                });
-            });
-        });
-    }
-
-    function bindRemove() {
+    function bindRemoveConfirm() {
         var passwordId = qs('#passwordId');
-        qsa('.remove-password').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                if (passwordId) {
-                    passwordId.value = btn.getAttribute('data-order') || '';
-                }
-            });
-        });
         var confirmBtn = qs('#success-remove-password');
         if (!confirmBtn || !window.jQuery) {
             return;
         }
-        var token = qs('meta[name="csrf-token"]');
         confirmBtn.addEventListener('click', function () {
             window.jQuery.ajax({
                 type: 'POST',
                 dataType: 'json',
                 url: confirmBtn.getAttribute('data-remove-url'),
                 data: {
-                    _token: token ? token.getAttribute('content') : '',
+                    _token: csrfToken(),
                     id: passwordId ? passwordId.value : '',
                 },
                 success: function () {
@@ -220,6 +376,18 @@
                     if (row) {
                         row.remove();
                     }
+                    var tbody = qs('[data-pw-saved-tbody]');
+                    if (tbody && !tbody.children.length) {
+                        var empty = qs('[data-pw-saved-empty]');
+                        var wrap = qs('[data-pw-saved-wrap]');
+                        if (empty) {
+                            empty.hidden = false;
+                        }
+                        if (wrap) {
+                            wrap.hidden = true;
+                        }
+                    }
+                    updateSavedCount(-1);
                     showToast('success', confirmBtn.getAttribute('data-remove-success') || 'Deleted');
                 },
             });
@@ -241,9 +409,9 @@
         restoreState();
         bindPresets();
         bindLengthControls();
-        bindCopyButtons();
-        bindComments();
-        bindRemove();
+        bindDelegatedActions();
+        bindRemoveConfirm();
         bindForm();
+        initTooltips(qs('.cabinet-pw-page'));
     });
 })();

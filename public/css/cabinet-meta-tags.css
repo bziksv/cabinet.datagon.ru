@@ -185,9 +185,54 @@
     font-weight: 500;
 }
 
-.cabinet-mt-page .cabinet-mt-results-card .progress {
-    height: 0.5rem;
-    border-radius: 0;
+.cabinet-mt-progress {
+    margin: 0;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--bs-border-color, #dee2e6);
+    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+    background: #f8fafc;
+}
+
+.cabinet-mt-progress__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.4rem;
+}
+
+.cabinet-mt-progress__label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.cabinet-mt-progress__pct {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: #64748b;
+}
+
+.cabinet-mt-progress__bar.progress {
+    height: 0.65rem;
+    border-radius: 999px;
+    background-color: #e2e8f0;
+    overflow: hidden;
+}
+
+.cabinet-mt-progress__bar .progress-bar {
+    border-radius: 999px;
+    transition: width 0.25s ease;
+}
+
+.cabinet-mt-progress--done {
+    background: #f0fdf4;
+}
+
+.cabinet-mt-progress--done .cabinet-mt-progress__label,
+.cabinet-mt-progress--done .cabinet-mt-progress__pct {
+    color: #166534;
 }
 
 .cabinet-mt-page .card-header-accordion {

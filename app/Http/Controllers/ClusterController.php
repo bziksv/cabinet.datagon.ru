@@ -185,15 +185,28 @@ class ClusterController extends Controller
             ], 422);
         }
 
+        $totalPhrases = count(array_unique(array_diff(explode("\n", str_replace("\r", "", $request['phrases'])), [])));
+        if ($progressId !== '') {
+            $replaced = ClusterProgress::claimActiveForUser((int) $user->id, $progressId);
+            if ($replaced) {
+                ClusterAnalysisDebugLog::info($progressId, 'http.analyseCluster.replaced_previous', [
+                    'previous_progress_id' => $replaced,
+                ]);
+            }
+            ClusterProgress::rememberExpectedTotal($progressId, $totalPhrases);
+            ClusterProgress::clearFailed($progressId);
+        }
+
         dispatch(new StartClusterAnalyseQueue($request->all(), $user))->onQueue(ClusterQueues::name('main'));
 
         ClusterAnalysisDebugLog::info($progressId, 'http.analyseCluster.dispatched', [
             'queue' => ClusterQueues::name('main'),
+            'total_phrases' => $totalPhrases,
         ]);
 
         return $this->withClusterDebug($progressId, [
             'result' => true,
-            'totalPhrases' => count(array_unique(array_diff(explode("\n", str_replace("\r", "", $request['phrases'])), []))),
+            'totalPhrases' => $totalPhrases,
             'totalRequests' => $countRequests,
         ]);
     }
@@ -308,6 +321,7 @@ class ClusterController extends Controller
             'phrases_pending' => $progress['phrases_pending'],
             'phrases_total' => $progress['phrases_total'],
             'waiting_in_queue' => $progress['waiting_in_queue'],
+            'starting' => !empty($progress['starting']),
             'debug_state' => $progress,
         ]);
     }

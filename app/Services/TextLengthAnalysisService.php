@@ -28,9 +28,10 @@ class TextLengthAnalysisService
 
     $charsWithSpaces = mb_strlen($text);
     $charsNoSpaces = mb_strlen(preg_replace('/\s/u', '', $text) ?? '');
-    $words = count(preg_split('/\s+/u', $trimmed, -1, PREG_SPLIT_NO_EMPTY) ?: []);
+    $words = self::countWords($trimmed);
     $lines = substr_count($text, "\n") + 1;
-    preg_match_all('/\s/u', $text, $spaceMatches);
+    // Только пробел U+0020 — не переносы строк и не табы.
+    preg_match_all('/ /u', $text, $spaceMatches);
     $spaces = count($spaceMatches[0] ?? []);
 
     return [
@@ -40,6 +41,28 @@ class TextLengthAnalysisService
       'lines' => $lines,
       'spaces' => $spaces,
     ];
+  }
+
+  /**
+   * Слово = токен с хотя бы одной буквой/цифрой.
+   * Тире, многоточие и прочая пунктуация между пробелами не считаются.
+   */
+  public static function countWords(string $text): int
+  {
+    $trimmed = trim($text);
+    if ($trimmed === '') {
+      return 0;
+    }
+
+    $parts = preg_split('/\s+/u', $trimmed, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    $n = 0;
+    foreach ($parts as $part) {
+      if (preg_match('/[\p{L}\p{N}]/u', $part)) {
+        $n++;
+      }
+    }
+
+    return $n;
   }
 
   /**
@@ -98,7 +121,7 @@ class TextLengthAnalysisService
       return trim($p) !== '';
     })));
 
-    $words = count(preg_split('/\s+/u', $trimmed, -1, PREG_SPLIT_NO_EMPTY) ?: []);
+    $words = self::countWords($trimmed);
     $readingTimeMin = max(1, (int) ceil($words / 200));
 
     return [

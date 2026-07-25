@@ -6,6 +6,15 @@ function escapeHtml(text) {
         .replace(/"/g, '&quot;');
 }
 
+/** Безопасный URL: битые ссылки из выдачи не роняют всю отрисовку. */
+function safeParseUrl(link) {
+    try {
+        return new URL(String(link || ''));
+    } catch (e) {
+        return null;
+    }
+}
+
 function maxAnalysedSitesPerPhrase(analysedSites) {
     let max = 0;
     $.each(analysedSites || {}, function (_, sites) {
@@ -46,44 +55,30 @@ function syncMetaTableColumns(requestedCount, analysedSites) {
     });
 }
 
-/** Кнопка «глаз» + выпадающий список фраз (Bootstrap dropdown) */
-function buildPhrasesEyeToggle(phrases) {
+/** Фразы в readonly textarea — удобно выделить и скопировать. */
+function buildPhrasesList(phrases) {
     const list = Array.isArray(phrases) ? phrases : [];
-    const countLabel = list.length ? String(list.length) : '0';
-    const menuItems = list.map(function (phrase) {
-        return '<li><span class="dropdown-item-text">' + escapeHtml(String(phrase)) + '</span></li>';
-    }).join('');
+    if (!list.length) {
+        return '<span class="text-muted">—</span>';
+    }
 
-    return '<div class="dropdown position-static cabinet-ca-phrases-dropdown d-inline-block">' +
-        '<button type="button" class="btn btn-sm btn-outline-secondary cabinet-ca-phrases-toggle" ' +
-        'data-bs-toggle="dropdown" aria-expanded="false" ' +
-        'title="Фразы, в выдаче которых встречается страница">' +
-        '<i class="fas fa-eye" aria-hidden="true"></i>' +
-        '<span class="badge text-bg-primary ms-1">' + countLabel + '</span>' +
-        '</button>' +
-        '<ul class="dropdown-menu dropdown-menu-end shadow-sm cabinet-ca-phrases-dropdown-menu">' +
-        (menuItems || '<li><span class="dropdown-item-text text-muted">—</span></li>') +
-        '</ul></div>';
+    const lines = list.map(function (phrase) {
+        return String(phrase);
+    }).join('\n');
+    const rows = Math.min(5, Math.max(1, list.length));
+
+    return '<textarea class="form-control form-control-sm cabinet-ca-phrases-field" readonly ' +
+        'rows="' + rows + '" ' +
+        'spellcheck="false">' + escapeHtml(lines) + '</textarea>';
+}
+
+/** @deprecated alias — раньше был глаз/dropdown */
+function buildPhrasesEyeToggle(phrases) {
+    return buildPhrasesList(phrases);
 }
 
 function initPhrasesEyeDropdowns($root) {
-    if (typeof bootstrap === 'undefined' || !bootstrap.Dropdown) {
-        return;
-    }
-
-    ($root || $('#sites-tables, #urls-table')).find('.cabinet-ca-phrases-toggle[data-bs-toggle="dropdown"]').each(function () {
-        const existing = bootstrap.Dropdown.getInstance(this);
-        if (existing) {
-            existing.dispose();
-        }
-        new bootstrap.Dropdown(this, {
-            popperConfig: function (defaultConfig) {
-                const cfg = typeof defaultConfig === 'function' ? defaultConfig() : (defaultConfig || {});
-
-                return Object.assign({}, cfg, {strategy: 'fixed'});
-            },
-        });
-    });
+    // no-op: фразы показываются сразу в ячейке
 }
 
 function normalizeHostForMatch(host) {
@@ -135,19 +130,60 @@ function formatSerpUrlDisplay(link) {
 
         return {host: host, path: path, href: link};
     } catch (e) {
-        return {host: link, path: '', href: link};
+        const raw = String(link || '');
+        return {host: raw.replace(/^https?:\/\//i, '').split('/')[0] || raw, path: '', href: raw};
     }
 }
 
 function resolveParseStatus(info) {
     if (info && info.parse_status) {
+        if (info.parse_status === 'ok' && !metaHasMeaningfulContent(info)) {
+            return 'meta_empty'
+        }
+
         return info.parse_status
     }
     if (info && info.danger) {
         return 'blocked'
     }
+    if (!metaHasMeaningfulContent(info)) {
+        return 'meta_empty'
+    }
 
     return 'ok'
+}
+
+function isMeaningfulMetaValue(value) {
+    const text = String(value == null ? '' : value).trim()
+    if (!text) {
+        return false
+    }
+
+    return /[0-9A-Za-zА-Яа-яЁё]/.test(text)
+}
+
+function metaHasMeaningfulContent(info) {
+    if (!info || !info.meta) {
+        return false
+    }
+
+    let hasMeta = false
+    $.each(info.meta, function (_key, values) {
+        if (!values || !values.length) {
+            return
+        }
+        $.each(values, function (_i, value) {
+            if (isMeaningfulMetaValue(value)) {
+                hasMeta = true
+                return false
+            }
+        })
+        if (hasMeta) {
+            return false
+        }
+    })
+
+    return hasMeta
 }
 
 function metaTableCellClass(status) {
@@ -190,22 +226,28 @@ function buildMetaInfoBlock(url, info, messages, btnGroup) {
         expanded = true
     } else {
         let hasMeta = false
+        let metaBody = ''
 
         if (info && info.meta) {
             $.each(info.meta, function (key, values) {
-                if (values && values.length > 0) {
+                const list = Array.isArray(values) ? values : (values != null && values !== '' ? [values] : [])
+                const meaningful = list.filter(function (v) {
+                    return isMeaningfulMetaValue(v)
+                })
+                if (meaningful.length > 0) {
                     hasMeta = true
-                    body +=
+                    metaBody +=
                         '<div class="cabinet-ca-meta-tag-block">' +
                         '   <div class="cabinet-ca-meta-tag-block__label">' + escapeHtml(key) + '</div>' +
                         '   <div class="cabinet-ca-meta-tag-block__text">' +
-                        values.map(function (v) { return escapeHtml(v); }).join('<br>') +
+                        meaningful.map(function (v) { return escapeHtml(v); }).join('<br>') +
                         '   </div>' +
                         '</div>'
                 }
             })
         }
 
+        body = metaBody
         if (status === 'meta_empty' || !hasMeta) {
             body = '<div class="cabinet-ca-status-notice cabinet-ca-status-notice--empty">' +
                 '<i class="fas fa-info-circle" aria-hidden="true"></i>' +
@@ -218,11 +260,16 @@ function buildMetaInfoBlock(url, info, messages, btnGroup) {
 }
 
 function renderTopSites(analysedSites, messages, requestedCount) {
-    $.each(analysedSites, function (phrase, sites) {
+    $.each(analysedSites || {}, function (phrase, sites) {
         let tr = '<tr class="render">'
         tr += '<td>' + escapeHtml(phrase) + '</td>'
-        $.each(sites, function (site, info) {
-            let url = new URL(site)
+        $.each(sites || {}, function (site, info) {
+            let url = safeParseUrl(site)
+            if (!url) {
+                tr += '<td class="cabinet-ca-fetch-failed-cell"><span class="text-muted small">' +
+                    escapeHtml(String(site)) + '</span></td>'
+                return
+            }
             let btnGroup = getBtnGroup(url, messages)
             const status = resolveParseStatus(info)
             const infoBlock = buildMetaInfoBlock(url, info, messages, btnGroup)
@@ -532,22 +579,35 @@ function buildSerpHighlightMeta(analysedSites, renderOptions) {
 function buildSerpRowsHtml(sites, messages) {
     let html = '';
     let iterator = 1;
+    const filterTip = (window.competitorHighlightStrings && window.competitorHighlightStrings.filterHostTip)
+        || 'Show only this site in all columns';
     $.each(sites || {}, function (link, object) {
-        let url = new URL(link);
+        let url = safeParseUrl(link);
+        if (!url) {
+            return;
+        }
         let display = formatSerpUrlDisplay(link);
         let btnGroup = getBtnGroup(url, messages);
         html +=
             '<div class="cabinet-ca-serp-row await-color" ' +
             'data-order="' + escapeHtml(display.host) + '" ' +
             'data-full-url="' + escapeHtml(link) + '" ' +
-            'data-main-page="' + (object['mainPage'] ? 'true' : 'false') + '" ' +
+            'data-main-page="' + (object && object['mainPage'] ? 'true' : 'false') + '" ' +
             'title="' + escapeHtml(link) + '">' +
             '    <span class="cabinet-ca-serp-rank">' + iterator + '</span>' +
             '    <div class="cabinet-ca-serp-url">' +
             '        <span class="cabinet-ca-serp-domain">' + escapeHtml(display.host) + '</span>' +
             (display.path ? '<span class="cabinet-ca-serp-path">' + escapeHtml(display.path) + '</span>' : '') +
             '    </div>' +
-            '    <div>' + btnGroup + '</div>' +
+            '    <div class="cabinet-ca-serp-row-actions">' +
+            '        <button type="button" class="btn btn-tool cabinet-ca-serp-filter-btn p-0" ' +
+            '                data-host="' + escapeHtml(display.host) + '" ' +
+            '                title="' + escapeHtml(filterTip) + '" ' +
+            '                aria-label="' + escapeHtml(filterTip) + '">' +
+            '            <i class="fas fa-filter" aria-hidden="true"></i>' +
+            '        </button>' +
+            '        ' + btnGroup +
+            '    </div>' +
             '</div>';
         iterator++;
     });
@@ -615,6 +675,7 @@ function initSerpToolbarTooltips() {
 
 function resetSerpResultsDom() {
     disposeSerpPhraseTooltips();
+    clearSerpHostFilter();
     clearSerpHighlights();
     $('#sites-tables').off('mouseenter.serpHighlight mouseleave.serpHighlight');
     $('#sites-tables').empty();
@@ -697,11 +758,12 @@ function renderTopSitesV2(analysedSites, messages, renderOptions) {
 function getStub(host, btnGroup, html, showBlock = false) {
 
     if (showBlock) {
-        return '<div class="card direct-chat direct-chat-primary" style="background: transparent !important; box-shadow: none; border: none">' +
+        return '<div class="card cabinet-ca-meta-card direct-chat direct-chat-primary" style="background: transparent !important; box-shadow: none; border: none">' +
             '        <div class="card-header ui-sortable-handle" style="padding: 0 !important; border: 0">' +
             '            <div class="d-flex justify-content-between align-items-start gap-2">' +
             '<div class="fw-semibold small cabinet-ca-meta-domain">' + escapeHtml(host) + btnGroup + '</div>' +
-            '                <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse">' +
+            '                <button type="button" class="btn btn-tool cabinet-ca-meta-collapse-btn" ' +
+            '                        data-cabinet-ca-toggle="meta-collapse" aria-expanded="true">' +
             '                    <i class="fas fa-minus"></i>' +
             '                </button>' +
             '            </div>' +
@@ -712,11 +774,12 @@ function getStub(host, btnGroup, html, showBlock = false) {
             '    </div>';
     }
 
-    return '<div class="card direct-chat direct-chat-primary collapsed-card" style="background: transparent !important; box-shadow: none; border: none">' +
+    return '<div class="card cabinet-ca-meta-card direct-chat direct-chat-primary collapsed-card" style="background: transparent !important; box-shadow: none; border: none">' +
         '        <div class="card-header ui-sortable-handle" style="padding: 0 !important; border: 0">' +
         '            <div class="d-flex justify-content-between align-items-start gap-2">' +
         '<div class="fw-semibold small cabinet-ca-meta-domain">' + escapeHtml(host) + btnGroup + '</div>' +
-        '                <button type="button" class="btn btn-tool" data-lte-toggle="card-collapse">' +
+        '                <button type="button" class="btn btn-tool cabinet-ca-meta-collapse-btn" ' +
+        '                        data-cabinet-ca-toggle="meta-collapse" aria-expanded="false">' +
         '                    <i class="fas fa-plus"></i>' +
         '                </button>' +
         '            </div>' +
@@ -726,6 +789,34 @@ function getStub(host, btnGroup, html, showBlock = false) {
         '        </div>' +
         '    </div>';
 }
+
+$(document).off('click.cabinetCaMetaCollapse', '[data-cabinet-ca-toggle="meta-collapse"]')
+    .on('click.cabinetCaMetaCollapse', '[data-cabinet-ca-toggle="meta-collapse"]', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const $btn = $(this);
+        const $card = $btn.closest('.cabinet-ca-meta-card, .card').first();
+        const $body = $card.children('.card-body');
+        if (!$body.length) {
+            return;
+        }
+
+        const isCollapsed = $card.hasClass('collapsed-card') || !$body.is(':visible');
+        const $icon = $btn.find('i').first();
+
+        if (isCollapsed) {
+            $card.removeClass('collapsed-card');
+            $body.stop(true, true).slideDown(180);
+            $icon.removeClass('fa-plus').addClass('fa-minus');
+            $btn.attr('aria-expanded', 'true');
+        } else {
+            $card.addClass('collapsed-card');
+            $body.stop(true, true).slideUp(180);
+            $icon.removeClass('fa-minus').addClass('fa-plus');
+            $btn.attr('aria-expanded', 'false');
+        }
+    });
 
 function getBtnGroup(url, messages) {
     return '<div class="btn-group">' +
@@ -852,42 +943,92 @@ function colorButtonsActions(duplicateHosts, duplicateUrls, highlightMeta) {
     })
 
     $('#coloredEloquentMyText').unbind().on('click', function () {
-        coloredButtons($('[data-bs-target="#coloredEloquentMyTextModal"]'))
-        clearSerpHighlights()
-
-        let myValues = $('#search-textarea').val()
-
-        let myValuesAr = myValues.split("\n").filter(function (line) {
-            return $.trim(line).length > 0
-        })
-
-        let elems = []
-        $.each($('.cabinet-ca-serp-row'), function () {
-            let target = $(this).attr('data-full-url');
-            if (target) {
-                let elem = $(this);
-                $.each(myValuesAr, function (linkKey, link) {
-                    if (target.indexOf(link) !== -1) {
-                        elems.push(elem)
-                    }
-                })
-            }
-
-        });
-
-        setSerpHighlight([...new Set(elems)], 'custom', '#fef08a')
+        applyCustomDomainHighlight()
     })
 
+    bindCustomHighlightOpenButton()
+    bindAggregatorHighlightOpenButton()
 }
 
-function highlightAggregatorSites() {
-    coloredButtons($('[data-bs-target="#coloredAgrigators"]'))
+function openCabinetBsModal(modalId) {
+    const el = document.getElementById(modalId)
+    if (!el || !window.bootstrap || !bootstrap.Modal) {
+        return
+    }
+    bootstrap.Modal.getOrCreateInstance(el).show()
+}
 
-    const agrigatorsAr = parseDomainLines($('#search-agrigators').val())
-    if (!agrigatorsAr.length) {
+function resetColoredButtons() {
+    $('.colored-button').each(function () {
+        $(this).removeClass('btn-primary').addClass('btn-outline-secondary')
+    })
+}
+
+function clearActiveSerpHighlightMode() {
+    clearSerpHighlights()
+    resetColoredButtons()
+}
+
+function applyCustomDomainHighlight() {
+    const myValuesAr = ($('#search-textarea').val() || '').split('\n').filter(function (line) {
+        return $.trim(line).length > 0
+    })
+
+    if (!myValuesAr.length) {
+        clearActiveSerpHighlightMode()
         return
     }
 
+    coloredButtons($('#coloredEloquentMyTextOpen'))
+    clearSerpHighlights()
+
+    const elems = []
+    $.each($('.cabinet-ca-serp-row'), function () {
+        const target = $(this).attr('data-full-url')
+        if (!target) {
+            return
+        }
+        const elem = $(this)
+        $.each(myValuesAr, function (linkKey, link) {
+            if (target.indexOf(link) !== -1) {
+                elems.push(elem)
+            }
+        })
+    })
+
+    setSerpHighlight([...new Set(elems)], 'custom', '#fef08a')
+}
+
+function bindCustomHighlightOpenButton() {
+    $('#coloredEloquentMyTextOpen').unbind().on('click', function (e) {
+        e.preventDefault()
+        if ($(this).hasClass('btn-primary')) {
+            clearActiveSerpHighlightMode()
+            return
+        }
+        openCabinetBsModal('coloredEloquentMyTextModal')
+    })
+}
+
+function bindAggregatorHighlightOpenButton() {
+    $('#coloredAgrigatorsOpen').unbind().on('click', function (e) {
+        e.preventDefault()
+        if ($(this).hasClass('btn-primary')) {
+            clearActiveSerpHighlightMode()
+            return
+        }
+        openCabinetBsModal('coloredAgrigators')
+    })
+}
+
+function highlightAggregatorSites() {
+    const agrigatorsAr = parseDomainLines($('#search-agrigators').val())
+    if (!agrigatorsAr.length) {
+        clearActiveSerpHighlightMode()
+        return
+    }
+
+    coloredButtons($('#coloredAgrigatorsOpen'))
     clearSerpHighlights()
 
     const elems = []
@@ -922,9 +1063,131 @@ $(document).off('click.cabinetCaAggregators', '#coloredAgrigatorsButton')
         highlightAggregatorSites()
     })
 
+$(document).off('click.cabinetCaClearHighlight', '#clearColoredEloquentMyText, #clearColoredAgrigators')
+    .on('click.cabinetCaClearHighlight', '#clearColoredEloquentMyText, #clearColoredAgrigators', function (e) {
+        e.preventDefault()
+        clearActiveSerpHighlightMode()
+    })
+
 function clearSerpHighlightHoverState() {
     $('.cabinet-ca-serp-row').removeClass('cabinet-ca-serp-row--dimmed cabinet-ca-serp-row--focus');
 }
+
+function eachSerpColumnContainer(callback) {
+    const $regionCols = $('#sites-tables .cabinet-ca-serp-region-col');
+    if ($regionCols.length) {
+        $regionCols.each(function () {
+            callback($(this));
+        });
+        return;
+    }
+
+    $('#sites-tables .cabinet-ca-phrase-card .card-body').each(function () {
+        callback($(this));
+    });
+}
+
+function removeSerpHostFilterPlaceholders() {
+    $('#sites-tables .cabinet-ca-serp-row--missing').remove();
+}
+
+function buildSerpHostMissingPlaceholder(host) {
+    const label = (window.competitorHighlightStrings && window.competitorHighlightStrings.hostNotInTop)
+        || 'not in top';
+
+    return '<div class="cabinet-ca-serp-row cabinet-ca-serp-row--missing" data-filter-placeholder="1">' +
+        '    <span class="cabinet-ca-serp-rank">—</span>' +
+        '    <div class="cabinet-ca-serp-url">' +
+        '        <span class="cabinet-ca-serp-domain">' + escapeHtml(host) + '</span>' +
+        '        <span class="cabinet-ca-serp-path">' + escapeHtml(label) + '</span>' +
+        '    </div>' +
+        '    <div></div>' +
+        '</div>';
+}
+
+function syncSerpHostFilterBar(host) {
+    const $bar = $('#cabinet-ca-serp-host-filter-bar');
+    if (!$bar.length) {
+        return;
+    }
+
+    if (!host) {
+        $bar.hide();
+        $('#cabinet-ca-serp-host-filter-label').text('');
+        return;
+    }
+
+    $('#cabinet-ca-serp-host-filter-label').text(host);
+    $bar.show();
+}
+
+function clearSerpHostFilter() {
+    window.cabinetCaSerpHostFilter = null;
+    removeSerpHostFilterPlaceholders();
+    $('#sites-tables .cabinet-ca-serp-row')
+        .removeClass('d-none cabinet-ca-serp-row--filter-match');
+    $('.cabinet-ca-serp-filter-btn').removeClass('is-active');
+    syncSerpHostFilterBar(null);
+}
+
+function applySerpHostFilter(host) {
+    const normalized = normalizeHostForMatch(host);
+    if (!normalized) {
+        clearSerpHostFilter();
+        return;
+    }
+
+    window.cabinetCaSerpHostFilter = normalized;
+    removeSerpHostFilterPlaceholders();
+
+    eachSerpColumnContainer(function ($col) {
+        let found = false;
+        $col.children('.cabinet-ca-serp-row').each(function () {
+            const rowHost = normalizeHostForMatch($(this).attr('data-order'));
+            if (rowHost === normalized) {
+                $(this).removeClass('d-none').addClass('cabinet-ca-serp-row--filter-match');
+                found = true;
+            } else {
+                $(this).addClass('d-none').removeClass('cabinet-ca-serp-row--filter-match');
+            }
+        });
+
+        if (!found) {
+            $col.append(buildSerpHostMissingPlaceholder(normalized));
+        }
+    });
+
+    $('.cabinet-ca-serp-filter-btn').removeClass('is-active');
+    $('.cabinet-ca-serp-filter-btn').filter(function () {
+        return normalizeHostForMatch($(this).attr('data-host')) === normalized;
+    }).addClass('is-active');
+
+    syncSerpHostFilterBar(normalized);
+}
+
+$(document).off('click.cabinetCaSerpHostFilter', '.cabinet-ca-serp-filter-btn')
+    .on('click.cabinetCaSerpHostFilter', '.cabinet-ca-serp-filter-btn', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const host = normalizeHostForMatch($(this).attr('data-host'));
+        if (!host) {
+            return;
+        }
+
+        if (window.cabinetCaSerpHostFilter === host) {
+            clearSerpHostFilter();
+            return;
+        }
+
+        applySerpHostFilter(host);
+    });
+
+$(document).off('click.cabinetCaSerpHostFilterClear', '#cabinet-ca-serp-host-filter-clear')
+    .on('click.cabinetCaSerpHostFilterClear', '#cabinet-ca-serp-host-filter-clear', function (e) {
+        e.preventDefault();
+        clearSerpHostFilter();
+    });
 
 function clearSerpHighlights() {
     clearSerpHighlightHoverState();
@@ -1014,9 +1277,7 @@ function setRandomColor(elem, backgroundColor, defaultColor) {
 }
 
 function coloredButtons(elem) {
-    $('.colored-button').each(function () {
-        $(this).removeClass('btn-primary').addClass('btn-outline-secondary');
-    });
+    resetColoredButtons();
     elem.removeClass('btn-outline-secondary').addClass('btn-primary');
 }
 

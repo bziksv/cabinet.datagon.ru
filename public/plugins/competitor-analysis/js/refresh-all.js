@@ -2,7 +2,6 @@ function refreshAll() {
     $('#start-analyse').prop('disabled', true);
     $('.top-sites').hide();
     $('.nested').hide();
-    $('.positions').hide();
     $('.tag-analysis').hide();
     $('#sites-block').hide();
     $('.urls.mt-5').hide();
@@ -19,9 +18,6 @@ function refreshAll() {
     $('.extra-th').hide();
 
     if ($.fn.dataTable) {
-        if ($('#positions').length && $.fn.dataTable.isDataTable('#positions')) {
-            $('#positions').DataTable().destroy();
-        }
         if ($('#urls-table').length && $.fn.dataTable.isDataTable('#urls-table')) {
             $('#urls-table').DataTable().destroy();
         }

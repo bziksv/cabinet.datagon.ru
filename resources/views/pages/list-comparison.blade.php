@@ -173,10 +173,6 @@
                                 <label class="form-check-label" for="cabinet-lc-opt-trim">{!! __('Trim lines') . $lcTip(__('Trims each line separately.')) !!}</label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="cabinet-lc-opt-empty" checked>
-                                <label class="form-check-label" for="cabinet-lc-opt-empty">{!! __('remove blank lines') . $lcTip(__('Removes lines that contain only whitespace.')) !!}</label>
-                            </div>
-                            <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="cabinet-lc-opt-ci">
                                 <label class="form-check-label" for="cabinet-lc-opt-ci">{!! __('Case-insensitive comparison') . $lcTip(__('Treats "Key" and "key" as the same line.')) !!}</label>
                             </div>
@@ -205,7 +201,7 @@
                 <button type="button" class="btn btn-outline-secondary click_tracking" data-click="Clear" data-lc-clear>
                     <i class="bi bi-x-lg me-1" aria-hidden="true"></i>{{ __('Clear') }}
                 </button>
-                <span class="text-muted small align-self-center ms-sm-2">{{ __('Ctrl+Enter — process, Ctrl+Z — undo') }}</span>
+                <span class="text-muted small align-self-center ms-sm-2">{{ __('Ctrl+Enter — process') }}</span>
             </div>
         </section>
 

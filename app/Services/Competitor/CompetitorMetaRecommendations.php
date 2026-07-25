@@ -303,12 +303,40 @@ class CompetitorMetaRecommendations
         $max = 0;
         foreach ($phraseGroup as $phrase) {
             $sites = $analysedSites[$phrase] ?? [];
-            if (is_array($sites)) {
-                $max = max($max, count($sites));
+            if (! is_array($sites)) {
+                continue;
             }
+            $withMeta = 0;
+            foreach ($sites as $site) {
+                if (! is_array($site)) {
+                    continue;
+                }
+                if ($this->siteHasUsableMeta($site)) {
+                    $withMeta++;
+                }
+            }
+            $max = max($max, $withMeta);
         }
 
         return max(1, $max);
+    }
+
+    /**
+     * Страницы без реального мета (таймаут / блок / TITLE="...") не поднимают порог рекомендаций.
+     */
+    protected function siteHasUsableMeta(array $site): bool
+    {
+        $status = $site['parse_status'] ?? null;
+        if ($status === 'fetch_failed' || $status === 'blocked' || $status === 'meta_empty') {
+            return false;
+        }
+
+        $meta = $site['meta'] ?? null;
+        if (! is_array($meta)) {
+            return $status === 'ok';
+        }
+
+        return ! \App\SearchCompetitors::metaIsEmpty($meta);
     }
 
     /**

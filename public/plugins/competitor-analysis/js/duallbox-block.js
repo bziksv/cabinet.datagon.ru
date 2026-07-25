@@ -44,18 +44,20 @@ function duallboxBlockRender(metaTags, count, localization) {
 
                 $(document).ready(function () {
                     $('#recommendations-table').dataTable({
-                        "order": [[0, "desc"]],
-                        "pageLength": 10,
-                        "searching": true,
-                        dom: 'lBfrtip',
+                        order: [[0, 'desc']],
+                        pageLength: 10,
+                        searching: true,
+                        autoWidth: false,
+                        dom: '<"row align-items-center g-2 cabinet-ca-dt-toolbar"<"col-auto"l><"col-auto"B><"col-auto ms-auto"f>>rt' +
+                            '<"row align-items-center g-2 cabinet-ca-dt-footer"<"col-auto"i><"col-auto ms-auto"p>>',
                         buttons: [
                             'copy', 'csv', 'excel'
-                        ]
+                        ],
+                        language: typeof competitorDataTablesLanguage === 'function'
+                            ? competitorDataTablesLanguage()
+                            : (window.competitorDataTablesLanguage || undefined),
                     })
 
-                    $('#recommendations-table_length').css('margin-right', '5px')
-                    $('#recommendations-table_wrapper > div.dt-buttons').css('display', 'inline')
-                    $('#recommendations-table_wrapper > div.dt-buttons').css('margin-left', '20px')
                     $('.dt-button').attr('class', 'btn btn-secondary')
 
                     $("html, body").animate({

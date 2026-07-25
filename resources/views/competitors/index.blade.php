@@ -205,9 +205,12 @@
                         {{ __('Highlight all main pages') }}
                     </button>
 
-                    <button type="button" class="btn btn-outline-secondary click_tracking" data-click="Highlight your"
-                            data-bs-toggle="modal"
-                            data-bs-target="#coloredEloquentMyTextModal">
+                    <button type="button"
+                            class="btn btn-outline-secondary colored-button click_tracking"
+                            id="coloredEloquentMyTextOpen"
+                            data-click="Highlight your"
+                            data-bs-toggle="tooltip" data-bs-placement="bottom"
+                            data-bs-title="{{ __('Highlight your own domains; click again to clear') }}">
                         {{ __('Highlight your') }}
                     </button>
 
@@ -228,11 +231,16 @@
                                               class="form form-control"
                                               placeholder="{{ __('The substring is searched in the string') }}"></textarea>
                                 </div>
-                                <div class="modal-footer">
-                                    <button class="btn btn-outline-secondary colored-button"
+                                <div class="modal-footer flex-wrap gap-2">
+                                    <button type="button" class="btn btn-primary"
                                             id="coloredEloquentMyText"
                                             data-bs-dismiss="modal">
                                         {{ __('Highlight your') }}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary"
+                                            id="clearColoredEloquentMyText"
+                                            data-bs-dismiss="modal">
+                                        {{ __('Clear highlight') }}
                                     </button>
                                     <button type="button" class="btn btn-secondary"
                                             data-bs-dismiss="modal">{{ __('Close') }}</button>
@@ -241,9 +249,12 @@
                         </div>
                     </div>
 
-                    <button type="button" class="btn btn-outline-secondary click_tracking" data-click="Highlight site aggregators"
-                            data-bs-toggle="modal"
-                            data-bs-target="#coloredAgrigators">
+                    <button type="button"
+                            class="btn btn-outline-secondary colored-button click_tracking"
+                            id="coloredAgrigatorsOpen"
+                            data-click="Highlight site aggregators"
+                            data-bs-toggle="tooltip" data-bs-placement="bottom"
+                            data-bs-title="{{ __('Highlight aggregators; click again to clear') }}">
                         {{ __('Highlight site aggregators') }}
                     </button>
 
@@ -262,11 +273,16 @@
                                     <textarea disabled name="search" id="search-agrigators" cols="30" rows="10"
                                               class="form form-control">{{ $config->agrigators }}</textarea>
                                 </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-primary colored-button"
+                                <div class="modal-footer flex-wrap gap-2">
+                                    <button type="button" class="btn btn-primary"
                                             id="coloredAgrigatorsButton"
                                             data-bs-dismiss="modal">
                                         {{ __('Highlight aggregators') }}
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary"
+                                            id="clearColoredAgrigators"
+                                            data-bs-dismiss="modal">
+                                        {{ __('Clear highlight') }}
                                     </button>
                                     <button type="button" class="btn btn-secondary"
                                             data-bs-dismiss="modal">{{ __('Close') }}</button>
@@ -278,6 +294,20 @@
                     <button class="btn btn-outline-secondary btn-sm" id="exportXLS">
                         <i class="fas fa-file-excel me-1" aria-hidden="true"></i>Экспорт XLS
                     </button>
+                    </div>
+
+                <div id="cabinet-ca-serp-host-filter-bar"
+                     class="cabinet-ca-serp-host-filter-bar alert alert-secondary border py-2 px-3 mb-3"
+                     style="display: none"
+                     role="status">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <i class="fas fa-filter" aria-hidden="true"></i>
+                        <span class="fw-semibold">{{ __('Host filter') }}:</span>
+                        <code id="cabinet-ca-serp-host-filter-label" class="mb-0"></code>
+                        <button type="button" class="btn btn-sm btn-outline-dark ms-auto"
+                                id="cabinet-ca-serp-host-filter-clear">
+                            {{ __('Clear host filter') }}
+                        </button>
                     </div>
                 </div>
 
@@ -389,32 +419,10 @@
                     <thead>
                     <tr>
                         <th class="cabinet-ca-urls-col-link">{{ __('Links') }}</th>
-                        <th class="cabinet-ca-urls-col-phrases text-center">{{ __('The phrase in which the link occurs') }}</th>
+                        <th class="cabinet-ca-urls-col-phrases">{{ __('The phrase in which the link occurs') }}</th>
                         <th class="cabinet-ca-urls-col-count text-center">{{ __('Number of repetitions') }}</th>
                     </thead>
                     <tbody id="urls-tbody">
-                    </tbody>
-                </table>
-                    </div>
-                </div>
-            </div>
-
-            <div class="positions cabinet-ca-results-section mt-5" style="display: none">
-                <div class="cabinet-ca-results-section__head">
-                    <h2 class="cabinet-ca-section-title mb-0">{{ __('Analysis by the percentage of getting into the top and middle positions') }}</h2>
-                </div>
-                <div class="card cabinet-ca-results-card border-0 shadow-sm">
-                    <div class="card-body p-0 table-responsive">
-                <table class="table table-hover table-sm mb-0 dataTable dtr-inline" id="positions">
-                    <thead>
-                    <tr>
-                        <th>{{ __('Domain') }}</th>
-                        <th>{{ __('Percentage of getting into the top') }}</th>
-                        <th>{{ __('Middle position') }}</th>
-                    </tr>
-                    </thead>
-                    <tbody id="positions-tbody">
-
                     </tbody>
                 </table>
                     </div>
@@ -490,8 +498,7 @@
         <script src="{{ asset('plugins/bootstrap4-duallistbox/jquery.bootstrap-duallistbox.js') }}"></script>
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script src="{{ asset('plugins/competitor-analysis/js/render-top-sites-table.js') }}?v={{ @filemtime(public_path('plugins/competitor-analysis/js/render-top-sites-table.js')) ?: time() }}"></script>
-        <script src="{{ asset('plugins/competitor-analysis/js/render-nesting-table.js') }}"></script>
-        <script src="{{ asset('plugins/competitor-analysis/js/render-site-positions-table.js') }}?v={{ @filemtime(public_path('plugins/competitor-analysis/js/render-site-positions-table.js')) ?: time() }}"></script>
+        <script src="{{ asset('plugins/competitor-analysis/js/render-nesting-table.js') }}?v={{ @filemtime(public_path('plugins/competitor-analysis/js/render-nesting-table.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/competitor-analysis/js/render-tags-table.js') }}?v={{ @filemtime(public_path('plugins/competitor-analysis/js/render-tags-table.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/competitor-analysis/js/render-urls-table.js') }}?v={{ @filemtime(public_path('plugins/competitor-analysis/js/render-urls-table.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/competitor-analysis/js/refresh-all.js') }}?v={{ @filemtime(public_path('plugins/competitor-analysis/js/refresh-all.js')) ?: time() }}"></script>
@@ -522,6 +529,24 @@
                 tipHighlightDomainsCompare: @json(__('Highlight identical domains in the same query column between the two cities')),
                 noCrossRegionUrls: @json(__('No identical URLs between cities in the same query column')),
                 noCrossRegionDomains: @json(__('No identical domains between cities in the same query column')),
+                filterHostTip: @json(__('Show only this site in all columns')),
+                hostNotInTop: @json(__('not in top')),
+            };
+
+            window.competitorDataTablesLanguage = {
+                search: @json(__('Search') . ':'),
+                lengthMenu: @json(__('show') . ' _MENU_ ' . __('records')),
+                info: @json(__('Showing') . ' ' . __('from') . ' _START_ ' . __('to') . ' _END_ ' . __('of') . ' _TOTAL_ ' . __('entries')),
+                infoEmpty: @json(__('Showing') . ' ' . __('from') . ' 0 ' . __('to') . ' 0 ' . __('of') . ' 0 ' . __('entries')),
+                infoFiltered: @json(__('(filtered from _MAX_ total)')),
+                zeroRecords: @json(__('No matching records found')),
+                emptyTable: @json(__('No data available in table')),
+                paginate: {
+                    first: '«',
+                    last: '»',
+                    next: '»',
+                    previous: '«',
+                },
             };
 
             window.competitorGeoExcludedPreset = @json(\App\Support\CompetitorSerpDomainFilter::excludedDomainsBreakdown());
@@ -601,6 +626,9 @@
             let activeCompetitorRegionKey = null;
             let competitorProgressTimer = null;
             let competitorLastProgressPercent = 0;
+            let competitorLastProgressAt = 0;
+            let competitorStallWarned = false;
+            const competitorStallWarnSec = {{ (int) config('cabinet-competitor-analysis.ui_stall_warn_sec', 90) }};
             const competitorAdminDebug = @json(!empty($admin));
             let competitorDebugPollCount = 0;
             let competitorClientDebugLines = [];
@@ -783,15 +811,11 @@
                 }
                 $('.top-sites').hide();
                 $('.nested').hide();
-                $('.positions').hide();
                 $('.tag-analysis').hide();
                 $('#sites-block').hide();
                 $('.urls.mt-5').hide();
                 $('#recommendations-block').hide();
                 $('.render').remove();
-                if ($.fn.dataTable && $('#positions').length && $.fn.dataTable.isDataTable('#positions')) {
-                    $('#positions').DataTable().destroy();
-                }
                 if ($.fn.dataTable && $('#urls-table').length && $.fn.dataTable.isDataTable('#urls-table')) {
                     $('#urls-table').DataTable().destroy();
                 }
@@ -803,7 +827,7 @@
                 }
                 activeCompetitorRegionKey = regionKey;
                 window.competitorActiveRegionKey = regionKey;
-                const payload = getRegionPayload(competitorResultBundle, regionKey);
+                const payload = getRegionPayload(competitorResultBundle, regionKey) || {};
 
                 if (window.competitorSerpCompareRegionKey === regionKey) {
                     window.competitorSerpCompareRegionKey = '';
@@ -817,17 +841,50 @@
                 }
 
                 const serpOptions = buildSerpRenderOptions(regionKey);
-                await renderTopSites(payload.analysedSites, localization, count);
-                await renderTopSitesV2(payload.analysedSites, localization, serpOptions);
-                await renderNestingTable(payload.pagesCounter);
-                await renderSitePositionsTable(payload.domainsPosition, {{ $config->positions_length }});
-                await renderTagsTable(payload.totalMetaTags);
-                await renderUrlsTable(payload.urls, {{ $config->urls_length }});
-                initCompetitorRecommendations(payload, count);
+                const steps = [
+                    ['meta', function () { return renderTopSites(payload.analysedSites, localization, count); }],
+                    ['serp', function () { return renderTopSitesV2(payload.analysedSites, localization, serpOptions); }],
+                    ['nesting', function () { return renderNestingTable(payload.pagesCounter); }],
+                    ['tags', function () { return renderTagsTable(payload.totalMetaTags); }],
+                    ['urls', function () { return renderUrlsTable(payload.urls, {{ $config->urls_length }}); }],
+                ];
+
+                for (let i = 0; i < steps.length; i++) {
+                    try {
+                        await Promise.resolve(steps[i][1]());
+                    } catch (stepErr) {
+                        competitorDebugLine('error', 'render.step_failed', {
+                            step: steps[i][0],
+                            message: stepErr && stepErr.message ? stepErr.message : String(stepErr)
+                        });
+                        if (typeof console !== 'undefined' && console.error) {
+                            console.error('competitor render step failed', steps[i][0], stepErr);
+                        }
+                    }
+                }
+
+                try {
+                    initCompetitorRecommendations(payload, count);
+                } catch (recErr) {
+                    competitorDebugLine('error', 'render.recommendations_failed', {
+                        message: recErr && recErr.message ? recErr.message : String(recErr)
+                    });
+                }
 
                 if (typeof renderGeoDependencyVerdict === 'function' && competitorResultBundle) {
-                    renderGeoDependencyVerdict(competitorResultBundle.geoDependency || null);
+                    try {
+                        renderGeoDependencyVerdict(competitorResultBundle.geoDependency || null);
+                    } catch (geoErr) {
+                        competitorDebugLine('error', 'render.geo_failed', {
+                            message: geoErr && geoErr.message ? geoErr.message : String(geoErr)
+                        });
+                    }
                 }
+            }
+
+            function hideCompetitorRenderBars() {
+                $('#render-bar').hide(300);
+                $('#progress-bar').hide(300);
             }
 
             function buildSerpRenderOptions(activeRegionKey) {
@@ -892,6 +949,8 @@
                     competitorPollGeneration++;
                     setCompetitorResultBundle(null);
                     competitorLastProgressPercent = 0;
+                    competitorLastProgressAt = Date.now();
+                    competitorStallWarned = false;
                     competitorDebugLine('info', 'analyse.click', {
                         phrases: phrases.length,
                         count: count,
@@ -1012,6 +1071,8 @@
                 competitorDebugPollCount = 0;
                 competitorClientDebugLines = [];
                 competitorRunFinished = false;
+                competitorLastProgressAt = Date.now();
+                competitorStallWarned = false;
                 competitorDebugLine('info', 'polling.start', {pageHash: window.session, pollGen: pollGen});
                 competitorProgressTimer = setInterval(function () {
                     getProgressPercent(token, count, pollGen);
@@ -1072,11 +1133,32 @@
                             percent = competitorLastProgressPercent;
                         } else if (percent > competitorLastProgressPercent) {
                             competitorLastProgressPercent = percent;
+                            competitorLastProgressAt = Date.now();
+                            competitorStallWarned = false;
                         } else if (percent < competitorLastProgressPercent) {
                             competitorDebugLine('warn', 'percent_dropped', {
                                 server: serverPercent,
                                 ui: competitorLastProgressPercent
                             });
+                        } else if (
+                            !competitorStallWarned
+                            && percent > 0
+                            && percent < 100
+                            && competitorStallWarnSec > 0
+                            && (Date.now() - competitorLastProgressAt) >= competitorStallWarnSec * 1000
+                        ) {
+                            competitorStallWarned = true;
+                            competitorDebugLine('warn', 'progress.stalled', {
+                                percent: percent,
+                                stallSec: competitorStallWarnSec
+                            });
+                            if (typeof toastr !== 'undefined' && toastr.warning) {
+                                toastr.warning(
+                                    @json(__('Competitor analysis stalled hint')),
+                                    @json(__('Analysis is taking longer than usual')),
+                                    {timeOut: 12000}
+                                );
+                            }
                         }
 
                         if (response.debug_admin && response.debug_log) {
@@ -1128,16 +1210,29 @@
                             const uiFirstKey = regionKeysForUi.length
                                 ? resolveRegionKey(regionKeysForUi[0])
                                 : firstRegionKey;
-                            if (uiFirstKey) {
-                                await renderCompetitorRegion(uiFirstKey, resultCount, localization)
-                            } else if (typeof renderGeoDependencyVerdict === 'function') {
-                                renderGeoDependencyVerdict(response.result.geoDependency || null);
+                            try {
+                                if (uiFirstKey) {
+                                    await renderCompetitorRegion(uiFirstKey, resultCount, localization)
+                                } else if (typeof renderGeoDependencyVerdict === 'function') {
+                                    renderGeoDependencyVerdict(response.result.geoDependency || null);
+                                }
+                            } catch (renderErr) {
+                                competitorDebugLine('error', 'render.failed', {
+                                    message: renderErr && renderErr.message ? renderErr.message : String(renderErr)
+                                });
+                                if (typeof console !== 'undefined' && console.error) {
+                                    console.error('competitor render failed', renderErr);
+                                }
+                                if (typeof toastr !== 'undefined' && toastr.error) {
+                                    toastr.error(
+                                        @json(__('Failed to render analysis results. Try again.')),
+                                        '',
+                                        {timeOut: 10000}
+                                    );
+                                }
+                            } finally {
+                                hideCompetitorRenderBars();
                             }
-
-                            setTimeout(function () {
-                                $('#render-bar').hide(300);
-                                $('#progress-bar').hide(300);
-                            }, 800);
 
                         } else {
                             setProgressBarStyles(percent);

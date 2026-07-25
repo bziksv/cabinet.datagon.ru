@@ -622,6 +622,10 @@ class SearchCompetitors extends Model
         $chunks = array_chunk($urls, $concurrency);
         $fetched = 0;
         $total = count($urls);
+        $timeout = max(1, (int) config('cabinet-competitor-analysis.site_curl_timeout', 4));
+        $connectTimeout = max(1, (int) config('cabinet-competitor-analysis.site_curl_connect_timeout', 3));
+        // Жёсткий потолок на чанк: иначе curl_multi может «висеть» дольше CURLOPT_TIMEOUT (DNS/SSL).
+        $chunkBudgetSec = max(12, ($timeout + $connectTimeout + 2) * 2);
 
         foreach ($chunks as $chunk) {
             $multi = curl_multi_init();
@@ -644,20 +648,45 @@ class SearchCompetitors extends Model
 
             if (count($handles) > 0) {
                 $running = null;
+                $deadline = microtime(true) + $chunkBudgetSec;
+                $timedOut = false;
+
                 do {
                     $status = curl_multi_exec($multi, $running);
-                    if ($running > 0) {
-                        curl_multi_select($multi, 0.25);
+                } while ($status === CURLM_CALL_MULTI_PERFORM);
+
+                while ($running > 0 && $status === CURLM_OK) {
+                    if (curl_multi_select($multi, 0.2) === -1) {
+                        usleep(50000);
                     }
-                } while ($running > 0 && $status === CURLM_OK);
+                    do {
+                        $status = curl_multi_exec($multi, $running);
+                    } while ($status === CURLM_CALL_MULTI_PERFORM);
+
+                    if (microtime(true) >= $deadline) {
+                        $timedOut = true;
+                        break;
+                    }
+                }
+
+                if ($timedOut && $this->pageHash) {
+                    CompetitorAnalysisDebugLog::warn($this->pageHash, 'site.fetch.chunk_timeout', [
+                        'chunk_size' => count($handles),
+                        'budget_sec' => $chunkBudgetSec,
+                        'still_running' => (int) $running,
+                    ]);
+                }
 
                 foreach ($handles as $url => $ch) {
-                    $response = self::readSiteCurlResponse($ch);
+                    $response = self::readSiteCurlMultiResponse($ch);
                     curl_multi_remove_handle($multi, $ch);
                     curl_close($ch);
+
+                    // Один короткий повтор только если multi реально ничего не отдал.
                     if ($response === null) {
                         $response = self::curlInit($url);
                     }
+
                     $this->duplicates[$url] = $this->buildSiteResultFromCurl($response, $url);
                     $fetched++;
                     if ($onProgress !== null) {
@@ -803,7 +832,7 @@ class SearchCompetitors extends Model
             }
         }
 
-        return [
+        return self::sanitizeMetaValues([
             'title' => $title,
             'h1' => self::getText($html, '/<h1[^>]*>(.*?)<\/h1>/is'),
             'h2' => self::getText($html, '/<h2[^>]*>(.*?)<\/h2>/is'),
@@ -812,35 +841,35 @@ class SearchCompetitors extends Model
             'h5' => self::getText($html, '/<h5[^>]*>(.*?)<\/h5>/is'),
             'h6' => self::getText($html, '/<h6[^>]*>(.*?)<\/h6>/is'),
             'description' => $description,
-        ];
+        ]);
     }
 
     protected static function getMetaContentByProperty(string $html, string $property): string
     {
+        $value = '';
         if (preg_match(
             '/<meta[^>]+property=["\']' . preg_quote($property, '/') . '["\'][^>]+content=["\']([^"\']*)["\']/is',
             $html,
             $m
         )) {
-            return trim(htmlspecialchars_decode(strip_tags($m[1])));
-        }
-        if (preg_match(
+            $value = trim(htmlspecialchars_decode(strip_tags($m[1])));
+        } elseif (preg_match(
             '/<meta[^>]+content=["\']([^"\']*)["\'][^>]+property=["\']' . preg_quote($property, '/') . '["\']/is',
             $html,
             $m
         )) {
-            return trim(htmlspecialchars_decode(strip_tags($m[1])));
+            $value = trim(htmlspecialchars_decode(strip_tags($m[1])));
         }
 
-        return '';
+        return self::isMeaningfulMetaValue($value) ? $value : '';
     }
 
     /**
      * @param array<string, array<int, string>> $meta
      */
-    protected static function metaIsEmpty(array $meta): bool
+    public static function metaIsEmpty(array $meta): bool
     {
-        foreach ($meta as $values) {
+        foreach (self::sanitizeMetaValues($meta) as $values) {
             if (is_array($values) && count($values) > 0) {
                 return false;
             }
@@ -951,7 +980,18 @@ class SearchCompetitors extends Model
     {
         foreach ($this->analysedSites as $phrase => $sites) {
             foreach ($sites as $link => $site) {
-                $this->metaTags[$phrase][] = $site['meta'];
+                if (! is_array($site)) {
+                    continue;
+                }
+                $status = $site['parse_status'] ?? 'ok';
+                if ($status !== 'ok') {
+                    continue;
+                }
+                $meta = $site['meta'] ?? null;
+                if (! is_array($meta) || self::metaIsEmpty($meta)) {
+                    continue;
+                }
+                $this->metaTags[$phrase][] = $meta;
             }
         }
 
@@ -1058,11 +1098,53 @@ class SearchCompetitors extends Model
         $hiddenText = [];
         preg_match_all($regex, $html, $matches, PREG_SET_ORDER);
         foreach ($matches as $match) {
-            if ($match[1] != "") {
-                $hiddenText[] = htmlspecialchars_decode(strip_tags($match[1]));
+            $text = trim(htmlspecialchars_decode(strip_tags($match[1])));
+            if (self::isMeaningfulMetaValue($text)) {
+                $hiddenText[] = $text;
             }
         }
+
         return $hiddenText;
+    }
+
+    /**
+     * Отсекает плейсхолдеры вроде "...", "—", пустые и строки без букв/цифр.
+     */
+    public static function isMeaningfulMetaValue(string $value): bool
+    {
+        $v = trim(html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        if ($v === '') {
+            return false;
+        }
+
+        return (bool) preg_match('/\p{L}|\p{N}/u', $v);
+    }
+
+    /**
+     * @param array<string, array<int, string>> $meta
+     * @return array<string, array<int, string>>
+     */
+    public static function sanitizeMetaValues(array $meta): array
+    {
+        foreach ($meta as $key => $values) {
+            if (! is_array($values)) {
+                $meta[$key] = [];
+                continue;
+            }
+            $clean = [];
+            foreach ($values as $value) {
+                if (! is_string($value)) {
+                    continue;
+                }
+                $value = trim(html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                if (self::isMeaningfulMetaValue($value)) {
+                    $clean[] = $value;
+                }
+            }
+            $meta[$key] = $clean;
+        }
+
+        return $meta;
     }
 
     public static function curlInit($site)
@@ -1100,6 +1182,10 @@ class SearchCompetitors extends Model
         curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, $connectTimeout);
         curl_setopt($curl, CURLOPT_TIMEOUT, $timeout);
         curl_setopt($curl, CURLOPT_FAILONERROR, false);
+        // Нужен для срабатывания CURLOPT_TIMEOUT при DNS/multi на *nix.
+        if (defined('CURLOPT_NOSIGNAL')) {
+            curl_setopt($curl, CURLOPT_NOSIGNAL, true);
+        }
         curl_setopt($curl, CURLOPT_USERAGENT, self::siteFetchUserAgents()[0]);
 
         return $curl;
@@ -1111,17 +1197,44 @@ class SearchCompetitors extends Model
     public static function readSiteCurlResponse($curl): ?array
     {
         $html = curl_exec($curl);
+
+        return self::normalizeSiteCurlPayload($html, $curl);
+    }
+
+    /**
+     * После curl_multi нельзя звать curl_exec — тело уже в хэндле, берём через curl_multi_getcontent.
+     *
+     * @param resource $curl
+     */
+    public static function readSiteCurlMultiResponse($curl): ?array
+    {
+        $html = function_exists('curl_multi_getcontent') ? curl_multi_getcontent($curl) : false;
+
+        return self::normalizeSiteCurlPayload($html, $curl);
+    }
+
+    /**
+     * @param resource $curl
+     * @param string|false|null $html
+     */
+    protected static function normalizeSiteCurlPayload($html, $curl): ?array
+    {
         $headers = curl_getinfo($curl);
-        if ($html === false || ! is_array($headers)) {
+        if ($html === false || $html === null || ! is_array($headers)) {
             return null;
         }
 
+        $html = (string) $html;
         $code = (int) ($headers['http_code'] ?? 0);
         if ($code < 200 || $code >= 400) {
             $body = self::responseBodyHtml([$html, $headers]);
             if (strlen($body) < 80) {
                 return null;
             }
+        }
+
+        if ($html === '' && $code === 0) {
+            return null;
         }
 
         return [$html, $headers];

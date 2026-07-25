@@ -42,17 +42,6 @@
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label" for="positions_length">Стандартная длинна таблицы <strong>«{{ __('Analysis by the percentage of getting into the top and middle positions') }}»</strong></label>
-                                {!! Form::select('positions_length', array_unique([
-                                        $config->positions_length => $config->positions_length,
-                                        '10' => 10,
-                                        '25' => 25,
-                                        '50' => 50,
-                                        '100' => 100,
-                                ]), null, ['class' => 'form-select', 'id' => 'positions_length']) !!}
-                            </div>
-
-                            <div class="col-md-6">
                                 <label class="form-label" for="count_top_10">Среднее количество повторений для вхождения слова в рекомендации <strong>Топ 10</strong></label>
                                 <input type="number"
                                        name="count_repeat_top_10"

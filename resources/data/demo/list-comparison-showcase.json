@@ -4,7 +4,6 @@
   "mode": "unique",
   "options": {
     "trim": true,
-    "removeEmpty": true,
     "caseInsensitive": true,
     "sortResult": true
   }

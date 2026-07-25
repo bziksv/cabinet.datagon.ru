@@ -6,7 +6,7 @@ return [
      * Стабильная база: 2.9.1s (см. text-analyzer 6.9s). Эксперименты — 2.9.2 или 2.9.1s-dev.
      * Журнал: titlo.ru/docs/cabinet-competitor-analysis-changelog.md
      */
-    'version' => '2.9.2',
+    'version' => '2.9.14',
 
     /** Расширенный лог прогресса для admin / Super Admin */
     'debug_log' => env('COMPETITOR_ANALYSIS_DEBUG_LOG', true),
@@ -27,13 +27,19 @@ return [
     'xmlstock_hybrid_retry_codes' => [202, 210],
 
     /** Таймауты curl при разборе сайтов конкурентов */
-    'site_curl_timeout' => (int) env('COMPETITOR_ANALYSIS_SITE_TIMEOUT', 4),
-    'site_curl_connect_timeout' => (int) env('COMPETITOR_ANALYSIS_SITE_CONNECT_TIMEOUT', 3),
+    'site_curl_timeout' => (int) env('COMPETITOR_ANALYSIS_SITE_TIMEOUT', 8),
+    'site_curl_connect_timeout' => (int) env('COMPETITOR_ANALYSIS_SITE_CONNECT_TIMEOUT', 4),
     'site_curl_max_attempts' => (int) env('COMPETITOR_ANALYSIS_SITE_MAX_ATTEMPTS', 2),
 
     /** Параллельная загрузка страниц (curl_multi); иначе — по одной */
     'site_curl_parallel' => env('COMPETITOR_ANALYSIS_SITE_PARALLEL', true),
     'site_curl_concurrency' => (int) env('COMPETITOR_ANALYSIS_SITE_CONCURRENCY', 8),
+
+    /**
+     * Сколько секунд UI ждёт без изменения % перед сообщением о зависании.
+     * Сам job при этом продолжит/завершится по своим таймаутам.
+     */
+    'ui_stall_warn_sec' => (int) env('COMPETITOR_ANALYSIS_UI_STALL_SEC', 90),
 
     /** Обновлять % в БД не чаще чем раз в N уникальных URL (снижает нагрузку на MySQL) */
     'progress_update_every_urls' => (int) env('COMPETITOR_ANALYSIS_PROGRESS_EVERY', 2),

@@ -45,11 +45,11 @@ function renderTagChips(values) {
 function renderTagsTable(metaTags) {
     $('.tag-analysis').show()
 
-    $.each(metaTags, function (phrase, tags) {
+    $.each(metaTags || {}, function (phrase, tags) {
         let row = '<tr class="render">'
         row += '<td>' + escapeHtml(phrase) + '</td>'
 
-        $.each(tags, function (meta, values) {
+        $.each(tags || {}, function (meta, values) {
             row += '<td><div class="cabinet-ca-tag-cell">' + renderTagChips(values) + '</div></td>'
         })
 

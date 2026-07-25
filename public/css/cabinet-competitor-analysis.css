@@ -325,6 +325,50 @@
     color: var(--bs-primary);
 }
 
+.cabinet-competitor-analysis-page .cabinet-ca-serp-row-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+.cabinet-competitor-analysis-page .cabinet-ca-serp-filter-btn {
+    opacity: 0.35;
+}
+
+.cabinet-competitor-analysis-page .cabinet-ca-serp-row:hover .cabinet-ca-serp-filter-btn,
+.cabinet-competitor-analysis-page .cabinet-ca-serp-filter-btn.is-active {
+    opacity: 1;
+    color: var(--bs-primary);
+}
+
+.cabinet-competitor-analysis-page .cabinet-ca-serp-filter-btn.is-active {
+    color: var(--bs-primary);
+}
+
+.cabinet-competitor-analysis-page .cabinet-ca-serp-row--filter-match {
+    background-color: #ecfdf5 !important;
+    box-shadow: inset 3px 0 0 #34d399 !important;
+}
+
+.cabinet-competitor-analysis-page .cabinet-ca-serp-row--missing {
+    cursor: default;
+    opacity: 0.72;
+    background: var(--bs-tertiary-bg);
+}
+
+.cabinet-competitor-analysis-page .cabinet-ca-serp-row--missing .cabinet-ca-serp-domain {
+    color: var(--bs-secondary-color);
+    font-weight: 500;
+}
+
+.cabinet-competitor-analysis-page .cabinet-ca-serp-host-filter-bar {
+    background: #f8fafc;
+}
+
+.cabinet-competitor-analysis-page .cabinet-ca-serp-host-filter-bar code {
+    font-size: 0.875rem;
+}
+
 /* Meta table (title/H1…) */
 
 .cabinet-competitor-analysis-page .cabinet-ca-meta-table thead th {
@@ -470,6 +514,29 @@
     word-break: break-all;
 }
 
+.cabinet-competitor-analysis-page .cabinet-ca-url-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.5rem;
+    align-items: start;
+}
+
+.cabinet-competitor-analysis-page .cabinet-ca-url-analyze {
+    margin-top: 0.1rem;
+    padding: 0.15rem 0.3rem;
+    color: var(--bs-secondary-color);
+    opacity: 0.65;
+    line-height: 1;
+    border-radius: 0.25rem;
+}
+
+.cabinet-competitor-analysis-page .cabinet-ca-url-analyze:hover,
+.cabinet-competitor-analysis-page tr:hover .cabinet-ca-url-analyze {
+    opacity: 1;
+    color: var(--bs-primary);
+    background: var(--bs-tertiary-bg);
+}
+
 .cabinet-competitor-analysis-page .cabinet-ca-url-link {
     color: var(--bs-primary);
     text-decoration: none;
@@ -485,7 +552,7 @@
 }
 
 .cabinet-competitor-analysis-page .cabinet-ca-urls-table tbody td {
-    vertical-align: middle;
+    vertical-align: top;
 }
 
 .cabinet-competitor-analysis-page .cabinet-ca-urls-col-link {
@@ -494,61 +561,46 @@
 }
 
 .cabinet-competitor-analysis-page .cabinet-ca-urls-col-phrases {
-    width: 7.5rem;
+    width: 16rem;
+    min-width: 14rem;
 }
 
 .cabinet-competitor-analysis-page .cabinet-ca-urls-col-count {
     width: 6.5rem;
 }
 
-.cabinet-competitor-analysis-page .cabinet-ca-urls-table-responsive {
-    overflow: visible !important;
-}
-
-.cabinet-competitor-analysis-page #urls-table td.cabinet-ca-url-phrases-cell {
-    position: static;
-    overflow: visible;
-}
-
+.cabinet-competitor-analysis-page #urls-table td.cabinet-ca-url-phrases-cell,
 .cabinet-competitor-analysis-page .cabinet-ca-url-phrases-cell {
-    position: static;
-    text-align: center;
-    vertical-align: middle;
-    padding-top: 0.5rem;
-    padding-bottom: 0.5rem;
+    min-width: 14rem;
+    max-width: 22rem;
+    text-align: left;
+    vertical-align: top;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
 }
 
-.cabinet-competitor-analysis-page .cabinet-ca-phrases-dropdown {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.cabinet-competitor-analysis-page .cabinet-ca-phrases-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.15rem;
-    white-space: nowrap;
-}
-
-.cabinet-competitor-analysis-page .cabinet-ca-phrases-dropdown-menu {
-    min-width: 11rem;
-    max-width: 18rem;
-    padding: 0.35rem 0;
-    z-index: 1080;
-}
-
-.cabinet-competitor-analysis-page .cabinet-ca-phrases-dropdown-menu .dropdown-item-text {
+.cabinet-competitor-analysis-page .cabinet-ca-phrases-field {
     display: block;
-    padding: 0.35rem 0.85rem;
-    white-space: normal;
-    line-height: 1.35;
+    width: 100%;
+    min-height: 2rem;
+    max-height: 6.5rem;
+    resize: vertical;
     font-size: 0.8125rem;
+    line-height: 1.35;
+    padding: 0.35rem 0.5rem;
+    background: var(--bs-body-bg);
+    cursor: text;
+}
+
+.cabinet-competitor-analysis-page .cabinet-ca-phrases-field:focus {
+    background: #fff;
+    box-shadow: 0 0 0 0.15rem rgba(13, 110, 253, 0.15);
 }
 
 .cabinet-competitor-analysis-page .cabinet-ca-urls-table .cabinet-ca-url-count-cell {
     text-align: center;
-    vertical-align: middle;
+    vertical-align: top;
+    padding-top: 0.55rem;
 }
 
 .cabinet-competitor-analysis-page .cabinet-ca-repeat-badge {
@@ -704,6 +756,29 @@
 
 .cabinet-competitor-analysis-page .await-color {
     word-break: break-word;
+}
+
+.cabinet-competitor-analysis-page .cabinet-ca-dt-toolbar,
+.cabinet-competitor-analysis-page .cabinet-ca-dt-footer {
+    margin: 0.5rem 0.75rem;
+}
+
+.cabinet-competitor-analysis-page .cabinet-ca-dt-footer .dataTables_info {
+    float: none;
+    padding-top: 0.35rem;
+    font-size: 0.875rem;
+    color: var(--bs-secondary-color);
+}
+
+.cabinet-competitor-analysis-page .cabinet-ca-dt-footer .dataTables_paginate {
+    float: none;
+    padding-top: 0;
+    text-align: right;
+}
+
+.cabinet-competitor-analysis-page .cabinet-ca-dt-toolbar .dt-buttons {
+    display: inline-flex;
+    gap: 0.35rem;
 }
 
 .cabinet-competitor-analysis-page #recommendations-table_length > label,

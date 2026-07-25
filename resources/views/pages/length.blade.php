@@ -56,7 +56,7 @@
                         <i class="bi bi-list-ol" aria-hidden="true"></i>
                     </span>
                     <div class="info-box-content">
-                        <span class="info-box-text">{{ __('Lines') }}</span>
+                        <span class="info-box-text">{{ __('Text length lines') }}</span>
                         <span class="info-box-number" data-tl-kpi-lines>—</span>
                     </div>
                 </div>

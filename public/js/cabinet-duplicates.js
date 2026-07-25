@@ -66,6 +66,14 @@
         return String(line).trim() === '';
     }
 
+    function countBlankLines(text) {
+        var value = String(text);
+        if (value === '') {
+            return 0;
+        }
+        return splitLines(value).filter(isBlankLine).length;
+    }
+
     function isCaseInsensitiveDedup() {
         var el = root.querySelector('#cabinet-dup-opt-dedup-ci');
         return el && el.checked;
@@ -193,7 +201,6 @@
                 var filtered = lines.filter(function (line) {
                     return !isBlankLine(line);
                 });
-                metrics.emptyRemoved += Math.max(0, lines.length - filtered.length);
                 return filtered.join('\n');
             },
             lowerCase: function (text) {
@@ -204,16 +211,22 @@
                 if (!chars) {
                     return text;
                 }
-                var pattern = '^[' + escapeRegExp(chars) + ']| [' + escapeRegExp(chars) + ']+';
-                return text.replace(new RegExp(pattern, 'gm'), ' ');
+                var escaped = escapeRegExp(chars);
+                // Начало строки — просто убрать символы (не заменять на пробел).
+                // После пробела/таба — убрать символы, разделитель оставить.
+                return text
+                    .replace(new RegExp('^[' + escaped + ']+', 'gm'), '')
+                    .replace(new RegExp('([ \\t])[' + escaped + ']+', 'gm'), '$1');
             },
             removeEndingChars: function (text) {
                 var chars = endCharsEl ? endCharsEl.value : '';
                 if (!chars) {
                     return text;
                 }
-                var pattern = '[' + escapeRegExp(chars) + ']+[ \t]|[' + escapeRegExp(chars) + ']$';
-                return text.replace(new RegExp(pattern, 'gm'), ' ');
+                var escaped = escapeRegExp(chars);
+                return text
+                    .replace(new RegExp('[' + escaped + ']+$', 'gm'), '')
+                    .replace(new RegExp('[' + escaped + ']+([ \\t])', 'gm'), '$1');
             },
             removeDuplicates: function (text) {
                 var lines = splitLines(text);
@@ -248,9 +261,7 @@
                 var lines = splitLines(text);
                 var nonEmpty = [];
                 lines.forEach(function (line) {
-                    if (isBlankLine(line)) {
-                        metrics.emptyRemoved += 1;
-                    } else {
+                    if (!isBlankLine(line)) {
                         nonEmpty.push(line);
                     }
                 });
@@ -265,8 +276,9 @@
     function processText() {
         var beforeText = textEl.value;
         var before = countAllLines(beforeText);
+        var blanksBefore = countBlankLines(beforeText);
         var text = beforeText;
-        var metrics = { dupRemoved: 0, emptyRemoved: 0 };
+        var metrics = { dupRemoved: 0 };
         var ops = processors(metrics);
         var selected = getSelectedOptions();
 
@@ -288,8 +300,10 @@
 
         textEl.value = text;
         var after = countAllLines(text);
+        // Считаем по факту до/после — не зависит от того, какая опция выкинула пустые.
+        var emptyRemoved = Math.max(0, blanksBefore - countBlankLines(text));
         updateLineCount();
-        setKpi(before, after, metrics.dupRemoved, metrics.emptyRemoved);
+        setKpi(before, after, metrics.dupRemoved, emptyRemoved);
         updateSplitLayout();
         scheduleSave();
     }

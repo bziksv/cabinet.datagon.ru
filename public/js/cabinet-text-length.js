@@ -35,6 +35,21 @@
     var titleMax = config.titleMax || 60;
     var descriptionMax = config.descriptionMax || 160;
 
+    function countWords(text) {
+        var trimmed = String(text).trim();
+        if (!trimmed) {
+            return 0;
+        }
+        // Слово = токен с буквой/цифрой; «—», «…» и т.п. между пробелами не считаем.
+        return trimmed.split(/\s+/).filter(function (token) {
+            try {
+                return /[\p{L}\p{N}]/u.test(token);
+            } catch (e) {
+                return /[0-9A-Za-z\u00C0-\u024F\u0400-\u04FF]/i.test(token);
+            }
+        }).length;
+    }
+
     function analyzeSummary(text) {
         var trimmed = String(text).trim();
         if (!trimmed) {
@@ -48,9 +63,10 @@
         }
         var charsWithSpaces = text.length;
         var charsNoSpaces = text.replace(/\s/g, '').length;
-        var words = trimmed.split(/\s+/).filter(Boolean).length;
+        var words = countWords(trimmed);
         var lines = text.split('\n').length;
-        var spaces = (text.match(/\s/g) || []).length;
+        // Только пробел — не переносы строк и не табы.
+        var spaces = (text.match(/ /g) || []).length;
         return {
             chars_with_spaces: charsWithSpaces,
             chars_no_spaces: charsNoSpaces,
@@ -89,7 +105,7 @@
             return p.trim() !== '';
         });
         var paragraphCount = paragraphs.length || 1;
-        var words = trimmed.split(/\s+/).filter(Boolean).length;
+        var words = countWords(trimmed);
         var readingTimeMin = Math.max(1, Math.ceil(words / 200));
         return {
             sentences: sentenceCount,

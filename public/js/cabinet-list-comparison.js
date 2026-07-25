@@ -38,7 +38,7 @@
     }
 
     function splitLines(text) {
-        return String(text).split(/[\r\n]+/);
+        return String(text).replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
     }
 
     function countNonEmptyLines(text) {
@@ -50,7 +50,6 @@
     function getOptions() {
         return {
             trim: !!(root.querySelector('#cabinet-lc-opt-trim') && root.querySelector('#cabinet-lc-opt-trim').checked),
-            removeEmpty: !!(root.querySelector('#cabinet-lc-opt-empty') && root.querySelector('#cabinet-lc-opt-empty').checked),
             caseInsensitive: !!(root.querySelector('#cabinet-lc-opt-ci') && root.querySelector('#cabinet-lc-opt-ci').checked),
             sortResult: !!(root.querySelector('#cabinet-lc-opt-sort') && root.querySelector('#cabinet-lc-opt-sort').checked),
         };
@@ -63,11 +62,10 @@
                 return line.trim();
             });
         }
-        if (opts.removeEmpty) {
-            lines = lines.filter(function (line) {
-                return line !== '';
-            });
-        }
+        // Пустые строки для сравнения фраз не имеют смысла — всегда отбрасываем.
+        lines = lines.filter(function (line) {
+            return line !== '';
+        });
         if (opts.caseInsensitive) {
             lines = lines.map(function (line) {
                 return line.toLowerCase();
@@ -111,24 +109,22 @@
     function compareLists(firstRaw, secondRaw, mode, opts) {
         var first = normalizeLines(firstRaw, opts);
         var second = normalizeLines(secondRaw, opts);
-        var overlap = arrayUnique(arrayIntersect(first, second)).filter(function (line) {
-            return line !== '';
-        });
+        var overlap = arrayUnique(arrayIntersect(first, second));
 
         var result;
         switch (mode) {
             case 'uniqueInFirstList':
-                result = arrayDiff(arrayUnique(arrayDiff(first, second)), ['']);
+                result = arrayUnique(arrayDiff(first, second));
                 break;
             case 'uniqueInSecondList':
-                result = arrayDiff(arrayUnique(arrayDiff(second, first)), ['']);
+                result = arrayUnique(arrayDiff(second, first));
                 break;
             case 'union':
-                result = arrayDiff(arrayUnique(first.concat(second)), ['']);
+                result = arrayUnique(first.concat(second));
                 break;
             case 'unique':
             default:
-                result = arrayDiff(arrayUnique(arrayIntersect(first, second)), ['']);
+                result = arrayUnique(arrayIntersect(first, second));
                 break;
         }
 
@@ -386,7 +382,6 @@
             if (state.options) {
                 var map = {
                     trim: '#cabinet-lc-opt-trim',
-                    removeEmpty: '#cabinet-lc-opt-empty',
                     caseInsensitive: '#cabinet-lc-opt-ci',
                     sortResult: '#cabinet-lc-opt-sort',
                 };
@@ -415,7 +410,6 @@
         if (demo.options) {
             var map = {
                 trim: '#cabinet-lc-opt-trim',
-                removeEmpty: '#cabinet-lc-opt-empty',
                 caseInsensitive: '#cabinet-lc-opt-ci',
                 sortResult: '#cabinet-lc-opt-sort',
             };
@@ -477,7 +471,7 @@
         input.addEventListener('change', scheduleSave);
     });
 
-    root.querySelectorAll('#cabinet-lc-opt-trim, #cabinet-lc-opt-empty, #cabinet-lc-opt-ci, #cabinet-lc-opt-sort').forEach(function (el) {
+    root.querySelectorAll('#cabinet-lc-opt-trim, #cabinet-lc-opt-ci, #cabinet-lc-opt-sort').forEach(function (el) {
         if (el) {
             el.addEventListener('change', scheduleSave);
         }

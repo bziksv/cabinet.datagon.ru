@@ -80,17 +80,25 @@ class DomainInformation extends Model
         ]);
     }
 
+    /**
+     * Календарные дни до истечения (0 если уже истекло / сегодня).
+     */
+    public static function daysUntilExpiry(string $freeDate): int
+    {
+        $days = Carbon::now()->startOfDay()->diffInDays(Carbon::parse($freeDate)->startOfDay(), false);
+
+        return max(0, (int) $days);
+    }
+
     public static function formatRegistrationSummary(string $registrationDate, string $freeDate): string
     {
-        $date = new Carbon($freeDate);
-
         return $registrationDate . "\n"
             . __('Registration expires')
             . $freeDate
             . ' '
             . __('through')
             . ' '
-            . $date->diffInDays(Carbon::now())
+            . self::daysUntilExpiry($freeDate)
             . ' '
             . __('days');
     }
@@ -117,11 +125,11 @@ class DomainInformation extends Model
         }
 
         if (isset($freeDate)) {
-            $freeDate = new Carbon($freeDate);
-            $diffInDays = $freeDate->diffInDays(Carbon::now());
+            $diffInDays = self::daysUntilExpiry($freeDate);
             $alertDays = DomainInformationConfig::expirationAlertDays();
 
-            if ($diffInDays < $alertDays) {
+            // Порог «за N дней»: уведомляем при N днях и меньше (включительно)
+            if ($diffInDays <= $alertDays) {
                 if ($user->telegram_bot_active && $project->check_registration_date && DomainInformationConfig::telegramEnabled()) {
                     TelegramBot::sendNotificationAboutExpirationRegistrationPeriod($project, $user->chat_id, $diffInDays);
                 }
@@ -217,13 +225,7 @@ class DomainInformation extends Model
                 $registeredAt = $registeredAt ?: ($extraDates['registered_at'] ?? null);
                 $expiresAt = $expiresAt ?: ($extraDates['expires_at'] ?? null);
             }
-            $daysLeft = null;
-            if ($expiresAt !== null) {
-                $daysLeft = Carbon::now()->startOfDay()->diffInDays(Carbon::parse($expiresAt)->startOfDay(), false);
-                if ($daysLeft < 0) {
-                    $daysLeft = 0;
-                }
-            }
+            $daysLeft = $expiresAt !== null ? self::daysUntilExpiry($expiresAt) : null;
             $registrationSummary = $registeredAt && $expiresAt
                 ? self::formatRegistrationSummary(
                     __('Registration date') . ' ' . $registeredAt,

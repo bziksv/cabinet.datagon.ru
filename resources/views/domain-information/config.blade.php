@@ -88,7 +88,7 @@
                     <div class="card-body small text-secondary">
                         <p class="mb-2">{{ __('Domain information cron explain') }}</p>
                         <ul class="mb-0 ps-3">
-                            <li><code>GET /api/domain-information/check-domain-crone/</code></li>
+                            <li><code>GET /api/domain-information/check-domain-crone</code></li>
                             <li>{{ __('Domain information admin free policy') }}</li>
                         </ul>
                     </div>

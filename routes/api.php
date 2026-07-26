@@ -22,6 +22,7 @@ Route::get('/backlink/scan-links', 'CroneController@scanLinks');
 Route::get('/backlink/scan-broken-links', 'CroneController@scanBrokenLinks');
 Route::get('/domain-monitoring/check-link-crone/{timing}', 'CroneController@checkLinkCrone');
 
+Route::get('/domain-information/check-domain-crone', 'CroneController@checkDomains');
 Route::get('/domain-information/check-domain-crone/', 'CroneController@checkDomains');
 
 Route::get('location', 'Api\LocationSearchController@index');

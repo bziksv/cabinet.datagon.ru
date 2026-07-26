@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => '1.2.1',
+    'version' => '1.2.2',
 
     'report_export_log_limit' => 100,
     'public_share_ttl_days' => [30, 90, 180, 365, 0],

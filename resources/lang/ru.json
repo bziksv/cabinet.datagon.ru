@@ -869,7 +869,7 @@
     "Domain information dns compare hint": "Уведомление о смене DNS — только если изменился набор серверов, а не порядок строк.",
     "Domain information email alerts": "Отслеживание срока регистрации доменов: оповещения",
     "Domain information expiration alert days": "Предупреждать об окончании регистрации за",
-    "Domain information expiration alert hint": "Уведомления об истечении срока — если до даты осталось меньше указанного числа дней.",
+    "Domain information expiration alert hint": "Уведомления об истечении срока — если до даты осталось не больше указанного числа дней (включительно).",
     "Domain information form section bulk": "Список доменов",
     "Domain information form section dns": "Оповещения о DNS",
     "Domain information form section domain": "Укажите домен",

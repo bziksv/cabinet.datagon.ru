@@ -73,25 +73,31 @@ class HistoryRelevanceController extends Controller
         $aaData = [];
         foreach ($records as $record) {
             $though = [];
-            if (isset($record['though'])) {
-                $though = $record['though'];
+            $thoughRelation = $record->relationLoaded('though') ? $record->though : null;
+            if ($thoughRelation) {
+                $though = is_array($thoughRelation) ? $thoughRelation : $thoughRelation->toArray();
                 unset($though['result']);
             }
 
+            // ArrayAccess со snake_case ('relevance_tags') для relation не отдаёт данные — только property
+            $tags = $record->relationLoaded('relevanceTags')
+                ? $record->relevanceTags
+                : collect();
+
             $data = [
-                'id' => $record['id'],
-                'name' => $record['name'],
-                'relevanceTags' => $record['relevance_tags'] ?? [],
-                'count_sites' => $record['count_sites'],
-                'count_checks' => $record['count_checks'],
-                'total_points' => $record['total_points'],
-                'avg_position' => $record['avg_position'],
+                'id' => $record->id,
+                'name' => $record->name,
+                'relevanceTags' => $tags->values()->all(),
+                'count_sites' => $record->count_sites,
+                'count_checks' => $record->count_checks,
+                'total_points' => $record->total_points,
+                'avg_position' => $record->avg_position,
                 'though' => $though,
                 'last_check' => ($record->story) ? $record->story->last_check : '',
             ];
 
             if ($owner) {
-                $data['owner'] = $record['user'];
+                $data['owner'] = $record->relationLoaded('user') ? $record->user : null;
             }
 
             $aaData[] = $data;

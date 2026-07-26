@@ -79,18 +79,18 @@
                     <div class="card-body">
                         <div class="tab-content">
                             <div class="tab-pane active" id="add-to-project">
-                                <label for="project-id">{{ __('Your projects') }}</label>
+                                <label for="manage-project-id">{{ __('Your projects') }}</label>
                                 @if(count($main) > 0)
-                                    <select name="project-id" id="project-id" class="form form-control mb-3">
+                                    <select name="project-id" id="manage-project-id" class="form form-control mb-3 js-tag-project-select">
                                         @foreach($main as $story)
                                             <option value="{{ $story->id }}">{{ $story->name }}</option>
                                         @endforeach
                                     </select>
                                 @endif
-                                <label for="tag-id">{{ __('Your tags') }}</label>
-                                <select name="tag-id" id="tag-id" class="form form-control">
+                                <label for="manage-tag-id">{{ __('Your tags') }}</label>
+                                <select name="tag-id" id="manage-tag-id" class="form form-control js-tag-select">
                                     @foreach($tags as $tag)
-                                        <option value="{{ $tag->id }}" id="option-tag-{{$tag->id}}">
+                                        <option value="{{ $tag->id }}" class="option-tag-{{ $tag->id }}">
                                             {{ $tag->name }}
                                         </option>
                                     @endforeach
@@ -152,28 +152,28 @@
         </div>
     </div>
 
-    <div class="modal fade" id="create-link" tabindex="-1" aria-labelledby="exampleModalLabel">
+    <div class="modal fade" id="create-link" tabindex="-1" aria-labelledby="createLinkModalLabel">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="exampleModalLabel">{{ __('Add a label to a project') }}</h5>
+                    <h5 class="modal-title" id="createLinkModalLabel">{{ __('Add a label to a project') }}</h5>
                     <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <label for="project-id">{{ __('Your projects') }}</label>
+                    <label for="link-project-id">{{ __('Your projects') }}</label>
                     @if(count($main) > 0)
-                        <select name="project-id" id="project-id" class="form form-control mb-3">
+                        <select name="project-id" id="link-project-id" class="form form-control mb-3 js-tag-project-select">
                             @foreach($main as $story)
                                 <option value="{{ $story->id }}">{{ $story->name }}</option>
                             @endforeach
                         </select>
                     @endif
-                    <label for="tag-id">{{ __('Your tags') }}</label>
-                    <select name="tag-id" id="tag-id" class="form form-control">
+                    <label for="link-tag-id">{{ __('Your tags') }}</label>
+                    <select name="tag-id" id="link-tag-id" class="form form-control js-tag-select">
                         @foreach($tags as $tag)
-                            <option value="{{ $tag->id }}" id="option-tag-{{$tag->id}}">
+                            <option value="{{ $tag->id }}" class="option-tag-{{ $tag->id }}">
                                 {{ $tag->name }}
                             </option>
                         @endforeach
@@ -935,12 +935,16 @@
                     data: function (row) {
                         let content = ''
 
-                        $.each(row.relevanceTags, function (key, value) {
+                        $.each(row.relevanceTags || [], function (key, value) {
+                            var color = value.color || '#333';
+                            var safeName = $('<div>').text(value.name || '').html();
                             content +=
-                                '<div class="d-flex justify-content-between align-items-center" style="color: ' + value.color + '" id="tag-' + value.id + '-item-' + row.id + '">' +
-                                value.name +
+                                '<div class="cabinet-relevance-tag d-inline-flex align-items-center me-1 mb-1"' +
+                                ' style="color:' + color + ';border:1px solid ' + color + ';border-radius:999px;padding:0.1rem 0.45rem;font-size:0.8rem;gap:0.35rem"' +
+                                ' id="tag-' + value.id + '-item-' + row.id + '">' +
+                                '<span>' + safeName + '</span>' +
                                 '    <i class="fa fa-trash"' +
-                                '       style="opacity: 0.5; cursor: pointer"' +
+                                '       style="opacity: 0.55; cursor: pointer"' +
                                 '       data-bs-toggle="modal"' +
                                 '       data-bs-target="#removeTagModal' + value.id + '' + row.id + '">' +
                                 '    </i>' +
@@ -1608,50 +1612,65 @@
                 }
             }
 
+            function currentTagForm($btn) {
+                var $modal = $btn.closest('.modal')
+                if (!$modal.length) {
+                    $modal = $('#exampleModal')
+                }
+                return {
+                    projectId: $modal.find('.js-tag-project-select').val(),
+                    tagId: $modal.find('.js-tag-select').val(),
+                }
+            }
+
             function refreshMethods() {
                 $('.create-new-link').unbind().on('click', function () {
+                    var form = currentTagForm($(this))
+                    if (!form.projectId || !form.tagId) {
+                        getErrorMessage('{{ __('The project or label does not exist') }}')
+                        return
+                    }
                     $.ajax({
                         type: "POST",
                         dataType: "json",
                         url: "{{ route('create.link.project.with.tag') }}",
                         data: {
                             _token: $('meta[name="csrf-token"]').attr('content'),
-                            projectId: $('#project-id').val(),
-                            tagId: $('#tag-id').val()
+                            projectId: form.projectId,
+                            tagId: form.tagId
                         },
                         success: function (response) {
                             if (response.code === 200) {
-                                $('#project-' + response.project.id).append(
-                                    '<div style="color: ' + response.tag.color + '" id="tag-' + response.tag.id + '-item-' + response.project.id + '">' + response.tag.name + '' +
-                                    ' <i class="fa fa-trash" style="opacity: 0.5; cursor: pointer" data-bs-toggle="modal"' +
-                                    ' data-target=#removeTagModal' + response.timestamps + '></i>' +
-                                    '</div>'
-                                )
-                                $('#removeLinksModals').append(
-                                    '<div class="modal fade" id="removeTagModal' + response.timestamps + '" aria-labelledby="removeTagModal' + response.timestamps + 'Label" aria-hidden="true"> ' +
-                                    '   <div class="modal-dialog"> ' +
-                                    '       <div class="modal-content"> ' +
-                                    '           <div class="modal-header"> ' +
-                                    '               <button type="button" class="close" data-bs-dismiss="modal" ' +
-                                    '               aria-label="Close"> ' +
-                                    '               <span aria-hidden="true">&times;</span> ' +
-                                    '               </button> ' +
-                                    '           </div> ' +
-                                    '       <div class="modal-body"> {{ __('Are you going to untie the label from the project, are you sure?') }} ' +
-                                    '   </div> ' +
-                                    '   <div class="modal-footer"> ' +
-                                    '           <button type="button"' +
-                                    '               class="btn btn-secondary remove-project-relevance-link"' +
-                                    '               data-tag="' + response.tag.id + '" ' +
-                                    '               data-history="' + response.project.id + '" data-bs-dismiss="modal">{{ __('Remove tag') }}' +
-                                    '           </button> ' +
-                                    '           <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}' +
-                                    '           </button>' +
-                                    '           </div>' +
-                                    '       </div>' +
-                                    '   </div>' +
-                                    '</div>')
+                                var modalId = 'removeTagModal' + response.tag.id + '' + response.project.id
+                                if (!$('#' + modalId).length) {
+                                    $('#removeLinksModals').append(
+                                        '<div class="modal fade" id="' + modalId + '" aria-hidden="true"> ' +
+                                        '   <div class="modal-dialog"> ' +
+                                        '       <div class="modal-content"> ' +
+                                        '           <div class="modal-header"> ' +
+                                        '               <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close"> ' +
+                                        '               <span aria-hidden="true">&times;</span> ' +
+                                        '               </button> ' +
+                                        '           </div> ' +
+                                        '       <div class="modal-body"> {{ __('Are you going to untie the label from the project, are you sure?') }} ' +
+                                        '   </div> ' +
+                                        '   <div class="modal-footer"> ' +
+                                        '           <button type="button"' +
+                                        '               class="btn btn-secondary remove-project-relevance-link"' +
+                                        '               data-tag="' + response.tag.id + '" ' +
+                                        '               data-history="' + response.project.id + '" data-bs-dismiss="modal">{{ __('Remove tag') }}' +
+                                        '           </button> ' +
+                                        '           <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}' +
+                                        '           </button>' +
+                                        '           </div>' +
+                                        '       </div>' +
+                                        '   </div>' +
+                                        '</div>')
+                                }
                                 getSuccessMessage(response.message)
+                                if ($.fn.DataTable.isDataTable('#main_history_table')) {
+                                    historyTable.ajax.reload(null, false)
+                                }
                             } else if (response.code === 415) {
                                 getErrorMessage(response.message)
                             }
@@ -1685,9 +1704,11 @@
                                     )
                                     getSuccessMessage(response.message)
 
-                                    $('#tag-id').append(
-                                        '<option value="' + response.tag.id + '" id="option-tag-' + response.tag.id + '">' + response.tag.name + '</option>'
+                                    $('.js-tag-select').append(
+                                        '<option value="' + response.tag.id + '" class="option-tag-' + response.tag.id + '">' + response.tag.name + '</option>'
                                     )
+                                    $('#tag-name').val('')
+                                    refreshMethods()
                                 } else if (response.code === 415) {
                                     getErrorMessage(response.message)
                                 }
@@ -1713,7 +1734,10 @@
                             if (response.code === 200) {
                                 getSuccessMessage(response.message)
                                 ojb.parent().parent().remove()
-                                $('#option-tag-' + id).remove()
+                                $('.option-tag-' + id).remove()
+                                if ($.fn.DataTable.isDataTable('#main_history_table')) {
+                                    historyTable.ajax.reload(null, false)
+                                }
                             }
                         },
                     });
@@ -1776,6 +1800,9 @@
                                 let iId = elem.attr('data-history')
                                 $("#tag-" + tId + "-item-" + iId).remove()
                                 getSuccessMessage(response.message)
+                                if ($.fn.DataTable.isDataTable('#main_history_table')) {
+                                    historyTable.ajax.reload(null, false)
+                                }
                             } else if (response.code === 415) {
                                 getErrorMessage(response.message)
                             }

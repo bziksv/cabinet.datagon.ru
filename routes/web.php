@@ -263,6 +263,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('site-types', 'SiteTypesController@index')->name('pages.site-types')->middleware('permission:Site types');
     Route::post('site-types/analyze', 'SiteTypesController@analyze')->name('pages.site-types.analyze')->middleware('permission:Site types');
     Route::post('site-types/export', 'SiteTypesController@exportCsv')->name('pages.site-types.export')->middleware('permission:Site types');
+    Route::post('site-types/catalog-presets', 'SiteTypesController@storeCatalogPreset')->name('pages.site-types.catalog-presets.store')->middleware('permission:Site types');
+    Route::put('site-types/catalog-presets/{id}', 'SiteTypesController@updateCatalogPreset')->name('pages.site-types.catalog-presets.update')->middleware('permission:Site types');
+    Route::delete('site-types/catalog-presets/{id}', 'SiteTypesController@destroyCatalogPreset')->name('pages.site-types.catalog-presets.destroy')->middleware('permission:Site types');
     Route::get('site-types/history/{id}', 'SiteTypesController@historyShow')->name('pages.site-types.history.show')->middleware('permission:Site types');
     Route::delete('site-types/history/{id}', 'SiteTypesController@historyDestroy')->name('pages.site-types.history.destroy')->middleware('permission:Site types');
 

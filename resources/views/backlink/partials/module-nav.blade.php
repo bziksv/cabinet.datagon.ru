@@ -13,13 +13,17 @@
                     <i class="bi bi-list-ul me-1" aria-hidden="true"></i>{{ __('My Projects') }}
                 </a>
             </li>
-            @if($active === 'create')
-                <li class="nav-item">
+            <li class="nav-item">
+                @if($active === 'create')
                     <span class="nav-link active" aria-current="page">
                         <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>{{ __('Add link tracking') }}
                     </span>
-                </li>
-            @endif
+                @else
+                    <a href="{{ route('add.backlink.view') }}" class="nav-link">
+                        <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>{{ __('Add link tracking') }}
+                    </a>
+                @endif
+            </li>
             @if(in_array($active, ['show', 'add-link'], true) && $projectId)
                 <li class="nav-item">
                     <a href="{{ route('show.backlink', $projectId) }}"

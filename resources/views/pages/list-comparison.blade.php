@@ -12,8 +12,14 @@
     @endslot
 
     @php
+        $lcModeHelp = [
+            'unique' => __('LC tip intersection'),
+            'uniqueInFirstList' => __('LC tip only A'),
+            'uniqueInSecondList' => __('LC tip only B'),
+            'union' => __('LC tip union'),
+        ];
         $lcTip = function ($text) {
-            return ' <i class="bi bi-question-circle text-muted cabinet-lc-tip" data-bs-toggle="tooltip" data-bs-placement="top" title="' . e($text) . '" aria-hidden="true"></i>';
+            return ' <i class="bi bi-question-circle text-muted cabinet-lc-tip" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="' . e($text) . '" title="' . e($text) . '" aria-label="' . e($text) . '" role="img"></i>';
         };
     @endphp
 
@@ -142,29 +148,30 @@
                     <div class="row">
                         <div class="col-lg-6">
                             <div class="form-check">
-                                <input class="form-check-input" type="radio" name="cabinet-lc-mode" id="cabinet-lc-mode-unique" data-lc-mode value="unique" checked>
+                                <input class="form-check-input" type="radio" name="cabinet-lc-mode" id="cabinet-lc-mode-unique" data-lc-mode value="unique" data-lc-help="{{ $lcModeHelp['unique'] }}" checked>
                                 <label class="form-check-label" for="cabinet-lc-mode-unique">
-                                    {!! __('Intersection') . $lcTip(__('a list of keywords that were found in both the first and second list (intersection)')) !!}
+                                    {!! __('Intersection') . $lcTip($lcModeHelp['unique']) !!}
                                 </label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input" type="radio" name="cabinet-lc-mode" id="cabinet-lc-mode-first" data-lc-mode value="uniqueInFirstList">
+                                <input class="form-check-input" type="radio" name="cabinet-lc-mode" id="cabinet-lc-mode-first" data-lc-mode value="uniqueInFirstList" data-lc-help="{{ $lcModeHelp['uniqueInFirstList'] }}">
                                 <label class="form-check-label" for="cabinet-lc-mode-first">
-                                    {!! __('Only in list A') . $lcTip(__('a list of keywords that are in the first list, but not in the second')) !!}
+                                    {!! __('Only in list A') . $lcTip($lcModeHelp['uniqueInFirstList']) !!}
                                 </label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input" type="radio" name="cabinet-lc-mode" id="cabinet-lc-mode-second" data-lc-mode value="uniqueInSecondList">
+                                <input class="form-check-input" type="radio" name="cabinet-lc-mode" id="cabinet-lc-mode-second" data-lc-mode value="uniqueInSecondList" data-lc-help="{{ $lcModeHelp['uniqueInSecondList'] }}">
                                 <label class="form-check-label" for="cabinet-lc-mode-second">
-                                    {!! __('Only in list B') . $lcTip(__('a list of keywords that are in the second list, but not in the first')) !!}
+                                    {!! __('Only in list B') . $lcTip($lcModeHelp['uniqueInSecondList']) !!}
                                 </label>
                             </div>
                             <div class="form-check mb-0">
-                                <input class="form-check-input" type="radio" name="cabinet-lc-mode" id="cabinet-lc-mode-union" data-lc-mode value="union">
+                                <input class="form-check-input" type="radio" name="cabinet-lc-mode" id="cabinet-lc-mode-union" data-lc-mode value="union" data-lc-help="{{ $lcModeHelp['union'] }}">
                                 <label class="form-check-label" for="cabinet-lc-mode-union">
-                                    {!! __('Union') . $lcTip(__('a list of keywords that were found in any of the lists (combining)')) !!}
+                                    {!! __('Union') . $lcTip($lcModeHelp['union']) !!}
                                 </label>
                             </div>
+                            <p class="cabinet-lc-mode-help small mt-3 mb-0" data-lc-mode-help role="status">{{ $lcModeHelp['unique'] }}</p>
                         </div>
                         <div class="col-lg-6">
                             <p class="text-muted small mb-2">{{ __('Processing options') }}</p>

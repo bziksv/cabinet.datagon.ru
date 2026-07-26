@@ -599,10 +599,23 @@
         var form = root.querySelector('form');
         if (form) {
             form.addEventListener('submit', function () {
-                if (editor.mode === 'source') {
-                    editor.setMode('wysiwyg');
+                // Перед POST сбрасываем debounce и кладём актуальный HTML в поле формы.
+                // Иначе при правке справа (CodeMirror) уходит пустой/старый description.
+                var html = codeMirror ? codeMirror.getValue() : editor.getData();
+                if (codeMirror && editor.getData() !== html) {
+                    syncingFromSource = true;
+                    try {
+                        editor.setData(html);
+                    } finally {
+                        syncingFromSource = false;
+                    }
                 }
-                editor.updateElement();
+                if ($textarea && $textarea.length) {
+                    $textarea.val(html);
+                }
+                if (typeof editor.updateElement === 'function') {
+                    editor.updateElement();
+                }
             });
         }
     }
@@ -754,6 +767,116 @@
         }
     }
 
+    function initListShare(root) {
+        var buttons = root.querySelectorAll('[data-he-list-share]');
+        var modalEl = root.querySelector('#cabinet-he-list-share-modal');
+        if (!buttons.length || !modalEl) {
+            return;
+        }
+
+        var createUrl = root.getAttribute('data-he-list-share-create-url') || '';
+        var copiedLabel = root.getAttribute('data-he-list-share-copied') || 'Copied';
+        var validUntilLabel = root.getAttribute('data-he-list-share-valid-until') || '';
+        var errorFallback = root.getAttribute('data-he-list-share-error') || 'Error';
+        var urlInput = modalEl.querySelector('[data-he-list-share-url]');
+        var expiresBadge = modalEl.querySelector('[data-he-list-share-expires]');
+        var copyBtn = modalEl.querySelector('[data-he-list-share-copy]');
+        var modal = null;
+
+        if (window.bootstrap && window.bootstrap.Modal) {
+            modal = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+        }
+
+        function showModal() {
+            if (modal) {
+                modal.show();
+                return;
+            }
+            modalEl.classList.add('show');
+            modalEl.style.display = 'block';
+            modalEl.removeAttribute('aria-hidden');
+        }
+
+        function copyUrl() {
+            if (!urlInput || !urlInput.value) {
+                return;
+            }
+            urlInput.select();
+            urlInput.setSelectionRange(0, urlInput.value.length);
+            var done = function () {
+                if (!copyBtn) {
+                    return;
+                }
+                var original = copyBtn.innerHTML;
+                copyBtn.innerHTML = '<i class="bi bi-check2 me-1" aria-hidden="true"></i>' + copiedLabel;
+                setTimeout(function () {
+                    copyBtn.innerHTML = original;
+                }, 1600);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(urlInput.value).then(done).catch(function () {
+                    document.execCommand('copy');
+                    done();
+                });
+            } else {
+                document.execCommand('copy');
+                done();
+            }
+        }
+
+        if (copyBtn) {
+            copyBtn.addEventListener('click', copyUrl);
+        }
+
+        buttons.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var descriptionId = parseInt(btn.getAttribute('data-description-id') || '0', 10);
+                if (!descriptionId || !createUrl) {
+                    return;
+                }
+
+                btn.disabled = true;
+                fetch(createUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken(),
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify({
+                        description_id: descriptionId,
+                    }),
+                }).then(function (response) {
+                    return response.json().catch(function () {
+                        return {};
+                    }).then(function (data) {
+                        if (!response.ok || !data.success) {
+                            throw new Error(data.message || errorFallback);
+                        }
+                        if (urlInput) {
+                            urlInput.value = data.url || '';
+                        }
+                        if (expiresBadge) {
+                            if (data.expires_at) {
+                                expiresBadge.textContent = (validUntilLabel ? validUntilLabel + ' ' : '') + data.expires_at;
+                                expiresBadge.classList.remove('d-none');
+                            } else {
+                                expiresBadge.classList.add('d-none');
+                            }
+                        }
+                        showModal();
+                        copyUrl();
+                    });
+                }).catch(function (error) {
+                    window.alert(error.message || errorFallback);
+                }).finally(function () {
+                    btn.disabled = false;
+                });
+            });
+        });
+    }
+
     document.querySelectorAll('.cabinet-html-editor-page').forEach(function (root) {
         if (window.bootstrap && window.bootstrap.Tooltip) {
             root.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
@@ -764,5 +887,6 @@
         var activateProject = initProjectTabs(root);
         initSearch(root, activateProject);
         initSplitEditor(root);
+        initListShare(root);
     });
 }(window, document));

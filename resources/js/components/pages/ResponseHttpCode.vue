@@ -124,7 +124,7 @@
                         <thead class="table-light">
                         <tr>
                             <th scope="col" style="width: 3rem">#</th>
-                            <th scope="col" style="width: 3.5rem">{{ more }}</th>
+                            <th scope="col" class="cabinet-hh-no-export" style="width: 3.5rem">{{ more }}</th>
                             <th scope="col">{{ urlTitle }}</th>
                             <th scope="col" class="sorting user-select-none" style="width: 6rem; cursor: pointer" @click.prevent="Sorting">
                                 {{ codeTitle }}
@@ -136,7 +136,7 @@
                         <tbody>
                         <tr v-for="item in items" :key="item.id">
                             <td class="text-secondary">{{ item.id + 1 }}</td>
-                            <td>
+                            <td class="cabinet-hh-no-export">
                                 <div class="dropdown">
                                     <button
                                         type="button"
@@ -330,6 +330,9 @@ export default {
                     table.DataTable().destroy();
                 }
 
+                const exportOptions = {
+                    columns: ":not(.cabinet-hh-no-export)",
+                };
                 this.table = table.DataTable({
                     destroy: true,
                     dom: "BtB",
@@ -337,11 +340,11 @@ export default {
                     searching: false,
                     paging: false,
                     buttons: [
-                        { extend: "csv", className: "btn btn-outline-secondary btn-sm" },
-                        { extend: "excel", className: "btn btn-outline-secondary btn-sm" },
-                        { extend: "pdf", className: "btn btn-outline-secondary btn-sm" },
-                        { extend: "copy", className: "btn btn-outline-secondary btn-sm" },
-                        { extend: "print", className: "btn btn-outline-secondary btn-sm" },
+                        { extend: "csv", className: "btn btn-outline-secondary btn-sm", exportOptions: exportOptions },
+                        { extend: "excel", className: "btn btn-outline-secondary btn-sm", exportOptions: exportOptions },
+                        { extend: "pdf", className: "btn btn-outline-secondary btn-sm", exportOptions: exportOptions },
+                        { extend: "copy", className: "btn btn-outline-secondary btn-sm", exportOptions: exportOptions },
+                        { extend: "print", className: "btn btn-outline-secondary btn-sm", exportOptions: exportOptions },
                     ],
                 });
 

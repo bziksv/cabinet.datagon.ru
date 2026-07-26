@@ -16,7 +16,11 @@
         $maxTexts = (int) config('cabinet-html-editor.limits.max_texts_per_project', 30);
     @endphp
 
-    <div class="cabinet-html-editor-page">
+    <div class="cabinet-html-editor-page"
+         data-he-list-share-create-url="{{ route('html.editor.public.share.create') }}"
+         data-he-list-share-copied="{{ __('Copied') }}"
+         data-he-list-share-valid-until="{{ __('Valid until') }}"
+         data-he-list-share-error="{{ __('Public link could not be created.') }}">
         <div class="alert alert-light border cabinet-he-howto mb-3" role="note">
             <p class="fw-semibold mb-2">{{ __('How the HTML editor works') }}</p>
             <ul class="mb-0 ps-3 small text-secondary cabinet-he-features-list">
@@ -165,7 +169,15 @@
                                                     </td>
                                                     <td class="text-end tabular-nums text-muted">{{ number_format($chars, 0, ',', ' ') }}</td>
                                                     <td class="text-end text-nowrap">
-                                                        <a href="{{ route('edit.description', $description->id) }}" class="btn btn-outline-secondary btn-sm py-0 px-2" title="{{ __('Edit HTML text') }}">
+                                                        <button type="button"
+                                                                class="btn btn-outline-primary btn-sm py-0 px-2"
+                                                                data-he-list-share
+                                                                data-description-id="{{ $description->id }}"
+                                                                title="{{ __('Create public link') }}"
+                                                                aria-label="{{ __('Create public link') }}">
+                                                            <i class="bi bi-share" aria-hidden="true"></i>
+                                                        </button>
+                                                        <a href="{{ route('edit.description', $description->id) }}" class="btn btn-outline-secondary btn-sm py-0 px-2 ms-1" title="{{ __('Edit HTML text') }}">
                                                             <i class="bi bi-pencil-square" aria-hidden="true"></i>
                                                         </a>
                                                         <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 ms-1" data-bs-toggle="modal" data-bs-target="#cabinet-he-delete-text-{{ $description->id }}" title="{{ __('Delete HTML text') }}">
@@ -219,6 +231,36 @@
                 </div>
             </div>
         @endif
+
+        <div class="modal fade" id="cabinet-he-list-share-modal" tabindex="-1" aria-labelledby="cabinet-he-list-share-title" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="cabinet-he-list-share-title">{{ __('Public link without registration') }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="small text-secondary mb-2">{{ __('HTML editor public share hint') }}</p>
+                        <p class="small mb-2">
+                            <span class="badge rounded-pill text-bg-success d-none" data-he-list-share-expires></span>
+                        </p>
+                        <div class="input-group input-group-sm">
+                            <input type="text"
+                                   class="form-control"
+                                   data-he-list-share-url
+                                   readonly
+                                   aria-label="{{ __('Public link without registration') }}">
+                            <button type="button" class="btn btn-outline-secondary" data-he-list-share-copy>
+                                <i class="bi bi-clipboard me-1" aria-hidden="true"></i>{{ __('Copy') }}
+                            </button>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     @slot('js')

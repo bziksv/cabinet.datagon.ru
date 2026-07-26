@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\SiteTypesService;
+use App\SiteTypesCatalogPreset;
 use App\SiteTypesHistory;
 use App\Support\CompetitorSearchRegions;
 use App\Support\DemoCabinet;
@@ -11,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -51,6 +53,25 @@ class SiteTypesController extends Controller
                 ->get(['id', 'title', 'params', 'phrases_count', 'results_count', 'cost', 'created_at']);
         }
 
+        $catalogPresets = [];
+        $maxCatalogPresets = (int) config('cabinet-site-types.max_catalog_presets', 20);
+        if ($user && Schema::hasTable('site_types_catalog_presets')) {
+            $catalogPresets = SiteTypesCatalogPreset::query()
+                ->where('user_id', $user->id)
+                ->orderBy('name')
+                ->get(['id', 'name', 'domains', 'updated_at'])
+                ->map(function (SiteTypesCatalogPreset $preset) {
+                    return [
+                        'id' => $preset->id,
+                        'name' => $preset->name,
+                        'domains' => is_array($preset->domains) ? $preset->domains : [],
+                        'updated_at' => optional($preset->updated_at)->format('d.m.Y H:i'),
+                    ];
+                })
+                ->values()
+                ->all();
+        }
+
         return view('pages.site-types', compact(
             'defaultYandex',
             'defaultGoogle',
@@ -63,7 +84,9 @@ class SiteTypesController extends Controller
             'historyLimit',
             'canSaveHistory',
             'savedCount',
-            'histories'
+            'histories',
+            'catalogPresets',
+            'maxCatalogPresets'
         ));
     }
 
@@ -190,6 +213,156 @@ class SiteTypesController extends Controller
             'history_limit' => SiteTypesLimits::historyLimitForUser($user),
             'can_save_history' => SiteTypesLimits::canSaveHistory($user),
         ]);
+    }
+
+    public function storeCatalogPreset(Request $request, SiteTypesService $service): JsonResponse
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return response()->json(['message' => __('Unauthorized')], 401);
+        }
+        if (! Schema::hasTable('site_types_catalog_presets')) {
+            return response()->json(['message' => __('Site types catalog presets storage not ready')], 503);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:120',
+            'domains' => 'nullable|array',
+        ]);
+
+        $domains = $this->normalizeCatalogDomains($service, $validated['domains'] ?? $request->all());
+        if ($this->catalogDomainsEmpty($domains)) {
+            return response()->json(['message' => __('Site types catalog preset empty')], 422);
+        }
+
+        $max = max(1, (int) config('cabinet-site-types.max_catalog_presets', 20));
+        $count = SiteTypesCatalogPreset::query()->where('user_id', $user->id)->count();
+        if ($count >= $max) {
+            return response()->json(['message' => __('You have reached the maximum number of presets')], 422);
+        }
+
+        $preset = SiteTypesCatalogPreset::query()->create([
+            'user_id' => $user->id,
+            'name' => trim($validated['name']),
+            'domains' => $domains,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'message' => __('Preset saved'),
+            'preset' => $this->catalogPresetPayload($preset),
+        ]);
+    }
+
+    public function updateCatalogPreset(Request $request, SiteTypesService $service, int $id): JsonResponse
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return response()->json(['message' => __('Unauthorized')], 401);
+        }
+        if (! Schema::hasTable('site_types_catalog_presets')) {
+            return response()->json(['message' => __('Site types catalog presets storage not ready')], 503);
+        }
+
+        $preset = SiteTypesCatalogPreset::query()
+            ->where('user_id', $user->id)
+            ->where('id', $id)
+            ->first();
+
+        if (! $preset) {
+            return response()->json(['message' => __('Site types catalog preset not found')], 404);
+        }
+
+        $validated = $request->validate([
+            'name' => 'nullable|string|max:120',
+            'domains' => 'nullable|array',
+        ]);
+
+        $domains = $this->normalizeCatalogDomains($service, $validated['domains'] ?? $request->all());
+        if ($this->catalogDomainsEmpty($domains)) {
+            return response()->json(['message' => __('Site types catalog preset empty')], 422);
+        }
+
+        if (! empty($validated['name'])) {
+            $preset->name = trim($validated['name']);
+        }
+        $preset->domains = $domains;
+        $preset->save();
+
+        return response()->json([
+            'ok' => true,
+            'message' => __('Site types catalog preset updated'),
+            'preset' => $this->catalogPresetPayload($preset),
+        ]);
+    }
+
+    public function destroyCatalogPreset(int $id): JsonResponse
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return response()->json(['message' => __('Unauthorized')], 401);
+        }
+        if (! Schema::hasTable('site_types_catalog_presets')) {
+            return response()->json(['message' => __('Site types catalog presets storage not ready')], 503);
+        }
+
+        $deleted = SiteTypesCatalogPreset::query()
+            ->where('user_id', $user->id)
+            ->where('id', $id)
+            ->delete();
+
+        return response()->json([
+            'ok' => (bool) $deleted,
+            'message' => __('Preset deleted'),
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     * @return array<string, array<int, string>>
+     */
+    private function normalizeCatalogDomains(SiteTypesService $service, array $input): array
+    {
+        $categories = array_keys(config('cabinet-site-types.categories', []));
+        $source = $input;
+        if (isset($input['domains']) && is_array($input['domains'])) {
+            $source = $input['domains'];
+        }
+
+        $domains = [];
+        foreach ($categories as $type) {
+            $raw = $source[$type] ?? $source['custom_' . $type] ?? '';
+            $domains[$type] = $service->parseDomainList($raw);
+        }
+
+        return $domains;
+    }
+
+    /**
+     * @param array<string, array<int, string>> $domains
+     */
+    private function catalogDomainsEmpty(array $domains): bool
+    {
+        foreach ($domains as $list) {
+            if (is_array($list) && $list !== []) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @return array{id: int, name: string, domains: array<string, array<int, string>>, updated_at: string|null}
+     */
+    private function catalogPresetPayload(SiteTypesCatalogPreset $preset): array
+    {
+        return [
+            'id' => (int) $preset->id,
+            'name' => (string) $preset->name,
+            'domains' => is_array($preset->domains) ? $preset->domains : [],
+            'updated_at' => optional($preset->updated_at)->format('d.m.Y H:i'),
+        ];
     }
 
     public function historyShow(int $id): JsonResponse

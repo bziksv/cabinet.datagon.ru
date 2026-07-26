@@ -35,14 +35,6 @@
             </div>
         </div>
 
-        <nav class="cabinet-cluster-v2-steps-nav mb-4" aria-label="{{ __('Cluster analysis steps') }}">
-            <ol class="cabinet-cluster-v2-steps-nav__list">
-                <li class="cabinet-cluster-v2-steps-nav__item is-active"><span>1</span> {{ __('Phrases') }}</li>
-                <li class="cabinet-cluster-v2-steps-nav__item"><span>2</span> {{ __('Region and clustering') }}</li>
-                <li class="cabinet-cluster-v2-steps-nav__item"><span>3</span> {{ __('Options and launch') }}</li>
-            </ol>
-        </nav>
-
         <div class="cabinet-cluster-v2-steps">
             <section class="cabinet-cluster-v2-step" id="clv2-step-1">
                 @include('cluster-v2.partials.step-head', [
@@ -76,7 +68,14 @@
                         <button type="button" class="btn btn-outline-primary" data-mode="professional" id="clv2-mode-pro">{{ __('Pro mode') }}</button>
                     </div>
                     <div class="row g-3">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
+                            <label class="form-label" for="clv2-search-engine">{{ __('Search Engine') }}</label>
+                            <select name="searchEngine" class="form-select" id="clv2-search-engine">
+                                <option value="yandex" @if(($config_classic->search_engine ?? 'yandex') === 'yandex') selected @endif>{{ __('Yandex') }}</option>
+                                <option value="google" @if(($config_classic->search_engine ?? 'yandex') === 'google') selected @endif>{{ __('Google') }}</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
                             <label class="form-label" for="clv2-region">{{ __('Region') }}</label>
                             <div class="cabinet-cluster-v2-region-field">
                                 @include('cluster-v2.partials.region-select', [
@@ -86,7 +85,7 @@
                                 ])
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label" for="clv2-clustering-level">
                                 {{ __('clustering level') }}
                                 <i class="fa fa-question-circle text-secondary ms-1"
@@ -102,15 +101,16 @@
                                 'hard' => __('hard - 70%'),
                             ], $config_classic->clustering_level, ['class' => 'form-select', 'id' => 'clv2-clustering-level']) !!}
                         </div>
+                        <div class="col-md-4 d-none" id="clv2-top-wrap">
+                            <label class="form-label" for="clv2-top">{{ __('TOP') }}</label>
+                            {!! Form::select('count', ['10'=>10,'20'=>20,'30'=>30,'40'=>40,'50'=>50], $config->count ?? 30, ['class'=>'form-select','id'=>'clv2-top']) !!}
+                            <p class="form-text mb-0 mt-1 d-none" id="clv2-google-limits-hint">{{ __('Monitoring google depth limits hint') }}</p>
+                        </div>
                     </div>
                     <div id="clv2-pro-panel" class="cabinet-cluster-v2-pro-block d-none mt-3">
                         <p class="small text-secondary mb-2">{{ __('Pro settings') }}</p>
                         <div class="row g-3">
-                            <div class="col-md-4">
-                                <label class="form-label" for="clv2-top">{{ __('TOP') }}</label>
-                                {!! Form::select('count', ['10'=>10,'20'=>20,'30'=>30,'40'=>40,'50'=>50], $config->count ?? 30, ['class'=>'form-select','id'=>'clv2-top']) !!}
-                            </div>
-                            <div class="col-md-8">
+                            <div class="col-12">
                                 <label class="form-label" for="clv2-ignored-domains">{{ __('Ignored domains') }}</label>
                                 <textarea id="clv2-ignored-domains" class="form-control form-control-sm" rows="2">{{ $config->ignored_domains }}</textarea>
                             </div>
@@ -168,6 +168,7 @@
                                             <input class="form-check-input" type="checkbox" id="clv2-search-target">
                                             <label class="form-check-label" for="clv2-search-target">{{ __('Accurate frequency analysis') }}</label>
                                         </div>
+                                        <p class="form-text mb-0 mt-1">{{ __('Frequency analysis uses Yandex Wordstat only.') }}</p>
                                     </div>
                                 </section>
 
@@ -189,7 +190,6 @@
                                             <input class="form-check-input" type="checkbox" id="clv2-search-relevance">
                                             <label class="form-check-label" for="clv2-search-relevance">{{ __('Select a relevant page for the domain') }}</label>
                                         </div>
-                                        <p class="form-text mb-0 mt-1">{{ __('Relevance page selection uses Yandex search results only.') }}</p>
                                     </div>
                                 </section>
 
@@ -299,6 +299,7 @@
                     getClusterRequest: @json(route('get.cluster.request')),
                 },
                 defaultRegion: @json($clusterV2DefaultRegion),
+                defaultRegions: @json($clusterV2DefaultRegions ?? ['yandex' => null, 'google' => null]),
                 defaults: {
                     classic: @json($clusterV2DefaultsClassic),
                     pro: @json($clusterV2DefaultsPro),

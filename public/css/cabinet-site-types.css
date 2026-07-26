@@ -1,6 +1,26 @@
 .cabinet-st-page {
     --st-accent: #7c3aed;
     --st-surface: #f8fafc;
+    display: flex;
+    flex-direction: column;
+}
+
+.cabinet-st-page > .cabinet-st-lead {
+    order: 1;
+}
+
+.cabinet-st-page > #cabinetStForm {
+    order: 2;
+}
+
+.cabinet-st-page > .cabinet-st-results-block,
+.cabinet-st-page > #cabinetStResultsWrap {
+    order: 3;
+}
+
+.cabinet-st-page > .cabinet-st-history-block,
+.cabinet-st-page > #cabinetStHistoryWrap {
+    order: 4;
 }
 
 .cabinet-st-lead {
@@ -80,6 +100,88 @@
 .cabinet-st-save-check input {
     margin: 0;
     flex: 0 0 auto;
+}
+
+.cabinet-st-progress {
+    border: 1px solid #ddd6fe;
+    background: #f5f3ff;
+    border-radius: 0.5rem;
+    padding: 0.75rem 0.9rem;
+}
+
+.cabinet-st-progress__head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 0.55rem;
+}
+
+.cabinet-st-progress__spinner {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 1.35rem;
+    height: 1.35rem;
+    margin-top: 0.15rem;
+    flex: 0 0 auto;
+    border: 2.5px solid rgba(124, 58, 237, 0.28);
+    border-top-color: #7c3aed;
+    border-radius: 50%;
+    animation: cabinet-st-spin 0.7s linear infinite !important;
+}
+
+@keyframes cabinet-st-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cabinet-st-progress__spinner {
+        animation: cabinet-st-spin 0.7s linear infinite !important;
+    }
+
+    .cabinet-st-progress__bar .progress-bar {
+        animation-duration: 1s !important;
+        animation-iteration-count: infinite !important;
+    }
+}
+
+.cabinet-st-progress__text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.cabinet-st-progress__title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #4c1d95;
+}
+
+.cabinet-st-progress__bar {
+    height: 0.55rem;
+    border-radius: 999px;
+    background: #ede9fe;
+    overflow: hidden;
+}
+
+.cabinet-st-progress__bar .progress-bar {
+    background-color: #7c3aed;
+}
+
+.cabinet-st-progress__keep {
+    line-height: 1.35;
+}
+
+.cabinet-st-presets {
+    padding: 0.75rem 0.85rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 0.5rem;
+    background: rgba(248, 250, 252, 0.9);
+}
+
+.cabinet-st-presets__select {
+    min-width: 14rem;
+    flex: 1 1 14rem;
 }
 
 .cabinet-st-catalogs {

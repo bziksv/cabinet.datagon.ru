@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => '1.3.1',
+    'version' => '1.3.5',
 
     /** Демо на titlo.ru/otslezhivanie-ssylok/ — POST api/demo/otslezhivanie-ssylok/run */
     'demo' => [

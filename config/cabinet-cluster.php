@@ -5,7 +5,7 @@ return [
    * Видимая версия модуля /cluster (badge в шапке карточки).
    * Журнал: titlo.ru/docs/cabinet-cluster-changelog.md
    */
-  'version' => '2.40.1',
+  'version' => '2.41.4',
 
   /** Без новых строк в cluster_queue_array — abort wait (минуты). */
   'wait_stale_minutes' => (int) env('CLUSTER_WAIT_STALE_MINUTES', 30),

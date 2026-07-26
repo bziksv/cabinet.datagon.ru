@@ -81,9 +81,14 @@ class Cluster
     {
         if ($request['mode'] === 'classic') {
             $config = ClusterConfigurationClassic::first();
-            $this->searchEngine = $config->search_engine;
+            $this->searchEngine = $request['searchEngine'] ?? $config->search_engine;
             $this->gainFactor = (int)$config->gain_factor;
-            $this->count = (int)$config->count;
+            // Для Google TOP влияет на лимиты и глубину — берём из формы, если передан
+            if (isset($request['count']) && strtolower((string) $this->searchEngine) === 'google') {
+                $this->count = max(10, (int) $request['count']);
+            } else {
+                $this->count = (int) $config->count;
+            }
             $this->setReductionRatio($config->reduction_ratio);
             $this->brutForceCount = (int)$config->brut_force_count;
             $this->brutForce = $config->brut_force;
@@ -128,6 +133,7 @@ class Cluster
             $this->request = $request;
             $this->request['engineVersion'] = $this->engineVersion;
             $this->request['count'] = $this->count;
+            $this->request['searchEngine'] = $this->searchEngine;
             $this->searchBase = filter_var($request['searchBase'], FILTER_VALIDATE_BOOLEAN);
             $this->searchRelevance = filter_var($request['searchRelevance'], FILTER_VALIDATE_BOOLEAN);
             $this->searchPhrases = filter_var($request['searchPhrases'], FILTER_VALIDATE_BOOLEAN);
@@ -211,6 +217,53 @@ class Cluster
     public function getXml(): SimplifiedXmlFacade
     {
         return $this->xml;
+    }
+
+    /**
+     * Выдача для кластеризации. Google: ≤10 URL/страница, лимит = ceil(TOP/10).
+     *
+     * @return list<string>
+     */
+    public function fetchPhraseSites(string $phrase): array
+    {
+        $engine = strtolower((string) $this->searchEngine);
+        $xml = $this->getXml();
+        $xml->setQuery($phrase);
+
+        if ($engine !== 'google') {
+            $xml->setPage('0');
+            $sites = $xml->getXMLResponse('yandex');
+
+            return is_array($sites) ? array_values($sites) : [];
+        }
+
+        $depth = max(10, (int) $this->count);
+        $pages = (int) max(1, (int) ceil($depth / 10));
+        $urls = [];
+
+        for ($page = 0; $page < $pages; $page++) {
+            $xml->setCount(10);
+            $xml->setPage((string) $page);
+            $chunk = $xml->getXMLResponse('google');
+            $chunk = is_array($chunk) ? array_values($chunk) : [];
+
+            foreach ($chunk as $url) {
+                $urls[] = $url;
+                if (count($urls) >= $depth) {
+                    break 2;
+                }
+            }
+
+            if (count($chunk) < 10) {
+                break;
+            }
+
+            if ($page + 1 < $pages) {
+                usleep(120000);
+            }
+        }
+
+        return $urls;
     }
 
     public function getProgressId(): string

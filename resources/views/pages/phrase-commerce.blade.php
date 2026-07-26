@@ -131,42 +131,7 @@
             </div>
         </form>
 
-        @if($canSaveHistory && count($histories))
-            <div class="px-4 mb-4">
-                <h5 class="h6 mb-2">{{ __('Phrase commerce history title') }}</h5>
-                <div class="table-responsive">
-                    <table class="table table-sm table-bordered mb-0">
-                        <thead>
-                        <tr>
-                            <th>{{ __('Date') }}</th>
-                            <th>{{ __('Title') }}</th>
-                            <th>{{ __('Site types col engine') }}</th>
-                            <th>{{ __('Site types history settings') }}</th>
-                            <th>{{ __('Site types col phrases') }}</th>
-                            <th></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        @foreach($histories as $h)
-                            <tr data-id="{{ $h->id }}">
-                                <td class="text-nowrap">{{ optional($h->created_at)->format('d.m.Y H:i') }}</td>
-                                <td>{{ $h->title }}</td>
-                                <td class="text-nowrap">{{ $h->enginesLabel() }}</td>
-                                <td class="small text-secondary">{{ $h->settingsLabel() }}</td>
-                                <td>{{ $h->phrases_count }}</td>
-                                <td class="text-nowrap">
-                                    <button type="button" class="btn btn-xs btn-outline-primary cabinet-pc-history-open">{{ __('Open') }}</button>
-                                    <button type="button" class="btn btn-xs btn-outline-danger cabinet-pc-history-del">{{ __('Delete') }}</button>
-                                </td>
-                            </tr>
-                        @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        @endif
-
-        <div class="px-4 pb-4 d-none" id="cabinetPcResultsWrap">
+        <div class="px-4 mb-4 d-none" id="cabinetPcResultsWrap">
             <div class="cabinet-pc-summary mb-3" id="cabinetPcSummary"></div>
             <div class="d-flex flex-wrap align-items-center justify-content-between mb-2 gap-2">
                 <h5 class="h6 mb-0">{{ __('Phrase commerce results title') }}
@@ -210,6 +175,41 @@
                 </table>
             </div>
         </div>
+
+        @if($canSaveHistory && count($histories))
+            <div class="px-4 pb-4">
+                <h5 class="h6 mb-2">{{ __('Phrase commerce history title') }}</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0">
+                        <thead>
+                        <tr>
+                            <th>{{ __('Date') }}</th>
+                            <th>{{ __('Title') }}</th>
+                            <th>{{ __('Site types col engine') }}</th>
+                            <th>{{ __('Site types history settings') }}</th>
+                            <th>{{ __('Site types col phrases') }}</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach($histories as $h)
+                            <tr data-id="{{ $h->id }}">
+                                <td class="text-nowrap">{{ optional($h->created_at)->format('d.m.Y H:i') }}</td>
+                                <td>{{ $h->title }}</td>
+                                <td class="text-nowrap">{{ $h->enginesLabel() }}</td>
+                                <td class="small text-secondary">{{ $h->settingsLabel() }}</td>
+                                <td>{{ $h->phrases_count }}</td>
+                                <td class="text-nowrap">
+                                    <button type="button" class="btn btn-xs btn-outline-primary cabinet-pc-history-open">{{ __('Open') }}</button>
+                                    <button type="button" class="btn btn-xs btn-outline-danger cabinet-pc-history-del">{{ __('Delete') }}</button>
+                                </td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
     </div>
 
     @slot('js')

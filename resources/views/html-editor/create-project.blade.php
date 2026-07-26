@@ -1,6 +1,6 @@
 @component('component.card', [
-    'title' => __('New project'),
-    'titleHtml' => e(__('New project')) . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-html-editor'])->render(),
+    'title' => __('HTML editor') . ' — ' . __('New project'),
+    'titleHtml' => e(__('HTML editor')) . ' — ' . e(__('New project')) . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-html-editor'])->render(),
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('css/cabinet-html-editor.css') }}?v={{ @filemtime(public_path('css/cabinet-html-editor.css')) ?: time() }}">
@@ -8,21 +8,9 @@
         <style>#header-nav-bar .cabinet-header-limits-menu tr.HtmlEditor { background: oldlace; }</style>
     @endslot
 
-    @slot('tools')
-        @if($showButton)
-            <a href="{{ route('HTML.editor') }}" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>{{ __('My projects') }}
-            </a>
-        @endif
-    @endslot
-
     <div class="cabinet-html-editor-page cabinet-html-editor-form" data-he-lang="{{ $lang }}">
         @if($showButton)
-            @include('html-editor.partials.cabinet-he-nav', [
-                'breadcrumbs' => [
-                    ['label' => __('New project')],
-                ],
-            ])
+            @include('html-editor.partials.cabinet-he-nav')
         @endif
         <p class="cabinet-he-form-hint text-secondary mb-4">
             {{ __('Name the project and write the first HTML text. You can add more texts later.') }}
@@ -36,7 +24,7 @@
                 <label class="form-label" for="project_name">{{ __('Project name') }}</label>
                 <input type="text" name="project_name" id="project_name" class="form-control @error('project_name') is-invalid @enderror"
                        placeholder="{{ __('For example: Landing summer sale') }}"
-                       value="{{ old('project_name', $request['project_name'] ?? '') }}">
+                       value="{{ old('project_name') }}">
                 @error('project_name') <div class="invalid-feedback">{{ $message }}</div> @enderror
             </div>
             <div class="mb-3">
@@ -47,13 +35,13 @@
                 </label>
                 <input type="text" name="short_description" id="short_description" class="form-control @error('short_description') is-invalid @enderror"
                        placeholder="{{ __('Optional note for yourself') }}"
-                       value="{{ old('short_description', $request['short_description'] ?? '') }}">
+                       value="{{ old('short_description') }}">
                 @error('short_description') <div class="invalid-feedback">{{ $message }}</div> @enderror
             </div>
             <p class="form-label fw-semibold mb-2">{{ __('First HTML text') }}</p>
             @include('html-editor.partials.cabinet-he-presets')
             @include('html-editor.partials.cabinet-he-editor-split', [
-                'fieldValue' => old('description', $request['description'] ?? ''),
+                'fieldValue' => old('description', ''),
                 'invalid' => $errors->has('description'),
             ])
             @error('description') <div class="invalid-feedback d-block mb-3">{{ $message }}</div> @enderror

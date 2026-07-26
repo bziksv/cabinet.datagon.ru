@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => '1.5.4s',
+    'version' => '1.5.6',
 
     'limits' => [
         'max_projects' => 20,

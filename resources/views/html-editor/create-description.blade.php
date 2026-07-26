@@ -1,6 +1,6 @@
 @component('component.card', [
-    'title' => __('Add HTML text'),
-    'titleHtml' => e(__('Add HTML text')) . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-html-editor'])->render(),
+    'title' => __('HTML editor') . ' — ' . __('Add HTML text'),
+    'titleHtml' => e(__('HTML editor')) . ' — ' . e(__('Add HTML text')) . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-html-editor'])->render(),
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('css/cabinet-html-editor.css') }}?v={{ @filemtime(public_path('css/cabinet-html-editor.css')) ?: time() }}">
@@ -8,18 +8,8 @@
         <style>#header-nav-bar .cabinet-header-limits-menu tr.HtmlEditor { background: oldlace; }</style>
     @endslot
 
-    @slot('tools')
-        <a href="{{ route('HTML.editor') }}" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>{{ __('My projects') }}
-        </a>
-    @endslot
-
     <div class="cabinet-html-editor-page cabinet-html-editor-form" data-he-lang="{{ $lang }}">
-        @include('html-editor.partials.cabinet-he-nav', [
-            'breadcrumbs' => [
-                ['label' => __('Add HTML text')],
-            ],
-        ])
+        @include('html-editor.partials.cabinet-he-nav')
         <p class="cabinet-he-form-hint text-secondary mb-4">
             {{ __('Edit visually on the left — HTML code updates on the right. You can edit either side.') }}
         </p>

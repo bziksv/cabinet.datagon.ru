@@ -15,7 +15,12 @@ class ClusterLimit extends Model
     public static function calculateCountRequests(array $request): int
     {
         $count = count(array_unique(array_diff(explode("\n", str_replace("\r", "", $request['phrases'])), [])));
-        $multiplier = 1;
+        $engine = strtolower((string) ($request['searchEngine'] ?? 'yandex'));
+        $top = max(10, (int) ($request['count'] ?? 10));
+        // Google XML: ≤10 URL на страницу → 1 лимит за каждые 10 позиций (ТОП-10=1, ТОП-20=2…)
+        $multiplier = $engine === 'google'
+            ? (int) max(1, (int) ceil($top / 10))
+            : 1;
 
         if (filter_var($request['searchBase'], FILTER_VALIDATE_BOOLEAN)) {
             $multiplier += 1;

@@ -10,8 +10,9 @@
         return;
     }
 
+    var sourceEl = root.querySelector('#cabinet-dup-source');
     var textEl = root.querySelector('#cabinet-dup-text');
-    var beforeViewEl = root.querySelector('#cabinet-dup-before-view');
+    var sourceCountEl = root.querySelector('[data-dup-source-count]');
     var lineCountEl = root.querySelector('[data-dup-line-count]');
     var kpiRoot = root.querySelector('.cabinet-dup-kpi');
     var kpiBefore = root.querySelector('[data-dup-before]');
@@ -20,15 +21,24 @@
     var kpiEmptyRemoved = root.querySelector('[data-dup-empty-removed]');
     var startCharsEl = root.querySelector('#cabinet-dup-start-chars');
     var endCharsEl = root.querySelector('#cabinet-dup-end-chars');
-    var splitToggleEl = root.querySelector('#cabinet-dup-split-toggle');
     var undoBtn = root.querySelector('[data-dup-undo]');
-    var beforePaneEl = root.querySelector('.cabinet-dup-split-pane--before');
-    var mainLabelEl = root.querySelector('[data-dup-main-label]');
     var dropZoneEl = root.querySelector('[data-dup-dropzone]');
+    var textShellEl = root.querySelector('[data-dup-text-shell]');
+    var highlightEl = root.querySelector('[data-dup-highlight]');
+    var editStatusEl = root.querySelector('[data-dup-edit-status]');
+    var editorEl = root.querySelector('.cabinet-dup-editor');
+    var resultPaneEl = root.querySelector('.cabinet-dup-pane--result');
     var configEl = document.getElementById('cabinet-duplicates-config');
     var config = {};
     var undoState = null;
     var saveTimer = null;
+    var autoBaseline = null;
+    var processBeforeText = null;
+    var pulseTimer = null;
+
+    if (!sourceEl || !textEl) {
+        return;
+    }
 
     if (configEl && configEl.textContent) {
         try {
@@ -40,6 +50,260 @@
 
     function escapeRegExp(value) {
         return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    /**
+     * Набор вроде "+-!" / ".!?" — удаляем любой из символов.
+     * Строка с буквами/цифрами (тег <li>, префикс) — удаляем целиком как есть.
+     */
+    function isCharClassNeedle(value) {
+        var needle = String(value);
+        if (needle === '') {
+            return false;
+        }
+        // Есть буква или цифра → это целый префикс/суффикс (например <li>, sku-).
+        if (/[\p{L}\p{N}]/u.test(needle)) {
+            return false;
+        }
+        return true;
+    }
+
+    function escapeCharClass(value) {
+        // В [] особые: ] \ ^ - и на всякий случай [
+        return String(value).replace(/[\]\\^\[\-]/g, '\\$&');
+    }
+
+    function removeEdgeNeedle(text, needle, edge) {
+        needle = String(needle || '');
+        if (!needle) {
+            return text;
+        }
+
+        var reLine;
+        var reWord;
+        if (isCharClassNeedle(needle)) {
+            var cls = escapeCharClass(needle);
+            if (edge === 'start') {
+                reLine = new RegExp('^[' + cls + ']+', 'gm');
+                reWord = new RegExp('([ \\t])[' + cls + ']+', 'gm');
+            } else {
+                reLine = new RegExp('[' + cls + ']+$', 'gm');
+                reWord = new RegExp('[' + cls + ']+([ \\t])', 'gm');
+            }
+        } else {
+            var lit = escapeRegExp(needle);
+            if (edge === 'start') {
+                reLine = new RegExp('^(?:' + lit + ')+', 'gm');
+                reWord = new RegExp('([ \\t])(?:' + lit + ')+', 'gm');
+            } else {
+                reLine = new RegExp('(?:' + lit + ')+$', 'gm');
+                reWord = new RegExp('(?:' + lit + ')+([ \\t])', 'gm');
+            }
+        }
+
+        if (edge === 'start') {
+            return text.replace(reLine, '').replace(reWord, '$1');
+        }
+        return text.replace(reLine, '').replace(reWord, '$1');
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function flash(message, title) {
+        if (window.toastr && typeof window.toastr.success === 'function') {
+            window.toastr.success(message, title || '');
+            return;
+        }
+        if (message) {
+            window.alert(message);
+        }
+    }
+
+    function syncHighlightMetrics() {
+        if (!highlightEl || !textEl) {
+            return;
+        }
+        var cs = window.getComputedStyle(textEl);
+        highlightEl.style.padding = cs.padding;
+        highlightEl.style.borderWidth = cs.borderWidth;
+        highlightEl.style.borderStyle = 'solid';
+        highlightEl.style.borderColor = 'transparent';
+        highlightEl.style.fontFamily = cs.fontFamily;
+        highlightEl.style.fontSize = cs.fontSize;
+        highlightEl.style.fontWeight = cs.fontWeight;
+        highlightEl.style.lineHeight = cs.lineHeight;
+        highlightEl.style.letterSpacing = cs.letterSpacing;
+        highlightEl.style.boxSizing = cs.boxSizing;
+    }
+
+    function setEditStatus(mode) {
+        if (!editStatusEl) {
+            return;
+        }
+        editStatusEl.classList.remove(
+            'd-none',
+            'cabinet-dup-edit-status--auto',
+            'cabinet-dup-edit-status--manual'
+        );
+        if (!mode) {
+            editStatusEl.hidden = true;
+            editStatusEl.classList.add('d-none');
+            editStatusEl.textContent = '';
+            return;
+        }
+        editStatusEl.hidden = false;
+        if (mode === 'manual') {
+            editStatusEl.classList.add('cabinet-dup-edit-status--manual');
+            editStatusEl.textContent = config.statusManual || 'Edited manually';
+        } else {
+            editStatusEl.classList.add('cabinet-dup-edit-status--auto');
+            editStatusEl.textContent = config.statusAuto || 'Auto-processed';
+        }
+    }
+
+    function clearHighlight() {
+        autoBaseline = null;
+        processBeforeText = null;
+        if (textShellEl) {
+            textShellEl.classList.remove(
+                'cabinet-dup-text-shell--lit',
+                'cabinet-dup-text-shell--manual',
+                'cabinet-dup-text-shell--pulse'
+            );
+        }
+        if (highlightEl) {
+            highlightEl.innerHTML = '';
+        }
+        setEditStatus(null);
+    }
+
+    function buildBeforeCounts(beforeText) {
+        var counts = Object.create(null);
+        splitLines(beforeText).forEach(function (line) {
+            counts[line] = (counts[line] || 0) + 1;
+        });
+        return counts;
+    }
+
+    function classifyAutoMarks(beforeText, afterText) {
+        var beforeCounts = buildBeforeCounts(beforeText);
+        return splitLines(afterText).map(function (line) {
+            if (isBlankLine(line)) {
+                return '';
+            }
+            if ((beforeCounts[line] || 0) > 0) {
+                beforeCounts[line] -= 1;
+                return 'cabinet-dup-hl-line--kept';
+            }
+            return 'cabinet-dup-hl-line--auto';
+        });
+    }
+
+    function classifyCurrentMarks(currentText) {
+        if (autoBaseline === null) {
+            return [];
+        }
+        if (currentText === autoBaseline) {
+            return classifyAutoMarks(processBeforeText || '', currentText);
+        }
+
+        var autoCounts = buildBeforeCounts(autoBaseline);
+        var beforeCounts = processBeforeText !== null
+            ? buildBeforeCounts(processBeforeText)
+            : null;
+
+        return splitLines(currentText).map(function (line) {
+            if (isBlankLine(line)) {
+                return '';
+            }
+            if ((autoCounts[line] || 0) > 0) {
+                autoCounts[line] -= 1;
+                // Строка из авторезультата — сохраняем зелёный.
+                if (beforeCounts && (beforeCounts[line] || 0) > 0) {
+                    beforeCounts[line] -= 1;
+                    return 'cabinet-dup-hl-line--kept';
+                }
+                return 'cabinet-dup-hl-line--auto';
+            }
+            return 'cabinet-dup-hl-line--manual';
+        });
+    }
+
+    function renderHighlight(text, marks) {
+        if (!highlightEl || !textShellEl) {
+            return;
+        }
+        if (autoBaseline === null) {
+            clearHighlight();
+            return;
+        }
+
+        syncHighlightMetrics();
+        var lines = splitLines(text);
+        if (text === '') {
+            highlightEl.innerHTML = '';
+        } else {
+            highlightEl.innerHTML = lines.map(function (line, index) {
+                var cls = marks[index] || '';
+                var body = line === '' ? '&nbsp;' : escapeHtml(line);
+                return '<div class="cabinet-dup-hl-line' + (cls ? ' ' + cls : '') + '">' + body + '</div>';
+            }).join('');
+        }
+
+        highlightEl.scrollTop = textEl.scrollTop;
+        highlightEl.scrollLeft = textEl.scrollLeft;
+        textShellEl.classList.add('cabinet-dup-text-shell--lit');
+
+        var hasManual = marks.some(function (mark) {
+            return mark === 'cabinet-dup-hl-line--manual';
+        });
+        textShellEl.classList.toggle('cabinet-dup-text-shell--manual', hasManual);
+        setEditStatus(hasManual || text !== autoBaseline ? 'manual' : 'auto');
+    }
+
+    function refreshHighlight() {
+        if (autoBaseline === null) {
+            return;
+        }
+        renderHighlight(textEl.value, classifyCurrentMarks(textEl.value));
+    }
+
+    function scrollToResult() {
+        var target = resultPaneEl || textShellEl || textEl || editorEl;
+        if (target && typeof target.scrollIntoView === 'function') {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        window.setTimeout(function () {
+            if (textEl && typeof textEl.focus === 'function') {
+                try {
+                    textEl.focus({ preventScroll: true });
+                } catch (e) {
+                    textEl.focus();
+                }
+            }
+        }, 280);
+    }
+
+    function pulseEditor() {
+        if (!textShellEl) {
+            return;
+        }
+        textShellEl.classList.remove('cabinet-dup-text-shell--pulse');
+        // force reflow so animation can replay
+        void textShellEl.offsetWidth;
+        textShellEl.classList.add('cabinet-dup-text-shell--pulse');
+        if (pulseTimer) {
+            window.clearTimeout(pulseTimer);
+        }
+        pulseTimer = window.setTimeout(function () {
+            textShellEl.classList.remove('cabinet-dup-text-shell--pulse');
+        }, 1200);
     }
 
     function splitLines(text) {
@@ -111,6 +375,9 @@
     }
 
     function updateLineCount() {
+        if (sourceCountEl) {
+            sourceCountEl.textContent = String(countNonEmptyLines(sourceEl.value));
+        }
         if (lineCountEl) {
             lineCountEl.textContent = String(countNonEmptyLines(textEl.value));
         }
@@ -133,22 +400,6 @@
     function updateUndoButton() {
         if (undoBtn) {
             undoBtn.disabled = !undoState;
-        }
-    }
-
-    function updateSplitLayout() {
-        var on = splitToggleEl && splitToggleEl.checked;
-        if (beforePaneEl) {
-            beforePaneEl.classList.toggle('d-none', !on);
-        }
-        root.classList.toggle('cabinet-dup-split-active', !!on);
-        if (mainLabelEl) {
-            var hasSnapshot = beforeViewEl && beforeViewEl.value.trim() !== '';
-            if (on && hasSnapshot) {
-                mainLabelEl.textContent = config.mainLabelProcessed || 'Processed list';
-            } else {
-                mainLabelEl.textContent = config.mainLabelYourText || 'Your text';
-            }
         }
     }
 
@@ -207,26 +458,12 @@
                 return text.toLowerCase();
             },
             removeStartingChars: function (text) {
-                var chars = startCharsEl ? startCharsEl.value : '';
-                if (!chars) {
-                    return text;
-                }
-                var escaped = escapeRegExp(chars);
-                // Начало строки — просто убрать символы (не заменять на пробел).
-                // После пробела/таба — убрать символы, разделитель оставить.
-                return text
-                    .replace(new RegExp('^[' + escaped + ']+', 'gm'), '')
-                    .replace(new RegExp('([ \\t])[' + escaped + ']+', 'gm'), '$1');
+                var needle = startCharsEl ? startCharsEl.value : '';
+                return removeEdgeNeedle(text, needle, 'start');
             },
             removeEndingChars: function (text) {
-                var chars = endCharsEl ? endCharsEl.value : '';
-                if (!chars) {
-                    return text;
-                }
-                var escaped = escapeRegExp(chars);
-                return text
-                    .replace(new RegExp('[' + escaped + ']+$', 'gm'), '')
-                    .replace(new RegExp('[' + escaped + ']+([ \\t])', 'gm'), '$1');
+                var needle = endCharsEl ? endCharsEl.value : '';
+                return removeEdgeNeedle(text, needle, 'end');
             },
             removeDuplicates: function (text) {
                 var lines = splitLines(text);
@@ -274,7 +511,16 @@
     }
 
     function processText() {
-        var beforeText = textEl.value;
+        var beforeText = sourceEl.value;
+        if (String(beforeText).trim() === '') {
+            flash(
+                config.emptySourceText || 'Paste text into the source list first',
+                config.fileTitle || ''
+            );
+            sourceEl.focus();
+            return;
+        }
+
         var before = countAllLines(beforeText);
         var blanksBefore = countBlankLines(beforeText);
         var text = beforeText;
@@ -283,14 +529,11 @@
         var selected = getSelectedOptions();
 
         undoState = {
-            text: beforeText,
-            beforeView: beforeViewEl ? beforeViewEl.value : '',
+            result: textEl.value,
+            autoBaseline: autoBaseline,
+            processBeforeText: processBeforeText,
         };
         updateUndoButton();
-
-        if (beforeViewEl && splitToggleEl && splitToggleEl.checked) {
-            beforeViewEl.value = beforeText;
-        }
 
         selected.forEach(function (name) {
             if (typeof ops[name] === 'function') {
@@ -298,28 +541,37 @@
             }
         });
 
+        // Исходный список не трогаем — всегда можно сравнить «до» и «после».
         textEl.value = text;
         var after = countAllLines(text);
         // Считаем по факту до/после — не зависит от того, какая опция выкинула пустые.
         var emptyRemoved = Math.max(0, blanksBefore - countBlankLines(text));
+        processBeforeText = beforeText;
+        autoBaseline = text;
+        renderHighlight(text, classifyAutoMarks(beforeText, text));
         updateLineCount();
         setKpi(before, after, metrics.dupRemoved, emptyRemoved);
-        updateSplitLayout();
         scheduleSave();
+        scrollToResult();
+        pulseEditor();
     }
 
     function undoLast() {
         if (!undoState) {
             return;
         }
-        textEl.value = undoState.text;
-        if (beforeViewEl) {
-            beforeViewEl.value = undoState.beforeView;
-        }
+        textEl.value = undoState.result || '';
+        autoBaseline = undoState.autoBaseline;
+        processBeforeText = undoState.processBeforeText;
         undoState = null;
         updateUndoButton();
         updateLineCount();
-        resetKpi();
+        if (autoBaseline === null) {
+            resetKpi();
+            clearHighlight();
+        } else {
+            refreshHighlight();
+        }
         scheduleSave();
     }
 
@@ -354,14 +606,13 @@
     }
 
     function clearForm() {
+        sourceEl.value = '';
         textEl.value = '';
-        if (beforeViewEl) {
-            beforeViewEl.value = '';
-        }
         undoState = null;
         updateUndoButton();
         updateLineCount();
         resetKpi();
+        clearHighlight();
         scheduleSave();
     }
 
@@ -439,10 +690,12 @@
 
     function readState() {
         return {
-            text: textEl.value,
+            source: sourceEl.value,
+            result: textEl.value,
+            // legacy key — чтобы старые вкладки не теряли текст при миграции
+            text: sourceEl.value,
             startChars: startCharsEl ? startCharsEl.value : '',
             endChars: endCharsEl ? endCharsEl.value : '',
-            split: splitToggleEl ? splitToggleEl.checked : false,
             options: {},
             caseInsensitiveDedup: isCaseInsensitiveDedup(),
         };
@@ -478,17 +731,20 @@
                 return;
             }
             var state = JSON.parse(raw);
-            if (state.text !== undefined) {
-                textEl.value = state.text;
+            if (state.source !== undefined) {
+                sourceEl.value = state.source;
+            } else if (state.text !== undefined) {
+                // Старый формат: один textarea — кладём в исходный список.
+                sourceEl.value = state.text;
+            }
+            if (state.result !== undefined) {
+                textEl.value = state.result;
             }
             if (startCharsEl && state.startChars !== undefined) {
                 startCharsEl.value = state.startChars;
             }
             if (endCharsEl && state.endChars !== undefined) {
                 endCharsEl.value = state.endChars;
-            }
-            if (splitToggleEl && state.split) {
-                splitToggleEl.checked = true;
             }
             if (state.options) {
                 root.querySelectorAll('[data-dup-option]').forEach(function (input) {
@@ -501,6 +757,11 @@
             if (ciEl && state.caseInsensitiveDedup !== undefined) {
                 ciEl.checked = !!state.caseInsensitiveDedup;
             }
+            if (sourceEl.value !== '' && textEl.value !== '') {
+                processBeforeText = sourceEl.value;
+                autoBaseline = textEl.value;
+                refreshHighlight();
+            }
         } catch (e) {
             /* ignore corrupt storage */
         }
@@ -511,7 +772,8 @@
         if (!demo || !demo.text) {
             return false;
         }
-        textEl.value = String(demo.text);
+        sourceEl.value = String(demo.text);
+        textEl.value = '';
         if (demo.options) {
             root.querySelectorAll('[data-dup-option]').forEach(function (input) {
                 if (Object.prototype.hasOwnProperty.call(demo.options, input.value)) {
@@ -539,11 +801,12 @@
         }
         var reader = new FileReader();
         reader.onload = function () {
-            textEl.value = String(reader.result || '');
+            sourceEl.value = String(reader.result || '');
             undoState = null;
             updateUndoButton();
             updateLineCount();
             resetKpi();
+            clearHighlight();
             scheduleSave();
         };
         reader.readAsText(file, 'UTF-8');
@@ -592,10 +855,9 @@
     if (copyBtn) {
         copyBtn.addEventListener('click', copyResult);
     }
-    var clearBtn = root.querySelector('[data-dup-clear]');
-    if (clearBtn) {
+    root.querySelectorAll('[data-dup-clear]').forEach(function (clearBtn) {
         clearBtn.addEventListener('click', clearForm);
-    }
+    });
     var selectAllBtn = root.querySelector('[data-dup-select-all]');
     if (selectAllBtn) {
         selectAllBtn.addEventListener('click', function () {
@@ -622,9 +884,30 @@
         });
     });
 
-    textEl.addEventListener('input', function () {
+    sourceEl.addEventListener('input', function () {
         updateLineCount();
         scheduleSave();
+    });
+
+    textEl.addEventListener('input', function () {
+        updateLineCount();
+        refreshHighlight();
+        scheduleSave();
+    });
+
+    textEl.addEventListener('scroll', function () {
+        if (!highlightEl || autoBaseline === null) {
+            return;
+        }
+        highlightEl.scrollTop = textEl.scrollTop;
+        highlightEl.scrollLeft = textEl.scrollLeft;
+    });
+
+    window.addEventListener('resize', function () {
+        if (autoBaseline !== null) {
+            syncHighlightMetrics();
+            refreshHighlight();
+        }
     });
 
     root.querySelectorAll('[data-dup-char-toggle]').forEach(function (input) {
@@ -650,19 +933,16 @@
         ciCheckbox.addEventListener('change', scheduleSave);
     }
 
-    if (splitToggleEl) {
-        splitToggleEl.addEventListener('change', function () {
-            updateSplitLayout();
-            scheduleSave();
-        });
-    }
-
     root.addEventListener('keydown', function (event) {
         if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
             event.preventDefault();
             processText();
         }
         if ((event.ctrlKey || event.metaKey) && event.key === 'z' && undoState) {
+            var tag = (event.target && event.target.tagName) || '';
+            if (tag === 'TEXTAREA' || tag === 'INPUT') {
+                return;
+            }
             event.preventDefault();
             undoLast();
         }
@@ -672,7 +952,6 @@
     if (!applyDemoShowcase()) {
         restoreState();
     }
-    updateSplitLayout();
     updateLineCount();
     updateCharFieldsState();
     updateUndoButton();

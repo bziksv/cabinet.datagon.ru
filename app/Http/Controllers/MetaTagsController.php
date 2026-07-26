@@ -27,7 +27,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
-use KubAT\PhpSimple\HtmlDomParser;
+use App\Classes\SimpleHtmlDom\HtmlDocument;
 use Ixudra\Curl\Facades\Curl;
 
 /**
@@ -344,17 +344,26 @@ class MetaTagsController extends Controller
             ->returnResponseArray()
             ->get();
 
-        $html["redirect"] = "";
+        if (!is_array($html)) {
+            $html = ['content' => '', 'status' => 0, 'headers' => []];
+        }
 
-        if (array_key_exists('Location', $html['headers'])) {
-            if ($html['headers']['Location'] != $domain) {
-                $html["redirect"] = implode(" → ", [$domain, $html['headers']['Location']]);
-            }
+        $html['content'] = isset($html['content']) && is_string($html['content']) ? $html['content'] : '';
+        $html['headers'] = isset($html['headers']) && is_array($html['headers']) ? $html['headers'] : [];
+        $html['redirect'] = '';
+
+        if (array_key_exists('Location', $html['headers']) && $html['headers']['Location'] != $domain) {
+            $html['redirect'] = implode(' → ', [$domain, $html['headers']['Location']]);
         }
 
         $this->response = $html;
+        $this->html = null;
 
-        $this->html = HtmlDomParser::str_get_html($html['content']);
+        if ($html['content'] !== '') {
+            $document = new HtmlDocument();
+            $document->load($html['content']);
+            $this->html = $document;
+        }
 
         return $this;
     }
@@ -377,6 +386,10 @@ class MetaTagsController extends Controller
 
     public function getByString(string $tag)
     {
+        if (!$this->html) {
+            return false;
+        }
+
         $el = $this->html->find($tag);
 
         if (!$el)

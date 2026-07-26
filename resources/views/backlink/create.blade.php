@@ -23,15 +23,6 @@
             </div>
         </div>
 
-        @include('backlink.partials.steps-nav', [
-            'navLabel' => __('Backlink create steps nav'),
-            'steps' => [
-                ['n' => 1, 'title' => __('Backlink step 1 title'), 'anchor' => 'cabinet-bl-step-1', 'active' => true],
-                ['n' => 2, 'title' => __('Backlink step 2 title'), 'anchor' => 'cabinet-bl-step-2'],
-                ['n' => 3, 'title' => __('Backlink step 3 title'), 'anchor' => 'cabinet-bl-step-3'],
-            ],
-        ])
-
         {!! Form::open(['action' => 'BacklinkController@store', 'method' => 'POST', 'class' => 'cabinet-bl-express-form']) !!}
         <section class="cabinet-bl-step" id="cabinet-bl-step-1" aria-labelledby="cabinet-bl-step-1-label">
             @include('backlink.partials.step-head', [

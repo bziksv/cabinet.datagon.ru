@@ -78,7 +78,9 @@
             status-fail="{{ __('Unavailable') }}"
         ></response-http-code>
 
+        {{-- v-pre: HTML ответа может содержать {{...}} — иначе Vue на #app обнуляет страницу --}}
         @if($hasResponse)
+            <div v-pre>
             @if($publicShareUrl !== '')
             <section class="cabinet-hh-share cabinet-hh-panel card border shadow-sm" aria-labelledby="cabinet-hh-share-title">
                 <div class="card-body">
@@ -104,6 +106,7 @@
                 @foreach($response as $arItems)
                     @php
                         $isOk = (int) ($arItems['status'] ?? 0) === 200;
+                        $headers = is_array($arItems['headers'] ?? null) ? $arItems['headers'] : [];
                     @endphp
                     <section class="cabinet-hh-result-card card border shadow-sm mb-0 @if($isOk) border-success @else border-danger @endif">
                         <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2 py-3 @if($isOk) text-bg-success-subtle @else text-bg-danger-subtle @endif">
@@ -115,7 +118,7 @@
                         <div class="card-body p-0 overflow-auto">
                             <table class="table table-striped table-hover mb-0">
                                 <tbody>
-                                @foreach($arItems['headers'] as $name => $val)
+                                @foreach($headers as $name => $val)
                                     <tr>
                                         <td>{{ $name }}</td>
                                         <td class="text-break">@if(is_array($val)){{ implode(', ', $val) }}@else{{ $val }}@endif</td>
@@ -141,6 +144,7 @@
                     </div>
                 </section>
             @endif
+            </div>
         @endif
     </div>
 

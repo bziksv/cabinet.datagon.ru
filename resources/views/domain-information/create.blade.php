@@ -7,7 +7,11 @@
     @endslot
 
     <div class="cabinet-di-page cabinet-di-create">
-        @include('domain-information.partials.module-nav', ['active' => 'projects', 'admin' => $admin ?? false])
+        <nav class="mb-3" aria-label="{{ __('Domain information') }}">
+            <a href="{{ route('domain.information') }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>{{ __('Domain information tab') }}
+            </a>
+        </nav>
 
         <div class="d-flex flex-column gap-2 mb-3">
             @include('domain-information.partials.free-tariff-email-notice')
@@ -15,7 +19,6 @@
         </div>
 
         <p class="text-secondary small mb-2">{{ __('Domain information create lead short') }}</p>
-        @include('domain-information.partials.create-steps-nav')
 
         {!! Form::open(['action' => 'DomainInformationController@store', 'method' => 'POST', 'class' => 'single', 'id' => 'cabinet-di-create-form']) !!}
 
@@ -148,7 +151,6 @@
                 $('.single').hide();
                 $('.cabinet-di-form-sections').hide();
                 $('.cabinet-di-create-submit').hide();
-                $('.cabinet-di-steps-nav').addClass('d-none');
             });
             $('.multi').on('click', function (e) {
                 e.preventDefault();
@@ -156,7 +158,6 @@
                 $('.single').show();
                 $('.cabinet-di-form-sections').show();
                 $('.cabinet-di-create-submit').show();
-                $('.cabinet-di-steps-nav').removeClass('d-none');
             });
         </script>
     @endslot

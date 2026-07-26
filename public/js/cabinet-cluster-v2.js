@@ -109,8 +109,36 @@
     }
   }
 
+  function currentSearchEngine() {
+    const engine = ($('#clv2-search-engine').val() || 'yandex').toLowerCase();
+    return engine === 'google' ? 'google' : 'yandex';
+  }
+
+  function currentTop() {
+    const fromSelect = parseInt($('#clv2-top').val(), 10);
+    if (!isNaN(fromSelect) && fromSelect > 0) {
+      return fromSelect;
+    }
+    const defaults = mode === 'professional'
+      ? (cfg.defaults && cfg.defaults.pro)
+      : (cfg.defaults && cfg.defaults.classic);
+    const fallback = defaults && defaults.count ? parseInt(defaults.count, 10) : 10;
+    return isNaN(fallback) || fallback < 10 ? 10 : fallback;
+  }
+
+  function googlePagesForTop(top) {
+    return Math.max(1, Math.ceil(Math.max(10, top) / 10));
+  }
+
+  function syncTopVisibility() {
+    const isGoogle = currentSearchEngine() === 'google';
+    const showTop = mode === 'professional' || isGoogle;
+    $('#clv2-top-wrap').toggleClass('d-none', !showTop);
+    $('#clv2-google-limits-hint').toggleClass('d-none', !isGoogle);
+  }
+
   function limitMultiplier() {
-    let m = 1;
+    let m = currentSearchEngine() === 'google' ? googlePagesForTop(currentTop()) : 1;
     if ($('#clv2-search-relevance').is(':checked')) m += 1;
     if ($('#clv2-search-base').is(':checked')) m += 1;
     if ($('#clv2-search-phrases').is(':checked')) m += 1;
@@ -195,6 +223,7 @@
       .toggleClass('btn-outline-primary', isClassic);
 
     $('#clv2-pro-panel').toggleClass('d-none', isClassic);
+    syncTopVisibility();
 
     updateLimits();
   }
@@ -203,7 +232,9 @@
     const data = targetMode === 'professional' ? cfg.defaults.pro : cfg.defaults.classic;
     if (!data) return;
 
-    setRegionValue(data.region, data.region_text);
+    const engine = data.search_engine === 'google' ? 'google' : 'yandex';
+    $('#clv2-search-engine').val(engine);
+    applyRegionForEngine(engine, data.region, data.region_text);
     $('#clv2-clustering-level').val(data.clustering_level);
     $('#clv2-top').val(String(data.count || 30));
     $('#clv2-save').val(String(data.save_results));
@@ -222,6 +253,7 @@
     }
 
     toggleBrutForce();
+    syncTopVisibility();
     updateLimits();
   }
 
@@ -242,9 +274,9 @@
       $('#clv2-comment').val(request.comment || '');
     }
 
-    if (request.region) {
-      setRegionValue(request.region, '');
-    }
+    const projectEngine = request.searchEngine === 'google' ? 'google' : 'yandex';
+    $('#clv2-search-engine').val(projectEngine);
+    applyRegionForEngine(projectEngine, request.region, '');
     if (request.clusteringLevel) {
       $('#clv2-clustering-level').val(request.clusteringLevel);
     }
@@ -279,6 +311,7 @@
 
     applyDomainFieldNormalization();
     toggleBrutForce();
+    syncTopVisibility();
     updateLimits();
 
     const step1 = document.getElementById('clv2-step-1');
@@ -357,11 +390,39 @@
     if (!id) return;
 
     const text = regionSelectLabel({ name: regionText, text: regionText }) || id;
-    if (!$region.find('option[value="' + id.replace(/"/g, '\\"') + '"]').length) {
-      const option = new Option(text, id, true, true);
-      $region.append(option);
-    }
+    $region.find('option').remove();
+    const option = new Option(text, id, true, true);
+    $region.append(option);
     $region.val(id).trigger('change.select2');
+  }
+
+  function defaultRegionForEngine(engine) {
+    const key = engine === 'google' ? 'google' : 'yandex';
+    const fromCfg = cfg.defaultRegions && cfg.defaultRegions[key];
+    if (fromCfg && fromCfg.id) {
+      return fromCfg;
+    }
+    return key === 'google'
+      ? { id: '1011969', name: 'Москва', text: 'Москва [1011969]' }
+      : { id: '213', name: 'Москва', text: 'Москва [213]' };
+  }
+
+  function applyRegionForEngine(engine, preferredId, preferredText) {
+    const fallback = defaultRegionForEngine(engine);
+    const id = preferredId ? String(preferredId) : '';
+    // Яндекс lr обычно ≤5 цифр; Google geotarget — 7+ (напр. 1011969)
+    const looksGoogleId = /^\d{7,}$/.test(id);
+    const validPreferred = id && (
+      (engine === 'google' && looksGoogleId) ||
+      (engine !== 'google' && !looksGoogleId)
+    );
+
+    if (validPreferred) {
+      setRegionValue(id, preferredText || '');
+      return;
+    }
+
+    setRegionValue(fallback.id, fallback.name || fallback.text || fallback.id);
   }
 
   function initRegionSelect() {
@@ -408,6 +469,7 @@
           return {
             q: params.term || '',
             limit: 25,
+            engine: currentSearchEngine(),
           };
         },
         processResults: function (data) {
@@ -432,6 +494,7 @@
   }
 
   function buildPayload(progressId) {
+    const engine = currentSearchEngine();
     const payload = {
       _token: csrf(),
       progressId: progressId,
@@ -445,13 +508,16 @@
       searchPhrases: $('#clv2-search-phrases').is(':checked'),
       searchTarget: $('#clv2-search-target').is(':checked'),
       searchRelevance: $('#clv2-search-relevance').is(':checked'),
-      searchEngine: 'yandex',
+      searchEngine: engine,
       sendMessage: $('#clv2-send-message').length ? $('#clv2-send-message').val() : '0',
       mode: mode === 'classic' ? 'classic' : 'professional',
     };
 
+    if (mode === 'professional' || engine === 'google') {
+      payload.count = String(currentTop());
+    }
+
     if (mode === 'professional') {
-      payload.count = $('#clv2-top').val();
       payload.brutForce = $('#clv2-brut-force').is(':checked');
       payload.brutForceCount = $('#clv2-brut-force-count').val();
       payload.reductionRatio = $('#clv2-reduction-ratio').val();
@@ -785,8 +851,14 @@
       applyDefaults(next);
     });
 
-    $('#clv2-phrases, #clv2-search-base, #clv2-search-phrases, #clv2-search-target, #clv2-search-relevance')
+    $('#clv2-phrases, #clv2-search-base, #clv2-search-phrases, #clv2-search-target, #clv2-search-relevance, #clv2-top')
       .on('input change', updateLimits);
+
+    $('#clv2-search-engine').on('change', function () {
+      applyRegionForEngine(currentSearchEngine());
+      syncTopVisibility();
+      updateLimits();
+    });
 
     $('#clv2-domain').on('blur', applyDomainFieldNormalization);
 

@@ -75,50 +75,60 @@
                 <span>{{ __('Step 1') }} — {{ __('Paste your list') }}</span>
             </h6>
 
-            <div class="cabinet-dup-presets mb-3">
-                <span class="text-muted small me-2">{{ __('Presets') }}:</span>
-                <div class="btn-group btn-group-sm flex-wrap">
-                    <button type="button" class="btn btn-outline-secondary" data-dup-preset="dedup-only">
-                        {{ __('Duplicates only') }}
-                    </button>
-                    <button type="button" class="btn btn-outline-secondary" data-dup-preset="seo">
-                        {{ __('SEO keyword list') }}
-                    </button>
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div class="cabinet-dup-presets">
+                    <span class="text-muted small me-2">{{ __('Presets') }}:</span>
+                    <div class="btn-group btn-group-sm flex-wrap">
+                        <button type="button" class="btn btn-outline-secondary" data-dup-preset="dedup-only">
+                            {{ __('Duplicates only') }}
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" data-dup-preset="seo">
+                            {{ __('SEO keyword list') }}
+                        </button>
+                    </div>
                 </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm click_tracking" data-click="Clear" data-dup-clear>
+                    <i class="bi bi-x-lg me-1" aria-hidden="true"></i>{{ __('Clear') }}
+                </button>
             </div>
 
             <div class="cabinet-dup-editor" data-dup-dropzone>
-                <div class="cabinet-dup-main-pane">
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                        <label class="form-label mb-0" for="cabinet-dup-text" data-dup-main-label>{{ __('Your text') }}</label>
-                        <span class="text-muted small">
-                            {{ __('Count phrases') }}:
-                            <span class="badge text-bg-light border cabinet-dup-line-badge" data-dup-line-count>0</span>
-                        </span>
+                <p class="text-muted small cabinet-dup-drop-hint mb-3">
+                    <i class="bi bi-file-earmark-arrow-up me-1" aria-hidden="true"></i>{{ __('Drop a .txt file here or paste text below') }}
+                </p>
+                <div class="cabinet-dup-compare-grid">
+                    <div class="cabinet-dup-pane cabinet-dup-pane--source">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <label class="form-label mb-0" for="cabinet-dup-source">{{ __('Source list') }}</label>
+                            <span class="text-muted small">
+                                {{ __('Count phrases') }}:
+                                <span class="badge text-bg-light border cabinet-dup-line-badge" data-dup-source-count>0</span>
+                            </span>
+                        </div>
+                        <textarea id="cabinet-dup-source"
+                                  class="form-control cabinet-dup-textarea"
+                                  rows="12"
+                                  placeholder="{{ __('Enter or paste keywords, one per line. Blank lines are ignored when counting.') }}"></textarea>
                     </div>
-                    <p class="text-muted small cabinet-dup-drop-hint mb-2">
-                        <i class="bi bi-file-earmark-arrow-up me-1" aria-hidden="true"></i>{{ __('Drop a .txt file here or paste text below') }}
-                    </p>
-                    <textarea id="cabinet-dup-text"
-                              class="form-control cabinet-dup-textarea"
-                              rows="12"
-                              placeholder="{{ __('Enter or paste keywords, one per line. Blank lines are ignored when counting.') }}"></textarea>
-                </div>
-
-                <div class="form-check form-switch cabinet-dup-split-toggle mt-3 mb-0">
-                    <input class="form-check-input" type="checkbox" role="switch" id="cabinet-dup-split-toggle">
-                    <label class="form-check-label" for="cabinet-dup-split-toggle">{{ __('Compare before and after') }}</label>
-                </div>
-
-                <div class="cabinet-dup-split-pane cabinet-dup-split-pane--before d-none mt-3">
-                    <label class="form-label" for="cabinet-dup-before-view">{{ __('Before processing') }}</label>
-                    <textarea id="cabinet-dup-before-view"
-                              class="form-control cabinet-dup-textarea cabinet-dup-textarea--readonly"
-                              rows="8"
-                              readonly
-                              tabindex="-1"
-                              aria-readonly="true"
-                              placeholder="{{ __('Snapshot appears here after you run processing') }}"></textarea>
+                    <div class="cabinet-dup-pane cabinet-dup-pane--result">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                            <label class="form-label mb-0" for="cabinet-dup-text">{{ __('Result') }}</label>
+                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                <span class="cabinet-dup-edit-status d-none" data-dup-edit-status hidden></span>
+                                <span class="text-muted small">
+                                    {{ __('Count phrases') }}:
+                                    <span class="badge text-bg-light border cabinet-dup-line-badge" data-dup-line-count>0</span>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="cabinet-dup-text-shell" data-dup-text-shell>
+                            <pre class="cabinet-dup-highlight" data-dup-highlight aria-hidden="true"></pre>
+                            <textarea id="cabinet-dup-text"
+                                      class="form-control cabinet-dup-textarea"
+                                      rows="12"
+                                      placeholder="{{ __('Result appears here after processing') }}"></textarea>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -193,7 +203,7 @@
                                        data-dup-option
                                        data-dup-char-toggle="cabinet-dup-start-chars"
                                        value="removeStartingChars">
-                                <label class="form-check-label" for="cabinet-dup-opt-start">{!! __('remove characters at the beginning of a word') . $dupTip(__('Characters from the field below, e.g. + - !')) !!}</label>
+                                <label class="form-check-label" for="cabinet-dup-opt-start">{!! __('remove characters at the beginning of a word') . $dupTip(__('Removes the whole text from the field (e.g. <li>), or each symbol for sets like +-!')) !!}</label>
                             </div>
                             <div class="cabinet-dup-char-field is-disabled" data-dup-char-field="cabinet-dup-start-chars">
                                 <input type="text"
@@ -201,7 +211,7 @@
                                        id="cabinet-dup-start-chars"
                                        value="+-!"
                                        disabled
-                                       placeholder="{{ __('remove characters at the beginning of a word') }}: +-!">
+                                       placeholder="&lt;li&gt;">
                             </div>
                             <div class="form-check">
                                 <input class="form-check-input"
@@ -210,7 +220,7 @@
                                        data-dup-option
                                        data-dup-char-toggle="cabinet-dup-end-chars"
                                        value="removeEndingChars">
-                                <label class="form-check-label" for="cabinet-dup-opt-end">{!! __('remove characters at the end of a word') . $dupTip(__('Characters from the field below, e.g. . ! ?')) !!}</label>
+                                <label class="form-check-label" for="cabinet-dup-opt-end">{!! __('remove characters at the end of a word') . $dupTip(__('Removes the whole text from the field (e.g. </li>), or each symbol for sets like .!?')) !!}</label>
                             </div>
                             <div class="cabinet-dup-char-field is-disabled" data-dup-char-field="cabinet-dup-end-chars">
                                 <input type="text"
@@ -218,7 +228,7 @@
                                        id="cabinet-dup-end-chars"
                                        value=".!?"
                                        disabled
-                                       placeholder="{{ __('remove characters at the end of a word') }}: .!?">
+                                       placeholder="&lt;/li&gt;">
                             </div>
                         </div>
                     </div>
@@ -234,7 +244,7 @@
 
             <div class="d-flex flex-wrap cabinet-dup-actions">
                 <button type="button" class="btn btn-secondary click_tracking" data-click="Remove duplicates" data-dup-process>
-                    <i class="bi bi-funnel me-1" aria-hidden="true"></i>{{ __('Remove duplicates') }}
+                    <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>{{ __('Edit list') }}
                 </button>
                 <button type="button" class="btn btn-outline-secondary" data-dup-undo disabled>
                     <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>{{ __('Undo') }}
@@ -256,10 +266,11 @@
             'copyTitle' => __('Copy'),
             'emptyText' => __('Nothing to copy'),
             'copyFailedText' => __('Copy failed'),
-            'mainLabelYourText' => __('Your text'),
-            'mainLabelProcessed' => __('Processed list'),
             'invalidFileText' => __('Only .txt files are supported'),
             'fileTitle' => __('File'),
+            'statusAuto' => __('Auto-processed'),
+            'statusManual' => __('Edited manually'),
+            'emptySourceText' => __('Paste text into the source list first'),
             'demoShowcase' => \App\Support\DemoCabinet::isCurrentUser()
                 ? \App\Support\DemoCabinet::duplicatesShowcase()
                 : null,

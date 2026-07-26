@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => '1.0.4',
+    'version' => '1.0.5',
 
     'max_seeds' => 100,
     'max_depth' => 3,

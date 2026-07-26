@@ -205,8 +205,35 @@
             </div>
         </form>
 
+        <div class="px-4 mb-4 d-none" id="cabinetSsResultsWrap">
+            <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
+                <h5 class="h6 mb-0">{{ __('Search suggestions results title') }}
+                    <span class="text-muted font-weight-normal" id="cabinetSsResultsMeta"></span>
+                </h5>
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="cabinetSsCopySuggests">{{ __('Search suggestions copy suggests') }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="cabinetSsExport">{{ __('Export') }} CSV</button>
+                </div>
+            </div>
+            <div class="table-responsive cabinet-ss-results-scroll">
+                <table class="table table-sm table-striped table-bordered mb-0" id="cabinetSsResults">
+                    <thead>
+                    <tr>
+                        <th>{{ __('Search suggestions col seed') }}</th>
+                        <th>{{ __('Search suggestions col suggest') }}</th>
+                        <th>{{ __('Search suggestions col engine') }}</th>
+                        <th>{{ __('Search suggestions col level') }}</th>
+                        <th>{{ __('Search suggestions col words') }}</th>
+                        <th>{{ __('Search suggestions col type') }}</th>
+                    </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
         @if($canSaveHistory && count($histories))
-            <div class="px-4 mb-4">
+            <div class="px-4 pb-4">
                 <h5 class="h6 mb-2">{{ __('Search suggestions history title') }}</h5>
                 <div class="table-responsive">
                     <table class="table table-sm table-bordered mb-0" id="cabinetSsHistoryTable">
@@ -241,33 +268,6 @@
                 </div>
             </div>
         @endif
-
-        <div class="px-4 pb-4 d-none" id="cabinetSsResultsWrap">
-            <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
-                <h5 class="h6 mb-0">{{ __('Search suggestions results title') }}
-                    <span class="text-muted font-weight-normal" id="cabinetSsResultsMeta"></span>
-                </h5>
-                <div class="d-flex flex-wrap gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-primary" id="cabinetSsCopySuggests">{{ __('Search suggestions copy suggests') }}</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="cabinetSsExport">{{ __('Export') }} CSV</button>
-                </div>
-            </div>
-            <div class="table-responsive cabinet-ss-results-scroll">
-                <table class="table table-sm table-striped table-bordered mb-0" id="cabinetSsResults">
-                    <thead>
-                    <tr>
-                        <th>{{ __('Search suggestions col seed') }}</th>
-                        <th>{{ __('Search suggestions col suggest') }}</th>
-                        <th>{{ __('Search suggestions col engine') }}</th>
-                        <th>{{ __('Search suggestions col level') }}</th>
-                        <th>{{ __('Search suggestions col words') }}</th>
-                        <th>{{ __('Search suggestions col type') }}</th>
-                    </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-        </div>
     </div>
 
     @slot('js')

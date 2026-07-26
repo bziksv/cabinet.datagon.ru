@@ -150,6 +150,7 @@
         var input = root.querySelector('[data-lc-mode][value="' + value + '"]');
         if (input) {
             input.checked = true;
+            updateModeHelp();
         }
     }
 
@@ -467,8 +468,37 @@
         });
     });
 
+    var modeHelpEl = root.querySelector('[data-lc-mode-help]');
+
+    function updateModeHelp() {
+        if (!modeHelpEl) {
+            return;
+        }
+        var checked = root.querySelector('[data-lc-mode]:checked');
+        var help = checked ? checked.getAttribute('data-lc-help') : '';
+        modeHelpEl.textContent = help || '';
+    }
+
+    function initTooltips() {
+        if (!window.bootstrap || !window.bootstrap.Tooltip) {
+            return;
+        }
+        root.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+            if (window.bootstrap.Tooltip.getInstance(el)) {
+                return;
+            }
+            new window.bootstrap.Tooltip(el, {
+                container: 'body',
+                trigger: 'hover focus',
+            });
+        });
+    }
+
     root.querySelectorAll('[data-lc-mode]').forEach(function (input) {
-        input.addEventListener('change', scheduleSave);
+        input.addEventListener('change', function () {
+            updateModeHelp();
+            scheduleSave();
+        });
     });
 
     root.querySelectorAll('#cabinet-lc-opt-trim, #cabinet-lc-opt-ci, #cabinet-lc-opt-sort').forEach(function (el) {
@@ -529,6 +559,8 @@
         restoreState();
     }
     updateCounts();
+    updateModeHelp();
+    initTooltips();
     if (!config.demoShowcase) {
         resetKpi();
     }

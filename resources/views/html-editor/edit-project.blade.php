@@ -1,25 +1,15 @@
 @component('component.card', [
-    'title' => __('Edit a project'),
-    'titleHtml' => e(__('Edit a project')) . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-html-editor'])->render(),
+    'title' => __('HTML editor') . ' — ' . __('Edit a project'),
+    'titleHtml' => e(__('HTML editor')) . ' — ' . e(__('Edit a project')) . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-html-editor'])->render(),
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('css/cabinet-html-editor.css') }}?v={{ @filemtime(public_path('css/cabinet-html-editor.css')) ?: time() }}">
         <style>#header-nav-bar .cabinet-header-limits-menu tr.HtmlEditor { background: oldlace; }</style>
     @endslot
 
-    @slot('tools')
-        <a href="{{ route('HTML.editor') }}?project={{ $project->id }}" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>{{ __('My projects') }}
-        </a>
-    @endslot
-
     <div class="cabinet-html-editor-form">
         @include('html-editor.partials.cabinet-he-nav', [
             'backUrl' => route('HTML.editor') . '?project=' . $project->id,
-            'breadcrumbs' => [
-                ['label' => $project->project_name, 'url' => route('HTML.editor') . '?project=' . $project->id],
-                ['label' => __('Edit a project')],
-            ],
         ])
         <form action="{{ route('save.edit.project') }}" method="POST">
             @csrf

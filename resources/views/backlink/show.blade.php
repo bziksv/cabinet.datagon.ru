@@ -129,7 +129,7 @@
                     <form action="{{ route('check.project.links', $project->id) }}"
                           method="post"
                           class="d-inline"
-                          onsubmit="return confirm(@json(__('Backlink check project confirm', ['count' => $linksTotal])))">
+                          onsubmit='return confirm(@json(__('Backlink check project confirm', ['count' => $linksTotal])))'>
                         @csrf
                         <button type="submit"
                                 class="btn btn-outline-primary"

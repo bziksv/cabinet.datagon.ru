@@ -5,7 +5,10 @@
  * Каталоги доменов + эвристика по URL/HTML страниц из ТОПа.
  */
 return [
-    'version' => '1.2.3',
+    'version' => '1.3.3',
+
+    /** Именованные пресеты «Свои списки доменов по типам» на пользователя */
+    'max_catalog_presets' => 20,
 
     'max_phrases' => 200,
     'depths' => [3, 5, 10, 20, 30],
@@ -57,7 +60,10 @@ return [
                 'joom.com', 'shein.com',
                 'detmir.ru', 'sportmaster.ru', 'decathlon.ru', 'adidas.ru', 'nike.com',
                 'leroymerlin.ru', 'lemanapro.ru', 'petrovich.ru', 'vseinstrumenti.ru',
-                'hoff.ru', 'divan.ru', 'askona.ru', 'ikea.com',
+                'hoff.ru', 'divan.ru', 'divanchik.ru', 'askona.ru', 'ikea.com',
+                'pushe.ru', 'mnogomeb.ru', 'nonton.ru', 'divany.ru', 'mebel.ru',
+                'lazurit.com', 'shatura.ru', 'stolplit.ru', 'angstrem-mebel.ru',
+                'mrdoors.ru', 'marya.ru', 'sokolmebel.ru', 'ormatek.com', 'promtex-orient.ru',
                 'apteka.ru', 'eapteka.ru', 'zdravcity.ru', 'uteka.ru',
                 'litres.ru', 'book24.ru', 'labirint.ru', 'chitai-gorod.ru',
                 're-store.ru', 'apple.com', 'samsung.com', 'xiaomi.com',

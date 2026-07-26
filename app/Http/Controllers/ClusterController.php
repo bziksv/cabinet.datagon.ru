@@ -15,8 +15,8 @@ use App\Jobs\Cluster\StartClusterAnalyseQueue;
 use App\Support\ClusterAnalysisDebugLog;
 use App\Support\ClusterProgress;
 use App\Support\ClusterQueues;
+use App\Support\CompetitorSearchRegions;
 use App\Support\DemoCabinet;
-use App\Support\YandexLrRegions;
 use App\User;
 use Carbon\Carbon;
 use Doctrine\DBAL\Exception;
@@ -55,6 +55,10 @@ class ClusterController extends Controller
             'clusterV2DefaultsClassic' => $this->clusterV2DefaultsFromConfig($configClassic),
             'clusterV2DefaultsPro' => $this->clusterV2DefaultsFromConfig($config),
             'clusterV2DefaultRegion' => $this->clusterV2ResolvedRegion($configClassic),
+            'clusterV2DefaultRegions' => [
+                'yandex' => CompetitorSearchRegions::defaultRegion('yandex'),
+                'google' => CompetitorSearchRegions::defaultRegion('google'),
+            ],
             'telegramConnected' => Auth::user()->isTelegramConnected(),
             'clusterV2PresetKawe' => $admin ? $this->clusterV2PresetKawe() : null,
         ]);
@@ -90,20 +94,20 @@ class ClusterController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
         $limit = min(50, max(5, (int) $request->query('limit', 25)));
+        $engine = CompetitorSearchRegions::normalizeEngine($request->query('engine'));
 
         return response()->json([
-            'results' => YandexLrRegions::search($q, $limit),
+            'results' => CompetitorSearchRegions::search($engine, $q, $limit),
         ]);
     }
 
     private function clusterV2ResolvedRegion($config): ?array
     {
-        $id = $config !== null ? (string) $config->region : '213';
-        if ($id === '') {
-            $id = '213';
-        }
+        $engine = CompetitorSearchRegions::normalizeEngine($config->search_engine ?? 'yandex');
+        $id = $config !== null ? (string) $config->region : '';
+        $found = $id !== '' ? CompetitorSearchRegions::find($engine, $id) : null;
 
-        return YandexLrRegions::find($id) ?? YandexLrRegions::find('213');
+        return $found ?? CompetitorSearchRegions::defaultRegion($engine);
     }
 
     private function clusterV2DefaultsFromConfig($config): array
@@ -112,10 +116,11 @@ class ClusterController extends Controller
             return [];
         }
 
-        $regionItem = YandexLrRegions::find((string) $config->region);
+        $engine = CompetitorSearchRegions::normalizeEngine($config->search_engine ?? 'yandex');
+        $regionItem = $this->clusterV2ResolvedRegion($config);
 
         return [
-            'region' => $config->region,
+            'region' => $regionItem['id'] ?? ($config->region ?: ($engine === 'google' ? '1011969' : '213')),
             'region_text' => $regionItem['name'] ?? ($regionItem['text'] ?? (string) $config->region),
             'count' => $config->count ?? 30,
             'clustering_level' => $config->clustering_level,
@@ -124,7 +129,7 @@ class ClusterController extends Controller
             'search_phrased' => (bool) $config->search_phrased,
             'search_target' => (bool) $config->search_target,
             'search_relevance' => (bool) $config->search_relevance,
-            'search_engine' => $config->search_engine ?? 'yandex',
+            'search_engine' => $engine,
             'send_message' => (bool) $config->send_message,
             'brut_force' => (bool) $config->brut_force,
             'gain_factor' => $config->gain_factor,

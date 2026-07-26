@@ -8,10 +8,17 @@
         <link rel="stylesheet" href="{{ asset('css/cabinet-site-types.css') }}?v={{ @filemtime(public_path('css/cabinet-site-types.css')) ?: time() }}">
     @endslot
 
+    @php
+        $catalogPresets = $catalogPresets ?? [];
+        $maxCatalogPresets = (int) ($maxCatalogPresets ?? config('cabinet-site-types.max_catalog_presets', 20));
+    @endphp
     <div class="cabinet-st-page" id="cabinetStPage"
          data-analyze-url="{{ route('pages.site-types.analyze') }}"
          data-export-url="{{ route('pages.site-types.export') }}"
          data-history-url="{{ url('/site-types/history') }}"
+         data-presets-store-url="{{ route('pages.site-types.catalog-presets.store') }}"
+         data-presets-update-url="{{ url('/site-types/catalog-presets') }}"
+         data-presets-destroy-url="{{ url('/site-types/catalog-presets') }}"
          data-regions-url="{{ route('competitor.analysis.regions') }}"
          data-csrf="{{ csrf_token() }}"
          data-can-save="{{ $canSaveHistory ? '1' : '0' }}"
@@ -20,6 +27,16 @@
          data-remaining="{{ $remaining !== null ? (int) $remaining : '' }}"
          data-history-limit="{{ $historyLimit !== null ? (int) $historyLimit : '' }}"
          data-saved-count="{{ (int) $savedCount }}"
+         data-max-catalog-presets="{{ $maxCatalogPresets }}"
+         data-i18n-preset-empty="{{ e(__('Site types catalog preset empty')) }}"
+         data-i18n-preset-select="{{ e(__('Site types catalog preset select')) }}"
+         data-i18n-preset-apply="{{ e(__('Site types catalog preset applied')) }}"
+         data-i18n-preset-updated="{{ e(__('Site types catalog preset updated')) }}"
+         data-i18n-preset-deleted="{{ e(__('Preset deleted')) }}"
+         data-i18n-preset-name-required="{{ e(__('Enter preset name')) }}"
+         data-i18n-preset-delete-confirm="{{ e(__('Site types catalog preset delete confirm')) }}"
+         data-i18n-preset-update-confirm="{{ e(__('Site types catalog preset update confirm')) }}"
+         data-i18n-preset-limit="{{ e(__('You have reached the maximum number of presets')) }}"
          data-categories="{{ e(json_encode(collect($categories)->map(function ($c, $k) {
              return [
                  'key' => $k,
@@ -29,6 +46,7 @@
                  'hint' => $c['hint'] ?? '',
              ];
          })->values()->all(), JSON_UNESCAPED_UNICODE)) }}">
+        <script type="application/json" id="cabinetStCatalogPresetsJson">@json($catalogPresets)</script>
 
         <div class="cabinet-st-lead px-4 py-3 mb-3">
             <div class="d-flex gap-3 align-items-center justify-content-between flex-wrap">
@@ -122,6 +140,35 @@
             <details class="cabinet-st-catalogs mb-3">
                 <summary>{{ __('Site types custom catalogs') }}</summary>
                 <p class="small text-secondary mb-3">{{ __('Site types custom catalogs hint') }}</p>
+
+                <div class="cabinet-st-presets mb-3" id="cabinetStPresets">
+                    <div class="d-flex flex-wrap align-items-end gap-2">
+                        <div class="cabinet-st-presets__select">
+                            <label class="form-label small mb-1" for="cabinetStPresetSelect">{{ __('Site types catalog presets') }}</label>
+                            <select id="cabinetStPresetSelect" class="form-control form-control-sm">
+                                <option value="">{{ __('Site types catalog preset select') }}</option>
+                                @foreach($catalogPresets as $preset)
+                                    <option value="{{ $preset['id'] }}">{{ $preset['name'] }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="cabinetStPresetApply" disabled>
+                            <i class="bi bi-download me-1" aria-hidden="true"></i>{{ __('Site types catalog preset apply') }}
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="cabinetStPresetSave"
+                                @if(count($catalogPresets) >= $maxCatalogPresets) disabled @endif>
+                            <i class="bi bi-bookmark-plus me-1" aria-hidden="true"></i>{{ __('Save as preset') }}
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="cabinetStPresetUpdate" disabled>
+                            <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>{{ __('Site types catalog preset update') }}
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" id="cabinetStPresetDelete" disabled>
+                            <i class="bi bi-trash me-1" aria-hidden="true"></i>{{ __('Delete preset') }}
+                        </button>
+                    </div>
+                    <p class="small text-muted mb-0 mt-2">{{ __('Site types catalog presets hint', ['max' => $maxCatalogPresets]) }}</p>
+                </div>
+
                 <div class="row">
                     @foreach($categories as $key => $cat)
                         <div class="col-md-6 col-xl-3 mb-3">
@@ -140,51 +187,58 @@
                 </div>
             </details>
 
+            <div class="modal fade" id="cabinetStPresetSaveModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">{{ __('Save as preset') }}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Cancel') }}"></button>
+                        </div>
+                        <div class="modal-body">
+                            <label class="form-label" for="cabinetStPresetName">{{ __('Preset name') }}</label>
+                            <input type="text" class="form-control" id="cabinetStPresetName" maxlength="120"
+                                   placeholder="{{ __('Site types catalog preset name placeholder') }}">
+                            <p class="small text-danger mb-0 mt-2 d-none" id="cabinetStPresetSaveError" role="alert"></p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-primary" id="cabinetStPresetSaveSubmit">{{ __('Save preset') }}</button>
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Cancel') }}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
                 <button type="submit" class="btn btn-primary" id="cabinetStSubmit">{{ __('Site types submit') }}</button>
                 <button type="button" class="btn btn-outline-secondary" id="cabinetStClear">{{ __('Clear') }}</button>
                 <span class="small text-muted ml-2" id="cabinetStStatus"></span>
             </div>
+
+            <div class="cabinet-st-progress d-none mb-3" id="cabinetStProgress" aria-live="polite">
+                <div class="cabinet-st-progress__head">
+                    <span class="cabinet-st-progress__spinner" aria-hidden="true"></span>
+                    <div class="cabinet-st-progress__text">
+                        <div class="cabinet-st-progress__title" id="cabinetStProgressTitle">{{ __('Site types progress title') }}</div>
+                        <div class="cabinet-st-progress__sub small text-secondary" id="cabinetStProgressSub"></div>
+                    </div>
+                    <div class="cabinet-st-progress__time small text-muted text-nowrap" id="cabinetStProgressTime">0:00</div>
+                </div>
+                <div class="progress cabinet-st-progress__bar">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated"
+                         id="cabinetStProgressBar"
+                         role="progressbar"
+                         aria-valuemin="0"
+                         aria-valuemax="100"
+                         aria-valuenow="0"
+                         style="width: 0%"></div>
+                </div>
+                <p class="cabinet-st-progress__keep small text-muted mb-0 mt-2">
+                    {{ __('Site types progress keep tab hint') }}
+                </p>
+            </div>
         </form>
 
-        @if($canSaveHistory && count($histories))
-            <div class="px-4 mb-4">
-                <h5 class="h6 mb-2">{{ __('Site types history title') }}</h5>
-                <div class="table-responsive">
-                    <table class="table table-sm table-bordered mb-0" id="cabinetStHistoryTable">
-                        <thead>
-                        <tr>
-                            <th>{{ __('Date') }}</th>
-                            <th>{{ __('Title') }}</th>
-                            <th>{{ __('Site types col engine') }}</th>
-                            <th>{{ __('Site types history settings') }}</th>
-                            <th>{{ __('Site types col phrases') }}</th>
-                            <th>{{ __('Site types positions') }}</th>
-                            <th></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        @foreach($histories as $h)
-                            <tr data-id="{{ $h->id }}">
-                                <td class="text-nowrap">{{ optional($h->created_at)->format('d.m.Y H:i') }}</td>
-                                <td>{{ $h->title }}</td>
-                                <td class="text-nowrap">{{ $h->enginesLabel() }}</td>
-                                <td class="small text-secondary">{{ $h->settingsLabel() }}</td>
-                                <td>{{ $h->phrases_count }}</td>
-                                <td>{{ $h->results_count }}</td>
-                                <td class="text-nowrap">
-                                    <button type="button" class="btn btn-xs btn-outline-primary cabinet-st-history-open">{{ __('Open') }}</button>
-                                    <button type="button" class="btn btn-xs btn-outline-danger cabinet-st-history-del">{{ __('Delete') }}</button>
-                                </td>
-                            </tr>
-                        @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        @endif
-
-        <div class="px-4 pb-4 d-none" id="cabinetStResultsWrap">
+        <div class="px-4 mb-4 d-none cabinet-st-results-block" id="cabinetStResultsWrap">
             <div class="cabinet-st-verdict mb-3" id="cabinetStVerdict">
                 <div class="cabinet-st-verdict__title" id="cabinetStVerdictTitle"></div>
                 <div class="cabinet-st-verdict__hint small" id="cabinetStVerdictHint"></div>
@@ -258,6 +312,43 @@
                 </table>
             </div>
         </div>
+
+        @if($canSaveHistory && count($histories))
+            <div class="px-4 pb-4 cabinet-st-history-block" id="cabinetStHistoryWrap">
+                <h5 class="h6 mb-2">{{ __('Site types history title') }}</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0" id="cabinetStHistoryTable">
+                        <thead>
+                        <tr>
+                            <th>{{ __('Date') }}</th>
+                            <th>{{ __('Title') }}</th>
+                            <th>{{ __('Site types col engine') }}</th>
+                            <th>{{ __('Site types history settings') }}</th>
+                            <th>{{ __('Site types col phrases') }}</th>
+                            <th>{{ __('Site types positions') }}</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach($histories as $h)
+                            <tr data-id="{{ $h->id }}">
+                                <td class="text-nowrap">{{ optional($h->created_at)->format('d.m.Y H:i') }}</td>
+                                <td>{{ $h->title }}</td>
+                                <td class="text-nowrap">{{ $h->enginesLabel() }}</td>
+                                <td class="small text-secondary">{{ $h->settingsLabel() }}</td>
+                                <td>{{ $h->phrases_count }}</td>
+                                <td>{{ $h->results_count }}</td>
+                                <td class="text-nowrap">
+                                    <button type="button" class="btn btn-xs btn-outline-primary cabinet-st-history-open">{{ __('Open') }}</button>
+                                    <button type="button" class="btn btn-xs btn-outline-danger cabinet-st-history-del">{{ __('Delete') }}</button>
+                                </td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
     </div>
 
     @slot('js')

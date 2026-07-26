@@ -84,6 +84,15 @@
     cursor: pointer;
 }
 
+.cabinet-list-comparison-page .cabinet-lc-mode-help {
+    padding: 0.65rem 0.75rem;
+    border-radius: 0.375rem;
+    background: rgba(var(--bs-primary-rgb), 0.06);
+    border-left: 3px solid var(--bs-primary);
+    color: var(--bs-body-color);
+    line-height: 1.4;
+}
+
 .cabinet-list-comparison-page .cabinet-lc-tip {
     font-size: 0.8rem;
     cursor: help;

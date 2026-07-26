@@ -37,6 +37,14 @@
     var submitBtn = document.getElementById('cabinetStSubmit');
     var clearBtn = document.getElementById('cabinetStClear');
     var statusEl = document.getElementById('cabinetStStatus');
+    var progressEl = document.getElementById('cabinetStProgress');
+    var progressTitle = document.getElementById('cabinetStProgressTitle');
+    var progressSub = document.getElementById('cabinetStProgressSub');
+    var progressTime = document.getElementById('cabinetStProgressTime');
+    var progressBar = document.getElementById('cabinetStProgressBar');
+    var progressTimer = null;
+    var progressStartedAt = 0;
+    var progressExpectedMs = 20000;
     var resultsWrap = document.getElementById('cabinetStResultsWrap');
     var resultsBody = document.querySelector('#cabinetStResults tbody');
     var resultsMeta = document.getElementById('cabinetStResultsMeta');
@@ -92,6 +100,92 @@
         statusEl.textContent = text || '';
         statusEl.classList.toggle('text-danger', !!isError);
         statusEl.classList.toggle('text-muted', !isError);
+    }
+
+    function formatElapsed(ms) {
+        var sec = Math.max(0, Math.floor(ms / 1000));
+        var m = Math.floor(sec / 60);
+        var s = sec % 60;
+        return m + ':' + (s < 10 ? '0' : '') + s;
+    }
+
+    function setProgressVisible(on) {
+        if (!progressEl) {
+            return;
+        }
+        progressEl.classList.toggle('d-none', !on);
+        if (!on && progressTimer) {
+            clearInterval(progressTimer);
+            progressTimer = null;
+        }
+    }
+
+    function paintProgress(pct, title, sub) {
+        var value = Math.max(0, Math.min(100, pct));
+        if (progressBar) {
+            progressBar.style.width = value + '%';
+            progressBar.setAttribute('aria-valuenow', String(value));
+        }
+        if (progressTitle && title) {
+            progressTitle.textContent = title;
+        }
+        if (progressSub && sub != null) {
+            progressSub.textContent = sub;
+        }
+        if (progressTime) {
+            progressTime.textContent = formatElapsed(Date.now() - progressStartedAt);
+        }
+    }
+
+    function estimateWorkUnits() {
+        var phrases = countPhrases();
+        var engines = enginesCount();
+        var depth = parseInt((depthHidden && depthHidden.value) || '10', 10) || 10;
+        var googlePages = engineGoogle && engineGoogle.checked ? Math.max(1, Math.ceil(depth / 10)) : 0;
+        var yandexReqs = engineYandex && engineYandex.checked ? 1 : 0;
+        var serpReqs = phrases * (yandexReqs + googlePages);
+        var pageProbes = phrases * Math.max(1, engines) * Math.min(depth, 15);
+        return Math.max(1, serpReqs + pageProbes);
+    }
+
+    function startProgress() {
+        var units = estimateWorkUnits();
+        var phrases = countPhrases();
+        var engines = enginesCount();
+        var depth = parseInt((depthHidden && depthHidden.value) || '10', 10) || 10;
+        // SERP + открытие страниц: грубо 0.5–1.2 с на единицу работы
+        progressExpectedMs = Math.max(8000, Math.round(units * 650));
+        progressStartedAt = Date.now();
+        setProgressVisible(true);
+        paintProgress(
+            4,
+            'Сбор выдачи и типизация…',
+            phrases + ' фраз · ' + engines + ' ПС · ТОП-' + depth + ' · открываем страницы'
+        );
+        if (progressTimer) {
+            clearInterval(progressTimer);
+        }
+        progressTimer = setInterval(function () {
+            var elapsed = Date.now() - progressStartedAt;
+            var pct = Math.min(92, Math.round(100 * (1 - Math.exp(-elapsed / (progressExpectedMs * 0.55)))));
+            var hint = elapsed < 12000
+                ? 'Снимаем выдачу и определяем типы сайтов'
+                : elapsed < 40000
+                    ? 'Ещё работаем — открываем страницы из ТОПа'
+                    : 'Долгий прогон · сервер всё ещё типизирует домены';
+            paintProgress(Math.max(4, pct), 'Сбор выдачи и типизация…', hint);
+        }, 400);
+    }
+
+    function finishProgress(ok) {
+        if (progressTimer) {
+            clearInterval(progressTimer);
+            progressTimer = null;
+        }
+        paintProgress(100, ok ? 'Готово' : 'Ошибка', ok ? 'Результаты ниже' : '');
+        setTimeout(function () {
+            setProgressVisible(false);
+        }, ok ? 450 : 1000);
     }
 
     function countPhrases() {
@@ -655,12 +749,23 @@
         URL.revokeObjectURL(url);
     }
 
+    function ensureResultsAboveHistory() {
+        var historyWrap = document.getElementById('cabinetStHistoryWrap');
+        if (!resultsWrap || !historyWrap || !resultsWrap.parentNode) {
+            return;
+        }
+        if (resultsWrap.nextElementSibling !== historyWrap) {
+            resultsWrap.parentNode.insertBefore(resultsWrap, historyWrap);
+        }
+    }
+
     function showResults(payload) {
         lastPayload = payload;
         if (!resultsWrap) {
             return;
         }
         resultsWrap.classList.remove('d-none');
+        ensureResultsAboveHistory();
 
         var summary = payload.summary || {};
         var queries = payload.queries || [];
@@ -725,6 +830,357 @@
         return data;
     }
 
+    function collectCustomDomainsMap() {
+        var map = {};
+        Array.prototype.forEach.call(document.querySelectorAll('.cabinet-st-custom'), function (el) {
+            var type = el.getAttribute('data-type');
+            if (!type) {
+                return;
+            }
+            var lines = String(el.value || '')
+                .split(/\r\n|\r|\n|,|;/)
+                .map(function (line) {
+                    return line.trim();
+                })
+                .filter(Boolean);
+            map[type] = lines;
+        });
+        return map;
+    }
+
+    function applyCustomDomainsMap(domains) {
+        domains = domains && typeof domains === 'object' ? domains : {};
+        Array.prototype.forEach.call(document.querySelectorAll('.cabinet-st-custom'), function (el) {
+            var type = el.getAttribute('data-type');
+            if (!type) {
+                return;
+            }
+            var list = domains[type];
+            if (Array.isArray(list)) {
+                el.value = list.join('\n');
+            } else if (typeof list === 'string') {
+                el.value = list;
+            } else {
+                el.value = '';
+            }
+        });
+    }
+
+    var presetSelect = document.getElementById('cabinetStPresetSelect');
+    var presetApplyBtn = document.getElementById('cabinetStPresetApply');
+    var presetSaveBtn = document.getElementById('cabinetStPresetSave');
+    var presetUpdateBtn = document.getElementById('cabinetStPresetUpdate');
+    var presetDeleteBtn = document.getElementById('cabinetStPresetDelete');
+    var presetNameInput = document.getElementById('cabinetStPresetName');
+    var presetSaveError = document.getElementById('cabinetStPresetSaveError');
+    var presetSaveSubmit = document.getElementById('cabinetStPresetSaveSubmit');
+    var presetSaveModalEl = document.getElementById('cabinetStPresetSaveModal');
+    var presetsStoreUrl = root.getAttribute('data-presets-store-url') || '';
+    var presetsUpdateBase = root.getAttribute('data-presets-update-url') || '';
+    var presetsDestroyBase = root.getAttribute('data-presets-destroy-url') || '';
+    var maxCatalogPresets = parseInt(root.getAttribute('data-max-catalog-presets') || '20', 10) || 20;
+    var catalogPresets = [];
+    try {
+        var presetsJsonEl = document.getElementById('cabinetStCatalogPresetsJson');
+        catalogPresets = presetsJsonEl ? JSON.parse(presetsJsonEl.textContent || '[]') || [] : [];
+    } catch (e) {
+        catalogPresets = [];
+    }
+
+    function i18n(attr, fallback) {
+        return root.getAttribute(attr) || fallback || '';
+    }
+
+    function findPreset(id) {
+        id = String(id || '');
+        for (var i = 0; i < catalogPresets.length; i += 1) {
+            if (String(catalogPresets[i].id) === id) {
+                return catalogPresets[i];
+            }
+        }
+        return null;
+    }
+
+    function refreshPresetSelect(selectedId) {
+        if (!presetSelect) {
+            return;
+        }
+        var current = selectedId != null ? String(selectedId) : String(presetSelect.value || '');
+        presetSelect.innerHTML = '';
+        var empty = document.createElement('option');
+        empty.value = '';
+        empty.textContent = i18n('data-i18n-preset-select', 'Выберите пресет');
+        presetSelect.appendChild(empty);
+        catalogPresets.forEach(function (preset) {
+            var opt = document.createElement('option');
+            opt.value = String(preset.id);
+            opt.textContent = preset.name;
+            presetSelect.appendChild(opt);
+        });
+        if (current && findPreset(current)) {
+            presetSelect.value = current;
+        } else {
+            presetSelect.value = '';
+        }
+        syncPresetButtons();
+        if (presetSaveBtn) {
+            presetSaveBtn.disabled = catalogPresets.length >= maxCatalogPresets;
+        }
+    }
+
+    function syncPresetButtons() {
+        var has = !!(presetSelect && presetSelect.value);
+        if (presetApplyBtn) {
+            presetApplyBtn.disabled = !has;
+        }
+        if (presetUpdateBtn) {
+            presetUpdateBtn.disabled = !has;
+        }
+        if (presetDeleteBtn) {
+            presetDeleteBtn.disabled = !has;
+        }
+    }
+
+    function domainsMapNonEmpty(map) {
+        var keys = Object.keys(map || {});
+        for (var i = 0; i < keys.length; i += 1) {
+            if (Array.isArray(map[keys[i]]) && map[keys[i]].length) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function showPresetModalError(msg) {
+        if (!presetSaveError) {
+            return;
+        }
+        if (msg) {
+            presetSaveError.textContent = msg;
+            presetSaveError.classList.remove('d-none');
+        } else {
+            presetSaveError.textContent = '';
+            presetSaveError.classList.add('d-none');
+        }
+    }
+
+    function openPresetSaveModal() {
+        showPresetModalError('');
+        if (presetNameInput) {
+            presetNameInput.value = '';
+        }
+        if (presetSaveModalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            bootstrap.Modal.getOrCreateInstance(presetSaveModalEl).show();
+        } else if (presetSaveModalEl && typeof $ !== 'undefined' && $.fn.modal) {
+            $(presetSaveModalEl).modal('show');
+        }
+    }
+
+    function closePresetSaveModal() {
+        if (presetSaveModalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            var inst = bootstrap.Modal.getInstance(presetSaveModalEl);
+            if (inst) {
+                inst.hide();
+            }
+        } else if (presetSaveModalEl && typeof $ !== 'undefined' && $.fn.modal) {
+            $(presetSaveModalEl).modal('hide');
+        }
+    }
+
+    function upsertPresetLocal(preset) {
+        var found = false;
+        catalogPresets = catalogPresets.map(function (row) {
+            if (String(row.id) === String(preset.id)) {
+                found = true;
+                return preset;
+            }
+            return row;
+        });
+        if (!found) {
+            catalogPresets.push(preset);
+        }
+        catalogPresets.sort(function (a, b) {
+            return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
+        });
+        refreshPresetSelect(preset.id);
+    }
+
+    function removePresetLocal(id) {
+        catalogPresets = catalogPresets.filter(function (row) {
+            return String(row.id) !== String(id);
+        });
+        refreshPresetSelect('');
+    }
+
+    if (presetSelect) {
+        presetSelect.addEventListener('change', syncPresetButtons);
+    }
+
+    if (presetApplyBtn) {
+        presetApplyBtn.addEventListener('click', function () {
+            var preset = findPreset(presetSelect && presetSelect.value);
+            if (!preset) {
+                return;
+            }
+            applyCustomDomainsMap(preset.domains || {});
+            var details = document.querySelector('.cabinet-st-catalogs');
+            if (details) {
+                details.open = true;
+            }
+            setStatus(i18n('data-i18n-preset-apply', 'Пресет списков применён'));
+        });
+    }
+
+    if (presetSaveBtn) {
+        presetSaveBtn.addEventListener('click', function () {
+            if (catalogPresets.length >= maxCatalogPresets) {
+                setStatus(i18n('data-i18n-preset-limit', 'Достигнуто максимальное число пресетов'), true);
+                return;
+            }
+            if (!domainsMapNonEmpty(collectCustomDomainsMap())) {
+                setStatus(i18n('data-i18n-preset-empty', 'Заполните хотя бы один список'), true);
+                return;
+            }
+            openPresetSaveModal();
+        });
+    }
+
+    if (presetSaveSubmit) {
+        presetSaveSubmit.addEventListener('click', function () {
+            var name = presetNameInput ? String(presetNameInput.value || '').trim() : '';
+            if (!name) {
+                showPresetModalError(i18n('data-i18n-preset-name-required', 'Введите название пресета'));
+                return;
+            }
+            var domains = collectCustomDomainsMap();
+            if (!domainsMapNonEmpty(domains)) {
+                showPresetModalError(i18n('data-i18n-preset-empty', 'Заполните хотя бы один список'));
+                return;
+            }
+            presetSaveSubmit.disabled = true;
+            fetch(presetsStoreUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrf,
+                },
+                body: JSON.stringify({ name: name, domains: domains }),
+            })
+                .then(function (res) {
+                    return res.json().then(function (data) {
+                        return { ok: res.ok, data: data };
+                    });
+                })
+                .then(function (pack) {
+                    presetSaveSubmit.disabled = false;
+                    if (!pack.ok || !pack.data || !pack.data.ok || !pack.data.preset) {
+                        showPresetModalError((pack.data && pack.data.message) || 'Не удалось сохранить');
+                        return;
+                    }
+                    upsertPresetLocal(pack.data.preset);
+                    closePresetSaveModal();
+                    setStatus(pack.data.message || 'Пресет сохранён');
+                })
+                .catch(function () {
+                    presetSaveSubmit.disabled = false;
+                    showPresetModalError('Ошибка сети или сервера');
+                });
+        });
+    }
+
+    if (presetUpdateBtn) {
+        presetUpdateBtn.addEventListener('click', function () {
+            var id = presetSelect && presetSelect.value;
+            var preset = findPreset(id);
+            if (!preset) {
+                return;
+            }
+            var domains = collectCustomDomainsMap();
+            if (!domainsMapNonEmpty(domains)) {
+                setStatus(i18n('data-i18n-preset-empty', 'Заполните хотя бы один список'), true);
+                return;
+            }
+            if (!window.confirm(i18n('data-i18n-preset-update-confirm', 'Перезаписать выбранный пресет?'))) {
+                return;
+            }
+            presetUpdateBtn.disabled = true;
+            fetch(presetsUpdateBase + '/' + id, {
+                method: 'PUT',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrf,
+                },
+                body: JSON.stringify({ name: preset.name, domains: domains }),
+            })
+                .then(function (res) {
+                    return res.json().then(function (data) {
+                        return { ok: res.ok, data: data };
+                    });
+                })
+                .then(function (pack) {
+                    syncPresetButtons();
+                    if (!pack.ok || !pack.data || !pack.data.ok || !pack.data.preset) {
+                        setStatus((pack.data && pack.data.message) || 'Не удалось обновить', true);
+                        return;
+                    }
+                    upsertPresetLocal(pack.data.preset);
+                    setStatus(pack.data.message || i18n('data-i18n-preset-updated', 'Пресет обновлён'));
+                })
+                .catch(function () {
+                    syncPresetButtons();
+                    setStatus('Ошибка сети или сервера', true);
+                });
+        });
+    }
+
+    if (presetDeleteBtn) {
+        presetDeleteBtn.addEventListener('click', function () {
+            var id = presetSelect && presetSelect.value;
+            if (!id) {
+                return;
+            }
+            if (!window.confirm(i18n('data-i18n-preset-delete-confirm', 'Удалить этот пресет?'))) {
+                return;
+            }
+            presetDeleteBtn.disabled = true;
+            fetch(presetsDestroyBase + '/' + id, {
+                method: 'DELETE',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': csrf,
+                },
+            })
+                .then(function (res) {
+                    return res.json().then(function (data) {
+                        return { ok: res.ok, data: data };
+                    });
+                })
+                .then(function (pack) {
+                    if (!pack.ok || !pack.data || !pack.data.ok) {
+                        syncPresetButtons();
+                        setStatus((pack.data && pack.data.message) || 'Не удалось удалить', true);
+                        return;
+                    }
+                    removePresetLocal(id);
+                    setStatus(pack.data.message || i18n('data-i18n-preset-deleted', 'Пресет удалён'));
+                })
+                .catch(function () {
+                    syncPresetButtons();
+                    setStatus('Ошибка сети или сервера', true);
+                });
+        });
+    }
+
+    refreshPresetSelect('');
+
     function buildFormBody() {
         var body = new FormData();
         body.append('_token', csrf);
@@ -775,7 +1231,8 @@
             }
 
             setLoading(true);
-            setStatus('Сбор выдачи, открытие страниц и типизация…');
+            setStatus('');
+            startProgress();
 
             fetch(analyzeUrl, {
                 method: 'POST',
@@ -797,14 +1254,22 @@
                         var msg =
                             (pack.data && pack.data.message) ||
                             'Не удалось выполнить проверку';
+                        finishProgress(false);
                         setStatus(msg, true);
                         return;
                     }
                     showResults(pack.data);
+                    finishProgress(true);
                     var warn = pack.data.history_warning;
+                    var elapsed = formatElapsed(Date.now() - progressStartedAt);
                     setStatus(
-                        'Готово' +
+                        'Готово: ' +
+                            ((pack.data.summary && pack.data.summary.total_positions) || 0) +
+                            ' поз. · списано ' +
+                            (pack.data.cost || 0) +
                             (pack.data.history_id ? ' · сохранено #' + pack.data.history_id : '') +
+                            ' · ' +
+                            elapsed +
                             (warn ? ' · ' + warn : ''),
                         !!warn
                     );
@@ -817,6 +1282,7 @@
                 })
                 .catch(function () {
                     setLoading(false);
+                    finishProgress(false);
                     setStatus('Ошибка сети или сервера', true);
                 });
         });
@@ -834,6 +1300,7 @@
                 resultsWrap.classList.add('d-none');
             }
             lastPayload = null;
+            setProgressVisible(false);
             setStatus('');
             updateCostPreview();
         });
@@ -943,6 +1410,9 @@
                     });
                     if (phrasesEl && item.params && Array.isArray(item.params.phrases)) {
                         phrasesEl.value = item.params.phrases.join('\n');
+                    }
+                    if (item.params && item.params.custom_domains) {
+                        applyCustomDomainsMap(item.params.custom_domains);
                     }
                     if (looksLegacy) {
                         setStatus(

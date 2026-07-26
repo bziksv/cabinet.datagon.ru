@@ -117,14 +117,14 @@ class TextEditorController extends Controller
         if (self::isDescriptionEmpty($request->description)) {
             flash()->overlay(__('The text cannot be empty'), ' ')->error();
 
-            return Redirect::back();
+            return Redirect::back()->withInput();
         }
-        $showButton = true;
+
         ProjectDescription::storeDescriptionProject($request->description, Project::createNewProject($request));
 
         flash()->overlay(__('Project was successfully created'), $request->project_name)->success();
 
-        return view('html-editor.create-project', array_merge(compact('showButton', 'request'), $this->editorFormExtras()));
+        return Redirect::route('HTML.editor');
     }
 
 
@@ -295,10 +295,15 @@ class TextEditorController extends Controller
      */
     public static function isDescriptionEmpty($description): bool
     {
-        if (strip_tags($description) === "") {
+        if ($description === null || $description === '') {
             return true;
         }
-        return false;
+
+        $plain = trim(html_entity_decode(strip_tags((string) $description), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $plain = preg_replace('/\x{00A0}/u', ' ', $plain);
+        $plain = trim((string) $plain);
+
+        return $plain === '';
     }
 
     /**

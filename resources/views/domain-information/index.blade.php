@@ -148,19 +148,22 @@
                             <div class="cabinet-di-cell cabinet-di-cell--center cabinet-di-cell--actions">
                                 <a href="{{ route('check.domain.information', $project->id) }}"
                                    class="btn btn-outline-secondary btn-sm"
-                                   title="{{ __('Run the check manually') }}">
-                                    <i class="bi bi-search" aria-hidden="true"></i>
+                                   data-di-tip="{{ __('Run the check manually') }}"
+                                   aria-label="{{ __('Run the check manually') }}">
+                                    <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
                                 </a>
                                 <button class="btn btn-outline-primary btn-sm cabinet-di-stats-log" type="button"
                                         data-project-id="{{ $project->id }}"
                                         data-project-domain="{{ $project->domain }}"
-                                        title="{{ __('Domain information stats log') }}">
+                                        data-di-tip="{{ __('Domain information stats log') }}"
+                                        aria-label="{{ __('Domain information stats log') }}">
                                     <i class="bi bi-bar-chart-line" aria-hidden="true"></i>
                                 </button>
                                 <button class="btn btn-outline-danger btn-sm" type="button"
                                         data-bs-toggle="modal"
                                         data-bs-target="#remove-project-id-{{ $project->id }}"
-                                        title="{{ __('Delete a domain') }}">
+                                        data-di-tip="{{ __('Delete a domain') }}"
+                                        aria-label="{{ __('Delete a domain') }}">
                                     <i class="bi bi-trash" aria-hidden="true"></i>
                                 </button>
                             </div>
@@ -236,6 +239,31 @@
 
             function escapeHtml(text) {
                 return $('<div>').text(text == null ? '' : String(text)).html();
+            }
+
+            function cabinetDiInitActionTooltips(root) {
+                if (typeof bootstrap === 'undefined' || !bootstrap.Tooltip) {
+                    return;
+                }
+                const $root = root ? $(root) : $(document);
+                $root.find('[data-di-tip]').each(function () {
+                    const el = this;
+                    const tip = el.getAttribute('data-di-tip');
+                    if (!tip) {
+                        return;
+                    }
+                    const existing = bootstrap.Tooltip.getInstance(el);
+                    if (existing) {
+                        existing.dispose();
+                    }
+                    new bootstrap.Tooltip(el, {
+                        container: 'body',
+                        trigger: 'hover focus',
+                        placement: el.getAttribute('data-bs-placement') || 'top',
+                        customClass: 'cabinet-di-action-tooltip',
+                        title: tip,
+                    });
+                });
             }
 
             function showToastSuccess(msg) {
@@ -608,6 +636,7 @@
                 if (typeof search === 'function') {
                     search(table);
                 }
+                cabinetDiInitActionTooltips('#table');
             });
         </script>
     @endslot

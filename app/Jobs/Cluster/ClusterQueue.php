@@ -50,8 +50,7 @@ class ClusterQueue implements ShouldQueue
         $clusterArrays = new \App\ClusterQueue();
         $river = new RiverFacade($this->cluster->getRegion());
 
-        $this->cluster->getXml()->setQuery($this->phrase);
-        $sites = $this->cluster->getXml()->getXMLResponse();
+        $sites = $this->cluster->fetchPhraseSites($this->phrase);
 
         if ($this->cluster->getSearchPhrases()) {
             $river->setQuery('"' . $this->phrase . '"');
@@ -75,9 +74,11 @@ class ClusterQueue implements ShouldQueue
         }
 
         if ($this->cluster->getSearchRelevance()) {
+            $engine = strtolower((string) $this->cluster->getSearchEngine()) === 'google' ? 'google' : 'yandex';
             $this->cluster->getXml()->setQuery("$this->phrase site:" . $this->cluster->getHost());
             $this->cluster->getXml()->setCount(10);
-            $relevance = $this->cluster->getXml()->getXMLResponse($this->cluster->getSearchEngine());
+            $this->cluster->getXml()->setPage('0');
+            $relevance = $this->cluster->getXml()->getXMLResponse($engine);
             if (count($relevance) > 3) {
                 $relevance = array_slice($relevance, 0, 3);
             }

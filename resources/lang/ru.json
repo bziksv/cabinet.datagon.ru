@@ -561,6 +561,7 @@
     "Classic mode": "Классический режим",
     "Cleaning parameters have been successfully changed": "Параметры отчистки успешно изменены",
     "Clear": "Очистить",
+    "All projects": "Все проекты",
     "Clear highlight": "Сбросить подсветку",
     "Clear search": "Очистить поиск",
     "Clear text": "Очистить текст",
@@ -5336,5 +5337,15 @@
     "not in top": "нет в топе",
     "Analysis is taking longer than usual": "Анализ идёт дольше обычного",
     "Competitor analysis stalled hint": "Прогресс не меняется — возможно, зависла загрузка страниц конкурентов. Подождите или запустите анализ заново.",
-    "Failed to render analysis results. Try again.": "Не удалось отрисовать результаты анализа. Попробуйте ещё раз."
+    "Failed to render analysis results. Try again.": "Не удалось отрисовать результаты анализа. Попробуйте ещё раз.",
+    "Enter user email": "Укажите email пользователя",
+    "Filter by tag": "Фильтр по метке",
+    "User email": "Email пользователя",
+    "No shared users yet": "Пока никому не выдан доступ",
+    "Show projects": "Показать проекты",
+    "Projects with access": "Проекты с доступом",
+    "Only projects already shared with this user will be listed.": "Показываются только проекты, к которым у этого пользователя уже есть доступ.",
+    "Enter email and load the list.": "Введите email и загрузите список.",
+    "User already has access to the selected projects": "У пользователя уже есть доступ к выбранным проектам",
+    "This user has no access to your projects": "У этого пользователя нет доступа к вашим проектам"
 }

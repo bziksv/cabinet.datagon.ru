@@ -635,6 +635,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/share-my-projects', 'SharingController@index')->name('sharing.view');
     Route::get('/share-my-project-config/{project}', 'SharingController@shareProjectConf')->name('share.project.conf');
+    Route::get('/share-my-projects/for-email', 'SharingController@sharedProjectsForEmail')->name('sharing.projects.for.email');
     Route::post('/get-access-to-my-project', 'SharingController@setAccess')->name('get.access.to.my.project');
     Route::post('/get-multiply-access-to-my-project', 'SharingController@setMultiplyAccess')->name('get.multiply.access.to.my.project');
     Route::post('/remove-multiply-access-to-my-project', 'SharingController@removeMultiplyAccess')->name('remove.multiply.access');

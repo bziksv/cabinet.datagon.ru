@@ -120,7 +120,30 @@ class SharingController extends Controller
      */
     public function setMultiplyAccess(Request $request): JsonResponse
     {
-        $user = User::where('email', '=', $request->email)
+        $email = trim((string) $request->input('email', ''));
+        $ids = $request->input('ids', []);
+        if (!is_array($ids)) {
+            $ids = [];
+        }
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+
+        if ($email === '') {
+            return response()->json([
+                'success' => false,
+                'message' => __('Enter user email'),
+                'code' => 415,
+            ]);
+        }
+
+        if ($ids === []) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Select at least one project'),
+                'code' => 415,
+            ]);
+        }
+
+        $user = User::where('email', '=', $email)
             ->where('id', '!=', Auth::id())
             ->first();
 
@@ -132,9 +155,15 @@ class SharingController extends Controller
             ]);
         }
 
-        $objects = [];
+        $access = (int) $request->input('access', 1);
+        if (!in_array($access, [1, 2], true)) {
+            $access = 1;
+        }
 
-        foreach ($request->ids as $key => $id) {
+        $objects = [];
+        $skipped = 0;
+
+        foreach ($ids as $id) {
             $project = ProjectRelevanceHistory::where('id', '=', $id)
                 ->where('user_id', '=', Auth::id())->first();
 
@@ -146,31 +175,101 @@ class SharingController extends Controller
                 ]);
             }
 
-            $project = RelevanceSharing::where('user_id', '=', $user->id)
+            $existing = RelevanceSharing::where('user_id', '=', $user->id)
                 ->where('project_id', '=', $id)
                 ->where('owner_id', '=', Auth::id())
                 ->first();
 
-            if (isset($project)) {
+            if (isset($existing)) {
+                $skipped++;
                 continue;
-            } else {
-                $newAccess = new RelevanceSharing();
-                $newAccess->user_id = $user->id;
-                $newAccess->project_id = $id;
-                $newAccess->owner_id = Auth::id();
-                $newAccess->access = $request->access;
-
-                $newAccess->save();
-                $objects[] = $newAccess;
             }
+
+            $newAccess = new RelevanceSharing();
+            $newAccess->user_id = $user->id;
+            $newAccess->project_id = $id;
+            $newAccess->owner_id = Auth::id();
+            $newAccess->access = $access;
+            $newAccess->save();
+            $objects[] = $newAccess;
+        }
+
+        if ($objects === []) {
+            return response()->json([
+                'success' => false,
+                'message' => __('User already has access to the selected projects'),
+                'code' => 415,
+                'objects' => [],
+                'user' => $user,
+            ]);
+        }
+
+        $message = "$user->email получил доступы до ваших проектов";
+        if ($skipped > 0) {
+            $message .= " ($skipped уже были выданы ранее)";
         }
 
         return response()->json([
             'success' => true,
-            'message' => "$user->email получил доступы до ваших проектов",
+            'message' => $message,
             'code' => 201,
             'objects' => $objects,
             'user' => $user
+        ]);
+    }
+
+    /**
+     * Проекты владельца, к которым у email уже есть доступ (для модалки отзыва).
+     */
+    public function sharedProjectsForEmail(Request $request): JsonResponse
+    {
+        $email = trim((string) $request->query('email', $request->input('email', '')));
+        if ($email === '') {
+            return response()->json([
+                'success' => false,
+                'message' => __('Enter user email'),
+                'code' => 415,
+            ]);
+        }
+
+        $user = User::where('email', '=', $email)
+            ->where('id', '!=', Auth::id())
+            ->first();
+
+        if (!isset($user)) {
+            return response()->json([
+                'success' => false,
+                'message' => "Пользователя с такой почтой не существует",
+                'code' => 415,
+            ]);
+        }
+
+        $shares = RelevanceSharing::query()
+            ->where('owner_id', Auth::id())
+            ->where('user_id', $user->id)
+            ->with(['item:id,name'])
+            ->orderBy('project_id')
+            ->get();
+
+        $projects = $shares->map(function (RelevanceSharing $share) {
+            return [
+                'id' => $share->project_id,
+                'share_id' => $share->id,
+                'name' => optional($share->item)->name ?: ('#' . $share->project_id),
+                'access' => (int) $share->access,
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'code' => 200,
+            'projects' => $projects,
+            'user' => [
+                'id' => $user->id,
+                'email' => $user->email,
+                'name' => $user->name,
+                'last_name' => $user->last_name,
+            ],
         ]);
     }
 
@@ -262,7 +361,30 @@ class SharingController extends Controller
      */
     public function removeMultiplyAccess(Request $request): JsonResponse
     {
-        $user = User::where('email', '=', $request->email)
+        $email = trim((string) $request->input('email', ''));
+        $ids = $request->input('ids', []);
+        if (!is_array($ids)) {
+            $ids = [];
+        }
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+
+        if ($email === '') {
+            return response()->json([
+                'success' => false,
+                'message' => __('Enter user email'),
+                'code' => 415,
+            ]);
+        }
+
+        if ($ids === []) {
+            return response()->json([
+                'success' => false,
+                'message' => __('Select at least one project'),
+                'code' => 415,
+            ]);
+        }
+
+        $user = User::where('email', '=', $email)
             ->where('id', '!=', Auth::id())
             ->first();
 
@@ -276,9 +398,10 @@ class SharingController extends Controller
 
         $objectsId = [];
 
-        foreach ($request->ids as $id) {
+        foreach ($ids as $id) {
             $sharing = RelevanceSharing::where('project_id', '=', $id)
                 ->where('user_id', '=', $user->id)
+                ->where('owner_id', '=', Auth::id())
                 ->first();
 
             if (isset($sharing)) {
@@ -287,8 +410,17 @@ class SharingController extends Controller
             }
         }
 
+        if ($objectsId === []) {
+            return response()->json([
+                'success' => false,
+                'message' => __('This user has no access to your projects'),
+                'code' => 415,
+                'objects' => [],
+            ]);
+        }
+
         return response()->json([
-            'success' => false,
+            'success' => true,
             'message' => "Доступы пользователя убраны",
             'code' => 200,
             'objects' => $objectsId

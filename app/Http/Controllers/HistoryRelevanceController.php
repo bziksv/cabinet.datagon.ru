@@ -209,6 +209,7 @@ class HistoryRelevanceController extends Controller
             if ($averageValues !== null && $averageValues !== '') {
                 $result['average_values'] = json_decode($averageValues, true);
             }
+            $result['region_name'] = \App\Common::getRegionName((string) $result->region);
             unset($result->results);
         }
 
@@ -259,11 +260,21 @@ class HistoryRelevanceController extends Controller
         $this->reconcileQueueState($object);
 
         $object->request = json_decode($object->request, true);
+        $req = is_array($object->request) ? $object->request : [];
+        $defaultEngine = strtolower((string) ($req['searchEngine'] ?? 'yandex')) === 'google' ? 'google' : 'yandex';
+        $regionId = (string) ($req['region'] ?? '');
+        $defaultRegion = $regionId !== ''
+            ? (\App\Support\CompetitorSearchRegions::find($defaultEngine, $regionId)
+                ?? \App\Support\CompetitorSearchRegions::defaultRegion($defaultEngine))
+            : \App\Support\CompetitorSearchRegions::defaultRegion($defaultEngine);
+
         return view('relevance-analysis.show-history', [
             'admin' => $admin,
             'id' => $id,
             'object' => $object,
-            'access' => $access ?? null
+            'access' => $access ?? null,
+            'defaultSearchEngine' => $defaultEngine,
+            'defaultRegion' => $defaultRegion,
         ]);
     }
 
@@ -361,7 +372,8 @@ class HistoryRelevanceController extends Controller
 
     public function repeatScan(Request $request): JsonResponse
     {
-        if (RelevanceHistory::checkRelevanceAnalysisLimits()) {
+        $cost = RelevanceHistory::serpRequestCost($request->all());
+        if (RelevanceHistory::checkRelevanceAnalysisLimits($cost)) {
             return response()->json([
                 'code' => 415,
                 'message' => __('Your limits are exhausted this month')
@@ -407,7 +419,8 @@ class HistoryRelevanceController extends Controller
 
     public function repeatQueueCompetitorsScan(Request $request): JsonResponse
     {
-        if (RelevanceHistory::checkRelevanceAnalysisLimits()) {
+        $cost = RelevanceHistory::serpRequestCost($request->all());
+        if (RelevanceHistory::checkRelevanceAnalysisLimits($cost)) {
             return response()->json([
                 'code' => 415,
                 'message' => __('Your limits are exhausted this month')
@@ -451,7 +464,8 @@ class HistoryRelevanceController extends Controller
 
     public function repeatQueueMainPageScan(Request $request): JsonResponse
     {
-        if (RelevanceHistory::checkRelevanceAnalysisLimits()) {
+        $cost = RelevanceHistory::serpRequestCost($request->all());
+        if (RelevanceHistory::checkRelevanceAnalysisLimits($cost)) {
             return response()->json([
                 'code' => 415,
                 'message' => __('Your limits are exhausted this month')
@@ -535,6 +549,10 @@ class HistoryRelevanceController extends Controller
                 'state',
                 'comment'
             ]);
+
+        foreach ($projects as $project) {
+            $project['region_name'] = \App\Common::getRegionName((string) $project->region);
+        }
 
         $ownerId = $projects[0]->user_id;
         $admin = User::isUserAdmin();

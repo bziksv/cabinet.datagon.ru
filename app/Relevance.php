@@ -2602,9 +2602,14 @@ class Relevance
     public function analysisByPhrase($request, $exp)
     {
         RelevanceProgress::editProgress(10, $request);
-        $xml = new SimplifiedXmlFacade($request['region']);
-        $xml->setQuery($request['phrase']);
-        $xmlResponse = $xml->getXMLResponse();
+        $engine = strtolower((string) ($request['searchEngine'] ?? 'yandex')) === 'google' ? 'google' : 'yandex';
+        $depth = max(10, (int) ($request['count'] ?? 10));
+        $xmlResponse = SimplifiedXmlFacade::fetchSerpUrls(
+            (string) ($request['region'] ?? ''),
+            (string) ($request['phrase'] ?? ''),
+            $engine,
+            $depth
+        );
 
         $this->removeIgnoredDomains($request, $xmlResponse, $exp);
         $this->parseSites($xmlResponse);

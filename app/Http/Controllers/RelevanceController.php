@@ -46,17 +46,23 @@ class RelevanceController extends Controller
             $prefillPhrase = mb_substr($prefillPhrase, 0, 50);
         }
 
+        $defaultEngine = 'yandex';
+        $defaultRegion = \App\Support\CompetitorSearchRegions::defaultRegion($defaultEngine);
+
         return view('relevance-analysis.index', [
             'admin' => $admin,
             'config' => $config,
             'prefillLink' => $prefillLink !== '' ? $prefillLink : null,
             'prefillPhrase' => $prefillPhrase !== '' ? $prefillPhrase : null,
+            'defaultSearchEngine' => $defaultEngine,
+            'defaultRegion' => $defaultRegion,
         ]);
     }
 
     public function analyse(Request $request): JsonResponse
     {
-        if (RelevanceHistory::checkRelevanceAnalysisLimits()) {
+        $cost = RelevanceHistory::serpRequestCost($request->all());
+        if (RelevanceHistory::checkRelevanceAnalysisLimits($cost)) {
             return response()->json([
                 'code' => 415,
                 'message' => __('Your limits are exhausted this month')
@@ -151,17 +157,24 @@ class RelevanceController extends Controller
     {
         $config = RelevanceAnalysisConfig::first();
         $admin = User::isUserAdmin();
+        $defaultEngine = 'yandex';
+        $defaultRegion = \App\Support\CompetitorSearchRegions::defaultRegion($defaultEngine);
 
         return view('relevance-analysis.queue', [
             'config' => $config,
             'admin' => $admin,
+            'defaultSearchEngine' => $defaultEngine,
+            'defaultRegion' => $defaultRegion,
         ]);
     }
 
     public function createTaskQueue(Request $request): JsonResponse
     {
-        $rows = explode("\n", $request->params);
-        if (RelevanceHistory::checkRelevanceAnalysisLimits(count($rows))) {
+        $rows = array_values(array_filter(array_map('trim', explode("\n", (string) $request->params)), static function ($row) {
+            return $row !== '';
+        }));
+        $perRow = RelevanceHistory::serpRequestCost($request->all());
+        if (RelevanceHistory::checkRelevanceAnalysisLimits(count($rows) * $perRow)) {
             return response()->json([
                 'code' => 415,
                 'message' => __('Your limits are exhausted this month')

@@ -7,6 +7,8 @@
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/datatable.css') }}"/>
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/toastr/toastr.css') }}"/>
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/relevance-analysis/css/style.css') }}"/>
+        <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
+        <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
         <style>
             .RelevanceAnalysis {
                 background: oldlace;
@@ -95,74 +97,12 @@
                             ]), null, ['class' => 'form-select rounded-0 count']) !!}
                         </div>
 
-                        <div class="form-group required">
-                            <label>{{ __('Region') }}</label>
-                            {!! Form::select('region', array_unique([
-                                   $config->region => $config->region,
-                                   '213' => __('Moscow'),
-                                   '1' => __('Moscow and the area'),
-                                   '20' => __('Arkhangelsk'),
-                                   '37' => __('Astrakhan'),
-                                   '197' => __('Barnaul'),
-                                   '4' => __('Belgorod'),
-                                   '77' => __('Blagoveshchensk'),
-                                   '191' => __('Bryansk'),
-                                   '24' => __('Veliky Novgorod'),
-                                   '75' => __('Vladivostok'),
-                                   '33' => __('Vladikavkaz'),
-                                   '192' => __('Vladimir'),
-                                   '38' => __('Volgograd'),
-                                   '21' => __('Vologda'),
-                                   '193' => __('Voronezh'),
-                                   '1106' => __('Grozny'),
-                                   '54' => __('Ekaterinburg'),
-                                   '5' => __('Ivanovo'),
-                                   '63' => __('Irkutsk'),
-                                   '41' => __('Yoshkar-ola'),
-                                   '43' => __('Kazan'),
-                                   '22' => __('Kaliningrad'),
-                                   '64' => __('Kemerovo'),
-                                   '7' => __('Kostroma'),
-                                   '35' => __('Krasnodar'),
-                                   '62' => __('Krasnoyarsk'),
-                                   '53' => __('Kurgan'),
-                                   '8' => __('Kursk'),
-                                   '9' => __('Lipetsk'),
-                                   '28' => __('Makhachkala'),
-                                   '23' => __('Murmansk'),
-                                   '1092' => __('Nazran'),
-                                   '30' => __('Nalchik'),
-                                   '47' => __('Nizhniy Novgorod'),
-                                   '65' => __('Novosibirsk'),
-                                   '66' => __('Omsk'),
-                                   '10' => __('Eagle'),
-                                   '48' => __('Orenburg'),
-                                   '49' => __('Penza'),
-                                   '50' => __('Perm'),
-                                   '25' => __('Pskov'),
-                                   '39' => __('Rostov-on-Don'),
-                                   '11' => __('Ryazan'),
-                                   '51' => __('Samara'),
-                                   '42' => __('Saransk'),
-                                   '2' => __('Saint-Petersburg'),
-                                   '12' => __('Smolensk'),
-                                   '239' => __('Sochi'),
-                                   '36' => __('Stavropol'),
-                                   '10649' => __('Stary Oskol'),
-                                   '973' => __('Surgut'),
-                                   '13' => __('Tambov'),
-                                   '14' => __('Tver'),
-                                   '67' => __('Tomsk'),
-                                   '15' => __('Tula'),
-                                   '195' => __('Ulyanovsk'),
-                                   '172' => __('Ufa'),
-                                   '76' => __('Khabarovsk'),
-                                   '45' => __('Cheboksary'),
-                                   '56' => __('Chelyabinsk'),
-                                   '1104' => __('Cherkessk'),
-                                   '16' => __('Yaroslavl'),
-                                   ]), null, ['class' => 'form-select rounded-0 region']) !!}
-                        </div>
+                        @include('relevance-analysis.partials.search-engine-region', [
+                            'defaultSearchEngine' => $defaultSearchEngine ?? 'yandex',
+                            'defaultRegion' => $defaultRegion ?? null,
+                            'engineId' => 'queue-search-engine',
+                            'regionId' => 'queue-region',
+                        ])
 
                         <div class="form-group required" id="ignoredDomainsBlock">
                             <label id="ignoredDomains">{{ __('Ignored domains') }}</label>
@@ -260,7 +200,26 @@
     </div>
     @slot('js')
         <script>
+            window.cabinetRelevanceSe = {
+                routes: { regions: @json(route('cluster.regions')) },
+                defaultRegions: {
+                    yandex: @json(\App\Support\CompetitorSearchRegions::defaultRegion('yandex')),
+                    google: @json(\App\Support\CompetitorSearchRegions::defaultRegion('google')),
+                },
+                i18n: {
+                    regionPlaceholder: @json(__('Search city or region')),
+                    regionSearchMin: @json(__('Enter at least 1 character to search')),
+                    regionNotFound: @json(__('No regions found')),
+                    regionSearching: @json(__('Searching…')),
+                },
+            };
+        </script>
+        <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
+        <script src="{{ asset('js/cabinet-select2-defaults.js') }}"></script>
+        <script src="{{ asset('js/cabinet-relevance-search-engine.js') }}?v={{ @filemtime(public_path('js/cabinet-relevance-search-engine.js')) ?: time() }}"></script>
+        <script>
             $('#add-in-queue').click(() => {
+                var se = (window.cabinetRelevanceSearchEngine && window.cabinetRelevanceSearchEngine.payloadFields()) || {};
                 $.ajax({
                     type: "POST",
                     dataType: "json",
@@ -272,7 +231,8 @@
                         link: $('.form-control.link').val(),
                         listWords: $('.form-control.listWords').val(),
                         count: $('.form-select.rounded-0.count').val(),
-                        region: $('.form-select.rounded-0.region').val(),
+                        region: se.region || $('#queue-region').val(),
+                        searchEngine: se.searchEngine || $('#queue-search-engine').val() || 'yandex',
                         ignoredDomains: $('.form-control.ignoredDomains').val(),
 
                         noIndex: $('#switchNoindex').is(':checked'),

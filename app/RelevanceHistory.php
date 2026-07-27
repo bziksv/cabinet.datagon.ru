@@ -75,6 +75,26 @@ class RelevanceHistory extends Model
         return $this->hasOne(RelevanceHistoryResult::class, 'project_id', 'id');
     }
 
+    /**
+     * Стоимость одного запуска: Яндекс = 1; Google = ceil(TOP/10).
+     */
+    public static function serpRequestCost(array $request): int
+    {
+        $type = (string) ($request['type'] ?? 'phrase');
+        if ($type === 'list') {
+            return 1;
+        }
+
+        $engine = strtolower((string) ($request['searchEngine'] ?? 'yandex'));
+        if ($engine !== 'google') {
+            return 1;
+        }
+
+        $top = max(10, (int) ($request['count'] ?? 10));
+
+        return (int) max(1, (int) ceil($top / 10));
+    }
+
     public static function checkRelevanceAnalysisLimits(int $count = 0): bool
     {
         $user = Auth::user();

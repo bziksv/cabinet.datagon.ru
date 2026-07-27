@@ -277,7 +277,7 @@
                     noShared: @json(__('This user has no access to your projects')),
                     loadFailed: @json(__('An unexpected error has occurred, please contact the administrator')),
                     emptyUsers: @json(__('No shared users yet')),
-                    removeConfirm: @json(__('Remove access') + '?'),
+                    removeConfirm: @json(__('Remove access') . '?'),
                 };
 
                 const routes = {

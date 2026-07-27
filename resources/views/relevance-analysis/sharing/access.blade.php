@@ -1308,7 +1308,7 @@
                                                 "      <textarea style='height: 160px;' data-target='" + val.id + "' class='history-comment form form-control' >" + val.comment + "</textarea>" +
                                                 "   </td>" +
                                                 "   <td>" + phrase + "</td>" +
-                                                "   <td>" + getRegionName(val.region) + "</td>" +
+                                                "   <td>" + (val.region_name || getRegionName(val.region)) + "</td>" +
                                                 "   <td>" + val.main_link + "</td>" +
                                                 "   <td>" + position + "</td>" +
                                                 "   <td>" + val.points + "</td>" +
@@ -1337,7 +1337,7 @@
                                                 "      <textarea style='height: 160px;' data-target='" + val.id + "' class='history-comment form form-control' >" + val.comment + "</textarea>" +
                                                 "   </td>" +
                                                 "   <td>" + phrase + "</td>" +
-                                                "   <td>" + getRegionName(val.region) + "</td>" +
+                                                "   <td>" + (val.region_name || getRegionName(val.region)) + "</td>" +
                                                 "   <td>" + val.main_link + "</td>" +
                                                 "   <td>" + position + "</td>" +
                                                 "   <td style='background: " + getColor(val.points, Math.round(val.average_values.points)) + "'>" + getTextResult(val.points, Math.round(val.average_values.points)) + "</td>" +
@@ -1452,7 +1452,7 @@
                                             '   <td data-target="' + key + '" class="col-1" style="text-align: center; vertical-align: inherit; width: 50px"></td>' +
                                             '   <td>' + value[0]['created_at'] + '</td>' +
                                             '   <td>' + key + '</td>' +
-                                            '   <td>' + getRegionName(value[0]['region']) + '</td>' +
+                                            '   <td>' + (value[0]['region_name'] || getRegionName(value[0]['region'])) + '</td>' +
                                             '   <td>' + value[0]['main_link'] + '</td>' +
                                             '   <td>' + position + '</td>' +
                                             '   <td>' + value[0]['points'] + '</td>' +

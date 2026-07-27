@@ -7,6 +7,8 @@
         <link rel="stylesheet" href="{{ asset('plugins/common/css/datatable.css') }}"/>
         @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-min'])
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.css') }}"/>
+        <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
+        <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/relevance-analysis/css/style.css') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/css/style.css')) ?: time() }}"/>
         <style>
             i:hover {
@@ -42,6 +44,65 @@
             #main_history_table_wrapper .dt-buttons {
                 display: none;
             }
+
+            .cabinet-relevance-tags-modal .modal-header {
+                align-items: center;
+            }
+
+            .cabinet-relevance-tags-modal .cabinet-relevance-tags-tabs .nav-link {
+                border: 0;
+                border-bottom: 2px solid transparent;
+                border-radius: 0;
+                color: #6c757d;
+                background: transparent;
+                padding: 0.5rem 0.75rem;
+                margin-bottom: -1px;
+            }
+
+            .cabinet-relevance-tags-modal .cabinet-relevance-tags-tabs .nav-link:hover {
+                color: #343a40;
+                border-color: transparent;
+            }
+
+            .cabinet-relevance-tags-modal .cabinet-relevance-tags-tabs .nav-link.active {
+                color: #0d6efd;
+                background: transparent;
+                border-bottom-color: #0d6efd;
+                font-weight: 600;
+            }
+
+            .cabinet-relevance-tags-modal .form-label {
+                margin-bottom: 0.35rem;
+                font-weight: 500;
+            }
+
+            .cabinet-relevance-tags-modal .select2-container {
+                width: 100% !important;
+            }
+
+            .cabinet-relevance-tags-modal .select2-container--bootstrap4 .select2-selection--single {
+                height: 38px !important;
+                padding: 0.375rem 0.75rem;
+                border: 1px solid #ced4da;
+                border-radius: 0.375rem;
+                display: flex;
+                align-items: center;
+            }
+
+            .cabinet-relevance-tags-modal .select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+                line-height: 1.5;
+                padding: 0;
+                color: #212529;
+            }
+
+            .cabinet-relevance-tags-modal .select2-container--bootstrap4 .select2-selection--single .select2-selection__arrow {
+                height: 36px;
+            }
+
+            .cabinet-relevance-tags-modal .form-control-color {
+                max-width: 3rem;
+                padding: 0.25rem;
+            }
         </style>
     @endslot
 
@@ -57,93 +118,102 @@
         </div>
     </div>
 
-    <div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel">
+    <div class="modal fade cabinet-relevance-tags-modal" id="exampleModal" tabindex="-1" role="dialog"
+         aria-labelledby="exampleModalLabel" aria-hidden="true">
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <ul class="nav nav-pills">
-                        <li class="nav-item">
-                            <a class="nav-link active" href="#add-to-project" data-bs-toggle="tab">
-                                {{ __('Add a label to a project') }}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#managing" data-bs-toggle="tab">{{ __('My Tags') }}</a>
-                        </li>
-                    </ul>
-                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    <h5 class="modal-title" id="exampleModalLabel">{{ __('Managing labels') }}</h5>
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <div>
-                    <div class="card-body">
-                        <div class="tab-content">
-                            <div class="tab-pane active" id="add-to-project">
-                                <label for="manage-project-id">{{ __('Your projects') }}</label>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs cabinet-relevance-tags-tabs mb-3" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button type="button" class="nav-link active" id="tab-add-to-project"
+                                    data-bs-toggle="tab" data-bs-target="#add-to-project" role="tab"
+                                    aria-controls="add-to-project" aria-selected="true">
+                                {{ __('Add a label to a project') }}
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button type="button" class="nav-link" id="tab-managing"
+                                    data-bs-toggle="tab" data-bs-target="#managing" role="tab"
+                                    aria-controls="managing" aria-selected="false">
+                                {{ __('My Tags') }}
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="add-to-project" role="tabpanel"
+                             aria-labelledby="tab-add-to-project">
+                            <div class="alert d-none js-tag-link-alert mb-3" role="alert"></div>
+                            <div class="mb-3">
+                                <label class="form-label" for="manage-project-id">{{ __('Your projects') }}</label>
                                 @if(count($main) > 0)
-                                    <select name="project-id" id="manage-project-id" class="form form-control mb-3 js-tag-project-select">
+                                    <select name="project-id" id="manage-project-id"
+                                            class="form-select js-tag-project-select"
+                                            data-placeholder="{{ __('Search by domain or name') }}">
                                         @foreach($main as $story)
                                             <option value="{{ $story->id }}">{{ $story->name }}</option>
                                         @endforeach
                                     </select>
+                                @else
+                                    <p class="text-secondary mb-0">{{ __('No records') }}</p>
                                 @endif
-                                <label for="manage-tag-id">{{ __('Your tags') }}</label>
-                                <select name="tag-id" id="manage-tag-id" class="form form-control js-tag-select">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="manage-tag-id">{{ __('Your tags') }}</label>
+                                <select name="tag-id" id="manage-tag-id"
+                                        class="form-select js-tag-select"
+                                        data-placeholder="{{ __('Your tags') }}">
                                     @foreach($tags as $tag)
                                         <option value="{{ $tag->id }}" class="option-tag-{{ $tag->id }}">
                                             {{ $tag->name }}
                                         </option>
                                     @endforeach
                                 </select>
-                                <div class="mt-3">
-                                    <button type="button" class="btn btn-secondary create-new-link">
-                                        {{ __('Save') }}
-                                    </button>
-                                    <button type="button" class="btn btn-default"
-                                            data-bs-dismiss="modal">
-                                        {{ __('Close') }}
-                                    </button>
-                                </div>
                             </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <button type="button" class="btn btn-primary create-new-link">{{ __('Save') }}</button>
+                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                            </div>
+                        </div>
 
-                            <div class="tab-pane" id="managing">
-                                <div class="mb-3">
-                                    {{ __('Your created tags:') }}
-                                    <ul class="mt-3" id="tags-list" style="list-style: none; padding-left: 0">
-                                        @foreach($tags as $tag)
-                                            <li>
-                                                <div class="btn-group mb-2">
-                                                    <input type="color" class="tag-color-input"
-                                                           data-target="{{ $tag->id }}"
-                                                           value="{{ $tag->color }}" style="height: 37px">
-                                                    <input type="text"
-                                                           class="form form-control w-100 tag-name-input d-inline"
-                                                           style="display: inline !important;"
-                                                           data-target="{{ $tag->id }}" value="{{ $tag->name }}">
-                                                    <button type="button" class="btn btn-secondary col-2 remove-tag"
-                                                            data-target="{{ $tag->id }}">
-                                                        <i class="fa fa-trash text-white"></i>
-                                                    </button>
-                                                </div>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                </div>
-                                <div class="border-top">
-                                    <h5 class="mt-3">{{ __('Add a new label') }}</h5>
-                                    <div class="mb-3">
+                        <div class="tab-pane fade" id="managing" role="tabpanel" aria-labelledby="tab-managing">
+                            <p class="text-secondary small mb-2">{{ __('Your created tags:') }}</p>
+                            <ul class="list-unstyled mb-3" id="tags-list">
+                                @foreach($tags as $tag)
+                                    <li class="mb-2">
                                         <div class="input-group">
-                                            <input type="text" id="tag-name" name="tag-name" class="form form-control"
-                                                   placeholder="{{ __('Name') }}">
-                                            <input type="color" name="tag-color" id="tag-color" style="height: 38px">
+                                            <input type="color" class="form-control form-control-color tag-color-input"
+                                                   data-target="{{ $tag->id }}"
+                                                   value="{{ $tag->color }}">
+                                            <input type="text"
+                                                   class="form-control tag-name-input"
+                                                   data-target="{{ $tag->id }}" value="{{ $tag->name }}">
+                                            <button type="button" class="btn btn-outline-danger remove-tag"
+                                                    data-target="{{ $tag->id }}" title="{{ __('Delete') }}">
+                                                <i class="fa fa-trash" aria-hidden="true"></i>
+                                            </button>
                                         </div>
-                                    </div>
+                                    </li>
+                                @endforeach
+                            </ul>
+                            <div class="border-top pt-3">
+                                <h6 class="mb-2">{{ __('Add a new label') }}</h6>
+                                <div class="input-group mb-3">
+                                    <input type="text" id="tag-name" name="tag-name" class="form-control"
+                                           placeholder="{{ __('Name') }}">
+                                    <input type="color" name="tag-color" id="tag-color"
+                                           class="form-control form-control-color">
                                 </div>
-                                <button class="btn btn-secondary" id="create-tag">
-                                    {{ __('Create a label') }}
-                                </button>
-                                <button type="button" class="btn btn-default"
-                                        data-bs-dismiss="modal">{{ __('Close') }}</button>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button type="button" class="btn btn-primary" id="create-tag">{{ __('Create a label') }}</button>
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -152,41 +222,46 @@
         </div>
     </div>
 
-    <div class="modal fade" id="create-link" tabindex="-1" aria-labelledby="createLinkModalLabel">
+    <div class="modal fade cabinet-relevance-tags-modal" id="create-link" tabindex="-1"
+         aria-labelledby="createLinkModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="createLinkModalLabel">{{ __('Add a label to a project') }}</h5>
-                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <label for="link-project-id">{{ __('Your projects') }}</label>
-                    @if(count($main) > 0)
-                        <select name="project-id" id="link-project-id" class="form form-control mb-3 js-tag-project-select">
-                            @foreach($main as $story)
-                                <option value="{{ $story->id }}">{{ $story->name }}</option>
+                    <div class="alert d-none js-tag-link-alert mb-3" role="alert"></div>
+                    <div class="mb-3">
+                        <label class="form-label" for="link-project-id">{{ __('Your projects') }}</label>
+                        @if(count($main) > 0)
+                            <select name="project-id" id="link-project-id"
+                                    class="form-select js-tag-project-select"
+                                    data-placeholder="{{ __('Search by domain or name') }}">
+                                @foreach($main as $story)
+                                    <option value="{{ $story->id }}">{{ $story->name }}</option>
+                                @endforeach
+                            </select>
+                        @endif
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="link-tag-id">{{ __('Your tags') }}</label>
+                        <select name="tag-id" id="link-tag-id"
+                                class="form-select js-tag-select"
+                                data-placeholder="{{ __('Your tags') }}">
+                            @foreach($tags as $tag)
+                                <option value="{{ $tag->id }}" class="option-tag-{{ $tag->id }}">
+                                    {{ $tag->name }}
+                                </option>
                             @endforeach
                         </select>
-                    @endif
-                    <label for="link-tag-id">{{ __('Your tags') }}</label>
-                    <select name="tag-id" id="link-tag-id" class="form form-control js-tag-select">
-                        @foreach($tags as $tag)
-                            <option value="{{ $tag->id }}" class="option-tag-{{ $tag->id }}">
-                                {{ $tag->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary create-new-link">
-                        {{ __('Save') }}
-                    </button>
-                    <button type="button" class="btn btn-default"
-                            data-bs-dismiss="modal">
-                        {{ __('Close') }}
-                    </button>
+                    <button type="button" class="btn btn-primary create-new-link">{{ __('Save') }}</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
                 </div>
             </div>
         </div>
@@ -860,6 +935,8 @@
     @slot('js')
         <!-- Toastr -->
         <script src="{{ asset('plugins/toastr/toastr.min.js') }}"></script>
+        <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
+        <script src="{{ asset('js/cabinet-select2-defaults.js') }}"></script>
         <!-- DataTables  & Plugins -->
         <script src="{{ asset('plugins/relevance-analysis/history/childHistoryTable.js') }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/history/common.js') }}"></script>
@@ -872,6 +949,32 @@
         <script src="{{ asset('plugins/datatables/search.js') }}"></script>
 
         <script>
+            function initTagModalSelects() {
+                if (typeof $.fn.select2 !== 'function') {
+                    return;
+                }
+                var lang = {
+                    noResults: function () { return @json(__('No records')); },
+                    searching: function () { return @json(__('Searching…')); },
+                };
+                $('.js-tag-project-select, .js-tag-select').each(function () {
+                    var $el = $(this);
+                    var $modal = $el.closest('.modal');
+                    if ($el.hasClass('select2-hidden-accessible')) {
+                        $el.select2('destroy');
+                    }
+                    $el.select2({
+                        theme: 'bootstrap4',
+                        width: '100%',
+                        placeholder: $el.data('placeholder') || '',
+                        allowClear: false,
+                        minimumResultsForSearch: 0,
+                        dropdownParent: $modal.length ? $modal : $(document.body),
+                        language: lang,
+                    });
+                });
+            }
+
             let words = {
                 search: "{{ __('Search') }}",
                 show: "{{ __('show') }}",
@@ -888,45 +991,31 @@
                 {
                     name: 'id',
                     data: function (row) {
-                        return '<span>' +
-                            '    <span class="project_name" style="cursor: pointer"' +
-                            '          data-order="' + row.id + '">' + row.name + '</span>' +
-                            '    <i class="fa fa-table project_name"' +
-                            '       data-order="' + row.id + '" style="opacity: 0.6; cursor:pointer;"></i>' +
-                            '    <i class="fa fa-list project_name_v2"' +
-                            '       data-order="' + row.id + '"' +
-                            '       style="opacity: 0.6; cursor:pointer;"></i>' +
-                            '</span>' +
-                            '<div class="dropdown" style="display: inline">' +
-                            '    <i class="fa fa-cogs" data-bs-toggle="dropdown"' +
-                            '       aria-expanded="false" style="opacity: 0.6; cursor: pointer"></i>' +
-                            '    <div class="dropdown-menu">' +
-                            '                   <span class="dropdown-item project_name"' +
-                            '  style="cursor:pointer;"' +
-                            '  data-order="' + row.id + '">' +
-                            '<i class="fa fa-table"></i> ' +
-                            '{{ __('Show the results of the analysis') }}' +
-                            '                   </span>' +
-                            '        <span class="dropdown-item project_name_v2"' +
-                            '              style="cursor:pointer;"' +
-                            '              data-order="' + row.id + '">' +
-                            '<i class="fa fa-list"></i> ' +
-                            '{{ __('View the results in a list') }}' +
-                            '                   </span>' +
-                            '        <span class="dropdown-item"' +
-                            '              style="cursor:pointer;"' +
-                            '              data-bs-toggle="modal" data-bs-target="#removeModal' + row.id + '">' +
-                            '<i class="fa fa-trash"></i> ' +
-                            '{{ __('Delete results without comments') }}' +
-                            '                   </span>' +
-                            '        <span class="dropdown-item"' +
-                            '              style="cursor:pointer;"' +
-                            '              data-bs-toggle="modal"' +
-                            '              data-bs-target="#removeWithFiltersModal' + row.id + '">' +
-                            '<i class="fa fa-trash"></i> ' +
-                            '{{ __('Delete using filters') }}' +
-                            '                   </span>' +
+                        return '<div class="cabinet-relevance-project-cell">' +
+                            '<span class="project_name cabinet-relevance-project-name" data-order="' + row.id + '">' + row.name + '</span>' +
+                            '<span class="cabinet-relevance-project-actions">' +
+                            '    <i class="fa fa-table project_name" data-order="' + row.id + '" title="{{ __('Show the results of the analysis') }}"></i>' +
+                            '    <i class="fa fa-list project_name_v2" data-order="' + row.id + '" title="{{ __('View the results in a list') }}"></i>' +
+                            '    <div class="dropdown">' +
+                            '        <button type="button" class="cabinet-relevance-project-menu-btn" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="{{ __('Actions') }}">' +
+                            '            <i class="fa fa-cogs" aria-hidden="true"></i>' +
+                            '        </button>' +
+                            '        <ul class="dropdown-menu">' +
+                            '            <li><button type="button" class="dropdown-item project_name" data-order="' + row.id + '">' +
+                            '                <i class="fa fa-fw fa-table" aria-hidden="true"></i>{{ __('Show the results of the analysis') }}' +
+                            '            </button></li>' +
+                            '            <li><button type="button" class="dropdown-item project_name_v2" data-order="' + row.id + '">' +
+                            '                <i class="fa fa-fw fa-list" aria-hidden="true"></i>{{ __('View the results in a list') }}' +
+                            '            </button></li>' +
+                            '            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#removeModal' + row.id + '">' +
+                            '                <i class="fa fa-fw fa-trash" aria-hidden="true"></i>{{ __('Delete results without comments') }}' +
+                            '            </button></li>' +
+                            '            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#removeWithFiltersModal' + row.id + '">' +
+                            '                <i class="fa fa-fw fa-trash" aria-hidden="true"></i>{{ __('Delete using filters') }}' +
+                            '            </button></li>' +
+                            '        </ul>' +
                             '    </div>' +
+                            '</span>' +
                             '</div>'
                     }
                 },
@@ -1029,18 +1118,28 @@
                 ],
                 dom: 'lfrtip',
                 language: {
+                    processing: @json(__('Loading records')),
+                    search: @json(__('Search') . ':'),
+                    lengthMenu: @json(__('show') . ' _MENU_ ' . __('records')),
+                    emptyTable: @json(__('No records')),
+                    zeroRecords: @json(__('No records')),
+                    info: @json(__('Showing') . ' ' . __('from') . ' _START_ ' . __('to') . ' _END_ ' . __('of') . ' _TOTAL_ ' . __('entries')),
+                    infoEmpty: @json(__('Showing') . ' ' . __('from') . ' 0 ' . __('to') . ' 0 ' . __('of') . ' 0 ' . __('entries')),
                     paginate: {
-                        "first": "«",
-                        "last": "»",
-                        "next": "»",
-                        "previous": "«"
+                        first: "«",
+                        last: "»",
+                        next: "»",
+                        previous: "«"
                     },
                 },
                 oLanguage: {
+                    "sProcessing": "{{ __('Loading records') }}",
                     "sSearch": "{{ __('Search') }}:",
                     "sLengthMenu": "{{ __('show') }} _MENU_ {{ __('records') }}",
                     "sEmptyTable": "{{ __('No records') }}",
+                    "sZeroRecords": "{{ __('No records') }}",
                     "sInfo": "{{ __('Showing') }} {{ __('from') }} _START_ {{ __('to') }} _END_ {{ __('of') }} _TOTAL_ {{ __('entries') }}",
+                    "sInfoEmpty": "{{ __('Showing') }} {{ __('from') }} 0 {{ __('to') }} 0 {{ __('of') }} 0 {{ __('entries') }}",
                 },
                 drawCallback: function () {
                     $('#changeAllState, #changeAllStateList').unbind().on('change', function () {
@@ -1130,7 +1229,7 @@
                                             "      <textarea style='height: 160px;' data-target='" + val.id + "' class='history-comment form form-control' >" + val.comment + "</textarea>" +
                                             "   </td>" +
                                             "   <td>" + phrase + "</td>" +
-                                            "   <td>" + getRegionName(val.region) + "</td>" +
+                                            "   <td>" + (val.region_name || getRegionName(val.region)) + "</td>" +
                                             "   <td>" + val.main_link + "</td>" +
                                             "   <td data-order='" + dataOrderPosition + "'>" + position + "</td>"
 
@@ -1312,7 +1411,7 @@
                                             '   <td data-target="' + key + '" class="col-1" style="text-align: center; vertical-align: inherit; width: 50px"></td>' +
                                             '   <td>' + value[0]['created_at'] + '</td>' +
                                             '   <td>' + key + '</td>' +
-                                            '   <td>' + getRegionName(value[0]['region']) + '</td>' +
+                                            '   <td>' + (value[0]['region_name'] || getRegionName(value[0]['region'])) + '</td>' +
                                             '   <td>' + value[0]['main_link'] + '</td>' +
                                             '   <td>' + position + '</td>' +
                                             '   <td>' + value[0]['points'] + ' </td>' +
@@ -1415,8 +1514,20 @@
                     })
 
                     refreshMethods()
+                    initTagModalSelects()
                 },
             });
+
+            initTagModalSelects()
+            $('#exampleModal, #create-link').on('shown.bs.modal', function () {
+                var $modal = $(this)
+                if (!$modal.find('.js-tag-project-select, .js-tag-select').first().hasClass('select2-hidden-accessible')) {
+                    initTagModalSelects()
+                }
+            })
+            $('#exampleModal').on('shown.bs.tab', 'button[data-bs-toggle="tab"]', function () {
+                initTagModalSelects()
+            })
 
             $('#main_history_table').css({
                 width: '100%',
@@ -1484,7 +1595,12 @@
             })
 
             function getRegionName(id) {
+                id = String(id == null ? '' : id);
+                if (!id) {
+                    return '';
+                }
                 switch (id) {
+
                     case '1' :
                         return "{{ __('Moscow and the area') }}";
                     case '20' :
@@ -1609,9 +1725,11 @@
                         return "{{ __('Cherkessk') }}";
                     case '16' :
                         return "{{ __('Yaroslavl') }}";
+                    default :
+                        return id;
+
                 }
             }
-
             function currentTagForm($btn) {
                 var $modal = $btn.closest('.modal')
                 if (!$modal.length) {
@@ -1623,13 +1741,44 @@
                 }
             }
 
+            function showTagLinkAlert($modal, type, message) {
+                var $alert = $modal.find('.js-tag-link-alert')
+                if (!$alert.length) {
+                    if (type === 'success') {
+                        getSuccessMessage(message, 5000)
+                    } else {
+                        getErrorMessage(message, 8000)
+                    }
+                    return
+                }
+                $alert
+                    .removeClass('d-none alert-success alert-danger alert-warning')
+                    .addClass(type === 'success' ? 'alert-success' : 'alert-warning')
+                    .html(message)
+                    .show()
+            }
+
             function refreshMethods() {
-                $('.create-new-link').unbind().on('click', function () {
-                    var form = currentTagForm($(this))
+                $('.create-new-link').off('click.relevanceTagLink').on('click.relevanceTagLink', function () {
+                    var $btn = $(this)
+                    var $modal = $btn.closest('.modal')
+                    if (!$modal.length) {
+                        $modal = $('#exampleModal')
+                    }
+                    var form = currentTagForm($btn)
+                    var projectName = $modal.find('.js-tag-project-select option:selected').text() || ''
+
                     if (!form.projectId || !form.tagId) {
+                        showTagLinkAlert($modal, 'error', '{{ __('The project or label does not exist') }}')
                         getErrorMessage('{{ __('The project or label does not exist') }}')
                         return
                     }
+
+                    if ($btn.prop('disabled')) {
+                        return
+                    }
+                    $btn.prop('disabled', true)
+
                     $.ajax({
                         type: "POST",
                         dataType: "json",
@@ -1667,13 +1816,32 @@
                                         '   </div>' +
                                         '</div>')
                                 }
-                                getSuccessMessage(response.message)
+                                showTagLinkAlert($modal, 'success', response.message)
+                                getSuccessMessage(response.message, 5000)
                                 if ($.fn.DataTable.isDataTable('#main_history_table')) {
+                                    var nameToFind = (response.project && response.project.name) || projectName
+                                    historyTable.search(nameToFind || '').draw()
                                     historyTable.ajax.reload(null, false)
                                 }
+                                setTimeout(function () {
+                                    var modalEl = $modal.get(0)
+                                    if (modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                                        bootstrap.Modal.getOrCreateInstance(modalEl).hide()
+                                    } else {
+                                        $modal.modal('hide')
+                                    }
+                                }, 700)
                             } else if (response.code === 415) {
-                                getErrorMessage(response.message)
+                                showTagLinkAlert($modal, 'error', response.message)
+                                getErrorMessage(response.message, 8000)
                             }
+                        },
+                        error: function () {
+                            showTagLinkAlert($modal, 'error', '{{ __('An unexpected error has occurred, please contact the administrator') }}')
+                            getErrorMessage('{{ __('An unexpected error has occurred, please contact the administrator') }}', 8000)
+                        },
+                        complete: function () {
+                            $btn.prop('disabled', false)
                         },
                     });
                 })
@@ -1692,23 +1860,26 @@
                             success: function (response) {
                                 if (response.code === 201) {
                                     $('#tags-list').append(
-                                        '<li data-target="' + response.tag.id + '"> ' +
-                                        '   <div class="btn-group mb-2"> ' +
-                                        '<input type="color" class="tag-color-input" data-target="' + response.tag.id + '" value="' + response.tag.color + '" style="height: 37px">' +
-                                        '       <input type="text" class="form form-control w-100 tag-name-input d-inline" style="display: inline !important;" ' +
-                                        '       data-target="' + response.tag.id + '" value="' + response.tag.name + '">' +
-                                        '<button type="button" class="btn btn-secondary col-2 remove-tag" data-target="' + response.tag.id + '"> ' +
-                                        '       <i class="fa fa-trash text-white"></i></button> ' +
-                                        '   </div> ' +
+                                        '<li class="mb-2" data-target="' + response.tag.id + '">' +
+                                        '  <div class="input-group">' +
+                                        '    <input type="color" class="form-control form-control-color tag-color-input" data-target="' + response.tag.id + '" value="' + response.tag.color + '">' +
+                                        '    <input type="text" class="form-control tag-name-input" data-target="' + response.tag.id + '" value="' + $('<div>').text(response.tag.name).html() + '">' +
+                                        '    <button type="button" class="btn btn-outline-danger remove-tag" data-target="' + response.tag.id + '" title="{{ __('Delete') }}">' +
+                                        '      <i class="fa fa-trash" aria-hidden="true"></i>' +
+                                        '    </button>' +
+                                        '  </div>' +
                                         '</li>'
                                     )
                                     getSuccessMessage(response.message)
 
-                                    $('.js-tag-select').append(
-                                        '<option value="' + response.tag.id + '" class="option-tag-' + response.tag.id + '">' + response.tag.name + '</option>'
-                                    )
+                                    $('.js-tag-select').each(function () {
+                                        var opt = new Option(response.tag.name, response.tag.id, false, false)
+                                        $(opt).addClass('option-tag-' + response.tag.id)
+                                        $(this).append(opt).trigger('change')
+                                    })
                                     $('#tag-name').val('')
                                     refreshMethods()
+                                    initTagModalSelects()
                                 } else if (response.code === 415) {
                                     getErrorMessage(response.message)
                                 }

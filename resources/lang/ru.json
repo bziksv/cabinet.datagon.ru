@@ -5347,5 +5347,6 @@
     "Only projects already shared with this user will be listed.": "Показываются только проекты, к которым у этого пользователя уже есть доступ.",
     "Enter email and load the list.": "Введите email и загрузите список.",
     "User already has access to the selected projects": "У пользователя уже есть доступ к выбранным проектам",
-    "This user has no access to your projects": "У этого пользователя нет доступа к вашим проектам"
+    "This user has no access to your projects": "У этого пользователя нет доступа к вашим проектам",
+    "Search by domain or name": "Поиск по домену или названию…"
 }

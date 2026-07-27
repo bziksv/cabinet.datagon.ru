@@ -42,7 +42,7 @@ class ProjectRelevanceHistoryTagsController extends Controller
                 return response()->json([
                     'success' => false,
                     'code' => 415,
-                    'message' => __('You cant link a label') . " $tag->name " . __('to the project') . "$project->name " . __('again')
+                    'message' => __('You cant link a label') . " «{$tag->name}» " . __('to the project') . " «{$project->name}» " . __('again')
                 ]);
             }
         }

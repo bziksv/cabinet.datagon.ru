@@ -663,17 +663,25 @@
                         { width: '14%', targets: 8 },
                     ],
                     language: {
+                        processing: @json(__('Loading records')),
+                        search: words.search + ":",
+                        lengthMenu: words.show + " _MENU_ " + words.records,
+                        emptyTable: words.noRecords,
+                        zeroRecords: words.noRecords,
+                        info: words.showing + " " + words.from + "  _START_ " + words.to + " _END_ " + words.of + " _TOTAL_ " + words.entries,
                         paginate: {
-                            "first": "«",
-                            "last": "»",
-                            "next": "»",
-                            "previous": "«"
+                            first: "«",
+                            last: "»",
+                            next: "»",
+                            previous: "«"
                         },
                     },
                     oLanguage: {
+                        "sProcessing": "{{ __('Loading records') }}",
                         "sSearch": words.search + ":",
                         "sLengthMenu": words.show + " _MENU_ " + words.records,
                         "sEmptyTable": words.noRecords,
+                        "sZeroRecords": words.noRecords,
                         "sInfo": words.showing + " " + words.from + "  _START_ " + words.to + " _END_ " + words.of + " _TOTAL_ " + words.entries,
                     },
                     initComplete: function () {
@@ -1071,7 +1079,7 @@
                                                     "      <textarea style='height: 160px;' data-target='" + val.id + "' class='history-comment form form-control' >" + val.comment + "</textarea>" +
                                                     "   </td>" +
                                                     "   <td>" + phrase + "</td>" +
-                                                    "   <td>" + getRegionName(val.region) + "</td>" +
+                                                    "   <td>" + (val.region_name || getRegionName(val.region)) + "</td>" +
                                                     "   <td>" + val.main_link + "</td>" +
                                                     "   <td>" + position + "</td>" +
                                                     "   <td>" + val.points + "</td>" +
@@ -1100,7 +1108,7 @@
                                                     "      <textarea style='height: 160px;' data-target='" + val.id + "' class='history-comment form form-control' >" + val.comment + "</textarea>" +
                                                     "   </td>" +
                                                     "   <td>" + phrase + "</td>" +
-                                                    "   <td>" + getRegionName(val.region) + "</td>" +
+                                                    "   <td>" + (val.region_name || getRegionName(val.region)) + "</td>" +
                                                     "   <td>" + val.main_link + "</td>" +
                                                     "   <td>" + position + "</td>" +
                                                     "   <td style='background: " + getColor(val.points, Math.round(val.average_values.points)) + "'>" + getTextResult(val.points, Math.round(val.average_values.points)) + "</td>" +
@@ -1237,7 +1245,7 @@
                                                 '   <td data-target="' + key + '" class="col-1" style="text-align: center; vertical-align: inherit; width: 50px"></td>' +
                                                 '   <td>' + value[0]['created_at'] + '</td>' +
                                                 '   <td>' + key + '</td>' +
-                                                '   <td>' + getRegionName(value[0]['region']) + '</td>' +
+                                                '   <td>' + (value[0]['region_name'] || getRegionName(value[0]['region'])) + '</td>' +
                                                 '   <td>' + value[0]['main_link'] + '</td>' +
                                                 '   <td>' + position + '</td>' +
                                                 '   <td>' + value[0]['points'] + '</td>' +
@@ -1492,45 +1500,31 @@
                 {
                     name: 'id',
                     data: function (row) {
-                        return '<span>' +
-                            '    <span class="project_name" style="cursor: pointer"' +
-                            '          data-order="' + row.id + '">' + row.name + '</span>' +
-                            '    <i class="fa fa-table project_name"' +
-                            '       data-order="' + row.id + '" style="opacity: 0.6; cursor:pointer;"></i>' +
-                            '    <i class="fa fa-list project_name_v2"' +
-                            '       data-order="' + row.id + '"' +
-                            '       style="opacity: 0.6; cursor:pointer;"></i>' +
-                            '</span>' +
-                            '<div class="dropdown" style="display: inline">' +
-                            '    <i class="fa fa-cogs" id="dropdownMenuButton" data-bs-toggle="dropdown"' +
-                            '       aria-expanded="false" style="opacity: 0.6; cursor: pointer"></i>' +
-                            '    <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">' +
-                            '                   <span class="dropdown-item project_name"' +
-                            '  style="cursor:pointer;"' +
-                            '  data-order="' + row.id + '">' +
-                            '<i class="fa fa-table"></i>' +
-                            '{{ __('Show the results of the analysis') }}' +
-                            '                   </span>' +
-                            '        <span class="dropdown-item project_name_v2"' +
-                            '              style="cursor:pointer;"' +
-                            '              data-order="' + row.id + '">' +
-                            '<i class="fa fa-list"></i>' +
-                            '{{ __('View the results in a list') }}' +
-                            '                   </span>' +
-                            '        <span class="dropdown-item"' +
-                            '              style="cursor:pointer;"' +
-                            '              data-bs-toggle="modal" data-bs-target="#removeModal' + row.id + '">' +
-                            '<i class="fa fa-trash"></i>' +
-                            '{{ __('Delete results without comments') }}' +
-                            '                   </span>' +
-                            '        <span class="dropdown-item"' +
-                            '              style="cursor:pointer;"' +
-                            '              data-bs-toggle="modal"' +
-                            '              data-bs-target="#removeWithFiltersModal' + row.id + '">' +
-                            '<i class="fa fa-trash"></i>' +
-                            '{{ __('Delete using filters') }}' +
-                            '                   </span>' +
+                        return '<div class="cabinet-relevance-project-cell">' +
+                            '<span class="project_name cabinet-relevance-project-name" data-order="' + row.id + '">' + row.name + '</span>' +
+                            '<span class="cabinet-relevance-project-actions">' +
+                            '    <i class="fa fa-table project_name" data-order="' + row.id + '" title="{{ __('Show the results of the analysis') }}"></i>' +
+                            '    <i class="fa fa-list project_name_v2" data-order="' + row.id + '" title="{{ __('View the results in a list') }}"></i>' +
+                            '    <div class="dropdown">' +
+                            '        <button type="button" class="cabinet-relevance-project-menu-btn" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="{{ __('Actions') }}">' +
+                            '            <i class="fa fa-cogs" aria-hidden="true"></i>' +
+                            '        </button>' +
+                            '        <ul class="dropdown-menu">' +
+                            '            <li><button type="button" class="dropdown-item project_name" data-order="' + row.id + '">' +
+                            '                <i class="fa fa-fw fa-table" aria-hidden="true"></i>{{ __('Show the results of the analysis') }}' +
+                            '            </button></li>' +
+                            '            <li><button type="button" class="dropdown-item project_name_v2" data-order="' + row.id + '">' +
+                            '                <i class="fa fa-fw fa-list" aria-hidden="true"></i>{{ __('View the results in a list') }}' +
+                            '            </button></li>' +
+                            '            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#removeModal' + row.id + '">' +
+                            '                <i class="fa fa-fw fa-trash" aria-hidden="true"></i>{{ __('Delete results without comments') }}' +
+                            '            </button></li>' +
+                            '            <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#removeWithFiltersModal' + row.id + '">' +
+                            '                <i class="fa fa-fw fa-trash" aria-hidden="true"></i>{{ __('Delete using filters') }}' +
+                            '            </button></li>' +
+                            '        </ul>' +
                             '    </div>' +
+                            '</span>' +
                             '</div>'
                     }
                 },

@@ -171,7 +171,7 @@ function format(data) {
             '   <td>' + value['created_at'] + '</td>' +
             '   <td> <textarea style="width: 150px; height: 160px;" data-target="' + value['id'] + '" class="history-comment form form-control">' + value['comment'] + '</textarea></td>' +
             '   <td style="width: 150px;">' + value['phrase'] + '</td>' +
-            '   <td style="width: 150px;">' + getRegionName(value['region']) + '</td>' +
+            '   <td style="width: 150px;">' + (value['region_name'] || (value['region_name'] || getRegionName(value['region']))) + '</td>' +
             '   <td style="width: 150px;">' + value['main_link'] + '</td>' +
             '   <td>' + value['position'] + '</td>' +
             '   <td>' + value['points'] + '</td>' +
@@ -402,7 +402,7 @@ function checkAnalyseProgress(id) {
                     0: newObject['last_check'],
                     1: '<textarea style="height: 160px;" data-target="' + newObject['id'] + '" class="history-comment form form-control"></textarea>',
                     2: newObject['phrase'],
-                    3: getRegionName(newObject['region']),
+                    3: (newObject['region_name'] || getRegionName(newObject['region'])),
                     4: newObject['main_link'],
                     5: newObject['position'] === 0 ? 'Не попал в топ 100' : newObject['position'],
                     6: newObject['points'],

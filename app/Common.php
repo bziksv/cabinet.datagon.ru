@@ -175,7 +175,14 @@ class Common
             case '16' :
                 return __('Yaroslavl');
             default:
-                return 'Регион не опознан';
+                foreach (['yandex', 'google'] as $engine) {
+                    $found = \App\Support\CompetitorSearchRegions::find($engine, $id);
+                    if ($found) {
+                        return (string) ($found['name'] ?? $found['text'] ?? $id);
+                    }
+                }
+
+                return $id !== '' ? $id : 'Регион не опознан';
         }
     }
 

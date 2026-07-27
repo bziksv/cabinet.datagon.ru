@@ -808,11 +808,63 @@ class SimplifiedXmlFacade extends XmlFacade
         return $result;
     }
 
+    /**
+     * SERP URLs. Google: ≤10 URL/страница → page=0..ceil(depth/10)-1.
+     *
+     * @return list<string>
+     */
+    public static function fetchSerpUrls(string $region, string $query, string $searchEngine = 'yandex', int $depth = 10): array
+    {
+        $engine = strtolower($searchEngine) === 'google' ? 'google' : 'yandex';
+        $depth = max(1, $depth);
+        $xml = new self($region, $engine === 'google' ? 10 : max(10, $depth));
+        $xml->setQuery($query);
+
+        if ($engine !== 'google') {
+            $xml->setPage('0');
+            $sites = $xml->getXMLResponse('yandex');
+
+            return is_array($sites) ? array_values($sites) : [];
+        }
+
+        $pages = (int) max(1, (int) ceil($depth / 10));
+        $urls = [];
+
+        for ($page = 0; $page < $pages; $page++) {
+            $xml->setCount(10);
+            $xml->setPage((string) $page);
+            $chunk = $xml->getXMLResponse('google');
+            $chunk = is_array($chunk) ? array_values($chunk) : [];
+
+            foreach ($chunk as $url) {
+                $urls[] = $url;
+                if (count($urls) >= $depth) {
+                    break 2;
+                }
+            }
+
+            if (count($chunk) < 10) {
+                break;
+            }
+
+            if ($page + 1 < $pages) {
+                usleep(120000);
+            }
+        }
+
+        return $urls;
+    }
+
     public static function getPosition($request)
     {
-        $xml = new SimplifiedXmlFacade($request['region']);
-        $xml->setQuery($request['phrase']);
-        $xmlResponse = $xml->getXMLResponse();
+        $engine = strtolower((string) ($request['searchEngine'] ?? 'yandex')) === 'google' ? 'google' : 'yandex';
+        $depth = max(10, (int) ($request['count'] ?? 30));
+        $xmlResponse = self::fetchSerpUrls(
+            (string) ($request['region'] ?? ''),
+            (string) ($request['phrase'] ?? ''),
+            $engine,
+            $depth
+        );
 
         $position = array_search(Str::lower($request['link']), $xmlResponse);
         if ($position === false) {

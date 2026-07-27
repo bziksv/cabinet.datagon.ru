@@ -55,12 +55,19 @@ class FetchParsePageJob implements ShouldQueue
 
         SiteAuditCrawl::query()->where('id', $this->crawlId)->increment('pages_fetched');
         $crawl->refresh();
+        if ($crawl->isFinished()) {
+            SiteAuditUserAgentSession::clear($this->crawlId);
+
+            return;
+        }
+
         $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
         $progress['fetched'] = (int) $crawl->pages_fetched;
         $progress['total'] = (int) $crawl->pages_total;
         // не затираем settings (скорость / UA)
         $crawl->progress_json = $progress;
-        if ($crawl->status !== SiteAuditCrawl::STATUS_FETCHING) {
+        if ($crawl->status === SiteAuditCrawl::STATUS_QUEUED
+            || $crawl->status === SiteAuditCrawl::STATUS_DISCOVERING) {
             $crawl->status = SiteAuditCrawl::STATUS_FETCHING;
         }
         $crawl->save();

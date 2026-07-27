@@ -34,6 +34,13 @@
                 План работ
             </button>
         @endif
+        @if(! $crawl->isFinished())
+            <form method="POST" action="{{ route('pages.site-audit.crawl.cancel', $crawl->id) }}" class="d-inline"
+                  onsubmit="return confirm('Остановить краул #{{ $crawl->id }}? Уже скачанные страницы останутся, дальше сканировать не будет.');">
+                @csrf
+                <button type="submit" class="btn btn-sm btn-outline-danger">Остановить</button>
+            </form>
+        @endif
         @if($crawl->isFinished())
             <form method="POST" action="{{ route('pages.site-audit.crawl.repeat', $crawl->id) }}" class="d-inline"
                   onsubmit="return confirm('Повторить краул для {{ e(optional($project)->domain ?? 'проекта') }} с теми же настройками?');">
@@ -94,7 +101,7 @@
         </div>
 
         @if($crawl->error)
-            <div class="alert alert-danger">{{ $crawl->error }}</div>
+            <div class="alert {{ $crawl->status === 'cancelled' ? 'alert-warning' : 'alert-danger' }}">{{ $crawl->error }}</div>
         @endif
 
         <div id="sa-share-box" class="alert alert-light border mb-3" style="{{ empty($shareUrl) ? 'display:none' : '' }}">
@@ -584,6 +591,21 @@
                     }
                 }
 
+                // Deep-link с отчёта: /crawl/N#sa-pane-plagiarism|relevance|dynamics
+                (function activateHashTab() {
+                    var hash = window.location.hash || '';
+                    if (hash.indexOf('#sa-pane-') !== 0) return;
+                    var tab = document.querySelector('#sa-audit-tabs a[href="' + hash + '"]');
+                    if (!tab) return;
+                    if (window.bootstrap && bootstrap.Tab) {
+                        bootstrap.Tab.getOrCreateInstance(tab).show();
+                    } else if (window.jQuery) {
+                        window.jQuery(tab).tab('show');
+                    } else {
+                        tab.click();
+                    }
+                })();
+
                 function showShare(url) {
                     if (shareUrl) shareUrl.value = url || '';
                     if (shareBox) shareBox.style.display = url ? '' : 'none';
@@ -672,11 +694,9 @@
                     var warn = parseFloat(pane.getAttribute('data-warn') || '70') || 70;
                     var startUrl = pane.getAttribute('data-start-url');
                     var statusUrl = pane.getAttribute('data-status-url');
+                    var candidatesUrl = pane.getAttribute('data-candidates-url') || '';
+                    var candidatesLazy = pane.getAttribute('data-candidates-lazy') === '1';
                     var csrf = pane.getAttribute('data-csrf');
-                    var runBtn = document.getElementById('sa-plag-run');
-                    var landBtn = document.getElementById('sa-plag-landings');
-                    var clearBtn = document.getElementById('sa-plag-clear');
-                    var selectedEl = document.getElementById('sa-plag-selected');
                     var progressWrap = document.getElementById('sa-plag-progress');
                     var progressLabel = document.getElementById('sa-plag-progress-label');
                     var progressBar = document.getElementById('sa-plag-progress-bar');
@@ -685,27 +705,47 @@
                     var resultsBody = document.getElementById('sa-plag-results');
                     var costEl = document.getElementById('sa-plag-cost');
                     var remainingEl = document.getElementById('sa-plag-remaining');
+                    var limitEl = document.getElementById('sa-plag-limit');
+                    var limitHint = document.getElementById('sa-plag-limit-hint');
                     var reportLink = document.getElementById('sa-plag-report-link');
                     var pollTimer = null;
+                    var candidatesLoaded = !candidatesLazy;
+                    var candidatesLoading = false;
+                    var limitsLoaded = false;
 
+                    function esc(s) {
+                        return String(s == null ? '' : s)
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/"/g, '&quot;');
+                    }
+                    function short(s, n) {
+                        s = String(s == null ? '' : s);
+                        return s.length > n ? s.slice(0, n) : s;
+                    }
                     function cbs() {
                         return Array.prototype.slice.call(document.querySelectorAll('.sa-plag-cb'));
                     }
                     function selectedUrls() {
                         return cbs().filter(function (c) { return c.checked; }).map(function (c) { return c.value; });
                     }
+                    function runBtn() { return document.getElementById('sa-plag-run'); }
+                    function selectedEl() { return document.getElementById('sa-plag-selected'); }
                     function updateSelected() {
                         var n = selectedUrls().length;
-                        if (selectedEl) selectedEl.textContent = 'Выбрано: ' + n + ' / ' + max;
+                        var el = selectedEl();
+                        if (el) el.textContent = 'Выбрано: ' + n + ' / ' + max;
+                        var rb = runBtn();
                         cbs().forEach(function (c) {
                             if (!c.checked && n >= max) c.disabled = true;
-                            else if (!runBtn || !runBtn.disabled) c.disabled = false;
+                            else if (!rb || !rb.disabled) c.disabled = false;
                         });
                     }
                     function setRunning(on) {
-                        if (runBtn) {
-                            runBtn.disabled = !!on;
-                            runBtn.textContent = on ? 'Проверка…' : 'Проверить выбранные';
+                        var rb = runBtn();
+                        if (rb) {
+                            rb.disabled = !!on;
+                            rb.textContent = on ? 'Проверка…' : 'Проверить выбранные';
                         }
                         cbs().forEach(function (c) { c.disabled = !!on; });
                         if (progressWrap) progressWrap.style.display = on ? '' : 'none';
@@ -736,6 +776,14 @@
                         }
                         if (remainingEl && meta && meta.remaining != null) {
                             remainingEl.textContent = meta.remaining;
+                            limitsLoaded = true;
+                        }
+                        if (limitEl && meta && meta.limit != null) {
+                            limitEl.textContent = meta.limit;
+                            limitsLoaded = true;
+                        }
+                        if (limitHint && limitsLoaded) {
+                            limitHint.style.display = 'none';
                         }
                         if (reportLink && (state.rows || []).length) {
                             reportLink.style.display = '';
@@ -749,16 +797,16 @@
                                 resultsBody.innerHTML = rows.map(function (row) {
                                     var low = row.uniqueness_pct != null && row.uniqueness_pct < warn;
                                     var src = (row.sources || []).slice(0, 2).map(function (s) {
-                                        return '<div><a href="' + (s.url || '#') + '" target="_blank" rel="noopener">' +
-                                            String(s.url || '').slice(0, 40) + '</a> (' + (s.overlap_pct || 0) + '%)</div>';
+                                        return '<div><a href="' + esc(s.url || '#') + '" target="_blank" rel="noopener">' +
+                                            esc(short(s.url || '', 40)) + '</a> (' + (s.overlap_pct || 0) + '%)</div>';
                                     }).join('') || '—';
                                     return '<tr class="' + (low ? 'table-warning' : '') + '">' +
-                                        '<td class="small"><a href="' + (row.url || '#') + '" target="_blank" rel="noopener">' +
-                                        String(row.url || '').slice(0, 60) + '</a></td>' +
+                                        '<td class="small"><a href="' + esc(row.url || '#') + '" target="_blank" rel="noopener">' +
+                                        esc(short(row.url || '', 60)) + '</a></td>' +
                                         '<td>' + (row.uniqueness_pct != null ? row.uniqueness_pct + '%' : '—') + '</td>' +
                                         '<td>' + (row.matched_pct != null ? row.matched_pct + '%' : '—') + '</td>' +
                                         '<td class="small">' + src + '</td>' +
-                                        '<td class="small text-danger">' + (row.error || '') + '</td>' +
+                                        '<td class="small text-danger">' + esc(row.error || '') + '</td>' +
                                         '</tr>';
                                 }).join('');
                             }
@@ -779,69 +827,230 @@
                             })
                             .catch(function () {});
                     }
-                    cbs().forEach(function (c) {
-                        c.addEventListener('change', function () {
-                            var n = selectedUrls().length;
-                            if (c.checked && n > max) {
-                                c.checked = false;
-                            }
-                            updateSelected();
-                        });
-                    });
-                    if (landBtn) {
-                        landBtn.addEventListener('click', function () {
-                            var n = 0;
-                            cbs().forEach(function (c) {
-                                var want = c.getAttribute('data-landing') === '1' && n < max;
-                                c.checked = want;
-                                if (want) n++;
+                    function bindCandidateUi() {
+                        cbs().forEach(function (c) {
+                            c.addEventListener('change', function () {
+                                var n = selectedUrls().length;
+                                if (c.checked && n > max) {
+                                    c.checked = false;
+                                }
+                                updateSelected();
                             });
-                            updateSelected();
                         });
-                    }
-                    if (clearBtn) {
-                        clearBtn.addEventListener('click', function () {
-                            cbs().forEach(function (c) { c.checked = false; });
-                            updateSelected();
-                        });
-                    }
-                    if (runBtn) {
-                        runBtn.addEventListener('click', function () {
-                            var urls = selectedUrls();
-                            if (!urls.length) {
-                                alert('Выберите URL');
-                                return;
-                            }
-                            setRunning(true);
-                            fetch(startUrl, {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Accept': 'application/json',
-                                    'X-CSRF-TOKEN': csrf
-                                },
-                                body: JSON.stringify({ urls: urls })
-                            })
-                                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
-                                .then(function (pack) {
-                                    if (!pack.ok) {
-                                        setRunning(false);
-                                        alert((pack.j && pack.j.message) ? pack.j.message : 'Не удалось запустить');
-                                        return;
-                                    }
-                                    renderState(pack.j.state, pack.j);
-                                    poll();
-                                })
-                                .catch(function () {
-                                    setRunning(false);
-                                    alert('Ошибка сети');
+                        var landBtn = document.getElementById('sa-plag-landings');
+                        var clearBtn = document.getElementById('sa-plag-clear');
+                        var rb = runBtn();
+                        if (landBtn) {
+                            landBtn.addEventListener('click', function () {
+                                var n = 0;
+                                cbs().forEach(function (c) {
+                                    var want = c.getAttribute('data-landing') === '1' && n < max;
+                                    c.checked = want;
+                                    if (want) n++;
                                 });
-                        });
+                                updateSelected();
+                            });
+                        }
+                        if (clearBtn) {
+                            clearBtn.addEventListener('click', function () {
+                                cbs().forEach(function (c) { c.checked = false; });
+                                updateSelected();
+                            });
+                        }
+                        if (rb) {
+                            rb.addEventListener('click', function () {
+                                var urls = selectedUrls();
+                                if (!urls.length) {
+                                    alert('Выберите URL');
+                                    return;
+                                }
+                                setRunning(true);
+                                fetch(startUrl, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Accept': 'application/json',
+                                        'X-CSRF-TOKEN': csrf
+                                    },
+                                    body: JSON.stringify({ urls: urls })
+                                })
+                                    .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                                    .then(function (pack) {
+                                        if (!pack.ok) {
+                                            setRunning(false);
+                                            alert((pack.j && pack.j.message) ? pack.j.message : 'Не удалось запустить');
+                                            return;
+                                        }
+                                        renderState(pack.j.state, pack.j);
+                                        poll();
+                                    })
+                                    .catch(function () {
+                                        setRunning(false);
+                                        alert('Ошибка сети');
+                                    });
+                            });
+                        }
+                        updateSelected();
                     }
-                    updateSelected();
+                    function renderCandidates(list) {
+                        var wrap = document.getElementById('sa-plag-candidates-wrap');
+                        if (!wrap) return;
+                        if (!list || !list.length) {
+                            wrap.innerHTML = '<div class="alert alert-light border">Нет страниц с достаточным текстом для проверки.</div>';
+                            return;
+                        }
+                        var rows = list.map(function (c) {
+                            return '<tr>' +
+                                '<td><input type="checkbox" class="sa-plag-cb" value="' + esc(c.url) + '" data-landing="' + (c.is_landing ? '1' : '0') + '"></td>' +
+                                '<td class="small"><a href="' + esc(c.url) + '" target="_blank" rel="noopener">' + esc(short(c.url, 70)) + '</a></td>' +
+                                '<td class="small text-muted">' + esc(short(c.title || '—', 50)) + '</td>' +
+                                '<td>' + (parseInt(c.word_count || 0, 10) || 0) + '</td>' +
+                                '<td>' + (c.is_landing ? '<span class="badge bg-info text-dark">посадочная</span>' : '') + '</td>' +
+                                '</tr>';
+                        }).join('');
+                        wrap.innerHTML =
+                            '<div class="d-flex flex-wrap align-items-center mb-2" style="gap:8px">' +
+                            '<button type="button" class="btn btn-sm btn-outline-secondary" id="sa-plag-landings">Только посадочные</button>' +
+                            '<button type="button" class="btn btn-sm btn-outline-secondary" id="sa-plag-clear">Снять выбор</button>' +
+                            '<span class="small text-muted" id="sa-plag-selected">Выбрано: 0 / ' + max + '</span>' +
+                            '<button type="button" class="btn btn-sm btn-primary ms-auto" id="sa-plag-run">Проверить выбранные</button>' +
+                            '</div>' +
+                            '<div class="cabinet-sa-table-wrap mb-3" style="max-height:320px;overflow:auto">' +
+                            '<table class="table table-sm mb-0" id="sa-plag-table"><thead class="thead-light"><tr>' +
+                            '<th style="width:36px"></th><th>URL</th><th>Title</th><th>Слов</th><th></th>' +
+                            '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+                        bindCandidateUi();
+                    }
+                    function loadCandidates() {
+                        if (candidatesLoaded || candidatesLoading || !candidatesUrl) return;
+                        candidatesLoading = true;
+                        if (!limitsLoaded) poll();
+                        fetch(candidatesUrl, { headers: { Accept: 'application/json' } })
+                            .then(function (r) { return r.json(); })
+                            .then(function (j) {
+                                candidatesLoaded = true;
+                                candidatesLoading = false;
+                                renderCandidates((j && j.candidates) || []);
+                            })
+                            .catch(function () {
+                                candidatesLoading = false;
+                                var wrap = document.getElementById('sa-plag-candidates-wrap');
+                                if (wrap) {
+                                    wrap.innerHTML = '<div class="alert alert-warning mb-0">Не удалось загрузить список URL. Откройте вкладку ещё раз.</div>';
+                                }
+                            });
+                    }
+                    if (!candidatesLazy) {
+                        bindCandidateUi();
+                    } else {
+                        var plagTab = document.getElementById('sa-tab-plagiarism');
+                        if (plagTab) {
+                            plagTab.addEventListener('shown.bs.tab', loadCandidates);
+                            plagTab.addEventListener('click', function () {
+                                setTimeout(loadCandidates, 0);
+                            });
+                        }
+                        if (window.location.hash === '#sa-pane-plagiarism') {
+                            loadCandidates();
+                        }
+                    }
                     @if(!empty($plagiarismState['status']) && in_array($plagiarismState['status'], ['queued', 'running'], true))
                     poll();
                     @endif
+                })();
+
+                (function initRelevanceTab() {
+                    var pane = document.getElementById('sa-pane-relevance');
+                    if (!pane) return;
+                    var rowsUrl = pane.getAttribute('data-rows-url') || '';
+                    var lazy = pane.getAttribute('data-rows-lazy') === '1';
+                    if (!lazy || !rowsUrl) return;
+                    var loaded = false;
+                    var loading = false;
+
+                    function esc(s) {
+                        return String(s == null ? '' : s)
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/"/g, '&quot;');
+                    }
+                    function short(s, n) {
+                        s = String(s == null ? '' : s);
+                        return s.length > n ? s.slice(0, n) : s;
+                    }
+                    function renderRows(rows) {
+                        var body = document.getElementById('sa-relevance-body');
+                        if (!body) return;
+                        if (!rows || !rows.length) {
+                            body.innerHTML = '<div class="alert alert-light border mb-0">' +
+                                'Нет посадочных из мониторинга для этого домена. ' +
+                                'Добавьте URL страницы к запросам в модуле мониторинга — появятся здесь.</div>';
+                            return;
+                        }
+                        var withH = 0;
+                        rows.forEach(function (r) { if (r.history_id) withH++; });
+                        var html = '<div class="small text-muted mb-2">Посадочных: ' + rows.length +
+                            ' · с анализом: ' + withH +
+                            ' · без анализа: ' + (rows.length - withH) + '</div>' +
+                            '<div class="cabinet-sa-table-wrap"><table class="table table-sm mb-0">' +
+                            '<thead class="thead-light"><tr>' +
+                            '<th>Запрос</th><th>Посадочная</th><th>Баллы</th><th>Покрытие</th><th>Поз.</th><th>Проверка</th><th></th>' +
+                            '</tr></thead><tbody>';
+                        rows.forEach(function (row) {
+                            html += '<tr><td class="small">' + esc(short(row.query, 40)) + '</td>' +
+                                '<td class="small"><a href="' + esc(row.url) + '" target="_blank" rel="noopener">' +
+                                esc(short(row.url, 55)) + '</a></td>';
+                            if (row.history_id) {
+                                var cov = (row.coverage != null || row.coverage_tf != null)
+                                    ? ((row.coverage != null ? row.coverage : '—') + ' / TF ' + (row.coverage_tf != null ? row.coverage_tf : '—'))
+                                    : '—';
+                                html += '<td>' + (row.points != null ? row.points : '—') + '</td>' +
+                                    '<td class="small">' + esc(cov) + '</td>' +
+                                    '<td>' + (row.position != null ? row.position : '—') + '</td>' +
+                                    '<td class="small text-muted">' + esc(row.last_check || '—') + '</td>' +
+                                    '<td class="text-nowrap">';
+                                if (row.history_url) {
+                                    html += '<a class="btn btn-sm btn-outline-primary" href="' + esc(row.history_url) +
+                                        '" target="_blank" rel="noopener">Открыть анализ</a> ';
+                                }
+                                html += '<a class="btn btn-sm btn-outline-secondary" href="' + esc(row.analyze_url || '#') +
+                                    '" target="_blank" rel="noopener" title="Повторить с prefill">Ещё раз</a></td>';
+                            } else {
+                                html += '<td colspan="4" class="small text-muted">Расчёта ещё не было</td>' +
+                                    '<td class="text-nowrap"><a class="btn btn-sm btn-primary" href="' +
+                                    esc(row.analyze_url || '#') + '" target="_blank" rel="noopener">Проверить в анализаторе</a></td>';
+                            }
+                            html += '</tr>';
+                        });
+                        html += '</tbody></table></div>';
+                        body.innerHTML = html;
+                    }
+                    function loadRows() {
+                        if (loaded || loading) return;
+                        loading = true;
+                        fetch(rowsUrl, { headers: { Accept: 'application/json' } })
+                            .then(function (r) { return r.json(); })
+                            .then(function (j) {
+                                loaded = true;
+                                loading = false;
+                                renderRows((j && j.rows) || []);
+                            })
+                            .catch(function () {
+                                loading = false;
+                                var body = document.getElementById('sa-relevance-body');
+                                if (body) {
+                                    body.innerHTML = '<div class="alert alert-warning mb-0">Не удалось загрузить. Откройте вкладку ещё раз.</div>';
+                                }
+                            });
+                    }
+                    var tab = document.getElementById('sa-tab-relevance');
+                    if (tab) {
+                        tab.addEventListener('shown.bs.tab', loadRows);
+                        tab.addEventListener('click', function () { setTimeout(loadRows, 0); });
+                    }
+                    if (window.location.hash === '#sa-pane-relevance') {
+                        loadRows();
+                    }
                 })();
 
                 var root = document.getElementById('sa-crawl-root');

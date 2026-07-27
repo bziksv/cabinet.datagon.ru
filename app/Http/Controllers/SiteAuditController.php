@@ -15,6 +15,9 @@ use App\Services\SiteAudit\SiteAuditPruner;
 use App\Services\SiteAudit\SiteAuditReportFilter;
 use App\Services\SiteAudit\SiteAuditRelevanceBridge;
 use App\Services\SiteAudit\SiteAuditExternalPlagiarismRunner;
+use App\Services\SiteAudit\SiteAuditGlobalCap;
+use App\Services\SiteAudit\SiteAuditLinkReferrers;
+use App\Services\SiteAudit\SiteAuditUserAgentSession;
 use App\SiteAuditCrawl;
 use App\SiteAuditFinding;
 use App\SiteAuditFindingNote;
@@ -54,7 +57,11 @@ class SiteAuditController extends Controller
                 ->where('user_id', $user->id)
                 ->withCount('crawls')
                 ->with(['crawls' => function ($q) {
-                    $q->orderByDesc('id')->limit(1);
+                    $q->orderByDesc('id')->limit(1)
+                        ->select([
+                            'id', 'project_id', 'user_id', 'status',
+                            'pages_total', 'pages_fetched', 'finished_at', 'created_at',
+                        ]);
                 }])
                 ->orderByDesc('id')
                 ->limit(50)
@@ -65,7 +72,11 @@ class SiteAuditController extends Controller
                 ->with('project')
                 ->orderByDesc('id')
                 ->limit(30)
-                ->get();
+                ->get([
+                    'id', 'project_id', 'user_id', 'status',
+                    'pages_total', 'pages_fetched', 'buckets_json', 'counts_json',
+                    'finished_at', 'created_at', 'error',
+                ]);
 
             $crawlSizes = SiteAuditCrawlStorage::payloadBytesByCrawlIds($crawls->pluck('id')->all());
 
@@ -78,12 +89,14 @@ class SiteAuditController extends Controller
             $crawlSizes = [];
         }
 
+        $canSchedule = $user && ! DemoCabinet::isCurrentUser() && SiteAuditSchedule::allowedForUser($user);
+
         return view('pages.site-audit', [
             'projects' => $projects,
             'crawls' => $crawls,
             'crawlSizes' => $crawlSizes,
             'schedules' => $schedules,
-            'canSchedule' => $user && ! DemoCabinet::isCurrentUser() && SiteAuditSchedule::allowedForUser($user),
+            'canSchedule' => $canSchedule,
             'scheduleFrequencies' => SiteAuditSchedule::frequencyLabels(),
             'pagesLimit' => SiteAuditLimits::pagesPerCrawlLimit(),
             'crawlsLimit' => SiteAuditLimits::crawlsPerMonthLimit(),
@@ -96,7 +109,7 @@ class SiteAuditController extends Controller
 
     public function showCrawl(int $id): View
     {
-        $crawl = $this->ownedCrawl($id);
+        $crawl = $this->ownedCrawl($id, true, true);
         $crawl->load('project');
 
         $counts = $crawl->counts_json ?: SiteAuditFinding::query()
@@ -135,13 +148,16 @@ class SiteAuditController extends Controller
             ];
         }
 
-        $archiveLimit = min(100, max(8, (int) config('site_audit.history_keep_per_project', 200)));
+        // Архив в модалке — без тяжёлых JSON; лимит небольшой (полный список не нужен на каждый просмотр).
+        $archiveLimit = 25;
         $archiveCrawls = SiteAuditCrawl::query()
             ->where('project_id', $crawl->project_id)
             ->whereIn('status', [SiteAuditCrawl::STATUS_DONE, SiteAuditCrawl::STATUS_FAILED])
             ->orderByDesc('id')
             ->limit($archiveLimit)
             ->get(['id', 'status', 'buckets_json', 'pages_total', 'pages_fetched', 'finished_at', 'created_at', 'error']);
+
+        $plagiarismRunner = new SiteAuditExternalPlagiarismRunner();
 
         return view('pages.site-audit-crawl', [
             'crawl' => $crawl,
@@ -169,21 +185,45 @@ class SiteAuditController extends Controller
                 : null,
             'canActionPlanAi' => (bool) config('deepseek.token')
                 && (bool) config('site_audit.action_plan_ai_enabled', true),
-            'plagiarismCandidates' => $crawl->status === SiteAuditCrawl::STATUS_DONE
-                ? (new SiteAuditExternalPlagiarismRunner())->candidates($crawl)
-                : [],
-            'plagiarismState' => (new SiteAuditExternalPlagiarismRunner())->state($crawl),
+            // Кандидаты и релевантность — lazy AJAX (LandingResolver + pages тяжелы на remote DB).
+            'plagiarismCandidates' => [],
+            'plagiarismCandidatesLazy' => $crawl->status === SiteAuditCrawl::STATUS_DONE,
+            'plagiarismCandidatesUrl' => route('pages.site-audit.plagiarism.candidates', $crawl->id),
+            'plagiarismState' => $plagiarismRunner->state($crawl),
             'plagiarismMaxUrls' => max(1, (int) config('site_audit.plagiarism_external_max_urls', 10)),
             'plagiarismWarnBelow' => (float) config('site_audit.plagiarism_external_warn_below', 70),
-            'plagiarismRemaining' => Auth::user()
-                ? TextUniquenessLimits::remainingForUser(Auth::user())
-                : null,
-            'plagiarismLimit' => Auth::user()
-                ? TextUniquenessLimits::limitForUser(Auth::user())
-                : null,
-            'relevanceRows' => $crawl->status === SiteAuditCrawl::STATUS_DONE
-                ? (new SiteAuditRelevanceBridge())->rowsForCrawl($crawl)
-                : [],
+            // Лимиты уникальности — через status AJAX (tariff/getAsArray на remote DB дорого).
+            'plagiarismRemaining' => null,
+            'plagiarismLimit' => null,
+            'relevanceRows' => [],
+            'relevanceRowsLazy' => $crawl->status === SiteAuditCrawl::STATUS_DONE,
+            'relevanceRowsUrl' => route('pages.site-audit.relevance.rows', $crawl->id),
+        ]);
+    }
+
+    public function plagiarismCandidates(int $id): JsonResponse
+    {
+        $crawl = $this->ownedCrawl($id);
+        if ($crawl->status !== SiteAuditCrawl::STATUS_DONE) {
+            return response()->json(['ok' => true, 'candidates' => []]);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'candidates' => (new SiteAuditExternalPlagiarismRunner())->candidates($crawl),
+        ]);
+    }
+
+    public function relevanceRows(int $id): JsonResponse
+    {
+        $crawl = $this->ownedCrawl($id);
+        if ($crawl->status !== SiteAuditCrawl::STATUS_DONE) {
+            return response()->json(['ok' => true, 'rows' => []]);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'rows' => (new SiteAuditRelevanceBridge())->rowsForCrawl($crawl),
         ]);
     }
 
@@ -224,7 +264,7 @@ class SiteAuditController extends Controller
         $crawl = $this->ownedCrawl($id);
         $runner = new SiteAuditExternalPlagiarismRunner();
 
-        return response()->json([
+                        return response()->json([
             'ok' => true,
             'state' => $runner->state($crawl),
             'finding_count' => (int) SiteAuditFinding::query()
@@ -233,6 +273,9 @@ class SiteAuditController extends Controller
                 ->count(),
             'remaining' => Auth::user()
                 ? TextUniquenessLimits::remainingForUser(Auth::user())
+                : null,
+            'limit' => Auth::user()
+                ? TextUniquenessLimits::limitForUser(Auth::user())
                 : null,
             'report_url' => route('pages.site-audit.report.show', [
                 'id' => $crawl->id,
@@ -243,7 +286,7 @@ class SiteAuditController extends Controller
 
     public function showReport(Request $request, int $id, string $code)
     {
-        $crawl = $this->ownedCrawl($id);
+        $crawl = $this->ownedCrawl($id, false);
         $crawl->load('project');
 
         $meta = config('site_audit.findings.' . $code);
@@ -320,6 +363,11 @@ class SiteAuditController extends Controller
 
             $total = (clone $query)->count();
 
+            // Groups тянут все findings в память — на больших отчётах уходим в list.
+            if ($viewMode === 'groups' && $total > 400) {
+                $viewMode = 'list';
+            }
+
             if ($viewMode === 'groups') {
                 $allRows = $query->get();
                 $allGroups = SiteAuditDuplicateGrouper::group($allRows, $code);
@@ -368,6 +416,28 @@ class SiteAuditController extends Controller
         // На отчёте по умолчанию открываем сводку со всеми замечаниями.
         $activeGroup = 'all';
 
+        $showReferrers = in_array($code, SiteAuditLinkReferrers::targetCodes(), true);
+        if ($showReferrers && $rows instanceof \Illuminate\Support\Collection && $rows->isNotEmpty()) {
+            $targetUrls = $rows->pluck('url')->filter()->unique()->values()->all();
+            $refMap = SiteAuditLinkReferrers::forCrawl((int) $crawl->id, $targetUrls);
+            $rows = $rows->map(function ($row) use ($refMap) {
+                $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+                $refs = $refMap[(string) $row->url] ?? [];
+                // broken_internal_link already has meta.from — merge
+                if (! empty($meta['from'])) {
+                    $from = (string) $meta['from'];
+                    if ($from !== '' && ! in_array($from, $refs, true)) {
+                        array_unshift($refs, $from);
+                    }
+                }
+                $meta['referrers'] = array_slice($refs, 0, 12);
+                $meta['referrer_count'] = count($refs);
+                $row->meta_json = $meta;
+
+                return $row;
+            });
+        }
+
         return view('pages.site-audit-report', [
             'crawl' => $crawl,
             'project' => $crawl->project,
@@ -403,9 +473,57 @@ class SiteAuditController extends Controller
             'bucketsAll' => $bucketsAll,
             'activeGroup' => $activeGroup,
             'itemGroup' => $itemGroup,
+            'showReferrers' => $showReferrers,
             'canIgnore' => ! DemoCabinet::isCurrentUser() && ($meta['source'] ?? '') !== 'pages_canonical',
             'canNote' => ! DemoCabinet::isCurrentUser() && ($meta['source'] ?? '') !== 'pages_canonical',
         ]);
+    }
+
+    public function cancelCrawl(Request $request, int $id)
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            if ($request->expectsJson()) {
+                return response()->json(['error' => 'demo'], 403);
+            }
+            abort(403);
+        }
+
+        $crawl = $this->ownedCrawl($id);
+        if ($crawl->isFinished()) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'ok' => true,
+                    'status' => $crawl->status,
+                    'status_label' => $crawl->statusLabelRu(),
+                    'finished' => true,
+                ]);
+            }
+
+            return redirect()
+                ->route('pages.site-audit.crawl.show', $crawl->id)
+                ->with('status', 'Краул уже завершён');
+        }
+
+        $crawl->status = SiteAuditCrawl::STATUS_CANCELLED;
+        $crawl->error = 'Остановлен пользователем';
+        $crawl->finished_at = now();
+        $crawl->save();
+
+        SiteAuditUserAgentSession::clear($crawl->id);
+        SiteAuditGlobalCap::promoteWaiting();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'status' => $crawl->status,
+                'status_label' => $crawl->statusLabelRu(),
+                'finished' => true,
+            ]);
+        }
+
+        return redirect()
+            ->route('pages.site-audit.crawl.show', $crawl->id)
+            ->with('status', 'Краул остановлен');
     }
 
     public function destroyCrawl(Request $request, int $id)
@@ -422,13 +540,13 @@ class SiteAuditController extends Controller
             if ($request->expectsJson()) {
                 return response()->json([
                     'error' => 'active',
-                    'message' => 'Нельзя удалить незавершённый краул',
+                    'message' => 'Нельзя удалить незавершённый краул — сначала остановите',
                 ], 422);
             }
 
             return redirect()
                 ->route('pages.site-audit.crawl.show', $crawl->id)
-                ->with('status', 'Нельзя удалить незавершённый краул');
+                ->with('status', 'Нельзя удалить незавершённый краул — сначала остановите');
         }
 
         (new SiteAuditPruner())->deleteCrawl($crawl);
@@ -1252,15 +1370,41 @@ class SiteAuditController extends Controller
         abort($status);
     }
 
-    private function ownedCrawl(int $id): SiteAuditCrawl
+    private function ownedCrawl(int $id, bool $withProgress = true, bool $slimProgress = false): SiteAuditCrawl
     {
         $user = Auth::user();
         abort_unless($user, 401);
 
-        return SiteAuditCrawl::query()
+        $base = [
+            'id', 'project_id', 'user_id', 'status',
+            'pages_total', 'pages_fetched', 'pages_limit',
+            'counts_json', 'buckets_json',
+            'finished_at', 'created_at', 'started_at', 'error',
+            'save_html',
+            'share_token', 'share_enabled_at',
+            'share_white_label', 'share_brand_name', 'share_brand_url', 'share_brand_logo',
+        ];
+
+        $query = SiteAuditCrawl::query()
             ->where('id', $id)
-            ->where('user_id', $user->id)
-            ->firstOrFail();
+            ->where('user_id', $user->id);
+
+        // Полный progress_json тянет landings/sitemap (100+ KB) — на remote DB это секунды.
+        if ($withProgress && $slimProgress) {
+            $cols = implode(', ', array_map(static function ($c) {
+                return 'site_audit_crawls.' . $c;
+            }, $base));
+
+            return $query
+                ->selectRaw("{$cols}, JSON_REMOVE(site_audit_crawls.progress_json, '\$.landings', '\$.sitemap', '\$.robots') as progress_json")
+                ->firstOrFail();
+        }
+
+        if (! $withProgress) {
+            return $query->firstOrFail($base);
+        }
+
+        return $query->firstOrFail();
     }
 
     /**

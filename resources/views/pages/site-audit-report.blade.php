@@ -85,6 +85,15 @@
                 <a class="nav-link {{ $activeGroup === 'seo' ? 'active' : '' }}" id="sa-tab-seo" data-bs-toggle="tab" href="#sa-pane-seo" role="tab"
                    title="SEO: title, описание, H1, дубли, посадочные, контент">SEO-аудит</a>
             </li>
+            {{-- Те же разделы, что на сводке краула: ведут на /crawl#… (контент там, не дублируем тяжёлую загрузку). --}}
+            <li class="nav-item">
+                <a class="nav-link" href="{{ route('pages.site-audit.crawl.show', $crawl->id) }}#sa-pane-plagiarism"
+                   title="Выборочная проверка уникальности текста vs интернет">Антиплагиат</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ route('pages.site-audit.crawl.show', $crawl->id) }}#sa-pane-relevance"
+                   title="Посадочные мониторинга ↔ анализатор релевантности">Релевантность</a>
+            </li>
         </ul>
 
         <div class="tab-content">

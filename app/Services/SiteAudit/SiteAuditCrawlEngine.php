@@ -167,6 +167,11 @@ class SiteAuditCrawlEngine
         $unchanged = 0;
 
         while ($i < count($queue)) {
+            $crawl->refresh();
+            if ($crawl->isFinished()) {
+                break;
+            }
+
             $url = $queue[$i];
             $i++;
 
@@ -183,6 +188,11 @@ class SiteAuditCrawlEngine
 
             if (! empty($out['content_unchanged'])) {
                 $unchanged++;
+            }
+
+            $crawl->refresh();
+            if ($crawl->isFinished()) {
+                break;
             }
 
             $crawl->pages_fetched = $i;
@@ -223,6 +233,22 @@ class SiteAuditCrawlEngine
         }
 
         SiteAuditUserAgentSession::clear($crawl->id);
+
+        $crawl->refresh();
+        if ($crawl->status === SiteAuditCrawl::STATUS_CANCELLED) {
+            $crawl->finished_at = $crawl->finished_at ?: now();
+            $crawl->save();
+            SiteAuditGlobalCap::promoteWaiting();
+
+            return $crawl->fresh();
+        }
+
+        if ($crawl->isFinished()) {
+            SiteAuditGlobalCap::promoteWaiting();
+
+            return $crawl->fresh();
+        }
+
         (new AggregateSiteAuditCrawlJob($crawl->id))->handle();
 
         return $crawl->fresh();

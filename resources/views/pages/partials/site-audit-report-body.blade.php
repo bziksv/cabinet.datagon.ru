@@ -50,16 +50,20 @@
 @else
     @php
         $colspan = 3;
+        if (!empty($showReferrers)) { $colspan++; }
         if (!empty($canIgnore)) { $colspan++; }
         if (!empty($canNote)) { $colspan++; }
+        $urlTip = !empty($showReferrers)
+            ? "Это URL, который сам ответил ошибкой при обходе (404 и т.п.).\nНе путать со страницей, где стоит ссылка — она в колонке «Откуда ссылаются»."
+            : "Адрес страницы с проблемой.\nНажмите ссылку — откроется сайт в новой вкладке.";
     @endphp
     <div class="cabinet-sa-table-wrap">
         <table class="table table-sm table-hover mb-0">
             <thead class="table-light">
             <tr>
-                <th style="width:38%" title="Адрес страницы, где нашлась проблема. Клик — открыть сайт.">
-                    URL
-                    @include('pages.partials.site-audit-tip', ['tip' => "Адрес страницы с проблемой.\nНажмите ссылку — откроется сайт в новой вкладке."])
+                <th style="width:{{ !empty($showReferrers) ? '28%' : '38%' }}" title="{{ !empty($showReferrers) ? 'Битый URL (цель)' : 'Адрес страницы с проблемой' }}">
+                    {{ !empty($showReferrers) ? 'Битый URL' : 'URL' }}
+                    @include('pages.partials.site-audit-tip', ['tip' => $urlTip])
                 </th>
                 <th title="Насколько срочно чинить: Грубые → Прочие → Предупреждения → Инфо.">
                     Приоритет
@@ -69,6 +73,14 @@
                     Детали
                     @include('pages.partials.site-audit-tip', ['tip' => "Кратко что не так: код ответа, какой дубль, какой запрос и т.д."])
                 </th>
+                @if(!empty($showReferrers))
+                    <th style="width:28%" title="Страницы краула, на которых есть ссылка на этот битый URL.">
+                        Откуда ссылаются
+                        @include('pages.partials.site-audit-tip', [
+                            'tip' => "Страницы, где в HTML есть ссылка на этот битый URL.\nЕсли пусто — URL попал в очередь из sitemap/посева, либо в крауле не сохранились исходящие ссылки (часто когда почти все ответы 4xx).",
+                        ])
+                    </th>
+                @endif
                 @if(!empty($canNote))
                     <th style="width:220px" title="Ваша заметка по этой ошибке. Хранится в проекте навсегда.">
                         Комментарий / статус
@@ -96,6 +108,9 @@
                     $note = $notesMap[(int) ($row->id ?? 0)] ?? null;
                     $isFixed = is_array($note) && (($note['status'] ?? '') === 'fixed');
                     $noteComment = is_array($note) ? (string) ($note['comment'] ?? '') : '';
+                    $rowMeta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+                    $referrers = is_array($rowMeta['referrers'] ?? null) ? $rowMeta['referrers'] : [];
+                    $referrerCount = (int) ($rowMeta['referrer_count'] ?? count($referrers));
                 @endphp
                 <tr class="{{ $isIgn ? 'cabinet-sa-row--ignored' : '' }}{{ $isFixed ? ' cabinet-sa-row--fixed' : '' }}">
                     <td class="cabinet-sa-url">
@@ -111,6 +126,22 @@
                     <td class="small">
                         {{ \App\Services\SiteAudit\SiteAuditFindingPresenter::metaLine($row->code ?? $code, $row->meta_json) }}
                     </td>
+                    @if(!empty($showReferrers))
+                        <td class="small">
+                            @if($referrerCount > 0)
+                                <ul class="list-unstyled mb-0 cabinet-sa-referrers">
+                                    @foreach(array_slice($referrers, 0, 5) as $ref)
+                                        <li><a href="{{ $ref }}" target="_blank" rel="noopener noreferrer">{{ \Illuminate\Support\Str::limit($ref, 55) }}</a></li>
+                                    @endforeach
+                                </ul>
+                                @if($referrerCount > 5)
+                                    <div class="text-muted">ещё {{ $referrerCount - 5 }}…</div>
+                                @endif
+                            @else
+                                <span class="text-muted">не найдено в ссылках краула</span>
+                            @endif
+                        </td>
+                    @endif
                     @if(!empty($canNote) && !empty($row->id))
                         <td class="cabinet-sa-note-cell">
                             <form method="POST" action="{{ route('pages.site-audit.note', $crawl->id) }}" class="cabinet-sa-note-form">

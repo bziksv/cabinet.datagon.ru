@@ -178,6 +178,14 @@ class SiteAuditAggregator
             ->orderBy('id')
             ->chunkById(200, function ($pages) use ($crawlId, $thin, $titleMin, $titleMax, $descMin, $descMax) {
                 foreach ($pages as $page) {
+                    // SEO/контент-находки только для успешно открытых HTML-страниц.
+                    // На 4xx/5xx/unreachable HTML не парсился → img/title = 0 по умолчанию,
+                    // иначе «Нет уникальных изображений» и т.п. заливают весь отчёт битыми URL.
+                    $status = $page->status_code;
+                    if ($status === null || (int) $status < 200 || (int) $status >= 400) {
+                        continue;
+                    }
+
                     $findings = [];
 
                     if ($page->word_count !== null && (int) $page->word_count > 0 && (int) $page->word_count < $thin) {
@@ -260,7 +268,7 @@ class SiteAuditAggregator
                         ]);
                     }
 
-                    if ((int) $page->unique_img_src_count === 0) {
+                    if ((int) $page->unique_img_src_count === 0 && ! $page->noindex) {
                         $findings[] = $this->row($crawlId, 'no_unique_images', $page, [
                             'img_count' => (int) $page->img_count,
                             'unique_img_src_count' => 0,

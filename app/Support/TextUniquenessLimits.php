@@ -7,9 +7,13 @@ use App\TextUniquenessUsage;
 use App\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class TextUniquenessLimits
 {
+    /** @var array<int, array|null> */
+    private static $settingsByUser = [];
+
     public static function periodKey(?Carbon $at = null): string
     {
         $at = $at ?? Carbon::now();
@@ -123,18 +127,8 @@ class TextUniquenessLimits
 
     private static function tariffInt(string $code, ?User $user = null): ?int
     {
-        $user = $user ?? Auth::user();
-        if (! $user) {
-            return null;
-        }
-
-        $tariff = $user->tariff();
-        if (! $tariff) {
-            return null;
-        }
-
-        $settings = $tariff->getAsArray()['settings'] ?? [];
-        if (! array_key_exists($code, $settings)) {
+        $settings = self::settings($user);
+        if ($settings === null || ! array_key_exists($code, $settings)) {
             return null;
         }
 
@@ -143,18 +137,38 @@ class TextUniquenessLimits
 
     private static function tariffMessage(string $code, ?User $user = null): ?string
     {
+        $settings = self::settings($user);
+        if ($settings === null) {
+            return null;
+        }
+
+        return $settings[$code]['message'] ?? null;
+    }
+
+    /**
+     * @return array|null
+     */
+    private static function settings(?User $user = null): ?array
+    {
         $user = $user ?? Auth::user();
         if (! $user) {
             return null;
         }
 
-        $tariff = $user->tariff();
-        if (! $tariff) {
-            return null;
+        $uid = (int) $user->id;
+        if (array_key_exists($uid, self::$settingsByUser)) {
+            return self::$settingsByUser[$uid];
         }
 
-        $settings = $tariff->getAsArray()['settings'] ?? [];
+        $cacheKey = 'tu_tariff_settings_' . $uid;
+        if (Cache::has($cacheKey)) {
+            return self::$settingsByUser[$uid] = Cache::get($cacheKey);
+        }
 
-        return $settings[$code]['message'] ?? null;
+        $tariff = $user->tariff();
+        $settings = $tariff ? ($tariff->getAsArray()['settings'] ?? []) : null;
+        Cache::put($cacheKey, $settings, 120);
+
+        return self::$settingsByUser[$uid] = $settings;
     }
 }

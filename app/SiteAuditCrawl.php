@@ -13,6 +13,7 @@ class SiteAuditCrawl extends Model
     public const STATUS_DONE = 'done';
     public const STATUS_FAILED = 'failed';
     public const STATUS_QUEUED_WAIT = 'queued_wait';
+    public const STATUS_CANCELLED = 'cancelled';
 
     protected $table = 'site_audit_crawls';
 
@@ -70,7 +71,16 @@ class SiteAuditCrawl extends Model
 
     public function isFinished(): bool
     {
-        return in_array($this->status, [self::STATUS_DONE, self::STATUS_FAILED], true);
+        return in_array($this->status, [
+            self::STATUS_DONE,
+            self::STATUS_FAILED,
+            self::STATUS_CANCELLED,
+        ], true);
+    }
+
+    public function isActive(): bool
+    {
+        return ! $this->isFinished();
     }
 
     public static function statusLabel(?string $status): string
@@ -83,6 +93,7 @@ class SiteAuditCrawl extends Model
             self::STATUS_DONE => 'Готово',
             self::STATUS_FAILED => 'Ошибка',
             self::STATUS_QUEUED_WAIT => 'В очереди (ждёт слот)',
+            self::STATUS_CANCELLED => 'Остановлен',
         ];
 
         return $map[$status] ?? (string) $status;
@@ -98,7 +109,7 @@ class SiteAuditCrawl extends Model
         if ($this->status === self::STATUS_DONE) {
             return 'done';
         }
-        if ($this->status === self::STATUS_FAILED) {
+        if ($this->status === self::STATUS_FAILED || $this->status === self::STATUS_CANCELLED) {
             return 'failed';
         }
 

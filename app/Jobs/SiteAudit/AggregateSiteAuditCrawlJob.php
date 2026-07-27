@@ -37,7 +37,7 @@ class AggregateSiteAuditCrawlJob implements ShouldQueue
 
         try {
             $crawl = SiteAuditCrawl::query()->find($this->crawlId);
-            if (! $crawl || $crawl->status === SiteAuditCrawl::STATUS_DONE) {
+            if (! $crawl || $crawl->isFinished()) {
                 return;
             }
 

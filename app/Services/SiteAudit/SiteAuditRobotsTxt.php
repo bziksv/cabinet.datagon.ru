@@ -209,32 +209,62 @@ class SiteAuditRobotsTxt
             return true;
         }
 
-        $matched = null;
         $matchedLen = -1;
         $allowed = true;
 
         foreach ($group['rules'] as $rule) {
-            $prefix = $rule['path'];
-            if ($prefix === '') {
+            $pattern = (string) ($rule['path'] ?? '');
+            if ($pattern === '') {
+                // пустой Disallow = разрешить всё (стандарт robots.txt)
+                if (! $rule['allow']) {
+                    continue;
+                }
+            }
+            if (! $this->pathMatchesRule($pattern, $path)) {
                 continue;
             }
-            // простой prefix match (без full wildcards)
-            $pattern = str_replace(['*', '$'], ['', ''], $prefix);
-            if ($pattern === '/') {
-                $ok = true;
-                $len = 1;
-            } else {
-                $ok = strpos($path, $pattern) === 0;
-                $len = strlen($pattern);
-            }
-            if ($ok && $len >= $matchedLen) {
+            // Специфичность: длина исходного паттерна (как у Google — longest match).
+            $len = strlen($pattern);
+            if ($len > $matchedLen) {
                 $matchedLen = $len;
-                $allowed = $rule['allow'];
-                $matched = $rule;
+                $allowed = (bool) $rule['allow'];
+            } elseif ($len === $matchedLen && $rule['allow']) {
+                // при равной длине — менее строгий Allow
+                $allowed = true;
             }
         }
 
-        return $matched === null ? true : $allowed;
+        return $matchedLen < 0 ? true : $allowed;
+    }
+
+    /**
+     * Google/Yandex robots.txt: * = любая последовательность, $ = конец URL.
+     * Без $ паттерн матчит как префикс (с учётом wildcard).
+     */
+    private function pathMatchesRule(string $pattern, string $path): bool
+    {
+        if ($pattern === '') {
+            return true;
+        }
+
+        $anchoredEnd = false;
+        if (substr($pattern, -1) === '$') {
+            $anchoredEnd = true;
+            $pattern = substr($pattern, 0, -1);
+        }
+
+        // preg_quote, затем вернуть wildcards
+        $regex = preg_quote($pattern, '#');
+        $regex = str_replace('\\*', '.*', $regex);
+
+        if ($anchoredEnd) {
+            $regex = '#^' . $regex . '$#u';
+        } else {
+            // префиксный матч: паттерн должен совпасть с началом path
+            $regex = '#^' . $regex . '#u';
+        }
+
+        return (bool) preg_match($regex, $path);
     }
 
     /**

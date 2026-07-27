@@ -250,7 +250,7 @@
                                     @php
                                         $fetchedN = (int) $c->pages_fetched;
                                         $totalN = max(0, (int) $c->pages_total);
-                                        $isFailed = $c->status === 'failed';
+                                        $isFailed = $c->status === 'failed' || $c->status === 'cancelled';
                                         $indeterminate = ! $finished && ($totalN < 1 || in_array($c->status, ['queued', 'queued_wait', 'discovering'], true));
                                         // /html/UI/general.html — Progress
                                         if ($finished && ! $isFailed) {
@@ -299,7 +299,7 @@
                                         }
                                     @endphp
                                     <span class="cabinet-sa-size {{ $sizeClass }}" title="payload в БД (pages + findings + meta), без HTML">
-                                        {{ \App\Services\SiteAudit\SiteAuditCrawlStorage::formatBytes($sizeBytes) }}
+                                        ~{{ \App\Services\SiteAudit\SiteAuditCrawlStorage::formatBytes($sizeBytes) }}
                                     </span>
                                 </td>
                                 <td data-sa-bucket="critical">{{ $b['critical'] ?? '—' }}</td>
@@ -309,6 +309,13 @@
                                 <td class="text-end text-nowrap">
                                     <span class="cabinet-sa-row-actions">
                                         <a class="btn btn-sm btn-outline-primary" href="{{ route('pages.site-audit.crawl.show', $c->id) }}">Сводка</a>
+                                        @if(! $finished)
+                                            <form method="POST" action="{{ route('pages.site-audit.crawl.cancel', $c->id) }}" class="d-inline"
+                                                  onsubmit="return confirm('Остановить краул #{{ $c->id }}?');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">Стоп</button>
+                                            </form>
+                                        @endif
                                         @if($finished)
                                             <form method="POST" action="{{ route('pages.site-audit.crawl.repeat', $c->id) }}" class="d-inline"
                                                   onsubmit="return confirm('Повторить краул для {{ e(optional($c->project)->domain ?? 'проекта') }} с теми же настройками?');">

@@ -6,9 +6,13 @@ use App\SiteAuditCrawl;
 use App\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class SiteAuditLimits
 {
+    /** @var array<int, array|null> */
+    private static $settingsByUser = [];
+
     public static function periodKey(?Carbon $at = null): string
     {
         return ($at ?? Carbon::now())->format('Y-m');
@@ -73,21 +77,38 @@ class SiteAuditLimits
 
     private static function settingValue(string $code, ?User $user = null): ?int
     {
+        $settings = self::settings($user);
+        if ($settings === null || ! array_key_exists($code, $settings)) {
+            return null;
+        }
+
+        return (int) $settings[$code]['value'];
+    }
+
+    /**
+     * @return array|null null = нет пользователя/тарифа
+     */
+    private static function settings(?User $user = null): ?array
+    {
         $user = $user ?? Auth::user();
         if (! $user) {
             return null;
         }
 
+        $uid = (int) $user->id;
+        if (array_key_exists($uid, self::$settingsByUser)) {
+            return self::$settingsByUser[$uid];
+        }
+
+        $cacheKey = 'sa_tariff_settings_' . $uid;
+        if (Cache::has($cacheKey)) {
+            return self::$settingsByUser[$uid] = Cache::get($cacheKey);
+        }
+
         $tariff = $user->tariff();
-        if (! $tariff) {
-            return null;
-        }
+        $settings = $tariff ? ($tariff->getAsArray()['settings'] ?? []) : null;
+        Cache::put($cacheKey, $settings, 120);
 
-        $settings = $tariff->getAsArray()['settings'] ?? [];
-        if (! array_key_exists($code, $settings)) {
-            return null;
-        }
-
-        return (int) $settings[$code]['value'];
+        return self::$settingsByUser[$uid] = $settings;
     }
 }

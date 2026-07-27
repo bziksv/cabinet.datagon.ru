@@ -6,14 +6,69 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Оценка размера данных краула в БД (payload строк, без HTML-файлов).
+ *
+ * Важно: не делаем SUM(LENGTH(longtext)) по pages/findings — на remote MySQL
+ * это десятки секунд на список краулов. Считаем дешёвую оценку по meta + счётчикам.
  */
 class SiteAuditCrawlStorage
 {
+    /** Примерный вес одной строки site_audit_pages (без HTML). */
+    private const BYTES_PER_PAGE = 1600;
+
+    /** Примерный вес одной finding. */
+    private const BYTES_PER_FINDING = 200;
+
     /**
      * @param int[] $crawlIds
      * @return array<int,int> crawl_id => bytes
      */
     public static function payloadBytesByCrawlIds(array $crawlIds): array
+    {
+        $crawlIds = array_values(array_filter(array_map('intval', $crawlIds)));
+        if ($crawlIds === []) {
+            return [];
+        }
+
+        $out = array_fill_keys($crawlIds, 0);
+        $placeholders = implode(',', array_fill(0, count($crawlIds), '?'));
+
+        $crawlRows = DB::select(
+            "SELECT id, pages_fetched, counts_json,
+                COALESCE(LENGTH(COALESCE(buckets_json,'')),0)
+              + COALESCE(LENGTH(COALESCE(counts_json,'')),0)
+              + COALESCE(LENGTH(COALESCE(error,'')),0)
+              + COALESCE(LENGTH(COALESCE(share_token,'')),0)
+              + 200 AS meta_bytes
+             FROM site_audit_crawls WHERE id IN ($placeholders)",
+            $crawlIds
+        );
+
+        foreach ($crawlRows as $row) {
+            $id = (int) $row->id;
+            $pages = max(0, (int) $row->pages_fetched);
+            $findings = 0;
+            $counts = json_decode((string) ($row->counts_json ?? ''), true);
+            if (is_array($counts)) {
+                foreach ($counts as $c) {
+                    $findings += (int) $c;
+                }
+            }
+
+            $out[$id] = (int) $row->meta_bytes
+                + $pages * self::BYTES_PER_PAGE
+                + $findings * self::BYTES_PER_FINDING;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Точный размер (тяжёлый). Только для админ/отладки, не для списка краулов.
+     *
+     * @param int[] $crawlIds
+     * @return array<int,int>
+     */
+    public static function payloadBytesExactByCrawlIds(array $crawlIds): array
     {
         $crawlIds = array_values(array_filter(array_map('intval', $crawlIds)));
         if ($crawlIds === []) {

@@ -1,6 +1,8 @@
 {{-- Вкладка внешнего антиплагиата: выборочный запуск TextUniqueness --}}
 @php
     $plagiarismCandidates = $plagiarismCandidates ?? [];
+    $plagiarismCandidatesLazy = !empty($plagiarismCandidatesLazy);
+    $plagiarismCandidatesUrl = $plagiarismCandidatesUrl ?? '';
     $plagiarismState = $plagiarismState ?? ['status' => 'idle', 'rows' => [], 'done' => 0, 'total' => 0];
     $plagiarismMaxUrls = (int) ($plagiarismMaxUrls ?? 10);
     $plagiarismWarnBelow = (float) ($plagiarismWarnBelow ?? 70);
@@ -12,6 +14,8 @@
 <div class="tab-pane fade" id="sa-pane-plagiarism" role="tabpanel"
      data-start-url="{{ route('pages.site-audit.plagiarism.start', $crawl->id) }}"
      data-status-url="{{ route('pages.site-audit.plagiarism.status', $crawl->id) }}"
+     data-candidates-url="{{ $plagiarismCandidatesUrl }}"
+     data-candidates-lazy="{{ $plagiarismCandidatesLazy ? '1' : '0' }}"
      data-max="{{ $plagiarismMaxUrls }}"
      data-warn="{{ $plagiarismWarnBelow }}"
      data-csrf="{{ csrf_token() }}">
@@ -22,53 +26,28 @@
         Порог замечания: уникальность &lt; {{ rtrim(rtrim(number_format($plagiarismWarnBelow, 1, '.', ''), '0'), '.') }}%.
         Макс. {{ $plagiarismMaxUrls }} URL за запуск.
         @if($plagiarismLimit !== null)
-            Остаток лимита уникальности: <strong id="sa-plag-remaining">{{ $plagiarismRemaining }}</strong> / {{ $plagiarismLimit }}.
+            Остаток лимита уникальности: <strong id="sa-plag-remaining">{{ $plagiarismRemaining }}</strong> / <span id="sa-plag-limit">{{ $plagiarismLimit }}</span>.
         @else
-            Лимит уникальности не задан на тарифе (без списания).
+            Остаток лимита уникальности: <strong id="sa-plag-remaining">…</strong> / <span id="sa-plag-limit">…</span>
+            <span class="text-muted" id="sa-plag-limit-hint">(подгружается)</span>
         @endif
     </p>
 
     @if($crawl->status !== 'done')
         <div class="alert alert-light border">Доступно после завершения краула.</div>
-    @elseif(empty($plagiarismCandidates))
-        <div class="alert alert-light border">Нет страниц с достаточным текстом для проверки.</div>
     @else
-        <div class="d-flex flex-wrap align-items-center mb-2" style="gap:8px">
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="sa-plag-landings">Только посадочные</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="sa-plag-clear">Снять выбор</button>
-            <span class="small text-muted" id="sa-plag-selected">Выбрано: 0 / {{ $plagiarismMaxUrls }}</span>
-            <button type="button" class="btn btn-sm btn-primary ms-auto" id="sa-plag-run" {{ $running ? 'disabled' : '' }}>
-                {{ $running ? 'Проверка…' : 'Проверить выбранные' }}
-            </button>
-        </div>
-
-        <div class="cabinet-sa-table-wrap mb-3" style="max-height:320px;overflow:auto">
-            <table class="table table-sm mb-0" id="sa-plag-table">
-                <thead class="thead-light">
-                <tr>
-                    <th style="width:36px"></th>
-                    <th>URL</th>
-                    <th>Title</th>
-                    <th>Слов</th>
-                    <th></th>
-                </tr>
-                </thead>
-                <tbody>
-                @foreach($plagiarismCandidates as $c)
-                    <tr>
-                        <td>
-                            <input type="checkbox" class="sa-plag-cb" value="{{ $c['url'] }}"
-                                   data-landing="{{ !empty($c['is_landing']) ? '1' : '0' }}"
-                                {{ $running ? 'disabled' : '' }}>
-                        </td>
-                        <td class="small"><a href="{{ $c['url'] }}" target="_blank" rel="noopener">{{ \Illuminate\Support\Str::limit($c['url'], 70) }}</a></td>
-                        <td class="small text-muted">{{ \Illuminate\Support\Str::limit($c['title'] ?? '—', 50) }}</td>
-                        <td>{{ (int) ($c['word_count'] ?? 0) }}</td>
-                        <td>@if(!empty($c['is_landing']))<span class="badge bg-info text-dark">посадочная</span>@endif</td>
-                    </tr>
-                @endforeach
-                </tbody>
-            </table>
+        <div id="sa-plag-candidates-wrap">
+            @if($plagiarismCandidatesLazy)
+                <div class="alert alert-light border mb-0" id="sa-plag-candidates-loading">Загрузка списка URL…</div>
+            @elseif(empty($plagiarismCandidates))
+                <div class="alert alert-light border">Нет страниц с достаточным текстом для проверки.</div>
+            @else
+                @include('pages.partials.site-audit-plagiarism-candidates', [
+                    'plagiarismCandidates' => $plagiarismCandidates,
+                    'plagiarismMaxUrls' => $plagiarismMaxUrls,
+                    'running' => $running,
+                ])
+            @endif
         </div>
     @endif
 

@@ -7,21 +7,15 @@ use App\SiteAuditFinding;
 use App\SiteAuditFindingNote;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class SiteAuditFindingNoteService
 {
     public function tableReady(): bool
     {
-        static $ready = null;
-        if ($ready === null) {
-            try {
-                $ready = Schema::hasTable('site_audit_finding_notes');
-            } catch (\Throwable $e) {
-                $ready = false;
-            }
-        }
+        static $ready = true;
 
+        // Schema::hasTable бьёт в information_schema (~0.2–0.5s на remote MySQL).
+        // Таблица есть после миграций; при отсутствии catch ниже в callers.
         return $ready;
     }
 

@@ -222,7 +222,33 @@ class SiteAuditFindingPresenter
 
             case 'http_4xx':
             case 'http_5xx':
-                return isset($meta['status']) ? ('код ' . (int) $meta['status']) : '—';
+                $bits = [];
+                if (isset($meta['status'])) {
+                    $bits[] = 'код ' . (int) $meta['status'];
+                }
+                $refN = (int) ($meta['referrer_count'] ?? 0);
+                if ($refN > 0) {
+                    $first = ! empty($meta['referrers'][0]) ? self::clip((string) $meta['referrers'][0], 45) : '';
+                    $bits[] = 'ссылаются: ' . $refN . ($first !== '' ? ' · ' . $first : '');
+                } elseif (array_key_exists('referrer_count', $meta)) {
+                    $bits[] = 'ссылок с страниц краула нет';
+                }
+
+                return $bits ? implode(' · ', $bits) : '—';
+
+            case 'unreachable':
+                $bits = [];
+                if (! empty($meta['error'])) {
+                    $bits[] = self::clip((string) $meta['error'], 40);
+                }
+                $refN = (int) ($meta['referrer_count'] ?? 0);
+                if ($refN > 0) {
+                    $bits[] = 'ссылаются: ' . $refN;
+                } elseif (array_key_exists('referrer_count', $meta)) {
+                    $bits[] = 'ссылок с страниц краула нет';
+                }
+
+                return $bits ? implode(' · ', $bits) : '—';
 
             case 'page_too_large':
                 $size = isset($meta['size_bytes']) ? self::formatBytes((int) $meta['size_bytes']) : null;
@@ -798,9 +824,6 @@ class SiteAuditFindingPresenter
 
             case 'multiple_h1':
                 return isset($meta['count']) ? ('H1: ' . (int) $meta['count']) : '—';
-
-            case 'unreachable':
-                return ! empty($meta['error']) ? self::clip($meta['error'], 120) : '—';
 
             default:
                 return self::clip(json_encode($meta, JSON_UNESCAPED_UNICODE), 120);

@@ -674,7 +674,7 @@ return [
             'phase' => 'B',
             'severity' => 'info',
             'title' => 'В sitemap, не в крауле',
-            'description' => 'URL есть в sitemap, но не попал в текущий краул (лимит / не дошли по ссылкам).',
+            'description' => 'URL есть в sitemap, но не сохранён в результатах этого краула (лимит, robots или сбой скачивания). Не путать с ошибкой самой страницы.',
         ],
         'landing_not_in_sitemap' => [
             'phase' => 'B',

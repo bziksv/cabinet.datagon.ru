@@ -37,7 +37,7 @@ class SiteAuditPageProcessor
         $bodyPath = isset($result['body_path']) ? (string) $result['body_path'] : null;
 
         try {
-            return $this->processFetched($crawlId, $url, $urlHash, $result, $crawlSettings);
+            return $this->processFetched($crawlId, $url, $urlHash, $result, $crawlSettings, $projectHost);
         } finally {
             SiteAuditBodyTemp::release($bodyPath);
         }
@@ -48,8 +48,14 @@ class SiteAuditPageProcessor
      * @param array<string, mixed> $crawlSettings
      * @return array{internal_links:string[]}
      */
-    private function processFetched(int $crawlId, string $url, string $urlHash, array $result, array $crawlSettings): array
-    {
+    private function processFetched(
+        int $crawlId,
+        string $url,
+        string $urlHash,
+        array $result,
+        array $crawlSettings,
+        string $projectHost
+    ): array {
         $findings = [];
         $internalLinks = [];
 

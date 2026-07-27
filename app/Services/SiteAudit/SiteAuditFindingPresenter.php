@@ -317,9 +317,18 @@ class SiteAuditFindingPresenter
                 return 'нет в sitemap';
 
             case 'sitemap_not_crawled':
-                return isset($meta['pages_limit'])
-                    ? ('лимит краула: ' . (int) $meta['pages_limit'])
-                    : 'не в крауле';
+                $reason = (string) ($meta['reason'] ?? '');
+                if ($reason === 'crawl_save_gap') {
+                    return 'сбой сохранения страниц в крауле';
+                }
+                if ($reason === 'likely_robots_or_not_queued') {
+                    return 'не в очереди (robots / фильтр)';
+                }
+                if ($reason === 'pages_limit' || isset($meta['pages_limit'])) {
+                    return 'лимит краула: ' . (int) ($meta['pages_limit'] ?? 0);
+                }
+
+                return 'не в крауле';
 
             case 'landing_not_in_sitemap':
                 return 'посадочная · нет в sitemap';

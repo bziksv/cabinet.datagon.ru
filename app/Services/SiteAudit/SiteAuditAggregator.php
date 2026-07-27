@@ -422,33 +422,39 @@ class SiteAuditAggregator
 
         $crawled = SiteAuditPage::query()
             ->where('crawl_id', $crawl->id)
-            ->where('status_code', '>=', 200)
-            ->where('status_code', '<', 400)
             ->get(['url', 'url_hash', 'status_code', 'content_type']);
 
         $crawledSet = [];
         $notIn = 0;
         foreach ($crawled as $page) {
             $crawledSet[$page->url] = true;
-            if (isset($sitemapSet[$page->url])) {
-                continue;
+            $code = (int) ($page->status_code ?? 0);
+            if (! isset($sitemapSet[$page->url])) {
+                // только успешно отданные HTML-подобные / без content_type
+                if ($code < 200 || $code >= 400) {
+                    continue;
+                }
+                $ct = (string) ($page->content_type ?? '');
+                if ($ct !== '' && stripos($ct, 'html') === false && stripos($ct, 'text') === false) {
+                    continue;
+                }
+                if ($notIn >= $maxNotIn) {
+                    continue;
+                }
+                SiteAuditFinding::query()->create($this->row($crawl->id, 'not_in_sitemap', $page, [
+                    'sitemap_url_count' => count($sitemapUrls),
+                ]));
+                $notIn++;
             }
-            // только HTML-подобные / без content_type
-            $ct = (string) ($page->content_type ?? '');
-            if ($ct !== '' && stripos($ct, 'html') === false && stripos($ct, 'text') === false) {
-                continue;
-            }
-            if ($notIn >= $maxNotIn) {
-                continue;
-            }
-            SiteAuditFinding::query()->create($this->row($crawl->id, 'not_in_sitemap', $page, [
-                'sitemap_url_count' => count($sitemapUrls),
-            ]));
-            $notIn++;
         }
 
+        $robotsSkipped = (int) ($crawl->progress_json['robots_skipped'] ?? 0);
+        $pagesLimit = (int) $crawl->pages_limit;
+        $pagesFetched = (int) $crawl->pages_fetched;
+        $pagesStored = count($crawledSet);
         $emitted = 0;
         foreach ($sitemapUrls as $u) {
+            // Уже есть в крауле (любой статус) — не считаем «не в крауле»
             if (isset($crawledSet[$u])) {
                 continue;
             }
@@ -457,6 +463,14 @@ class SiteAuditAggregator
             }
             $hash = SiteAuditUrlNormalizer::hash($u);
             $cfg = config('site_audit.findings.sitemap_not_crawled', []);
+            $reason = 'in_sitemap_not_in_crawl';
+            if ($pagesStored < max(1, (int) ($pagesFetched * 0.5)) && $pagesFetched > 10) {
+                $reason = 'crawl_save_gap';
+            } elseif ($robotsSkipped > 0 && $pagesLimit > $pagesFetched) {
+                $reason = 'likely_robots_or_not_queued';
+            } elseif ($pagesLimit > 0 && $pagesFetched >= $pagesLimit) {
+                $reason = 'pages_limit';
+            }
             SiteAuditFinding::query()->create([
                 'crawl_id' => $crawl->id,
                 'code' => 'sitemap_not_crawled',
@@ -464,8 +478,12 @@ class SiteAuditAggregator
                 'url' => $u,
                 'url_hash' => $hash,
                 'meta_json' => [
-                    'reason' => 'in_sitemap_not_in_crawl',
-                    'pages_limit' => (int) $crawl->pages_limit,
+                    'reason' => $reason,
+                    'pages_limit' => $pagesLimit,
+                    'pages_fetched' => $pagesFetched,
+                    'pages_stored' => $pagesStored,
+                    'robots_skipped' => $robotsSkipped,
+                    'sitemap_url_count' => count($sitemapUrls),
                 ],
             ]);
             $emitted++;

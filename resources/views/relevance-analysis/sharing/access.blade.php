@@ -18,7 +18,7 @@
                 background: oldlace;
             }
 
-            .row {
+            .row.cabinet-ra-ignore {
                 margin: 0 !important;
             }
 
@@ -92,11 +92,11 @@
                         <tr>
                             <th class="table-header">{{ __('Project name') }}</th>
                             <th class="table-header">{{ __('Owner') }}</th>
-                            <th class="table-header">{{ __('Number of analyzed pages') }}</th>
-                            <th class="table-header">{{ __('Number of saved scans') }}</th>
-                            <th class="table-header">{{ __('Total score') }}</th>
-                            <th class="table-header">{{ __('Avg position') }}</th>
-                            <th class="table-header">{{ __('Last check') }}</th>
+                            <th class="table-header" title="{{ __('Number of analyzed pages') }}">{{ __('Relevance stats col pages') }}</th>
+                            <th class="table-header" title="{{ __('Number of saved scans') }}">{{ __('Relevance stats col scans') }}</th>
+                            <th class="table-header" title="{{ __('Total score') }}">{{ __('Relevance stats col score') }}</th>
+                            <th class="table-header" title="{{ __('Avg position') }}">{{ __('Relevance stats col position') }}</th>
+                            <th class="table-header" title="{{ __('Last check') }}">{{ __('Relevance stats col last check') }}</th>
                             <th class="table-header">{{ __('Actions') }}</th>
                         </tr>
                         </thead>
@@ -330,13 +330,16 @@
                                     </a>
                                     <i class="fa fa-table project_name"
                                        data-order="{{ $item->item->id }}"
-                                       style="opacity: 0.6; cursor:pointer;"></i>
+                                       style="opacity: 0.6; cursor:pointer;"
+                                       data-ra-tip="{{ e(__('Show the results of the analysis')) }}"></i>
 
                                     <i class="fa fa-list project_name_v2"
                                        data-order="{{ $item->item->id }}"
-                                       style="opacity: 0.6; cursor:pointer;"></i>
+                                       style="opacity: 0.6; cursor:pointer;"
+                                       data-ra-tip="{{ e(__('View the results in a list')) }}"></i>
                                     <i class="fa fa-cogs" id="dropdownMenuButton" data-bs-toggle="dropdown"
-                                       aria-expanded="false" style="opacity: 0.6; cursor: pointer"></i>
+                                       aria-expanded="false" style="opacity: 0.6; cursor: pointer"
+                                       data-ra-tip="{{ e(__('Actions')) }}"></i>
                                     <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
                                             <span class="dropdown-item project_name"
                                                   style="cursor:pointer;"
@@ -385,7 +388,7 @@
                                         <i class="fa fa-repeat" style="opacity: 0.6; cursor: pointer"
                                            data-bs-target="#repeatUniqueScan{{ $item->item->id }}"
                                            data-bs-toggle="modal" data-bs-placement="top"
-                                           title="{{ __('restart analyzed pages') }}"></i>
+                                           data-ra-tip="{{ e(__('restart analyzed pages')) }}"></i>
                                     </span>
                                 </td>
                                 <td>{{ $item->project[0]->count_checks }}</td>
@@ -394,7 +397,8 @@
                                 <td>{{ $item->project[0]->last_check }}</td>
 
                                 <td class="sharing-table__actions">
-                                    <button class="btn btn-secondary remove-access" data-target="{{ $item->id }}">
+                                    <button class="btn btn-secondary remove-access" data-target="{{ $item->id }}"
+                                            data-ra-tip="{{ e(__('Relevance share refuse access tip')) }}">
                                         Отказаться от доступа
                                     </button>
                                 </td>
@@ -722,6 +726,7 @@
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
         <script src="{{ asset('plugins/relevance-analysis/history/childHistoryTable.js') }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/history/common.js') }}"></script>
+        <script src="{{ asset('js/cabinet-relevance-tooltips.js') }}?v={{ @filemtime(public_path('js/cabinet-relevance-tooltips.js')) ?: time() }}"></script>
         <script>
             let words = {
                 search: "{{ __('Search') }}",
@@ -744,11 +749,16 @@
             };
 
             $(document).ready(function (){
+                if (typeof window.initRelevanceActionTips === 'function') {
+                    window.initRelevanceActionTips(document);
+                }
                 let accessProjectsTable = $('#main_history_table').DataTable({
                     autoWidth: false,
                     order: [[6, 'desc']],
                     pageLength: 10,
-                    dom: 'lfrtip',
+                    dom: "<'row'<'col-sm-12 col-md-6'f><'col-sm-12 col-md-6'l>>" +
+                        "<'row'<'col-sm-12'tr>>" +
+                        "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
                     searching: true,
                     language: {
                         paginate: {

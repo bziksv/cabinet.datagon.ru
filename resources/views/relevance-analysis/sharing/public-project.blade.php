@@ -5,13 +5,46 @@
             .public-share-banner {
                 border-left: 4px solid #2563eb;
             }
+            #public-share-scans_wrapper .dataTables_filter {
+                float: left;
+                text-align: left;
+                margin-bottom: 0.5rem;
+            }
+            #public-share-scans_wrapper .dataTables_length {
+                float: right;
+                text-align: right;
+                margin-bottom: 0.5rem;
+            }
+            #public-share-scans_wrapper > .row:first-child > [class*="col-"]:first-child {
+                text-align: left;
+            }
+            #public-share-scans_wrapper > .row:first-child > [class*="col-"]:last-child {
+                text-align: right;
+            }
+            #public-share-scans_wrapper .dataTables_length label {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.35rem;
+                justify-content: flex-end;
+            }
+            #public-share-scans_wrapper .dataTables_filter label {
+                display: inline-flex;
+                align-items: center;
+                gap: 0.35rem;
+            }
         </style>
     @endslot
 
     <div class="alert alert-info public-share-banner mb-4">
         <div class="fw-semibold mb-1">{{ __('Public project access') }}</div>
-        <div class="mb-0 small">{{ __('View-only access without registration. Link expires on') }}
-            <strong>{{ $share->expires_at->format('d.m.Y H:i') }}</strong>.
+        <div class="mb-0 small">
+            {{ __('View-only access without registration.') }}
+            @if($share->isUnlimited())
+                <strong>{{ __('Relevance share ttl unlimited') }}</strong>.
+            @else
+                {{ __('Link expires on') }}
+                <strong>{{ $share->expires_at->format('d.m.Y H:i') }}</strong>.
+            @endif
         </div>
     </div>
 
@@ -80,6 +113,19 @@
                 $('#public-share-scans').DataTable({
                     pageLength: 25,
                     order: [[3, 'desc']],
+                    dom: "<'row'<'col-sm-12 col-md-6'f><'col-sm-12 col-md-6'l>>" +
+                        "<'row'<'col-sm-12'tr>>" +
+                        "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+                    language: {
+                        search: @json(__('Search') . ':'),
+                        lengthMenu: @json(__('show') . ' _MENU_ ' . __('records')),
+                        emptyTable: @json(__('No records')),
+                        zeroRecords: @json(__('No records')),
+                        info: @json(__('Showing') . ' ' . __('from') . ' _START_ ' . __('to') . ' _END_ ' . __('of') . ' _TOTAL_ ' . __('entries')),
+                        infoEmpty: @json(__('Showing') . ' ' . __('from') . ' 0 ' . __('to') . ' 0 ' . __('of') . ' 0 ' . __('entries')),
+                        infoFiltered: @json(__('(filtered from _MAX_ total)')),
+                        paginate: { first: '«', last: '»', next: '»', previous: '«' },
+                    },
                 });
             });
         </script>

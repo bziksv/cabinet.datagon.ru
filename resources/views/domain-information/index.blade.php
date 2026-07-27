@@ -62,7 +62,19 @@
             <table id="table" class="table table-sm table-bordered table-striped align-middle cabinet-di-table w-100 mb-0">
                 <thead>
                 <tr>
-                    <th class="cabinet-di-th-check" aria-label="{{ __('Select') }}"></th>
+                    <th class="cabinet-di-th-check">
+                        <div class="cabinet-di-td-check">
+                            <input type="checkbox"
+                                   id="cabinet-di-select-all"
+                                   class="cabinet-di-row-select__input"
+                                   aria-label="{{ __('Select all') }}"
+                                   title="{{ __('Domain information select all tip') }}">
+                            <label for="cabinet-di-select-all"
+                                   class="cabinet-di-row-select__hit"
+                                   data-di-tip="{{ __('Domain information select all tip') }}"
+                                   aria-hidden="true"></label>
+                        </div>
+                    </th>
                     <th>{{ __('Domain') }}</th>
                     <th>{{ __('Domain information notify dns') }}</th>
                     <th>{{ __('Domain information notify expiry') }}</th>
@@ -453,8 +465,42 @@
                 });
             });
 
+            function cabinetDiRowCheckboxes(dt, checkedOnly) {
+                const selector = checkedOnly
+                    ? 'input[name=enums].cabinet-di-row-select__input:checked'
+                    : 'input[name=enums].cabinet-di-row-select__input';
+                return dt.$(selector, { search: 'applied' });
+            }
+
+            function cabinetDiSyncSelectAll(dt) {
+                const $all = $('#cabinet-di-select-all');
+                if (!$all.length || !dt) {
+                    return;
+                }
+                const $boxes = cabinetDiRowCheckboxes(dt, false);
+                const total = $boxes.length;
+                const checked = cabinetDiRowCheckboxes(dt, true).length;
+                if (!total) {
+                    $all.prop({ checked: false, indeterminate: false });
+                    return;
+                }
+                $all.prop('checked', checked === total);
+                $all.prop('indeterminate', checked > 0 && checked < total);
+            }
+
+            function cabinetDiTableApi() {
+                if (!$.fn.DataTable || !$.fn.DataTable.isDataTable('#table')) {
+                    return null;
+                }
+                return $('#table').DataTable();
+            }
+
             $('#selectedProjects').on('click', function () {
-                const ids = $('input[name=enums]:checked').map(function () { return $(this).val(); }).get().join(', ');
+                const table = cabinetDiTableApi();
+                const $checked = table
+                    ? cabinetDiRowCheckboxes(table, true)
+                    : $('input[name=enums].cabinet-di-row-select__input:checked');
+                const ids = $checked.map(function () { return $(this).val(); }).get().join(', ');
                 if (!ids) {
                     $('.toast-top-right.delete-error-message').show(300);
                     setTimeout(function () { $('.toast-top-right.delete-error-message').hide(300); }, 4000);
@@ -468,7 +514,10 @@
             });
 
             $('#checkSelectedProjects').on('click', async function () {
-                const $projects = $('input[name=enums]:checked');
+                const table = cabinetDiTableApi();
+                const $projects = table
+                    ? cabinetDiRowCheckboxes(table, true)
+                    : $('input[name=enums].cabinet-di-row-select__input:checked');
                 if ($projects.length === 0) {
                     showToastError(@json(__('You need to select the projects you want to delete')));
                     return;
@@ -632,10 +681,26 @@
                         sEmptyTable: cabinetDiDt.emptyTable,
                         sInfo: cabinetDiDt.info,
                     },
+                    drawCallback: function () {
+                        cabinetDiSyncSelectAll(this.api());
+                        cabinetDiInitActionTooltips('#table');
+                    },
                 });
                 if (typeof search === 'function') {
                     search(table);
                 }
+
+                $('#cabinet-di-select-all').on('change', function () {
+                    const checked = $(this).prop('checked');
+                    $(this).prop('indeterminate', false);
+                    cabinetDiRowCheckboxes(table, false).prop('checked', checked);
+                });
+
+                $('#table tbody').on('change', 'input[name=enums].cabinet-di-row-select__input', function () {
+                    cabinetDiSyncSelectAll(table);
+                });
+
+                cabinetDiSyncSelectAll(table);
                 cabinetDiInitActionTooltips('#table');
             });
         </script>

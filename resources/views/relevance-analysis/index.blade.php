@@ -51,6 +51,19 @@
             .dataTables_length > label > select {
                 margin: 0 5px !important;
             }
+
+            .form-control.is-invalid,
+            .form-select.is-invalid,
+            textarea.form-control.is-invalid {
+                border-color: #dc3545;
+                box-shadow: 0 0 0 0.15rem rgba(220, 53, 69, 0.2);
+            }
+
+            /* Bootstrap .toast { display:none } ломает toastr-разметку на этой странице */
+            .toast-top-right > .toast.toast-error,
+            .toast-top-right > .toast.toast-success {
+                display: block !important;
+            }
         </style>
     @endslot
     <div id="toast-container" class="toast-top-right error-message empty" style="display:none;">
@@ -608,6 +621,7 @@
         <script src="{{ asset('plugins/relevance-analysis/scriptsV6/renderPhrasesTable.js') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/scriptsV6/renderPhrasesTable.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/scriptsV6/renderRecommendationsTable.js') }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/history/common.js') }}"></script>
+        <script src="{{ asset('js/cabinet-relevance-tooltips.js') }}?v={{ @filemtime(public_path('js/cabinet-relevance-tooltips.js')) ?: time() }}"></script>
         <script>
             window.relevanceHybridLabels = {
                 text: @json(__('text')),
@@ -756,11 +770,7 @@
                             return
                         }
                         if (response.crash != undefined) {
-                            $('.toast-message.error-message').html("{{ __('An error has occurred, repeat the request.') }}")
-                            $('.toast-top-right.error-message.empty').show(300)
-                            setTimeout(() => {
-                                $('.toast-top-right.error-message.empty').hide(300)
-                            }, 5000)
+                            showAnalyseError("{{ __('An error has occurred, repeat the request.') }}")
 
                             refreshAllRenderElements()
                             $('#full-analyse').prop("disabled", false);
@@ -790,7 +800,104 @@
                 });
             }
 
+            function showAnalyseError(message) {
+                var text = message || "{{ __('An error has occurred, repeat the request.') }}"
+                var $box = $('.toast-top-right.error-message.empty')
+                $box.find('.toast-message.error-message').html(text)
+                // Без анимации height: Bootstrap .toast раньше давал 0×0, и jQuery .show(300) «запоминал» нулевой размер
+                $box.stop(true, true).css({display: 'block', height: '', width: '', opacity: 1})
+                clearTimeout(window._analyseErrorToastTimer)
+                window._analyseErrorToastTimer = setTimeout(function () {
+                    $box.fadeOut(300)
+                }, 5000)
+            }
+
+            function clearAnalyseFieldErrors() {
+                $('.form-control.link, .form-control.phrase, #siteList').removeClass('is-invalid')
+            }
+
+            function markAnalyseFieldInvalid($el) {
+                $el.addClass('is-invalid')
+            }
+
+            function isLandingUrlValid(link) {
+                try {
+                    var url = new URL(String(link || '').trim())
+                    return (url.protocol === 'http:' || url.protocol === 'https:') && !!url.hostname
+                } catch (e) {
+                    return false
+                }
+            }
+
+            /**
+             * Клиентская проверка перед запуском анализа: тост + подсветка полей.
+             * Без этого пустые поля уходят в AJAX, а ошибка бэка часто «молчит» (нет подсветки).
+             */
+            function validateAnalyseForm(type) {
+                clearAnalyseFieldErrors()
+
+                var $link = $('.form-control.link')
+                var $phrase = $('.form-control.phrase')
+                var $siteList = $('#siteList')
+                var link = String($link.val() || '').trim()
+                var phrase = String($phrase.val() || '').trim()
+                var checkType = String($('#check-type').val() || 'phrase')
+                var messages = []
+                var $firstInvalid = null
+
+                function fail($el, msg) {
+                    markAnalyseFieldInvalid($el)
+                    if (!$firstInvalid) {
+                        $firstInvalid = $el
+                    }
+                    if (messages.indexOf(msg) === -1) {
+                        messages.push(msg)
+                    }
+                }
+
+                if (!link) {
+                    fail($link, "{{ __('A link to the landing page is required.') }}")
+                } else if (!isLandingUrlValid(link)) {
+                    fail($link, "{{ __('Ваша посадочная страница должна быть полным URL адресом. Пример: https://site.ru') }}")
+                }
+
+                if (type === 'full') {
+                    if (!phrase) {
+                        fail($phrase, "{{ __('The keyword is required to fill in.') }}")
+                    }
+                    if (checkType === 'list') {
+                        var sites = String($siteList.val() || '').split(/\n/).map(function (s) {
+                            return s.trim()
+                        }).filter(Boolean)
+                        if (sites.length < 5) {
+                            fail($siteList, "{{ __('The list of sites must contain at least 5 sites') }}")
+                        }
+                    }
+                }
+
+                if (!messages.length) {
+                    return true
+                }
+
+                showAnalyseError(messages.join('<br>'))
+                if ($firstInvalid && $firstInvalid.length) {
+                    $('html, body').animate({
+                        scrollTop: Math.max(0, $firstInvalid.offset().top - 120)
+                    }, 250)
+                    $firstInvalid.trigger('focus')
+                }
+                return false
+            }
+
+            $(document).on('input change', '.form-control.link, .form-control.phrase, #siteList', function () {
+                $(this).removeClass('is-invalid')
+            })
+
             function startProgress(type) {
+                if (!validateAnalyseForm(type)) {
+                    return
+                }
+
                 $.ajax({
                     type: "POST",
                     dataType: "json",
@@ -810,12 +917,8 @@
                         }
                     },
                     error: function (response) {
-                        $('.toast-message.error-message').html(response.responseJSON.message)
-
-                        $('.toast-top-right.error-message.empty').show(300)
-                        setTimeout(() => {
-                            $('.toast-top-right.error-message.empty').hide(300)
-                        }, 5000)
+                        var msg = response && response.responseJSON && response.responseJSON.message
+                        showAnalyseError(msg)
                     }
                 });
             }
@@ -850,24 +953,23 @@
                         endProgress()
                         let message = ''
                         if (response.responseText) {
-                            let messages = JSON.parse(response.responseText);
-                            $.each(messages['errors'], function (key, value) {
-                                message += value + "<br>"
-                            });
+                            try {
+                                let messages = JSON.parse(response.responseText);
+                                $.each(messages['errors'], function (key, value) {
+                                    message += (Array.isArray(value) ? value.join('<br>') : value) + "<br>"
+                                });
+                            } catch (e) {
+                                message = ''
+                            }
 
                             if (message === '') {
                                 message = "{{ __('An error has occurred, repeat the request.') }}"
                             }
 
-                            $('.toast-message.error-message').html(message)
+                            showAnalyseError(message)
                         } else {
-                            $('.toast-message.error-message').html("{{ __('An error has occurred, repeat the request.') }}")
+                            showAnalyseError("{{ __('An error has occurred, repeat the request.') }}")
                         }
-
-                        $('.toast-top-right.error-message.empty').show(300)
-                        setTimeout(() => {
-                            $('.toast-top-right.error-message.empty').hide(300)
-                        }, 5000)
 
                         errorRequest()
                     }
@@ -893,13 +995,8 @@
                         if (response.responseText) {
                             prepareMessage(response)
                         } else {
-                            $('.toast-message.error-message').html("{{ __('An error has occurred, repeat the request.') }}")
+                            showAnalyseError("{{ __('An error has occurred, repeat the request.') }}")
                         }
-
-                        $('.toast-top-right.error-message.empty').show(300)
-                        setTimeout(() => {
-                            $('.toast-top-right.error-message.empty').hide(300)
-                        }, 5000)
 
                         errorRequest()
                     }
@@ -925,13 +1022,8 @@
                         if (response.responseText) {
                             prepareMessage(response)
                         } else {
-                            $('.toast-message.error-message').html("{{ __('An error has occurred, repeat the request.') }}")
+                            showAnalyseError("{{ __('An error has occurred, repeat the request.') }}")
                         }
-
-                        $('.toast-top-right.error-message.empty').show(300)
-                        setTimeout(() => {
-                            $('.toast-top-right.error-message.empty').hide(300)
-                        }, 5000)
 
                         errorRequest()
                     }
@@ -1006,8 +1098,7 @@
                         );
                     } catch (e) {
                         console.error(e)
-                        $('.toast-message.error-message').html("{{ __('An error has occurred, repeat the request.') }}")
-                        $('.toast-top-right.error-message.empty').show(300)
+                        showAnalyseError("{{ __('An error has occurred, repeat the request.') }}")
                         enableAnalyseButtons()
                     }
                 }, 50)
@@ -1081,27 +1172,27 @@
             function prepareMessage(response) {
                 let message = ''
                 if (response.responseText) {
-                    let messages = JSON.parse(response.responseText);
-                    $.each(messages['errors'], function (key, value) {
-                        message += value + "<br>"
-                    });
-
-                    if (message === '') {
-                        message = "{{ __('An unexpected error has occurred, contact your administrator') }}"
+                    try {
+                        let messages = JSON.parse(response.responseText);
+                        $.each(messages['errors'], function (key, value) {
+                            message += (Array.isArray(value) ? value.join('<br>') : value) + "<br>"
+                        });
+                    } catch (e) {
+                        message = ''
                     }
 
-                    $('.toast-message.error-message').html(message)
+                    if (message === '') {
+                        message = (response.responseJSON && response.responseJSON.message)
+                            || "{{ __('An unexpected error has occurred, contact your administrator') }}"
+                    }
                 } else {
-                    $('.toast-message.error-message').html("{{ __('An error has occurred, repeat the request.') }}")
+                    message = "{{ __('An error has occurred, repeat the request.') }}"
                 }
+                showAnalyseError(message)
             }
 
             function limitMessage() {
-                $('.toast-message.error-message').html("{{ __('Your limits are exhausted this month') }}")
-                $('.toast-top-right.error-message.empty').show(300)
-                setTimeout(() => {
-                    $('.toast-top-right.error-message.empty').hide(300)
-                }, 5000)
+                showAnalyseError("{{ __('Your limits are exhausted this month') }}")
             }
 
             function getData() {

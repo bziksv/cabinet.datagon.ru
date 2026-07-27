@@ -26,11 +26,17 @@ class RelevanceProgressController extends Controller
             }
         }
 
-        $mainUrl = parse_url($request['data']['link']);
-        if(isset($mainUrl['scheme']) === false || isset($mainUrl['host']) === false)
-        {
+        $link = trim((string) ($request['data']['link'] ?? ''));
+        if ($link === '') {
             return response()->json([
-                'message' => __('Ваша посадочная страница должна быть полным URL адресом. Пример: https://site.ru')
+                'message' => __('A link to the landing page is required.'),
+            ], 415);
+        }
+
+        $mainUrl = parse_url($link);
+        if (!is_array($mainUrl) || empty($mainUrl['scheme']) || empty($mainUrl['host'])) {
+            return response()->json([
+                'message' => __('Ваша посадочная страница должна быть полным URL адресом. Пример: https://site.ru'),
             ], 415);
         }
 

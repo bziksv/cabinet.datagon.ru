@@ -23,6 +23,9 @@ class SharingController extends Controller
             ->with([
                 'relevanceTags:id,name,color',
                 'sharing.user:id,email,name,last_name',
+                'publicShare' => function ($query) {
+                    $query->active();
+                },
             ])
             ->orderByDesc('id')
             ->get(['id', 'user_id', 'name']);
@@ -47,11 +50,13 @@ class SharingController extends Controller
 
         $access = RelevanceSharing::where('project_id', '=', $project->id)->get();
         $publicShare = RelevancePublicShare::where('project_id', $project->id)->active()->first();
+        $admin = User::isUserAdmin();
 
         return view('relevance-analysis.sharing.sharing-config', [
             'project' => $project,
             'access' => $access,
             'publicShare' => $publicShare,
+            'admin' => $admin,
         ]);
     }
 
@@ -441,14 +446,17 @@ class SharingController extends Controller
             ]);
         }
 
-        $share = RelevancePublicShare::issueForProject($project, Auth::id());
+        $ttlDays = \App\Support\RelevancePublicShareTtl::normalize($request->input('ttl_days', 30));
+        $share = RelevancePublicShare::issueForProject($project, Auth::id(), $ttlDays);
 
         return response()->json([
             'success' => true,
             'message' => __('Public link created'),
             'code' => 201,
             'url' => $share->publicUrl(),
-            'expires_at' => $share->expires_at->format('d.m.Y H:i'),
+            'expires_at' => $share->expires_at ? $share->expires_at->format('d.m.Y H:i') : null,
+            'expires_label' => $share->expiresLabel(),
+            'ttl_days' => $ttlDays,
         ]);
     }
 

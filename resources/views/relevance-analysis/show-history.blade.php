@@ -135,14 +135,16 @@
             </div>
             <div style="cursor:pointer;" class="pl-1 pr-1">
                 {{ __('Phrase') }}:
-                <span class="project-info copyInBuffer" data-target="{{ $object->phrase }}">
+                <span class="project-info copyInBuffer" data-target="{{ $object->phrase }}"
+                      data-ra-tip="{{ e(__('Copy')) }}">
                     {{ $object->phrase }}
                     <i class="fa fa-copy"></i>
                 </span>
             </div>
             <div style="cursor:pointer;" class="pl-1 pr-1">
                 {{ __('Landing page') }}:
-                <span class="project-info copyInBuffer" data-target="{{ $object->main_link }}">
+                <span class="project-info copyInBuffer" data-target="{{ $object->main_link }}"
+                      data-ra-tip="{{ e(__('Copy')) }}">
                     {{ $object->main_link }}
                     <i class="fa fa-copy"></i>
                 </span>
@@ -692,8 +694,12 @@
         <script src="{{ asset('plugins/relevance-analysis/scriptsV6/renderPhrasesTable.js') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/scriptsV6/renderPhrasesTable.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/scriptsV6/renderRecommendationsTable.js') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/scriptsV6/renderRecommendationsTable.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/history/common.js') }}"></script>
+        <script src="{{ asset('js/cabinet-relevance-tooltips.js') }}?v={{ @filemtime(public_path('js/cabinet-relevance-tooltips.js')) ?: time() }}"></script>
         <script>
             $(document).ready(function () {
+                if (typeof window.initRelevanceActionTips === 'function') {
+                    window.initRelevanceActionTips(document);
+                }
                 $('#app > div > div > div.card-header').append($('#params').html())
                 $('#params').remove()
             })

@@ -2,6 +2,7 @@
 
 namespace App;
 
+use App\Support\RelevancePublicShareTtl;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -34,12 +35,39 @@ class RelevancePublicShare extends Model
     {
         return $query
             ->whereNull('revoked_at')
-            ->where('expires_at', '>', Carbon::now());
+            ->where(function ($query) {
+                $query->whereNull('expires_at')
+                    ->orWhere('expires_at', '>', Carbon::now());
+            });
     }
 
     public function isActive(): bool
     {
-        return $this->revoked_at === null && $this->expires_at !== null && $this->expires_at->isFuture();
+        return $this->revoked_at === null
+            && ($this->expires_at === null || $this->expires_at->isFuture());
+    }
+
+    public function isUnlimited(): bool
+    {
+        return $this->expires_at === null;
+    }
+
+    public function expiresLabel(): string
+    {
+        if ($this->isUnlimited()) {
+            return (string) __('Relevance share ttl unlimited');
+        }
+
+        return __('Valid until') . ': ' . $this->expires_at->format('d.m.Y H:i');
+    }
+
+    public function ttlDaysFromRecord(): int
+    {
+        if ($this->ttl_days !== null) {
+            return RelevancePublicShareTtl::normalize($this->ttl_days);
+        }
+
+        return $this->isUnlimited() ? RelevancePublicShareTtl::UNLIMITED : self::TTL_DAYS;
     }
 
     public function publicUrl(): string
@@ -47,8 +75,10 @@ class RelevancePublicShare extends Model
         return url('/public/share/relevance/' . $this->token);
     }
 
-    public static function issueForProject(ProjectRelevanceHistory $project, int $ownerId): self
+    public static function issueForProject(ProjectRelevanceHistory $project, int $ownerId, $ttlDays = 30): self
     {
+        $ttlDays = RelevancePublicShareTtl::normalize($ttlDays);
+
         static::where('project_id', $project->id)->active()->update([
             'revoked_at' => Carbon::now(),
         ]);
@@ -57,7 +87,8 @@ class RelevancePublicShare extends Model
             'project_id' => $project->id,
             'owner_id' => $ownerId,
             'token' => Str::random(48),
-            'expires_at' => Carbon::now()->addDays(static::TTL_DAYS),
+            'ttl_days' => $ttlDays,
+            'expires_at' => RelevancePublicShareTtl::resolveExpiresAt($ttlDays),
         ]);
     }
 

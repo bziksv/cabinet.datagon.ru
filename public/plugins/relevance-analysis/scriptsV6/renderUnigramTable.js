@@ -72,6 +72,7 @@ function bindUnigramCopyHandler(successMessage) {
 }
 
 function decorateUnigramWordCells() {
+    var tipCopy = (window.__raActionTips && window.__raActionTips.copy) || 'Копировать'
     $('#unigram tbody td:nth-child(2)').each(function () {
         var cell = $(this)
         if (cell.find('.unigram-word-text').length) {
@@ -85,7 +86,7 @@ function decorateUnigramWordCells() {
             $('<div class="unigram-word-cell"></div>').append(
                 $('<span class="unigram-word-text"></span>').text(wordText),
                 ' ',
-                $('<i class="fa fa-copy copy-icon" role="button" tabindex="0" title="Копировать"></i>')
+                $('<i class="fa fa-copy copy-icon" role="button" tabindex="0"></i>').attr('data-ra-tip', tipCopy)
             )
         )
 
@@ -93,6 +94,9 @@ function decorateUnigramWordCells() {
             cell.append(lockBlock)
         }
     })
+    if (typeof window.initRelevanceActionTips === 'function') {
+        window.initRelevanceActionTips(document.getElementById('unigram_wrapper') || document)
+    }
 }
 
 function formatHybridMetric(number) {
@@ -113,6 +117,16 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
         onReady = searchPassages
         searchPassages = false
     }
+
+    window.__raActionTips = Object.assign({}, window.__raActionTips || {}, {
+        copy: (words && words.copy) || 'Копировать',
+        lock: (words && words.lockWord) || 'Добавить слово в игнор',
+        unlock: (words && words.unlockWord) || 'Убрать слово из игнора',
+        expand: (words && words.expandForms) || 'Развернуть словоформы',
+        collapse: (words && words.collapseForms) || 'Свернуть',
+        childWords: (words && words.childWords) || 'Словоформы',
+        missingWords: (words && words.missingWords) || 'Упущенные слова',
+    })
 
     if (searchPassages) {
         $('#unigram > thead > tr:nth-child(2) > th:nth-child(14)').after(
@@ -248,19 +262,24 @@ function initUnigramDataTable(count, words, resultId, searchPassages, onReady) {
     $.each($('.dt-buttons'), function (key, value) {
         if (key === 1) {
             $(this).append(
-                "<a class='btn btn-secondary click_tracking' data-click='Child Words' href='/show-child-words/" + resultId + "' target='_blank'>" +
+                "<a class='btn btn-secondary click_tracking' data-click='Child Words' href='/show-child-words/" + resultId + "' target='_blank'" +
+                (typeof window.relevanceActionTipAttr === 'function' ? window.relevanceActionTipAttr((words && words.childWords) || 'Словоформы') : '') + ">" +
                 (words.childWords || 'Словоформы') +
                 "</a>"
             )
             if (resultId !== 0) {
                 $(this).append(
-                    "<a class='btn btn-secondary mr-1 click_tracking' data-click='Missing Words' href='/show-missing-words/" + resultId + "' target='_blank'>" +
+                    "<a class='btn btn-secondary mr-1 click_tracking' data-click='Missing Words' href='/show-missing-words/" + resultId + "' target='_blank'" +
+                    (typeof window.relevanceActionTipAttr === 'function' ? window.relevanceActionTipAttr((words && words.missingWords) || 'Упущенные слова') : '') + ">" +
                     (words.missingWords || 'Упущенные слова') +
                     "</a>"
                 )
             }
         }
     })
+    if (typeof window.initRelevanceActionTips === 'function') {
+        window.initRelevanceActionTips(document.getElementById('unigram_wrapper') || document)
+    }
 
     bindUnigramFilters(table, searchPassages)
     ensureUnigramTableScrollWrap()
@@ -381,14 +400,16 @@ function renderMainTr(key, wordWorm, searchPassages) {
     let repeatInLinkMainPageWarning = repeatInLinkMainPage == 0 ? " class='bg-warning-elem'" : ''
     let myPassagesWarning = repeatInPassagesMainPage == 0 ? 'bg-warning-elem' : ''
     let totalInMainPage = repeatInPassagesMainPage == 0 && repeatInLinkMainPage == 0 && repeatInTextMainPage == 0 ? " class='bg-warning-elem'" : ''
+    let tip = window.__raActionTips || {}
+    let tipAttr = window.relevanceActionTipAttr || function () { return '' }
     let lockBlock =
         "    <span class='lock-block'>" +
-        "        <i class='fa fa-solid fa-plus-square-o lock' data-target='" + key + "' onclick='addWordInIgnore($(this))'></i>" +
-        "        <i class='fa fa-solid fa-minus-square-o unlock' data-target='" + key + "' style='display:none;' onclick='removeWordFromIgnored($(this))'></i>" +
+        "        <i class='fa fa-solid fa-plus-square-o lock' data-target='" + key + "' onclick='addWordInIgnore($(this))'" + tipAttr(tip.lock || 'Добавить слово в игнор') + "></i>" +
+        "        <i class='fa fa-solid fa-minus-square-o unlock' data-target='" + key + "' style='display:none;' onclick='removeWordFromIgnored($(this))'" + tipAttr(tip.unlock || 'Убрать слово из игнора') + "></i>" +
         "    </span>"
 
     let newRow = "<tr class='render'>" +
-        "   <td class='" + className + "' onclick='showWordWorms($(this))' data-target='" + key + "'>" +
+        "   <td class='" + className + "' onclick='showWordWorms($(this))' data-target='" + key + "'" + tipAttr(tip.expand || 'Развернуть словоформы') + ">" +
         "      <i class='fa fa-plus'></i>" +
         "   </td>" +
         "   <td>" + key + lockBlock + "</td>" +
@@ -479,15 +500,17 @@ function renderChildTr(elem, key, word, stats) {
         repeatInPassagesMainPageWarning = 'bg-warning-elem'
     }
 
+    let tip = window.__raActionTips || {}
+    let tipAttr = window.relevanceActionTipAttr || function () { return '' }
     let lockBlock =
         "    <span class='lock-block'>" +
-        "        <i class='fa fa-solid fa-plus-square-o lock' data-target='" + word + "' onclick='addWordInIgnore($(this))'></i>" +
-        "        <i class='fa fa-solid fa-minus-square-o unlock' data-target='" + word + "' style='display:none;' onclick='removeWordFromIgnored($(this))'></i>" +
-        "        <i class='fa fa-copy copy-text-in-buffer' data-target='" + word + "'></i>" +
+        "        <i class='fa fa-solid fa-plus-square-o lock' data-target='" + word + "' onclick='addWordInIgnore($(this))'" + tipAttr(tip.lock || 'Добавить слово в игнор') + "></i>" +
+        "        <i class='fa fa-solid fa-minus-square-o unlock' data-target='" + word + "' style='display:none;' onclick='removeWordFromIgnored($(this))'" + tipAttr(tip.unlock || 'Убрать слово из игнора') + "></i>" +
+        "        <i class='fa fa-copy copy-text-in-buffer' data-target='" + word + "'" + tipAttr(tip.copy || 'Копировать') + "></i>" +
         "    </span>"
 
     let newChildRow = "<tr style='background-color: #f4f6f9;' data-order='" + key + "' class='render child-table-row'>" +
-        "   <td " + bgWarn + " onclick='hideWordWorms($(this))' data-target='" + key + "'>" +
+        "   <td " + bgWarn + " onclick='hideWordWorms($(this))' data-target='" + key + "'" + tipAttr(tip.collapse || 'Свернуть') + ">" +
         "   <i class='fa fa-minus'></i>" +
         "   </td>" +
         "   <td>" + word + lockBlock + "</td>" +
@@ -547,6 +570,9 @@ function showWordWorms(elem) {
             renderChildTr(parent, target, word, stats)
         })
         elem.addClass('show-children')
+        if (typeof window.initRelevanceActionTips === 'function') {
+            window.initRelevanceActionTips(document.getElementById('unigram_wrapper') || document)
+        }
     }
 }
 

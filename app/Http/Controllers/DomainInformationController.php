@@ -81,60 +81,109 @@ class DomainInformationController extends Controller
         }
 
         if (isset($request->domains)) {
-            DomainInformationController::multipleCreation($request->domains, $user);
-        } else {
-            $domain = DomainInformation::getDomain($request->domain);
-
-            if (DomainInformation::isValidDomain($domain)) {
-                $monitoring = new DomainInformation($request->all());
-                $monitoring->domain = $domain;
-                $monitoring->user_id = $user->id;
-                $monitoring->check_dns_email = 0;
-                $monitoring->check_registration_date_email = 0;
-                $monitoring->save();
-                flash()->overlay(__('Domain added successfully'), ' ')->success();
+            $result = self::multipleCreation($request->domains, $user);
+            if ($result['added'] > 0 && $result['skipped'] > 0) {
+                flash()->overlay(
+                    __('Domain information bulk added with skips', [
+                        'added' => $result['added'],
+                        'skipped' => $result['skipped'],
+                    ]),
+                    ' '
+                )->success();
+            } elseif ($result['added'] > 0) {
+                flash()->overlay(__('Domains added successfully'), ' ')->success();
+            } elseif ($result['skipped'] > 0) {
+                flash()->overlay(__('All domains from the list are already being tracked'), ' ')->error();
             } else {
                 flash()->overlay(__('There is no such domain'), ' ')->error();
 
                 return Redirect::back();
             }
+        } else {
+            $domain = DomainInformation::normalizeDomain((string) $request->domain);
+
+            if (!DomainInformation::isValidDomain($domain)) {
+                flash()->overlay(__('There is no such domain'), ' ')->error();
+
+                return Redirect::back();
+            }
+
+            if (DomainInformation::existsForUser((int) $user->id, $domain)) {
+                flash()->overlay(__('This domain is already being tracked'), ' ')->error();
+
+                return Redirect::back();
+            }
+
+            $monitoring = new DomainInformation($request->all());
+            $monitoring->domain = $domain;
+            $monitoring->user_id = $user->id;
+            $monitoring->check_dns_email = 0;
+            $monitoring->check_registration_date_email = 0;
+            $monitoring->save();
+            flash()->overlay(__('Domain added successfully'), ' ')->success();
         }
 
         return Redirect::route('domain.information');
     }
 
     /**
-     * @param $domains
-     * @param $user
-     * @return void
+     * @param  string  $domains
+     * @param  User  $user
+     * @return array{added:int,skipped:int}
      */
-    public static function multipleCreation($domains, $user)
+    public static function multipleCreation($domains, $user): array
     {
         $newRecord = [];
-        $domains = explode("\r\n", $domains);
-        $domains = array_diff($domains, array(''));
+        $lines = preg_split('/\r\n|\r|\n/', (string) $domains) ?: [];
+        $lines = array_values(array_filter(array_map('trim', $lines), static function ($line) {
+            return $line !== '';
+        }));
 
-        foreach ($domains as $item) {
+        $existing = DomainInformation::query()
+            ->where('user_id', $user->id)
+            ->pluck('domain')
+            ->map(static function ($domain) {
+                return DomainInformation::normalizeDomain((string) $domain);
+            })
+            ->all();
+        $existingMap = array_fill_keys($existing, true);
+        $seenInBatch = [];
+        $skipped = 0;
+
+        foreach ($lines as $item) {
             $obj = explode(':', $item);
-            $domain = $obj[0];
+            $domain = DomainInformation::normalizeDomain((string) ($obj[0] ?? ''));
             $counter = count($obj);
-            $checkRegistrationDate = explode('/', $obj[$counter - 1]);
+            $checkRegistrationDate = explode('/', (string) ($obj[$counter - 1] ?? '0'));
 
-            if (DomainInformation::isValidDomain($domain)) {
-                $newRecord[] = [
-                    'user_id' => $user->id,
-                    'domain' => $domain,
-                    'check_dns' => (boolean) $obj[1] ?? false,
-                    'check_registration_date' => (boolean) $checkRegistrationDate[0] ?? false,
-                    'check_dns_email' => 0,
-                    'check_registration_date_email' => 0,
-                ];
+            if (!DomainInformation::isValidDomain($domain)) {
+                continue;
             }
+
+            if (isset($existingMap[$domain]) || isset($seenInBatch[$domain])) {
+                $skipped++;
+                continue;
+            }
+
+            $seenInBatch[$domain] = true;
+            $newRecord[] = [
+                'user_id' => $user->id,
+                'domain' => $domain,
+                'check_dns' => (bool) ($obj[1] ?? false),
+                'check_registration_date' => (bool) ($checkRegistrationDate[0] ?? false),
+                'check_dns_email' => 0,
+                'check_registration_date_email' => 0,
+            ];
         }
 
         if (count($newRecord) >= 1) {
             DomainInformation::insert($newRecord);
         }
+
+        return [
+            'added' => count($newRecord),
+            'skipped' => $skipped,
+        ];
     }
 
     /**

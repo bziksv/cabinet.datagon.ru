@@ -32,7 +32,7 @@
                 background: oldlace;
             }
 
-            .row {
+            .row.cabinet-ra-ignore {
                 margin: 0 !important;
             }
 
@@ -195,7 +195,7 @@
                                                    class="form-control tag-name-input"
                                                    data-target="{{ $tag->id }}" value="{{ $tag->name }}">
                                             <button type="button" class="btn btn-outline-danger remove-tag"
-                                                    data-target="{{ $tag->id }}" title="{{ __('Delete') }}">
+                                                    data-target="{{ $tag->id }}" data-ra-tip="{{ e(__('Delete')) }}">
                                                 <i class="fa fa-trash" aria-hidden="true"></i>
                                             </button>
                                         </div>
@@ -504,7 +504,8 @@
                         </li>
                     @endif
                     <button type="button" class="btn btn-secondary" data-bs-toggle="modal"
-                            data-bs-target="#exampleModal">
+                            data-bs-target="#exampleModal"
+                            data-ra-tip="{{ e(__('Relevance managing labels tip')) }}">
                         {{ __('Managing labels') }}
                     </button>
                 </ul>
@@ -519,12 +520,12 @@
                         <tr>
                             <th class="table-header">{{ __('Project name') }}</th>
                             <th class="table-header">{{ __('Tags') }}</th>
-                            <th class="table-header">{{ __('Number of analyzed pages') }}</th>
-                            <th class="table-header">{{ __('Number of saved scans') }}</th>
-                            <th class="table-header">{{ __('Total score') }}</th>
-                            <th class="table-header">{{ __('Avg position') }}</th>
-                            <th class="table-header">{{ __('end-to-end analysis') }}</th>
-                            <th class="table-header">{{ __('Last check') }}</th>
+                            <th class="table-header" title="{{ __('Number of analyzed pages') }}">{{ __('Relevance stats col pages') }}</th>
+                            <th class="table-header" title="{{ __('Number of saved scans') }}">{{ __('Relevance stats col scans') }}</th>
+                            <th class="table-header" title="{{ __('Total score') }}">{{ __('Relevance stats col score') }}</th>
+                            <th class="table-header" title="{{ __('Avg position') }}">{{ __('Relevance stats col position') }}</th>
+                            <th class="table-header" title="{{ __('End-to-end analysis') }}">{{ __('Relevance stats col though') }}</th>
+                            <th class="table-header" title="{{ __('Last check') }}">{{ __('Relevance stats col last check') }}</th>
                         </tr>
                         </thead>
                         <tbody></tbody>
@@ -947,6 +948,7 @@
         <script src="{{ asset('plugins/keyword-generator/js/lib/clipboard.min.js') }}"></script>
         <script src="{{ asset('plugins/clipboard/index.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/search.js') }}"></script>
+        <script src="{{ asset('js/cabinet-relevance-tooltips.js') }}?v={{ @filemtime(public_path('js/cabinet-relevance-tooltips.js')) ?: time() }}"></script>
 
         <script>
             function initTagModalSelects() {
@@ -994,10 +996,13 @@
                         return '<div class="cabinet-relevance-project-cell">' +
                             '<span class="project_name cabinet-relevance-project-name" data-order="' + row.id + '">' + row.name + '</span>' +
                             '<span class="cabinet-relevance-project-actions">' +
-                            '    <i class="fa fa-table project_name" data-order="' + row.id + '" title="{{ __('Show the results of the analysis') }}"></i>' +
-                            '    <i class="fa fa-list project_name_v2" data-order="' + row.id + '" title="{{ __('View the results in a list') }}"></i>' +
+                            '    <i class="fa fa-table project_name" data-order="' + row.id + '"' +
+                            '       data-ra-tip="{{ e(__('Show the results of the analysis')) }}"></i>' +
+                            '    <i class="fa fa-list project_name_v2" data-order="' + row.id + '"' +
+                            '       data-ra-tip="{{ e(__('View the results in a list')) }}"></i>' +
                             '    <div class="dropdown">' +
-                            '        <button type="button" class="cabinet-relevance-project-menu-btn" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="{{ __('Actions') }}">' +
+                            '        <button type="button" class="cabinet-relevance-project-menu-btn" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false"' +
+                            '                data-ra-tip="{{ e(__('Actions')) }}">' +
                             '            <i class="fa fa-cogs" aria-hidden="true"></i>' +
                             '        </button>' +
                             '        <ul class="dropdown-menu">' +
@@ -1035,7 +1040,8 @@
                                 '    <i class="fa fa-trash"' +
                                 '       style="opacity: 0.55; cursor: pointer"' +
                                 '       data-bs-toggle="modal"' +
-                                '       data-bs-target="#removeTagModal' + value.id + '' + row.id + '">' +
+                                '       data-bs-target="#removeTagModal' + value.id + '' + row.id + '"' +
+                                '       data-ra-tip="{{ e(__('Relevance unlink tag tip')) }}">' +
                                 '    </i>' +
                                 '</div>'
                         })
@@ -1046,11 +1052,13 @@
                 {
                     name: 'count_sites',
                     data: function (row) {
-                        return '<span class="count-sites-' + row.id + '">' + row.count_sites + '</span>' +
-                            '<i class="fa fa-repeat" style="opacity: 0.6; cursor: pointer"' +
+                        return '<span class="cabinet-relevance-count-sites">' +
+                            '<span class="count-sites-' + row.id + '">' + row.count_sites + '</span>' +
+                            '<i class="fa fa-repeat"' +
                             '   data-bs-target="#repeatUniqueScan' + row.id + '"' +
                             '   data-bs-toggle="modal" data-bs-placement="top"' +
-                            '   title="{{ __('restart analyzed pages') }}"></i>'
+                            '   data-ra-tip="{{ e(__('restart analyzed pages')) }}"></i>' +
+                            '</span>';
                     },
 
                 },
@@ -1079,21 +1087,21 @@
                                 '    </div>' +
                                 '</div>'
                         } else {
-                            return '<div class="though-cell btn-group">' +
-                                '     <button type="button" class="btn btn-secondary" data-bs-target="#startThroughScan' + row.id + '"' +
-                                '             data-bs-toggle="modal"' +
-                                '             data-bs-placement="top">' +
-                                '         {{ __('End-to-end analysis') }}' +
-                                '     </button>' +
-                                '     <button type="button" class="btn btn-secondary though-help-btn">' +
-                                '     <span class="__helper-link ui_tooltip_w">' +
-                                '         <i class="fa fa-question-circle" aria-hidden="true"></i>' +
-                                '         <span class="ui_tooltip __bottom __l">' +
-                                '             <span class="ui_tooltip_content">Для анализа используются результаты последнего сканирования каждой фразы и посадочной страницы</span>' +
-                                '         </span>' +
-                                '     </span>' +
-                                '     </button>' +
-                                ' </div>'
+                            return '<div class="though-cell">' +
+                                '  <div class="cabinet-ra-though-actions">' +
+                                '    <button type="button" class="btn btn-sm btn-secondary"' +
+                                '            data-bs-target="#startThroughScan' + row.id + '"' +
+                                '            data-bs-toggle="modal"' +
+                                '            data-ra-tip="{{ e(__('Relevance end-to-end button tip')) }}">' +
+                                '        {{ __('End-to-end analysis') }}' +
+                                '    </button>' +
+                                '    <button type="button" class="btn btn-sm btn-secondary though-help-btn"' +
+                                '            data-ra-tip="{{ e(__('Relevance though analysis tip')) }}"' +
+                                '            aria-label="{{ e(__('Help')) }}">' +
+                                '        <i class="fa fa-question-circle" aria-hidden="true"></i>' +
+                                '    </button>' +
+                                '  </div>' +
+                                '</div>'
                         }
                     },
                 },
@@ -1110,13 +1118,15 @@
                 processing: true,
                 serverSide: true,
                 order: [[7, 'desc']],
+                dom: "<'row'<'col-sm-12 col-md-6'f><'col-sm-12 col-md-6'l>>" +
+                    "<'row'<'col-sm-12'tr>>" +
+                    "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
                 aoColumnDefs: [
                     {
                         bSortable: false,
                         aTargets: [1, 2, 6]
                     }
                 ],
-                dom: 'lfrtip',
                 language: {
                     processing: @json(__('Loading records')),
                     search: @json(__('Search') . ':'),
@@ -1142,6 +1152,9 @@
                     "sInfoEmpty": "{{ __('Showing') }} {{ __('from') }} 0 {{ __('to') }} 0 {{ __('of') }} 0 {{ __('entries') }}",
                 },
                 drawCallback: function () {
+                    if (typeof window.initRelevanceActionTips === 'function') {
+                        window.initRelevanceActionTips(document.getElementById('main_history_table_wrapper') || document);
+                    }
                     $('#changeAllState, #changeAllStateList').unbind().on('change', function () {
                         let state = $(this).is(':checked')
                         $.each($('.custom-control-input.switch'), function () {
@@ -1337,13 +1350,16 @@
                                                         }
                                                     });
 
-                                                    cell.html('<div>' + cell.text() + ' <i class="fa fa-copy copy-icon"></i></div>');
+                                                    cell.html('<div>' + cell.text() + ' <i class="fa fa-copy copy-icon" data-ra-tip="{{ e(__('Copy')) }}"></i></div>');
 
                                                     clipboard.on('success', function (e) {
                                                         e.clearSelection();
                                                         getSuccessMessage("{{ __('Success copied') }}")
                                                     });
                                                 });
+                                                if (typeof window.initRelevanceActionTips === 'function') {
+                                                    window.initRelevanceActionTips(document.getElementById('history_table_wrapper') || document);
+                                                }
                                             },
                                         });
 
@@ -1429,7 +1445,10 @@
                                             width: '100%'
                                         })
 
-                                        $('#list-history-body > tr.render > td.col-1').append('<i class="fa fa-eye"></i>')
+                                        $('#list-history-body > tr.render > td.col-1').append('<i class="fa fa-eye" data-ra-tip="{{ e(__('Relevance open details tip')) }}"></i>')
+                                        if (typeof window.initRelevanceActionTips === 'function') {
+                                            window.initRelevanceActionTips(document.getElementById('list-history_wrapper') || document);
+                                        }
 
                                         if ($.fn.DataTable.fnIsDataTable($('#list-history'))) {
                                             $('#list-history').dataTable().fnDestroy();
@@ -1519,6 +1538,9 @@
             });
 
             initTagModalSelects()
+            if (typeof window.initRelevanceActionTips === 'function') {
+                window.initRelevanceActionTips(document);
+            }
             $('#exampleModal, #create-link').on('shown.bs.modal', function () {
                 var $modal = $(this)
                 if (!$modal.find('.js-tag-project-select, .js-tag-select').first().hasClass('select2-hidden-accessible')) {
@@ -1864,7 +1886,7 @@
                                         '  <div class="input-group">' +
                                         '    <input type="color" class="form-control form-control-color tag-color-input" data-target="' + response.tag.id + '" value="' + response.tag.color + '">' +
                                         '    <input type="text" class="form-control tag-name-input" data-target="' + response.tag.id + '" value="' + $('<div>').text(response.tag.name).html() + '">' +
-                                        '    <button type="button" class="btn btn-outline-danger remove-tag" data-target="' + response.tag.id + '" title="{{ __('Delete') }}">' +
+                                        '    <button type="button" class="btn btn-outline-danger remove-tag" data-target="' + response.tag.id + '" data-ra-tip="{{ e(__('Delete')) }}">' +
                                         '      <i class="fa fa-trash" aria-hidden="true"></i>' +
                                         '    </button>' +
                                         '  </div>' +

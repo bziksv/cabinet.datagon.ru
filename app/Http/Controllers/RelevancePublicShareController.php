@@ -64,7 +64,9 @@ class RelevancePublicShareController extends Controller
             'object' => $object,
             'access' => $viewOnlyAccess,
             'publicShareToken' => $token,
-            'publicShareExpires' => $share->expires_at->format('d.m.Y H:i'),
+            'publicShareExpires' => $share->isUnlimited()
+                ? (string) __('Relevance share ttl unlimited')
+                : $share->expires_at->format('d.m.Y H:i'),
         ]);
     }
 

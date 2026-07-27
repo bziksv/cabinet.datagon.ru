@@ -196,10 +196,11 @@ function renderPhraseTr(key, item) {
     var median = item['medianInCompetitors'] != null ? item['medianInCompetitors'] : 0
     var avg = item['avgInTotalCompetitors'] != null ? item['avgInTotalCompetitors'] : 0
 
+    var tipCopy = (window.__raActionTips && window.__raActionTips.copy) || 'Копировать'
     return "<tr class='render'>" +
         "<td><div class='phrases-word-cell'>" +
         "<span class='phrases-word-text'>" + escapePhraseHtml(key) + "</span> " +
-        "<i class='fa fa-copy copy-icon' role='button' tabindex='0' title='Копировать'></i>" +
+        "<i class='fa fa-copy copy-icon' role='button' tabindex='0' data-ra-tip='" + String(tipCopy).replace(/'/g, '&#39;') + "'></i>" +
         "</div></td>" +
         "<td>" + formatPhraseMetric(item['tfidfTop'] ?? item['score'] ?? 0) + "</td>" +
         "<td>" + formatPhraseMetric(item['tfidfSite'] ?? 0) + "</td>" +
@@ -228,6 +229,7 @@ function escapePhraseHtml(text) {
 }
 
 function decoratePhrasesWordCells() {
+    var tipCopy = (window.__raActionTips && window.__raActionTips.copy) || 'Копировать'
     $('#phrases tbody td:first-child').each(function () {
         var cell = $(this)
         if (cell.find('.phrases-word-text').length) {
@@ -243,10 +245,13 @@ function decoratePhrasesWordCells() {
             $('<div class="phrases-word-cell"></div>').append(
                 $('<span class="phrases-word-text"></span>').text(phraseText),
                 ' ',
-                $('<i class="fa fa-copy copy-icon" role="button" tabindex="0" title="Копировать"></i>')
+                $('<i class="fa fa-copy copy-icon" role="button" tabindex="0"></i>').attr('data-ra-tip', tipCopy)
             )
         )
     })
+    if (typeof window.initRelevanceActionTips === 'function') {
+        window.initRelevanceActionTips(document.getElementById('phrases_wrapper') || document)
+    }
 }
 
 function bindPhrasesCopyHandler(successMessage) {

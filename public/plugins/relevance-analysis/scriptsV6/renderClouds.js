@@ -545,9 +545,10 @@ $('#coverage-clouds-button').click(function () {
             var coverageItems = []
 
             $.each(tfCompClouds, function (key, value) {
+                var tipAttr = typeof window.relevanceActionTipAttr === 'function' ? window.relevanceActionTipAttr : function () { return '' }
                 var btnGroup =
                     "<div class='btn-group coverage-cloud-item__actions'>" +
-                    "        <button type='button' data-bs-toggle='dropdown' aria-expanded='false' class='text-dark btn btn-tool dropdown-toggle'>" +
+                    "        <button type='button' data-bs-toggle='dropdown' aria-expanded='false' class='text-dark btn btn-tool dropdown-toggle'" + tipAttr('Действия с сайтом') + ">" +
                     "            <i class='fas fa-external-link-alt'></i>" +
                     "        </button> " +
                     "       <div role='menu' class='dropdown-menu dropdown-menu-left'>" +
@@ -582,6 +583,9 @@ $('#coverage-clouds-button').click(function () {
 
             paintCloudsSequential(coverageItems, function () {
                 generatedCompetitorCoverage = true
+                if (typeof window.initRelevanceActionTips === 'function') {
+                    window.initRelevanceActionTips(document.getElementById('coverage-clouds') || document)
+                }
 
                 $('.add-in-ignored-domains').click(function () {
                     var url = new URL($(this).attr('data-target'))

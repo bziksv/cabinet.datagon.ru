@@ -22,7 +22,8 @@ function renderScannedSitesList(words, sites, avgCoveragePercent, count, hide, b
     $.each(sites, function (key, value) {
         let site = value['site']
 
-        let btnGroup = "<div class='btn-group'>" + " <button type='button' data-bs-toggle='dropdown' aria-expanded='false' class='text-dark btn btn-tool dropdown-toggle'>" +
+        let tipAttr = typeof window.relevanceActionTipAttr === 'function' ? window.relevanceActionTipAttr : function () { return '' }
+        let btnGroup = "<div class='btn-group'>" + " <button type='button' data-bs-toggle='dropdown' aria-expanded='false' class='text-dark btn btn-tool dropdown-toggle'" + tipAttr('Действия с сайтом') + ">" +
             " <i class='fas fa-external-link-alt'></i>" +
             " </button> " +
             " <div role='menu' class='dropdown-menu dropdown-menu-left'>" +
@@ -147,11 +148,17 @@ function renderScannedSitesList(words, sites, avgCoveragePercent, count, hide, b
         },
         drawCallback: function () {
             syncScannedSitesHeaderSticky()
+            if (typeof window.initRelevanceActionTips === 'function') {
+                window.initRelevanceActionTips(document.getElementById('scanned-sites_wrapper') || document)
+            }
         },
         initComplete: function () {
             ensureScannedSitesTableScrollWrap()
             renderScannedSitesRecommendationsRow(avg, words)
             syncScannedSitesHeaderSticky()
+            if (typeof window.initRelevanceActionTips === 'function') {
+                window.initRelevanceActionTips(document.getElementById('scanned-sites_wrapper') || document)
+            }
             window.requestAnimationFrame(function () {
                 syncScannedSitesHeaderSticky()
             })

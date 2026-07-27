@@ -155,6 +155,27 @@ class DomainInformation extends Model
     }
 
     /**
+     * Нормализация домена для хранения и сравнения (без схемы, lowercase).
+     */
+    public static function normalizeDomain(string $raw): string
+    {
+        $domain = self::getDomain(trim($raw));
+        $domain = preg_replace('#^www\.#i', '', $domain) ?: $domain;
+
+        return strtolower(rtrim($domain, '.'));
+    }
+
+    public static function existsForUser(int $userId, string $domain): bool
+    {
+        $domain = self::normalizeDomain($domain);
+
+        return self::query()
+            ->where('user_id', $userId)
+            ->whereRaw('LOWER(domain) = ?', [$domain])
+            ->exists();
+    }
+
+    /**
      * @param $link
      * @return string
      */

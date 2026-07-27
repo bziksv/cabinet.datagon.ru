@@ -154,7 +154,8 @@
             @foreach($though->result as $key => $item)
                 <tr>
                     <td>
-                        <i class="fa fa-plus show-more" data-target="{{ $key }}"></i>
+                        <i class="fa fa-plus show-more" data-target="{{ $key }}"
+                           data-ra-tip="{{ e(__('Relevance though expand tip')) }}"></i>
                     </td>
                     <td>{{ $key }}</td>
                     <td>
@@ -205,6 +206,7 @@
         <script src="{{ asset('plugins/datatables/buttons/jszip.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/vfs_fonts.min.js') }}"></script>
         <script src="{{ asset('plugins/datatables/buttons/html5.min.js') }}"></script>
+        <script src="{{ asset('js/cabinet-relevance-tooltips.js') }}?v={{ @filemtime(public_path('js/cabinet-relevance-tooltips.js')) ?: time() }}"></script>
         <script>
             let totalResults = "{{ json_encode($allElems) }}";
             totalResults = totalResults.replace(/&quot;/g, '"')
@@ -215,6 +217,9 @@
             let recordId = "{{ $though->id }}";
 
             $(document).ready(function () {
+                if (typeof window.initRelevanceActionTips === 'function') {
+                    window.initRelevanceActionTips(document);
+                }
                 let thoughTable = $('#though-table').DataTable({
                     "order": [[3, "desc"]],
                     "pageLength": 50,
@@ -292,7 +297,9 @@
                                 '</td>'
 
                             table.row.add({
-                                0: '<i class="fa fa-plus show-more" data-target="' + key + '"></i> ',
+                                0: '<i class="fa fa-plus show-more" data-target="' + key + '"' +
+                                    (typeof window.relevanceActionTipAttr === 'function' ? window.relevanceActionTipAttr(@json(__('Relevance though expand tip'))) : '') +
+                                    '></i> ',
                                 1: key,
                                 2: ChildTable,
                                 3: (value[key]['tf']).toFixed(5),
@@ -320,6 +327,9 @@
                                 $('.sticky').click(function () {
                                     $('.render-child').remove()
                                 });
+                                if (typeof window.initRelevanceActionTips === 'function') {
+                                    window.initRelevanceActionTips(document);
+                                }
                             })
                         }
                     },
@@ -357,7 +367,9 @@
                                 '</table>'
                             tr.after(
                                 '<tr class="render-child" data-target="' + target + '">' +
-                                '   <td class="remove-child" data-target="' + target + '"> <i class="fa fa-minus" ></i></td>' +
+                                '   <td class="remove-child" data-target="' + target + '"' +
+                                (typeof window.relevanceActionTipAttr === 'function' ? window.relevanceActionTipAttr(@json(__('Relevance though collapse tip'))) : '') +
+                                '> <i class="fa fa-minus" ></i></td>' +
                                 '   <td>' + key + '</td>' +
                                 '   <td>' +
                                 '       <a data-bs-toggle="collapse" href="#childTable' + key + '" role="button" aria-expanded="false" aria-controls="childTable' + key + '">' +
@@ -378,6 +390,9 @@
                         }
                     })
                     removeElems()
+                    if (typeof window.initRelevanceActionTips === 'function') {
+                        window.initRelevanceActionTips(document);
+                    }
                 })
             }, 100)
 

@@ -1,51 +1,41 @@
-@component('component.card', ['title' =>  __('Statistics')])
+@component('component.card', ['title' => __('Statistics')])
     @slot('css')
         <link rel="stylesheet"
               href="{{ asset('plugins/keyword-generator/css/font-awesome-4.7.0/css/font-awesome.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/keyword-generator/css/style.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/jqcloud/css/jqcloud.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/common/css/datatable.css') }}">
+        {{-- common/datatable.css не подключаем: PNG-спрайты sort_*.png конфликтуют со стрелками ↑↓ из dataTables.bootstrap4 --}}
+        @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-min'])
         <link rel="stylesheet" href="{{ asset('plugins/toastr/toastr.css') }}">
-        <link rel="stylesheet" href="{{ asset('plugins/relevance-analysis/css/style.css') }}">
-
-        {{-- RowGroup --}}
+        <link rel="stylesheet" href="{{ asset('plugins/relevance-analysis/css/style.css') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/css/style.css')) ?: time() }}">
         <link rel="stylesheet" href="{{ asset('plugins/datatables-rowgroup/css/rowGroup.bootstrap4.css') }}">
-
         <style>
             i:hover {
                 opacity: 1 !important;
                 transition: .3s;
             }
-
             .empty-td {
                 background: #dee2e6;
                 width: 0;
                 padding: 0 !important;
                 border: none;
             }
-
             .fixed-width {
                 max-width: 50px !important;
             }
-
             .RelevanceAnalysis {
                 background: oldlace;
             }
-
-            .dataTables_length > label {
-                display: flex;
+            .cabinet-module-main-card > .card-body {
+                padding: 0.75rem 1rem 1rem;
             }
-
-            .dataTables_length > label > select {
-                margin: 0 5px !important;
+            .cabinet-module-main-card > .card-body > .card {
+                margin: 0;
+                border: 0;
+                box-shadow: none;
             }
-
-            .row {
-                margin: 0 !important;
-            }
-
-            #statistics_table td:first-child {
-                width: 75%;
+            .cabinet-module-main-card > .card-body > .card > .card-body {
+                padding: 0.75rem 0 0;
             }
         </style>
     @endslot
@@ -64,170 +54,159 @@
 
     <div class="card">
         <div class="card-header d-flex p-0">
-            <div class="card-header d-flex p-0">
-                <ul class="nav nav-pills p-2">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ route('relevance-analysis') }}">{{ __('Analyzer') }}</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ route('create.queue.view') }}">
-                            {{ __('Create page analysis tasks') }}
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ route('relevance.history') }}">{{ __('History') }}</a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('sharing.view') }}" class="nav-link">{{ __('Share your projects') }}</a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="{{ route('access.project') }}"
-                           class="nav-link">{{ __('Projects available to you') }}</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active"
-                           href="{{ route('all.relevance.projects') }}">{{ __('Statistics') }}</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link admin-link"
-                           href="{{ route('show.config') }}">{{ __('Module administration') }}</a>
-                    </li>
-                </ul>
-            </div>
+            <ul class="nav nav-pills p-2">
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ route('relevance-analysis') }}">{{ __('Analyzer') }}</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ route('create.queue.view') }}">
+                        {{ __('Create page analysis tasks') }}
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ route('relevance.history') }}">{{ __('History') }}</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('sharing.view') }}" class="nav-link">{{ __('Share your projects') }}</a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ route('access.project') }}"
+                       class="nav-link">{{ __('Projects available to you') }}</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active"
+                       href="{{ route('all.relevance.projects') }}">{{ __('Statistics') }}</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link admin-link"
+                       href="{{ route('show.config') }}">{{ __('Module administration') }}</a>
+                </li>
+            </ul>
         </div>
         <div class="card-body">
-            <div class="tab-content">
-                <div class="tab-pane active" id="tab_1">
-                    <div class="d-flex w-100">
-                        <div class="w-50 pr-3">
-                            <h3 style="padding-bottom: 44px">{{ __('General statistics of the module') }}</h3>
-                            <table style="margin: 0 0 35px 0 !important;" id="statistics_table"
-                                   class="table table-bordered table-hover dataTable dtr-inline mb-5">
-                                <tbody>
-                                <tr>
-                                    <td>
-                                        <b>{{ __('Number of checks for the current day') }}</b>
-                                    </td>
-                                    <td> {{ $statistics['toDay']['count_checks'] ?? 0 }} </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <b>{{ __('Number of checks for the current month') }}</b>
-                                    </td>
-                                    <td> {{ $statistics['month']}} </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <b>{{ __('Number of errors for the current day') }}</b>
-                                    </td>
-                                    <td> {{ $statistics['toDay']['count_fails'] ?? 0 }} </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <b>{{ __('Number of projects') }}</b>
-                                    </td>
-                                    <td> {{ $statistics['countProjects']}} </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <b>{{ __('Number of saved scan results') }}</b>
-                                    </td>
-                                    <td> {{ $statistics['countSavedResults']}} </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <b>{{ __('Number of unique landing pages') }}</b>
-                                    </td>
-                                    <td> {{ $statistics['pages'] }} </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <b>{{ __('Number of unique landing domains') }}</b>
-                                    </td>
-                                    <td> {{ $statistics['domains'] }} </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <b>{{ __('Total number of unique analyzed domains') }}</b>
-                                    </td>
-                                    <td> {{ $statistics['allDomains'] }} </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <b>{{ __('Total number of unique analyzed sites') }}</b>
-                                    </td>
-                                    <td> {{ $statistics['allPages'] }} </td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <b>{{ __('Number of tasks in the queue') }}</b>
-                                    </td>
-                                    <td id="countJobs"> {{ $statistics['countJobs'] }} </td>
-                                </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="w-50 ">
-                            <h3>{{ __('Users and their tasks') }}</h3>
-                            <table id="user_jobs_table" class="table table-bordered table-hover dataTable dtr-inline" style="width: 100%">
-                                <thead>
-                                <tr>
-                                    <th>{{ __('User') }}</th>
-                                    <th>{{ __('Email') }}</th>
-                                    <th>{{ __('Queue') }}</th>
-                                    <th>{{ __('Job') }}</th>
-                                </tr>
-                                </thead>
-                                <tbody id="user_jobs_table_body">
-                                @foreach($usersJobs as $job)
-                                    <tr class="job-row">
-                                        <td>{{ $job['user'] }}</td>
-                                        <td>{{ $job['email'] }}</td>
-                                        <td> {{ $job['queue'] }} </td>
-                                        <td> {{ $job['job'] }} </td>
-                                    </tr>
-                                @endforeach
-                                </tbody>
-                                <tfoot>
+            <div class="cabinet-ra-stats">
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-xl-5">
+                        <section class="cabinet-ra-stats-panel h-100">
+                            <header class="cabinet-ra-stats-panel__head">
+                                <h2 class="cabinet-ra-stats-panel__title">{{ __('General statistics of the module') }}</h2>
+                            </header>
+                            <div class="cabinet-ra-stats-panel__body">
+                                <table id="statistics_table" class="table table-sm cabinet-ra-stats-metrics mb-0">
+                                    <tbody>
                                     <tr>
-                                        <th colspan="2">
-                                            <select name="" class="user-job-group text-center" style="width:100%">
-                                                <option value="0">{{ __('Group by name') }}</option>
-                                                <option value="1">{{ __('Group by email') }}</option>
-                                                <option value="2">{{ __('Group by queue') }}</option>
-                                                <option value="3">{{ __('Group by job') }}</option>
-                                            </select>
-                                        </th>
-                                        <th colspan="2">
-                                            <select name="" class="user-job-view text-center" style="width:100%">
-                                                <option value="1">{{ __('Detail view') }}</option>
-                                                <option value="2">{{ __('Short view') }}</option>
-                                            </select>
-                                        </th>
+                                        <th scope="row">{{ __('Number of checks for the current day') }}</th>
+                                        <td>{{ $statistics['toDay']['count_checks'] ?? 0 }}</td>
                                     </tr>
-                                </tfoot>
-                            </table>
-                        </div>
+                                    <tr>
+                                        <th scope="row">{{ __('Number of checks for the current month') }}</th>
+                                        <td>{{ $statistics['month'] }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">{{ __('Number of errors for the current day') }}</th>
+                                        <td>{{ $statistics['toDay']['count_fails'] ?? 0 }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">{{ __('Number of projects') }}</th>
+                                        <td>{{ $statistics['countProjects'] }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">{{ __('Number of saved scan results') }}</th>
+                                        <td>{{ $statistics['countSavedResults'] }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">{{ __('Number of unique landing pages') }}</th>
+                                        <td>{{ $statistics['pages'] }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">{{ __('Number of unique landing domains') }}</th>
+                                        <td>{{ $statistics['domains'] }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">{{ __('Total number of unique analyzed domains') }}</th>
+                                        <td>{{ $statistics['allDomains'] }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">{{ __('Total number of unique analyzed sites') }}</th>
+                                        <td>{{ $statistics['allPages'] }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">{{ __('Number of tasks in the queue') }}</th>
+                                        <td id="countJobs">{{ $statistics['countJobs'] }}</td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
                     </div>
+                    <div class="col-12 col-xl-7">
+                        <section class="cabinet-ra-stats-panel h-100">
+                            <header class="cabinet-ra-stats-panel__head">
+                                <h2 class="cabinet-ra-stats-panel__title">{{ __('Users and their tasks') }}</h2>
+                                <div class="cabinet-ra-stats-jobs-toolbar">
+                                    <select class="form-select form-select-sm user-job-group" aria-label="{{ __('Group by name') }}">
+                                        <option value="0">{{ __('Group by name') }}</option>
+                                        <option value="1">{{ __('Group by email') }}</option>
+                                        <option value="2">{{ __('Group by queue') }}</option>
+                                        <option value="3">{{ __('Group by job') }}</option>
+                                    </select>
+                                    <select class="form-select form-select-sm user-job-view" aria-label="{{ __('Detail view') }}">
+                                        <option value="1">{{ __('Detail view') }}</option>
+                                        <option value="2">{{ __('Short view') }}</option>
+                                    </select>
+                                </div>
+                            </header>
+                            <div class="cabinet-ra-stats-panel__body">
+                                <table id="user_jobs_table" class="table table-bordered table-hover table-sm dataTable dtr-inline mb-0" style="width: 100%">
+                                    <thead>
+                                    <tr>
+                                        <th>{{ __('User') }}</th>
+                                        <th>{{ __('Email') }}</th>
+                                        <th>{{ __('Queue') }}</th>
+                                        <th>{{ __('Job') }}</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="user_jobs_table_body">
+                                    @foreach($usersJobs as $job)
+                                        <tr class="job-row">
+                                            <td>{{ $job['user'] }}</td>
+                                            <td>{{ $job['email'] }}</td>
+                                            <td>{{ $job['queue'] }}</td>
+                                            <td>{{ $job['job'] }}</td>
+                                        </tr>
+                                    @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+                    </div>
+                </div>
 
-                    <h3>{{ __('All user projects') }}</h3>
-                    <table id="users_projects" class="table table-bordered table-hover dataTable dtr-inline mb-3" style="width: 100%">
-                        <thead>
-                        <tr>
-                            <th class="table-header">{{ __('Project name') }}</th>
-                            <th class="table-header">{{ __('Tags') }}</th>
-                            <th class="table-header">{{ __('Owner') }}</th>
-                            <th class="table-header">{{ __('Number of analyzed pages') }}</th>
-                            <th class="table-header">{{ __('Number of saved scans') }}</th>
-                            <th class="table-header">{{ __('Total score') }}</th>
-                            <th class="table-header">{{ __('Avg position') }}</th>
-                            <th class="table-header">{{ __('End-to-end analysis') }}</th>
-                            <th class="table-header">{{ __('Last check') }}</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        </tbody>
-                    </table>
+                <section class="cabinet-ra-stats-panel">
+                    <header class="cabinet-ra-stats-panel__head">
+                        <h2 class="cabinet-ra-stats-panel__title">{{ __('All user projects') }}</h2>
+                    </header>
+                    <div class="cabinet-ra-stats-panel__body">
+                        <table id="users_projects" class="table table-bordered table-hover table-sm dataTable dtr-inline mb-0" style="width: 100%">
+                            <thead>
+                            <tr>
+                                <th class="table-header">{{ __('Project name') }}</th>
+                                <th class="table-header">{{ __('Tags') }}</th>
+                                <th class="table-header">{{ __('Owner') }}</th>
+                                <th class="table-header" title="{{ __('Number of analyzed pages') }}">{{ __('Relevance stats col pages') }}</th>
+                                <th class="table-header" title="{{ __('Number of saved scans') }}">{{ __('Relevance stats col scans') }}</th>
+                                <th class="table-header" title="{{ __('Total score') }}">{{ __('Relevance stats col score') }}</th>
+                                <th class="table-header" title="{{ __('Avg position') }}">{{ __('Relevance stats col position') }}</th>
+                                <th class="table-header" title="{{ __('End-to-end analysis') }}">{{ __('Relevance stats col though') }}</th>
+                                <th class="table-header" title="{{ __('Last check') }}">{{ __('Relevance stats col last check') }}</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
 
                     <div id="block-for-modals">
 
@@ -545,8 +524,6 @@
                         <tbody id="list-history-body">
                         </tbody>
                     </table>
-                </div>
-            </div>
         </div>
     </div>
 
@@ -565,6 +542,7 @@
         <script src="{{ asset('plugins/relevance-analysis/history/mainHistoryTable.js') }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/history/childHistoryTable.js') }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/history/common.js') }}"></script>
+        <script src="{{ asset('js/cabinet-relevance-tooltips.js') }}?v={{ @filemtime(public_path('js/cabinet-relevance-tooltips.js')) ?: time() }}"></script>
         <script>
             let usersProjects
             let gettedProjects
@@ -590,25 +568,26 @@
                     }
                 });
 
-                let userJobsTable = $('#user_jobs_table').dataTable({
-                    "order": [[0, "desc"]],
-                    "paging": false,
-                    "scrollCollapse": true,
-                    "scrollY": '340px',
-                    "searching": true,
+                let userJobsTable = $('#user_jobs_table').DataTable({
+                    order: [[0, 'desc']],
+                    paging: false,
+                    searching: true,
+                    autoWidth: false,
+                    dom: "<'row'<'col-12'f>>" +
+                        "<'row'<'col-12'tr>>" +
+                        "<'row'<'col-12'i>>",
                     language: {
+                        search: words.search + ':',
+                        emptyTable: words.noRecords,
+                        zeroRecords: words.noRecords,
+                        info: words.showing + ' ' + words.from + ' _START_ ' + words.to + ' _END_ ' + words.of + ' _TOTAL_ ' + words.entries,
+                        infoEmpty: words.showing + ' ' + words.from + ' 0 ' + words.to + ' 0 ' + words.of + ' 0 ' + words.entries,
                         paginate: {
-                            "first": "«",
-                            "last": "»",
-                            "next": "»",
-                            "previous": "«"
+                            first: '«',
+                            last: '»',
+                            next: '»',
+                            previous: '«'
                         },
-                    },
-                    "oLanguage": {
-                        "sSearch": words.search + ":",
-                        "sLengthMenu": words.show + " _MENU_ " + words.records,
-                        "sEmptyTable": words.noRecords,
-                        "sInfo": words.showing + " " + words.from + "  _START_ " + words.to + " _END_ " + words.of + " _TOTAL_ " + words.entries,
                     },
                     orderFixed: [0, 'asc'],
                     rowGroup: {
@@ -617,10 +596,13 @@
                             return group + ' (' + rows.count() + ')';
                         },
                     },
+                    initComplete: function () {
+                        this.api().columns.adjust();
+                    },
                 });
 
                 $('.user-job-group').change(function () {
-                    let table = userJobsTable.api();
+                    let table = userJobsTable;
                     let val = $(this).val();
 
                     table.order.fixed({ pre: [[val, 'asc']] });
@@ -629,38 +611,26 @@
 
                 $('.user-job-view').change(function(){
                     if($(this).val() == 1)
-                        userJobsTable.find('.job-row').show();
+                        $('#user_jobs_table .job-row').show();
                     else
-                        userJobsTable.find('.job-row').hide();
+                        $('#user_jobs_table .job-row').hide();
                 });
 
                 usersProjects = $('#users_projects').DataTable({
                     pageLength: 10,
                     processing: true,
                     serverSide: true,
-                    scrollX: true,
                     autoWidth: false,
+                    scrollX: true,
                     ajax: "{{ route('get.all.relevance.projects') }}",
                     columns: columns,
                     order: [[8, 'desc']],
-                    aoColumnDefs: [
-                        {
-                            bSortable: false,
-                            aTargets: [1, 2, 7]
-                        },
-                        {
-                            type: "num",
-                            targets: [3, 4, 5]
-                        },
-                        { width: '14%', targets: 0 },
-                        { width: '10%', targets: 1 },
-                        { width: '14%', targets: 2 },
-                        { width: '8%', targets: 3 },
-                        { width: '8%', targets: 4 },
-                        { width: '7%', targets: 5 },
-                        { width: '7%', targets: 6 },
-                        { width: '18%', targets: 7 },
-                        { width: '14%', targets: 8 },
+                    dom: "<'row'<'col-sm-12 col-md-6'f><'col-sm-12 col-md-6'l>>" +
+                        "<'row'<'col-sm-12'tr>>" +
+                        "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+                    columnDefs: [
+                        { orderable: false, targets: [1, 2, 7] },
+                        { type: 'num', targets: [3, 4, 5] },
                     ],
                     language: {
                         processing: @json(__('Loading records')),
@@ -669,6 +639,7 @@
                         emptyTable: words.noRecords,
                         zeroRecords: words.noRecords,
                         info: words.showing + " " + words.from + "  _START_ " + words.to + " _END_ " + words.of + " _TOTAL_ " + words.entries,
+                        infoEmpty: words.showing + " " + words.from + " 0 " + words.to + " 0 " + words.of + " 0 " + words.entries,
                         paginate: {
                             first: "«",
                             last: "»",
@@ -676,19 +647,14 @@
                             previous: "«"
                         },
                     },
-                    oLanguage: {
-                        "sProcessing": "{{ __('Loading records') }}",
-                        "sSearch": words.search + ":",
-                        "sLengthMenu": words.show + " _MENU_ " + words.records,
-                        "sEmptyTable": words.noRecords,
-                        "sZeroRecords": words.noRecords,
-                        "sInfo": words.showing + " " + words.from + "  _START_ " + words.to + " _END_ " + words.of + " _TOTAL_ " + words.entries,
-                    },
                     initComplete: function () {
                         this.api().columns.adjust()
                     },
                     drawCallback: function () {
                         this.api().columns.adjust()
+                        if (typeof window.initRelevanceActionTips === 'function') {
+                            window.initRelevanceActionTips(document.getElementById('users_projects_wrapper') || document);
+                        }
                         let api = this.api();
                         let currentPageData = api.rows({page: 'current'}).data();
                         let newModals = ''
@@ -1261,7 +1227,10 @@
                                                 width: '100%'
                                             })
 
-                                            $('#list-history-body > tr.render > td.col-1').append('<i class="fa fa-eye"></i>')
+                                            $('#list-history-body > tr.render > td.col-1').append('<i class="fa fa-eye" data-ra-tip="{{ e(__('Relevance open details tip')) }}"></i>')
+                                            if (typeof window.initRelevanceActionTips === 'function') {
+                                                window.initRelevanceActionTips(document.getElementById('list-history_wrapper') || document);
+                                            }
 
                                             if ($.fn.DataTable.fnIsDataTable($('#list-history'))) {
                                                 $('#list-history').dataTable().fnDestroy();
@@ -1503,10 +1472,13 @@
                         return '<div class="cabinet-relevance-project-cell">' +
                             '<span class="project_name cabinet-relevance-project-name" data-order="' + row.id + '">' + row.name + '</span>' +
                             '<span class="cabinet-relevance-project-actions">' +
-                            '    <i class="fa fa-table project_name" data-order="' + row.id + '" title="{{ __('Show the results of the analysis') }}"></i>' +
-                            '    <i class="fa fa-list project_name_v2" data-order="' + row.id + '" title="{{ __('View the results in a list') }}"></i>' +
+                            '    <i class="fa fa-table project_name" data-order="' + row.id + '"' +
+                            '       data-ra-tip="{{ e(__('Show the results of the analysis')) }}"></i>' +
+                            '    <i class="fa fa-list project_name_v2" data-order="' + row.id + '"' +
+                            '       data-ra-tip="{{ e(__('View the results in a list')) }}"></i>' +
                             '    <div class="dropdown">' +
-                            '        <button type="button" class="cabinet-relevance-project-menu-btn" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" title="{{ __('Actions') }}">' +
+                            '        <button type="button" class="cabinet-relevance-project-menu-btn" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false"' +
+                            '                data-ra-tip="{{ e(__('Actions')) }}">' +
                             '            <i class="fa fa-cogs" aria-hidden="true"></i>' +
                             '        </button>' +
                             '        <ul class="dropdown-menu">' +
@@ -1540,7 +1512,8 @@
                                 '    <i class="fa fa-trash"' +
                                 '       style="opacity: 0.5; cursor: pointer"' +
                                 '       data-bs-toggle="modal"' +
-                                '       data-bs-target="#removeTagModal' + value.id + '' + row.id + '">' +
+                                '       data-bs-target="#removeTagModal' + value.id + '' + row.id + '"' +
+                                '       data-ra-tip="{{ e(__('Relevance unlink tag tip')) }}">' +
                                 '    </i>' +
                                 '</div>'
                         })
@@ -1566,7 +1539,7 @@
                             '<i class="fa fa-repeat" style="opacity: 0.6; cursor: pointer"' +
                             '   data-bs-target="#repeatUniqueScan' + row.id + '"' +
                             '   data-bs-toggle="modal" data-bs-placement="top"' +
-                            '   title="{{ __('restart analyzed pages') }}"></i>' +
+                            '   data-ra-tip="{{ e(__('restart analyzed pages')) }}"></i>' +
                             '</span>'
                     },
 
@@ -1596,21 +1569,21 @@
                                 '    </div>' +
                                 '</div>'
                         } else {
-                            return '<div class="though-cell btn-group">' +
-                                '     <button type="button" class="btn btn-secondary" data-bs-target="#startThroughScan' + row.id + '"' +
-                                '             data-bs-toggle="modal"' +
-                                '             data-bs-placement="top">' +
-                                '         {{ __('End-to-end analysis') }}' +
-                                '     </button>' +
-                                '     <button type="button" class="btn btn-secondary">' +
-                                '     <span class="__helper-link ui_tooltip_w">' +
-                                '         <i class="fa fa-question-circle"></i>' +
-                                '         <span class="ui_tooltip __right">' +
-                                '             <span class="ui_tooltip_content">Для анализа используются результаты последнего сканирования каждой фразы и посадочной страницы</span>' +
-                                '         </span>' +
-                                '     </span>' +
-                                '     </button>' +
-                                ' </div>'
+                            return '<div class="though-cell">' +
+                                '  <div class="cabinet-ra-though-actions">' +
+                                '    <button type="button" class="btn btn-sm btn-secondary"' +
+                                '            data-bs-target="#startThroughScan' + row.id + '"' +
+                                '            data-bs-toggle="modal"' +
+                                '            data-ra-tip="{{ e(__('Relevance end-to-end button tip')) }}">' +
+                                '        {{ __('End-to-end analysis') }}' +
+                                '    </button>' +
+                                '    <button type="button" class="btn btn-sm btn-secondary though-help-btn"' +
+                                '            data-ra-tip="{{ e(__('Relevance though analysis tip')) }}"' +
+                                '            aria-label="{{ e(__('Help')) }}">' +
+                                '        <i class="fa fa-question-circle" aria-hidden="true"></i>' +
+                                '    </button>' +
+                                '  </div>' +
+                                '</div>'
                         }
                     },
                 },

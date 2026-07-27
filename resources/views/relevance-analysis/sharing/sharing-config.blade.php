@@ -1,4 +1,4 @@
-@component('component.card', ['title' =>  "$project->name" ])
+@component('component.card', ['title' => __('Share your projects')])
     @section('content')
         @slot('css')
             <link rel="stylesheet" type="text/css"
@@ -11,6 +11,36 @@
             <style>
                 .RelevanceAnalysis {
                     background: oldlace;
+                }
+                #users-access_wrapper .dataTables_filter {
+                    float: left;
+                    text-align: left;
+                    margin-bottom: 0.5rem;
+                }
+                #users-access_wrapper .dataTables_length {
+                    float: right;
+                    text-align: right;
+                    margin-bottom: 0.5rem;
+                }
+                #users-access_wrapper > .row:first-child > [class*="col-"]:first-child {
+                    text-align: left;
+                }
+                #users-access_wrapper > .row:first-child > [class*="col-"]:last-child {
+                    text-align: right;
+                }
+                #users-access_wrapper .dataTables_filter label,
+                #users-access_wrapper .dataTables_length label {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 0.35rem;
+                    margin: 0;
+                }
+                #users-access_wrapper .dataTables_length label {
+                    justify-content: flex-end;
+                }
+                #users-access .access-select {
+                    width: 100%;
+                    max-width: 16rem;
                 }
             </style>
         @endslot
@@ -50,6 +80,9 @@
                                 <option value="1">Только просмотр</option>
                                 <option value="2">Просмотр и возможность запуска повторного анализа</option>
                             </select>
+                            <p class="form-text mb-0 mt-1 js-access-limit-hint d-none">
+                                {{ __('Relevance share reanalysis limits hint') }}
+                            </p>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -60,13 +93,49 @@
             </div>
         </div>
 
-        <div class="card mb-4">
+        <div class="card">
+            <div class="card-header d-flex p-0">
+                <ul class="nav nav-pills p-2">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ route('relevance-analysis') }}">{{ __('Analyzer') }}</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ route('create.queue.view') }}">{{ __('Create page analysis tasks') }}</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ route('relevance.history') }}">{{ __('History') }}</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('sharing.view') }}" class="nav-link active">{{ __('Share your projects') }}</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ route('access.project') }}" class="nav-link">{{ __('Projects available to you') }}</a>
+                    </li>
+                    @if(!empty($admin))
+                        <li class="nav-item">
+                            <a class="nav-link admin-link" href="{{ route('all.relevance.projects') }}">{{ __('Statistics') }}</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link admin-link" href="{{ route('show.config') }}">{{ __('Module administration') }}</a>
+                        </li>
+                    @endif
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <a href="{{ route('sharing.view') }}" class="btn btn-outline-secondary btn-sm mb-2">
+                        <i class="fa fa-arrow-left me-1" aria-hidden="true"></i>{{ __('Back to list') }}
+                    </a>
+                    <h4 class="mb-0">{{ __('Project') }} {{ $project->name }}</h4>
+                </div>
+
+                <div class="card mb-4">
             <div class="card-header">
                 <h5 class="mb-0">{{ __('Public link without registration') }}</h5>
             </div>
             <div class="card-body">
                 <p class="text-muted small mb-3">
-                    {{ __('Anyone with the link can view the project for 30 days without logging in. View only.') }}
+                    {{ __('Relevance share public hint ttl') }}
                 </p>
                 <div class="input-group input-group-sm mb-2">
                     <input type="text"
@@ -75,11 +144,24 @@
                            readonly
                            value="{{ isset($publicShare) ? $publicShare->publicUrl() : '' }}"
                            placeholder="{{ __('Create a public link to copy it here') }}">
-                    <button type="button" class="btn btn-outline-secondary" id="copyPublicShareUrl" @if(empty($publicShare)) disabled @endif>
+                    <button type="button" class="btn btn-outline-secondary" id="copyPublicShareUrl"
+                            data-ra-tip="{{ e(__('Relevance share copy public url tip')) }}"
+                            @if(empty($publicShare)) disabled @endif>
                         <i class="fa fa-copy"></i>
                     </button>
                 </div>
                 <div class="d-flex flex-wrap align-items-center gap-2">
+                    @php($shareTtlOptions = \App\Support\RelevancePublicShareTtl::labelsForUi())
+                    <label class="visually-hidden" for="publicShareTtl">{{ __('Relevance share ttl label') }}</label>
+                    <select id="publicShareTtl" class="form-select form-select-sm" style="width: auto; min-width: 8rem;"
+                            aria-label="{{ __('Relevance share ttl label') }}">
+                        @foreach($shareTtlOptions as $days => $label)
+                            <option value="{{ $days }}"
+                                @if((int) $days === (int) (isset($publicShare) ? $publicShare->ttlDaysFromRecord() : 30)) selected @endif>
+                                {{ $label }}
+                            </option>
+                        @endforeach
+                    </select>
                     <button type="button" class="btn btn-primary btn-sm" id="createPublicShare">
                         {{ isset($publicShare) ? __('Refresh public link') : __('Create public link') }}
                     </button>
@@ -88,20 +170,19 @@
                     </button>
                     <span class="text-muted small" id="publicShareExpires">
                         @if(!empty($publicShare))
-                            {{ __('Valid until') }}: {{ $publicShare->expires_at->format('d.m.Y H:i') }}
+                            {{ $publicShare->expiresLabel() }}
                         @endif
                     </span>
                 </div>
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-header d-flex p-0">
-                <h3 class="p-3">{{ "Проект $project->name" }}</h3>
+                <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Пользователи имеющие доступ до проекта</h5>
             </div>
             <div class="card-body">
-                <div class="d-flex justify-content-between mb-3">
-                    <h5>Пользователи имеющие доступ до проекта</h5>
+                <div class="d-flex justify-content-end mb-3">
                     <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#ProjectModal">
                         Дать доступ к проекту
                     </button>
@@ -127,15 +208,10 @@
                             </span>
                             </td>
                             <td>
-                                <select name="access" class="form form-control access-select" style="width: 350px"
+                                <select name="access" class="form-select form-select-sm access-select"
                                         data-target="{{ $item->id }}">
-                                    @if($item->access == 1)
-                                        <option value="1">Только просмотр</option>
-                                        <option value="2">Просмотр и запуск повторного анализа</option>
-                                    @elseif($item->access == 2)
-                                        <option value="2">Просмотр и запуск повторного анализа</option>
-                                        <option value="1">Только просмотр</option>
-                                    @endif
+                                    <option value="1" @if($item->access == 1) selected @endif>{{ __('Viewing only') }}</option>
+                                    <option value="2" @if($item->access == 2) selected @endif>{{ __('Relevance share access reanalyse short') }}</option>
                                 </select>
                             </td>
                             <td>
@@ -152,11 +228,47 @@
                 </table>
             </div>
         </div>
+            </div>
+        </div>
         @slot('js')
             <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
+            <script src="{{ asset('js/cabinet-relevance-tooltips.js') }}?v={{ @filemtime(public_path('js/cabinet-relevance-tooltips.js')) ?: time() }}"></script>
             <script>
                 $(document).ready(function () {
-                    $('#users-access').DataTable();
+                    const dtLang = {
+                        search: @json(__('Search') . ':'),
+                        lengthMenu: @json(__('show') . ' _MENU_ ' . __('records')),
+                        emptyTable: @json(__('No records')),
+                        zeroRecords: @json(__('No records')),
+                        info: @json(__('Showing') . ' ' . __('from') . ' _START_ ' . __('to') . ' _END_ ' . __('of') . ' _TOTAL_ ' . __('entries')),
+                        infoEmpty: @json(__('Showing') . ' ' . __('from') . ' 0 ' . __('to') . ' 0 ' . __('of') . ' 0 ' . __('entries')),
+                        infoFiltered: @json(__('(filtered from _MAX_ total)')),
+                        paginate: { first: '«', last: '»', next: '»', previous: '«' },
+                    };
+                    const dtDom = "<'row'<'col-sm-12 col-md-6'f><'col-sm-12 col-md-6'l>>" +
+                        "<'row'<'col-sm-12'tr>>" +
+                        "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>";
+                    window.initUsersAccessTable = function () {
+                        return $('#users-access').DataTable({
+                            pageLength: 10,
+                            order: [[2, 'desc']],
+                            columnDefs: [{ orderable: false, targets: [1, 3] }],
+                            dom: dtDom,
+                            language: dtLang,
+                        });
+                    };
+
+                    if (typeof window.initRelevanceActionTips === 'function') {
+                        window.initRelevanceActionTips(document);
+                    }
+                    function syncAccessLimitHint() {
+                        $('.js-access-limit-hint').toggleClass('d-none', $('#access').val() !== '2');
+                    }
+                    $('#access').on('change', syncAccessLimitHint);
+                    $('#ProjectModal').on('show.bs.modal', syncAccessLimitHint);
+                    syncAccessLimitHint();
+
+                    window.initUsersAccessTable();
 
                     $('#copyPublicShareUrl').on('click', function () {
                         const input = document.getElementById('publicShareUrl');
@@ -175,11 +287,15 @@
                             data: {
                                 _token: $('meta[name="csrf-token"]').attr('content'),
                                 project_id: $('#projectId').val(),
+                                ttl_days: $('#publicShareTtl').val(),
                             },
                             success: function (response) {
                                 if (response.code === 201) {
                                     $('#publicShareUrl').val(response.url);
-                                    $('#publicShareExpires').text('{{ __('Valid until') }}: ' + response.expires_at);
+                                    $('#publicShareExpires').text(response.expires_label || '');
+                                    if (response.ttl_days !== undefined) {
+                                        $('#publicShareTtl').val(String(response.ttl_days));
+                                    }
                                     $('#copyPublicShareUrl, #revokePublicShare').prop('disabled', false);
                                     $('#createPublicShare').text('{{ __('Refresh public link') }}');
                                     $('.toast-top-right.success-message').show(300);
@@ -253,19 +369,20 @@
                                     setTimeout(() => {
                                         $('.toast-top-right.error-message').hide(300)
                                     }, 3000)
+                                    return
+                                }
+
+                                if (!response.object || !response.user) {
+                                    return
                                 }
 
                                 let options
-
-                                if (response.object.access === '1') {
-                                    options =
-                                        '<option value="1">Только просмотр</option> ' +
-                                        '<option value="2">Просмотр и  запуск повторного анализа</option>'
-                                } else {
-                                    options =
-                                        '<option value="2">Просмотр и  запуск повторного анализа</option>' +
-                                        '<option value="1">Только просмотр</option> '
-                                }
+                                const access = String(response.object.access || '')
+                                const optViewOnly = @json(__('Viewing only'))
+                                const optReanalyse = @json(__('Relevance share access reanalyse short'))
+                                options =
+                                    '<option value="1"' + (access === '1' ? ' selected' : '') + '>' + optViewOnly + '</option>' +
+                                    '<option value="2"' + (access === '2' ? ' selected' : '') + '>' + optReanalyse + '</option>'
 
                                 $("#users-access").dataTable().fnDestroy();
                                 $('#accessProjects').append(
@@ -275,7 +392,7 @@
                                     "   <span class='text-muted'>" + response.user.name + " " + response.user.last_name + "</span>" +
                                     "   </td>" +
                                     "   <td>" +
-                                    '<select name="access" class="form form-control access-select" style="width: 350px" data-target="' + response.object.id + '">' +
+                                    '<select name="access" class="form-select form-select-sm access-select" data-target="' + response.object.id + '">' +
                                     options +
                                     '</select>' +
                                     "   </td>" +
@@ -287,7 +404,7 @@
                                     '   </td>' +
                                     '</tr>'
                                 )
-                                $('#users-access').DataTable()
+                                window.initUsersAccessTable()
                             },
                             error: function (response) {
                             }
@@ -313,7 +430,7 @@
                                         $('.toast-top-right.success-message').hide(300)
                                     }, 3000)
                                     button.parent().parent().remove()
-                                    $('#users-access').DataTable()
+                                    window.initUsersAccessTable()
                                 } else if (response.code === 415) {
                                     $('.toast-top-right.error-message').show(300)
                                     $('.toast-message.error-message').html(response.message)
@@ -326,7 +443,7 @@
                     });
 
                     $('.access-select').unbind().on('change', function () {
-                        let elem = $('.access-select')
+                        let elem = $(this)
                         $.ajax({
                             type: "POST",
                             dataType: "json",

@@ -57,6 +57,44 @@
         errorBody: root.getAttribute('data-i18n-notify-error-body') || 'Откройте вкладку и посмотрите сообщение об ошибке.',
     };
 
+    function initTooltip(el) {
+        if (!el || !window.bootstrap || !window.bootstrap.Tooltip) {
+            return;
+        }
+        var tip = el.getAttribute('data-ss-tip');
+        if (!tip) {
+            return;
+        }
+        var existing = window.bootstrap.Tooltip.getInstance(el);
+        if (existing) {
+            existing.dispose();
+        }
+        new window.bootstrap.Tooltip(el, {
+            container: 'body',
+            trigger: 'hover focus',
+            placement: el.getAttribute('data-bs-placement') || 'top',
+            customClass: 'cabinet-ss-tooltip',
+            title: tip,
+        });
+    }
+
+    function initTooltips(scope) {
+        if (!window.bootstrap || !window.bootstrap.Tooltip) {
+            return;
+        }
+        (scope || root).querySelectorAll('[data-ss-tip]').forEach(initTooltip);
+    }
+
+    function hideTooltip(el) {
+        if (!el || !window.bootstrap || !window.bootstrap.Tooltip) {
+            return;
+        }
+        var tip = window.bootstrap.Tooltip.getInstance(el);
+        if (tip) {
+            tip.hide();
+        }
+    }
+
     function initRegionSelect() {
         if (!regionSelect || typeof window.jQuery === 'undefined' || typeof window.jQuery.fn.select2 !== 'function') {
             return;
@@ -247,6 +285,7 @@
             if (!btn) {
                 return;
             }
+            hideTooltip(btn);
             applyQuickPreset(btn.getAttribute('data-preset'));
         });
     }
@@ -312,6 +351,7 @@
             if (!btn) {
                 return;
             }
+            hideTooltip(btn);
             mergeStopPreset(btn.getAttribute('data-stop-preset'));
         });
     }
@@ -686,6 +726,7 @@
 
     form.addEventListener('submit', function (e) {
         e.preventDefault();
+        hideTooltip(submitBtn);
         submitBtn.disabled = true;
         collectInFlight = true;
         setStatus('Сбор…', 'busy');
@@ -748,6 +789,7 @@
     });
 
     clearBtn.addEventListener('click', function () {
+        hideTooltip(clearBtn);
         document.getElementById('cabinetSsSeeds').value = '';
         document.getElementById('cabinetSsStop').value = '';
         renderResults([]);
@@ -755,6 +797,7 @@
     });
 
     exportBtn.addEventListener('click', function () {
+        hideTooltip(exportBtn);
         if (!lastResults.length) {
             return;
         }
@@ -777,6 +820,7 @@
 
     if (copySuggestsBtn) {
         copySuggestsBtn.addEventListener('click', function () {
+            hideTooltip(copySuggestsBtn);
             if (!lastResults.length) {
                 setStatus('Нет подсказок для копирования', 'error');
                 return;
@@ -802,6 +846,12 @@
     root.addEventListener('click', function (e) {
         var openBtn = e.target.closest('.cabinet-ss-history-open');
         var delBtn = e.target.closest('.cabinet-ss-history-del');
+        if (openBtn) {
+            hideTooltip(openBtn);
+        }
+        if (delBtn) {
+            hideTooltip(delBtn);
+        }
         var tr = e.target.closest('tr[data-id]');
         if (!tr) {
             return;
@@ -896,4 +946,6 @@
                 setStatus('Не удалось открыть историю', 'error');
             });
     })();
+
+    initTooltips(root);
 })();

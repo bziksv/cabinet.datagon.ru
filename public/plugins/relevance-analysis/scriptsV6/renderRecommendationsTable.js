@@ -22,7 +22,9 @@ function renderRecommendationsTable(recommendations, count, words) {
 
         newRows +=
             "<tr class='render'>" +
-            "<td class='text-center'> <i class='fa fa-trash remove-recommendation'></i> </td>" +
+            "<td class='text-center'> <i class='fa fa-trash remove-recommendation'" +
+            (typeof window.relevanceActionTipAttr === 'function' ? window.relevanceActionTipAttr('Удалить рекомендацию') : '') +
+            "></i> </td>" +
             "<td class='col-1'>" + key + "</td>" +
             "<td class='col-1'>" + value['tf'] + "</td>" +
             "<td class='col-2'>" + value['avg'] + "</td>" +
@@ -35,6 +37,10 @@ function renderRecommendationsTable(recommendations, count, words) {
     })
 
     tBody.html(newRows)
+
+    if (typeof window.initRelevanceActionTips === 'function') {
+        window.initRelevanceActionTips(document.getElementById('recommendations_wrapper') || document)
+    }
 
     if ($.fn.DataTable.fnIsDataTable($('#recommendations'))) {
         $('#recommendations').dataTable().fnDestroy();

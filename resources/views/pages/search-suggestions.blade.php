@@ -60,14 +60,14 @@
                                 <button type="button"
                                         class="btn btn-sm btn-outline-secondary cabinet-ss-stop-presets__btn"
                                         data-stop-preset="{{ $key }}"
-                                        title="{{ $preset['hint'] ?? '' }}">
+                                        data-ss-tip="{{ $preset['hint'] ?? '' }}">
                                     {{ $preset['label'] ?? $key }}
                                 </button>
                             @endforeach
                             <button type="button"
                                     class="btn btn-sm btn-outline-danger cabinet-ss-stop-presets__btn"
                                     data-stop-preset="clear"
-                                    title="{{ __('Search suggestions stop presets clear hint') }}">
+                                    data-ss-tip="{{ __('Search suggestions stop presets clear hint') }}">
                                 {{ __('Search suggestions stop presets clear') }}
                             </button>
                         </div>
@@ -78,11 +78,16 @@
                     <div class="form-group">
                         <label class="d-block">{{ __('Search suggestions quick presets') }}</label>
                         <div class="cabinet-ss-quick" id="cabinetSsQuickPresets" role="group" aria-label="{{ __('Search suggestions quick presets') }}">
-                            <button type="button" class="btn btn-sm btn-outline-primary cabinet-ss-quick__btn" data-preset="basic">{{ __('Search suggestions quick basic') }}</button>
-                            <button type="button" class="btn btn-sm btn-outline-primary cabinet-ss-quick__btn" data-preset="alphabet">{{ __('Search suggestions quick alphabet') }}</button>
-                            <button type="button" class="btn btn-sm btn-outline-primary cabinet-ss-quick__btn" data-preset="commerce">{{ __('Search suggestions quick commerce') }}</button>
-                            <button type="button" class="btn btn-sm btn-outline-primary cabinet-ss-quick__btn" data-preset="questions">{{ __('Search suggestions quick questions') }}</button>
-                            <button type="button" class="btn btn-sm btn-outline-primary cabinet-ss-quick__btn" data-preset="max">{{ __('Search suggestions quick max') }}</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary cabinet-ss-quick__btn" data-preset="basic"
+                                    data-ss-tip="{{ __('Search suggestions quick basic tip') }}">{{ __('Search suggestions quick basic') }}</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary cabinet-ss-quick__btn" data-preset="alphabet"
+                                    data-ss-tip="{{ __('Search suggestions quick alphabet tip') }}">{{ __('Search suggestions quick alphabet') }}</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary cabinet-ss-quick__btn" data-preset="commerce"
+                                    data-ss-tip="{{ __('Search suggestions quick commerce tip') }}">{{ __('Search suggestions quick commerce') }}</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary cabinet-ss-quick__btn" data-preset="questions"
+                                    data-ss-tip="{{ __('Search suggestions quick questions tip') }}">{{ __('Search suggestions quick questions') }}</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary cabinet-ss-quick__btn" data-preset="max"
+                                    data-ss-tip="{{ __('Search suggestions quick max tip') }}">{{ __('Search suggestions quick max') }}</button>
                         </div>
                         <small class="form-text text-muted">{{ __('Search suggestions quick presets hint') }}</small>
                     </div>
@@ -176,8 +181,10 @@
             </div>
 
             <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-                <button type="submit" class="btn btn-primary" id="cabinetSsSubmit">{{ __('Search suggestions submit') }}</button>
-                <button type="button" class="btn btn-outline-secondary" id="cabinetSsClear">{{ __('Clear') }}</button>
+                <button type="submit" class="btn btn-primary" id="cabinetSsSubmit"
+                        data-ss-tip="{{ __('Search suggestions submit tip') }}">{{ __('Search suggestions submit') }}</button>
+                <button type="button" class="btn btn-outline-secondary" id="cabinetSsClear"
+                        data-ss-tip="{{ __('Search suggestions clear tip') }}">{{ __('Clear') }}</button>
                 <span class="small text-muted ml-2" id="cabinetSsStatus"></span>
             </div>
 
@@ -211,8 +218,10 @@
                     <span class="text-muted font-weight-normal" id="cabinetSsResultsMeta"></span>
                 </h5>
                 <div class="d-flex flex-wrap gap-2">
-                    <button type="button" class="btn btn-sm btn-outline-primary" id="cabinetSsCopySuggests">{{ __('Search suggestions copy suggests') }}</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="cabinetSsExport">{{ __('Export') }} CSV</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="cabinetSsCopySuggests"
+                            data-ss-tip="{{ __('Search suggestions copy suggests tip') }}">{{ __('Search suggestions copy suggests') }}</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="cabinetSsExport"
+                            data-ss-tip="{{ __('Search suggestions export tip') }}">{{ __('Export') }} CSV</button>
                 </div>
             </div>
             <div class="table-responsive cabinet-ss-results-scroll">
@@ -258,8 +267,12 @@
                                 <td>{{ $h->seeds_count }}</td>
                                 <td>{{ $h->results_count }}</td>
                                 <td class="text-nowrap">
-                                    <button type="button" class="btn btn-xs btn-outline-primary cabinet-ss-history-open">{{ __('Open') }}</button>
-                                    <button type="button" class="btn btn-xs btn-outline-danger cabinet-ss-history-del">{{ __('Delete') }}</button>
+                                    <div class="cabinet-ss-history-actions">
+                                        <button type="button" class="btn btn-xs btn-outline-primary cabinet-ss-history-open"
+                                                data-ss-tip="{{ __('Search suggestions history open tip') }}">{{ __('Open') }}</button>
+                                        <button type="button" class="btn btn-xs btn-outline-danger cabinet-ss-history-del"
+                                                data-ss-tip="{{ __('Search suggestions history delete tip') }}">{{ __('Delete') }}</button>
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach

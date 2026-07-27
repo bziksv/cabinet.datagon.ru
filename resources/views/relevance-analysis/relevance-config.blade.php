@@ -6,16 +6,20 @@
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/jqcloud/css/jqcloud.css') }}"/>
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/datatable.css') }}"/>
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/toastr/toastr.css') }}"/>
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/relevance-analysis/css/style.css') }}"/>
+        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/relevance-analysis/css/style.css') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/css/style.css')) ?: time() }}"/>
+        <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
+        <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
         <style>
-            #tab_1 > div.d-flex.flex-column > div:nth-child(3) > button.btn.btn-secondary.col-2 > span > span > span,
-            #tab_1 > div.d-flex.flex-column > div:nth-child(2) > button.btn.btn-secondary.col-2 > span > span > span,
-            #tab_1 > div.d-flex.flex-column > div:nth-child(1) > button.btn.btn-secondary.col-2 > span > span > span {
-                width: 400px;
-            }
-
             .RelevanceAnalysis {
                 background: oldlace;
+            }
+            #separator,
+            #cleaningInterval,
+            input[name="boostPercent"] {
+                max-width: 6rem;
+            }
+            .cabinet-relevance-region-field .select2-container {
+                width: 100% !important;
             }
         </style>
     @endslot
@@ -61,7 +65,7 @@
         <div class="card-body">
             <div class="tab-content">
                 <div class="row">
-                    <div class="col-4">
+                    <div class="col-12 col-lg-6">
                         <div class="card card-primary">
                             <div class="card-header">
                                 <h3 class="card-title">{{ __('Analyzer Settings') }}</h3>
@@ -72,7 +76,7 @@
                                 </div>
                             </div>
                             <div class="card-body">
-                                <form action="{{ route('changeConfig') }}" method="POST" class="col-12 p-0">
+                                <form action="{{ route('changeConfig') }}" method="POST" class="p-0">
                                     @csrf
                                     <div>
                                         <div class="form-group required">
@@ -85,8 +89,8 @@
                                                     ]), null, ['class' => 'form-select rounded-0']) !!}
                                         </div>
 
-                                        <div class="form-group required">
-                                            <label>{{ __('Select the default region') }}</label>
+                                        <div class="form-group required cabinet-relevance-region-field">
+                                            <label for="config-region">{{ __('Select the default region') }}</label>
                                             {!! Form::select('region', array_unique([
                                                     $config->region => $config->region,
                                                     '213' => __('Moscow'),
@@ -151,7 +155,11 @@
                                                     '56' => __('Chelyabinsk'),
                                                     '1104' => __('Cherkessk'),
                                                     '16' => __('Yaroslavl'),
-                                                    ]), null, ['class' => 'form-select rounded-0']) !!}
+                                                    ]), $config->region, [
+                                                        'class' => 'form-select rounded-0 js-config-region',
+                                                        'id' => 'config-region',
+                                                        'data-placeholder' => __('Search city or region'),
+                                                    ]) !!}
                                         </div>
 
                                         <div class="form-group required">
@@ -159,9 +167,9 @@
                                             {!! Form::textarea("ignored_domains", $config->ignored_domains ,["class" => "form-control"] ) !!}
                                         </div>
 
-                                        <div class="form-group required d-flex align-items-center">
-                                            <span>{{ __('The number of characters to crop by default') }}</span>
-                                            <input type="number" class="form form-control col-2 ml-1 mr-1"
+                                        <div class="form-group required">
+                                            <label for="separator">{{ __('The number of characters to crop by default') }}</label>
+                                            <input type="number" class="form-control" style="max-width: 6rem"
                                                    name="separator"
                                                    id="separator" value="{{ $config->separator }}">
                                         </div>
@@ -267,10 +275,10 @@
                                             </div>
                                         </div>
 
-                                        <div class="d-flex mt-3 mb-3">
+                                        <div class="mt-3 mb-3">
                                             <div>
                                                 <label for="boostPercent">{{ __('add % to coverage') }}</label>
-                                                <input name="boostPercent" type="number" class="form form-control"
+                                                <input name="boostPercent" id="boostPercent" type="number" class="form-control"
                                                        value="{{ $config->boostPercent }}">
                                             </div>
                                         </div>
@@ -280,7 +288,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-4">
+                    <div class="col-12 col-lg-5">
                         <div class="card card-success">
                             <div class="card-header">
                                 <h3 class="card-title">{{ __('Settings for auto-cleaning results') }}</h3>
@@ -292,11 +300,13 @@
                                 </div>
                             </div>
                             <div class="card-body">
-                                {{ __('Auto-cleaning every') }}
-                                <input type="number" class="form form-control w-25 d-inline" id="cleaningInterval"
-                                       value="{{ $config->cleaning_interval }}">
-                                {{ __('days') }}
-                                <p>Размер таблицы {{ $size }} MB </p>
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                    <label class="mb-0" for="cleaningInterval">{{ __('Auto-cleaning every') }}</label>
+                                    <input type="number" class="form-control" style="max-width: 6rem" id="cleaningInterval"
+                                           value="{{ $config->cleaning_interval }}">
+                                    <span>{{ __('days') }}</span>
+                                </div>
+                                <p class="mb-0 text-muted">Размер таблицы {{ $size }} MB</p>
                             </div>
                         </div>
                     </div>
@@ -305,21 +315,44 @@
         </div>
     </div>
     @slot('js')
+        <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
+        <script src="{{ asset('js/cabinet-select2-defaults.js') }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/history/common.js') }}"></script>
         <script>
-            $('#cleaningInterval').on('change', function () {
-                $.ajax({
-                    type: "POST",
-                    dataType: "json",
-                    url: "{{ route('change.cleaning.interval') }}",
-                    data: {
-                        newInterval: $(this).val()
-                    },
-                    success: function (response) {
-                        getSuccessMessage(response.message)
-                    },
+            $(function () {
+                var $region = $('#config-region');
+                if ($region.length && typeof $.fn.select2 === 'function') {
+                    $region.select2({
+                        theme: 'bootstrap4',
+                        width: '100%',
+                        placeholder: $region.data('placeholder') || @json(__('Search city or region')),
+                        allowClear: false,
+                        minimumResultsForSearch: 0,
+                        language: {
+                            noResults: function () {
+                                return @json(__('No regions found'));
+                            },
+                            searching: function () {
+                                return @json(__('Searching…'));
+                            },
+                        },
+                    });
+                }
+
+                $('#cleaningInterval').on('change', function () {
+                    $.ajax({
+                        type: "POST",
+                        dataType: "json",
+                        url: "{{ route('change.cleaning.interval') }}",
+                        data: {
+                            newInterval: $(this).val()
+                        },
+                        success: function (response) {
+                            getSuccessMessage(response.message)
+                        },
+                    });
                 });
-            })
+            });
 
             function getSuccessMessage(message, time = 3000) {
                 $('.toast-top-right.success-message').show(300)

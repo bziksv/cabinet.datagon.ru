@@ -13,39 +13,64 @@
         <link rel="stylesheet" type="text/css"
               href="{{ asset('plugins/relevance-analysis/css/style.css') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/css/style.css')) ?: time() }}"/>
         <style>
+            /* Убрать двойной карточный отступ вокруг вкладок/таблицы */
+            .cabinet-module-main-card > .card-body {
+                padding: 0.75rem 1rem 1rem;
+            }
+            .cabinet-module-main-card > .card-body > .card {
+                margin: 0;
+                border: 0;
+                box-shadow: none;
+            }
+            .cabinet-module-main-card > .card-body > .card > .card-body {
+                padding: 0.75rem 0 0;
+            }
             #my-projects-table { width: 100% !important; }
             #my-projects-table th,
             #my-projects-table td { vertical-align: top; }
-            .cabinet-share-chip {
-                display: inline-flex;
+            #my-projects-table_wrapper {
+                width: 100%;
+            }
+            #my-projects-table_wrapper .dataTables_length,
+            #my-projects-table_wrapper .dataTables_filter {
+                margin-bottom: 0.5rem;
+            }
+            #my-projects-table_wrapper > .row + .row {
+                margin-top: 0;
+            }
+            #my-projects-table_wrapper > table.dataTable,
+            #my-projects-table_wrapper .dataTables_scroll {
+                margin-top: 0 !important;
+                margin-bottom: 0.5rem !important;
+            }
+            .cabinet-share-user-row {
+                display: flex;
                 align-items: center;
-                gap: .35rem;
-                margin: 0 .35rem .35rem 0;
-                padding: .2rem .55rem;
-                border: 1px solid var(--bs-border-color);
-                border-radius: 999px;
-                background: #fff;
-                font-size: .8125rem;
-                max-width: 100%;
+                gap: .4rem;
+                min-height: 2rem;
+                margin: 0 0 .35rem;
             }
-            .cabinet-share-chip__email { font-weight: 600; }
-            .cabinet-share-chip__level { color: var(--bs-secondary-color); }
-            .cabinet-share-chip select {
-                width: auto;
-                min-width: 9.5rem;
-                max-width: 12rem;
-                padding: .15rem .4rem;
-                font-size: .75rem;
-                height: auto;
+            .cabinet-share-user-row:last-child { margin-bottom: 0; }
+            .cabinet-share-user-row__email {
+                font-weight: 600;
+                font-size: .875rem;
+                word-break: break-all;
+                line-height: 1.25;
             }
-            .cabinet-share-chip__remove {
+            .cabinet-share-user-row__remove {
                 border: 0;
                 background: transparent;
                 color: var(--bs-secondary-color);
                 padding: 0 .15rem;
                 line-height: 1;
+                flex-shrink: 0;
             }
-            .cabinet-share-chip__remove:hover { color: #dc3545; }
+            .cabinet-share-user-row__remove:hover { color: #dc3545; }
+            .sharing-access-cell .access-select {
+                width: 100%;
+                min-width: 12rem;
+                max-width: 16rem;
+            }
             .cabinet-share-empty { color: var(--bs-secondary-color); font-size: .875rem; }
             .cabinet-share-project-list {
                 max-height: 280px;
@@ -54,7 +79,41 @@
                 border-radius: .375rem;
                 padding: .5rem .75rem;
             }
-            .cabinet-share-toolbar { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+            .cabinet-share-actions {
+                display: inline-flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: .4rem;
+            }
+            #my-projects-table_filter.cabinet-share-dt-filter {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                justify-content: flex-start;
+                gap: .5rem .75rem;
+            }
+            #my-projects-table_filter .cabinet-share-toolbar__filter {
+                display: inline-flex;
+                align-items: center;
+                gap: .4rem;
+                margin: 0;
+            }
+            #my-projects-table_filter .cabinet-share-toolbar__filter .form-select {
+                width: auto;
+                min-width: 11rem;
+                height: 34px;
+                padding: 0.25rem 1.75rem 0.25rem 0.5rem;
+                font-size: 0.875rem;
+            }
+            #my-projects-table_filter .cabinet-share-toolbar__actions {
+                display: inline-flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: .4rem;
+            }
+            #my-projects-table_filter .cabinet-share-toolbar__actions .btn {
+                white-space: nowrap;
+            }
             .cabinet-share-tag {
                 display: inline-block;
                 margin: 0 .25rem .25rem 0;
@@ -104,13 +163,25 @@
         </div>
 
         <div class="card-body">
-            <div class="cabinet-share-toolbar">
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#accessModal">
-                    <i class="fa fa-user-plus me-1" aria-hidden="true"></i>{{ __('Give access') }}
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#offAccessModal">
-                    <i class="fa fa-user-times me-1" aria-hidden="true"></i>{{ __('Take access rights') }}
-                </button>
+            <div id="share-toolbar-mount" class="d-none">
+                <div class="cabinet-share-toolbar__filter">
+                    <label class="form-label mb-0 text-nowrap" for="share-access-filter">{{ __('Relevance share access filter') }}</label>
+                    <select id="share-access-filter" class="form-select form-select-sm">
+                        <option value="">{{ __('Relevance share filter all projects') }}</option>
+                        <option value="with">{{ __('Relevance share filter with access') }}</option>
+                        <option value="without">{{ __('Relevance share filter without access') }}</option>
+                    </select>
+                </div>
+                <div class="cabinet-share-toolbar__actions">
+                    <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#accessModal"
+                            data-ra-tip="{{ e(__('Relevance share give access tip')) }}">
+                        <i class="fa fa-user-plus me-1" aria-hidden="true"></i>{{ __('Give access') }}
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#offAccessModal"
+                            data-ra-tip="{{ e(__('Relevance share take access tip')) }}">
+                        <i class="fa fa-user-times me-1" aria-hidden="true"></i>{{ __('Take access rights') }}
+                    </button>
+                </div>
             </div>
 
             <table id="my-projects-table" class="table table-bordered table-striped table-hover dataTable dtr-inline mb-0">
@@ -118,13 +189,19 @@
                 <tr>
                     <th>{{ __('Project name') }}</th>
                     <th>{{ __('Tags') }}</th>
-                    <th>{{ __('Users who have access to the project') }}</th>
+                    <th>{{ __('Relevance share col email') }}</th>
+                    <th>{{ __('Relevance share col access') }}</th>
                     <th>{{ __('Actions') }}</th>
                 </tr>
                 </thead>
                 <tbody>
                 @foreach($projects as $item)
-                    <tr id="story-id-{{ $item->id }}" data-project-id="{{ $item->id }}">
+                    @php
+                        $activePublic = ($item->publicShare && $item->publicShare->isActive()) ? $item->publicShare : null;
+                    @endphp
+                    <tr id="story-id-{{ $item->id }}"
+                        data-project-id="{{ $item->id }}"
+                        data-has-shares="{{ $item->sharing->isNotEmpty() ? '1' : '0' }}">
                         <td>
                             <span class="fw-semibold">{{ $item->name }}</span>
                         </td>
@@ -135,23 +212,42 @@
                                 <span class="cabinet-share-empty">—</span>
                             @endforelse
                         </td>
-                        <td class="sharing-users-cell" data-project-id="{{ $item->id }}">
+                        <td class="sharing-emails-cell" data-project-id="{{ $item->id }}">
                             @forelse($item->sharing as $share)
-                                @include('relevance-analysis.sharing.partials.access-chip', ['share' => $share])
+                                @include('relevance-analysis.sharing.partials.access-email', ['share' => $share])
                             @empty
                                 <span class="cabinet-share-empty js-share-empty">{{ __('No shared users yet') }}</span>
                             @endforelse
                         </td>
+                        <td class="sharing-access-cell" data-project-id="{{ $item->id }}">
+                            @foreach($item->sharing as $share)
+                                @include('relevance-analysis.sharing.partials.access-level', ['share' => $share])
+                            @endforeach
+                        </td>
                         <td class="text-nowrap">
-                            <button type="button"
-                                    class="btn btn-sm btn-outline-primary js-grant-one"
-                                    data-project-id="{{ $item->id }}"
-                                    data-project-name="{{ $item->name }}">
-                                + {{ __('Give access') }}
-                            </button>
-                            <a href="{{ route('share.project.conf', $item->id) }}" class="btn btn-sm btn-secondary">
-                                {{ __('More') }}
-                            </a>
+                            <div class="cabinet-share-actions">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary js-grant-one"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#accessModal"
+                                        data-project-id="{{ $item->id }}"
+                                        data-project-name="{{ $item->name }}"
+                                        data-ra-tip="{{ e(__('Relevance share grant one tip')) }}">
+                                    + {{ __('Give access') }}
+                                </button>
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary js-public-open"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#publicShareModal"
+                                        data-project-id="{{ $item->id }}"
+                                        data-project-name="{{ $item->name }}"
+                                        data-public-url="{{ $activePublic ? $activePublic->publicUrl() : '' }}"
+                                        data-public-expires="{{ $activePublic ? $activePublic->expiresLabel() : '' }}"
+                                        data-public-ttl="{{ $activePublic ? $activePublic->ttlDaysFromRecord() : 30 }}"
+                                        data-ra-tip="{{ e(__('Relevance share public create tip')) }}">
+                                    <i class="fa fa-link me-1" aria-hidden="true"></i>{{ __('Relevance share public col') }}
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 @endforeach
@@ -166,9 +262,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="accessModalLabel">{{ __('Give access') }}</h5>
-                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
@@ -182,6 +276,9 @@
                             <option value="1">{{ __('Viewing only') }}</option>
                             <option value="2">{{ __('Viewing and the ability to run a re-analysis') }}</option>
                         </select>
+                        <p class="form-text mb-0 mt-1 js-access-limit-hint d-none">
+                            {{ __('Relevance share reanalysis limits hint') }}
+                        </p>
                     </div>
                     @if($allTags->isNotEmpty())
                         <div class="mb-3">
@@ -194,17 +291,26 @@
                             </select>
                         </div>
                     @endif
-                    <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                         <span class="form-label mb-0">{{ __('Projects') }}</span>
-                        <div class="btn-group btn-group-sm">
-                            <button type="button" class="btn btn-outline-secondary" id="access-select-all">{{ __('Select all') }}</button>
-                            <button type="button" class="btn btn-outline-secondary" id="access-select-none">{{ __('Clear') }}</button>
+                        <div class="d-flex flex-wrap align-items-center gap-2">
+                            <input type="search"
+                                   id="access-project-search"
+                                   class="form-control form-control-sm"
+                                   style="width: 12rem; max-width: 100%;"
+                                   placeholder="{{ __('Search projects') }}"
+                                   autocomplete="off">
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-secondary" id="access-select-all">{{ __('Select all') }}</button>
+                                <button type="button" class="btn btn-outline-secondary" id="access-select-none">{{ __('Clear') }}</button>
+                            </div>
                         </div>
                     </div>
                     <div class="cabinet-share-project-list" id="access-project-list">
                         @forelse($projects as $item)
                             <div class="form-check js-access-project-row"
                                  data-project-id="{{ $item->id }}"
+                                 data-project-name="{{ mb_strtolower($item->name) }}"
                                  data-tags="{{ $item->relevanceTags->pluck('id')->implode(',') }}">
                                 <input class="form-check-input js-access-project" type="checkbox"
                                        value="{{ $item->id }}" id="grant-p-{{ $item->id }}">
@@ -223,15 +329,63 @@
         </div>
     </div>
 
+    <div class="modal fade" id="publicShareModal" tabindex="-1" aria-labelledby="publicShareModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="publicShareModalLabel">{{ __('Public link without registration') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-2" id="publicShareProjectName"></p>
+                    <p class="text-muted small mb-3">
+                        {{ __('Relevance share public hint ttl') }}
+                    </p>
+                    <input type="hidden" id="publicShareProjectId" value="">
+                    <div class="input-group input-group-sm mb-2">
+                        <input type="text"
+                               id="publicShareUrl"
+                               class="form-control"
+                               readonly
+                               value=""
+                               placeholder="{{ __('Create a public link to copy it here') }}">
+                        <button type="button" class="btn btn-outline-secondary" id="publicShareCopy" disabled
+                                data-ra-tip="{{ e(__('Relevance share public copy tip')) }}">
+                            <i class="fa fa-copy" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        @php($shareTtlOptions = \App\Support\RelevancePublicShareTtl::labelsForUi())
+                        <label class="visually-hidden" for="publicShareTtl">{{ __('Relevance share ttl label') }}</label>
+                        <select id="publicShareTtl" class="form-select form-select-sm" style="width: auto; min-width: 8rem;"
+                                aria-label="{{ __('Relevance share ttl label') }}">
+                            @foreach($shareTtlOptions as $days => $label)
+                                <option value="{{ $days }}" @if((int) $days === 30) selected @endif>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        <button type="button" class="btn btn-primary btn-sm" id="publicShareCreate">
+                            {{ __('Create public link') }}
+                        </button>
+                        <button type="button" class="btn btn-outline-danger btn-sm" id="publicShareRevoke" disabled>
+                            {{ __('Revoke public link') }}
+                        </button>
+                        <span class="text-muted small" id="publicShareExpires"></span>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {{-- Отзыв: только уже выданные --}}
     <div class="modal fade" id="offAccessModal" tabindex="-1" aria-labelledby="offAccessModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="offAccessModalLabel">{{ __('Take access rights') }}</h5>
-                    <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
@@ -267,17 +421,25 @@
     @slot('js')
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
+        <script src="{{ asset('js/cabinet-relevance-tooltips.js') }}?v={{ @filemtime(public_path('js/cabinet-relevance-tooltips.js')) ?: time() }}"></script>
         <script>
             (function ($) {
                 const i18n = {
                     viewOnly: @json(__('Viewing only')),
-                    viewReanalyse: @json(__('Viewing and launching a re-analysis')),
+                    viewReanalyse: @json(__('Relevance share access reanalyse short')),
                     emailRequired: @json(__('Enter user email')),
                     projectsRequired: @json(__('Select at least one project')),
                     noShared: @json(__('This user has no access to your projects')),
                     loadFailed: @json(__('An unexpected error has occurred, please contact the administrator')),
                     emptyUsers: @json(__('No shared users yet')),
-                    removeConfirm: @json(__('Remove access') . '?'),
+                    removeConfirm: @json(__('Remove access')),
+                    createPublic: @json(__('Create')),
+                    createPublicFull: @json(__('Create public link')),
+                    refreshPublic: @json(__('Refresh public link')),
+                    validUntil: @json(__('Valid until')),
+                    copied: @json(__('Copied')),
+                    createPublicTip: @json(__('Relevance share public create tip')),
+                    refreshPublicTip: @json(__('Relevance share public refresh tip')),
                 };
 
                 const routes = {
@@ -286,6 +448,8 @@
                     revokeOne: @json(route('remove.access.to.my.project')),
                     change: @json(route('change.access.to.my.project')),
                     sharedForEmail: @json(route('sharing.projects.for.email')),
+                    publicCreate: @json(route('relevance.public.share.create')),
+                    publicRevoke: @json(route('relevance.public.share.revoke')),
                 };
 
                 function csrf() {
@@ -312,44 +476,88 @@
                     return String(access) === '2' ? i18n.viewReanalyse : i18n.viewOnly;
                 }
 
-                function chipHtml(share, user) {
+                function emailRowHtml(share, user) {
                     const email = user.email || '';
                     const name = [user.name, user.last_name].filter(Boolean).join(' ').trim();
+                    return (
+                        '<div class="cabinet-share-user-row" data-share-id="' + share.id + '" data-project-id="' + share.project_id + '">' +
+                        '<span class="cabinet-share-user-row__email" title="' + escapeHtml(name) + '">' + escapeHtml(email) + '</span>' +
+                        '<button type="button" class="cabinet-share-user-row__remove removeAccess" data-share-id="' + share.id + '" data-ra-tip="' + escapeHtml(i18n.removeConfirm) + '">&times;</button>' +
+                        '</div>'
+                    );
+                }
+
+                function accessRowHtml(share) {
                     const access = String(share.access);
                     return (
-                        '<span class="cabinet-share-chip" data-share-id="' + share.id + '" data-project-id="' + share.project_id + '">' +
-                        '<span class="cabinet-share-chip__email" title="' + escapeHtml(name) + '">' + escapeHtml(email) + '</span>' +
+                        '<div class="cabinet-share-user-row" data-share-id="' + share.id + '" data-project-id="' + share.project_id + '">' +
                         '<select class="form-select form-select-sm access-select" data-share-id="' + share.id + '">' +
                         '<option value="1"' + (access === '1' ? ' selected' : '') + '>' + escapeHtml(i18n.viewOnly) + '</option>' +
                         '<option value="2"' + (access === '2' ? ' selected' : '') + '>' + escapeHtml(i18n.viewReanalyse) + '</option>' +
                         '</select>' +
-                        '<button type="button" class="cabinet-share-chip__remove removeAccess" data-share-id="' + share.id + '" title="' + escapeHtml(i18n.removeConfirm) + '">&times;</button>' +
-                        '</span>'
+                        '</div>'
                     );
                 }
 
-                function ensureEmptyPlaceholder($cell) {
-                    if (!$cell.find('.cabinet-share-chip').length && !$cell.find('.js-share-empty').length) {
-                        $cell.append('<span class="cabinet-share-empty js-share-empty">' + escapeHtml(i18n.emptyUsers) + '</span>');
+                let projectsTable = null;
+
+                function projectCells(projectId) {
+                    return {
+                        emails: $('.sharing-emails-cell[data-project-id="' + projectId + '"]'),
+                        access: $('.sharing-access-cell[data-project-id="' + projectId + '"]'),
+                    };
+                }
+
+                function syncRowHasShares(projectId) {
+                    const cells = projectCells(projectId);
+                    const $row = cells.emails.closest('tr');
+                    const has = cells.emails.find('.cabinet-share-user-row').length > 0 ? '1' : '0';
+                    $row.attr('data-has-shares', has);
+                }
+
+                function redrawProjectsTable() {
+                    if (projectsTable) {
+                        projectsTable.draw(false);
                     }
                 }
 
-                function addChips(objects, user) {
-                    $.each(objects || [], function (_, share) {
-                        const $cell = $('.sharing-users-cell[data-project-id="' + share.project_id + '"]');
-                        $cell.find('.js-share-empty').remove();
-                        if ($cell.find('.cabinet-share-chip[data-share-id="' + share.id + '"]').length) {
-                            return;
+                function ensureEmptyPlaceholder(projectId) {
+                    const cells = projectCells(projectId);
+                    if (!cells.emails.find('.cabinet-share-user-row').length) {
+                        if (!cells.emails.find('.js-share-empty').length) {
+                            cells.emails.append('<span class="cabinet-share-empty js-share-empty">' + escapeHtml(i18n.emptyUsers) + '</span>');
                         }
-                        $cell.append(chipHtml(share, user));
-                    });
+                        cells.access.empty();
+                    }
+                    syncRowHasShares(projectId);
+                    redrawProjectsTable();
                 }
 
-                function removeChip(shareId) {
-                    const $chip = $('.cabinet-share-chip[data-share-id="' + shareId + '"]');
-                    const $cell = $chip.closest('.sharing-users-cell');
-                    $chip.remove();
-                    ensureEmptyPlaceholder($cell);
+                function addShareRows(objects, user) {
+                    $.each(objects || [], function (_, share) {
+                        const cells = projectCells(share.project_id);
+                        cells.emails.find('.js-share-empty').remove();
+                        if (cells.emails.find('.cabinet-share-user-row[data-share-id="' + share.id + '"]').length) {
+                            return;
+                        }
+                        cells.emails.append(emailRowHtml(share, user));
+                        cells.access.append(accessRowHtml(share));
+                        if (typeof window.initRelevanceActionTips === 'function') {
+                            window.initRelevanceActionTips(cells.emails.get(0));
+                        }
+                        syncRowHasShares(share.project_id);
+                    });
+                    redrawProjectsTable();
+                }
+
+                function removeShareRow(shareId) {
+                    const $emailRow = $('.sharing-emails-cell .cabinet-share-user-row[data-share-id="' + shareId + '"]');
+                    const projectId = $emailRow.attr('data-project-id') || $emailRow.closest('[data-project-id]').attr('data-project-id');
+                    $emailRow.remove();
+                    $('.sharing-access-cell .cabinet-share-user-row[data-share-id="' + shareId + '"]').remove();
+                    if (projectId) {
+                        ensureEmptyPlaceholder(projectId);
+                    }
                 }
 
                 function selectedGrantIds() {
@@ -366,23 +574,38 @@
 
                 function filterGrantProjects() {
                     const tagId = String($('#access-tag-filter').val() || '');
+                    const query = String($('#access-project-search').val() || '').trim().toLowerCase();
                     $('.js-access-project-row').each(function () {
-                        const tags = String($(this).data('tags') || '').split(',').filter(Boolean);
-                        const show = !tagId || tags.indexOf(tagId) !== -1;
-                        $(this).toggle(show);
+                        const $row = $(this);
+                        const tags = String($row.data('tags') || '').split(',').filter(Boolean);
+                        const name = String($row.attr('data-project-name') || $row.find('.form-check-label').text() || '').toLowerCase();
+                        const matchTag = !tagId || tags.indexOf(tagId) !== -1;
+                        const matchQuery = !query || name.indexOf(query) !== -1;
+                        const show = matchTag && matchQuery;
+                        $row.toggle(show);
                         if (!show) {
-                            $(this).find('.js-access-project').prop('checked', false);
+                            $row.find('.js-access-project').prop('checked', false);
                         }
                     });
                 }
 
                 $(function () {
-                    $('#my-projects-table').DataTable({
+                    function syncAccessLimitHint() {
+                        $('.js-access-limit-hint').toggleClass('d-none', $('#access-level').val() !== '2');
+                    }
+                    $('#access-level').on('change', syncAccessLimitHint);
+                    $('#accessModal').on('show.bs.modal', syncAccessLimitHint);
+                    syncAccessLimitHint();
+
+                    projectsTable = $('#my-projects-table').DataTable({
                         autoWidth: false,
                         pageLength: 10,
                         order: [[0, 'asc']],
+                        dom: "<'row'<'col-sm-12 col-lg-9'f><'col-sm-12 col-lg-3'l>>" +
+                            "<'row'<'col-sm-12'tr>>" +
+                            "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
                         columnDefs: [
-                            { orderable: false, targets: [2, 3] },
+                            { orderable: false, targets: [2, 3, 4] },
                         ],
                         language: {
                             search: '{{ __('Search') }}:',
@@ -393,7 +616,48 @@
                         },
                     });
 
+                    const $dtFilter = $('#my-projects-table_filter');
+                    $dtFilter.addClass('cabinet-share-dt-filter');
+                    $dtFilter.append($('#share-toolbar-mount').children());
+                    $('#share-toolbar-mount').remove();
+
+                    if (typeof window.initRelevanceActionTips === 'function') {
+                        window.initRelevanceActionTips($dtFilter[0] || document);
+                    }
+
+                    $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
+                        if (!projectsTable || settings.nTable !== projectsTable.table().node()) {
+                            return true;
+                        }
+                        const mode = String($('#share-access-filter').val() || '');
+                        if (!mode) {
+                            return true;
+                        }
+                        const row = projectsTable.row(dataIndex).node();
+                        const has = row && String(row.getAttribute('data-has-shares') || '0') === '1';
+                        if (mode === 'with') {
+                            return has;
+                        }
+                        if (mode === 'without') {
+                            return !has;
+                        }
+                        return true;
+                    });
+
+                    $('#share-access-filter').on('change', function () {
+                        projectsTable.draw();
+                    });
+
+                    if (typeof window.initRelevanceActionTips === 'function') {
+                        window.initRelevanceActionTips(document);
+                    }
+
                     $('#access-tag-filter').on('change', filterGrantProjects);
+                    $('#access-project-search').on('input', filterGrantProjects);
+                    $('#accessModal').on('hidden.bs.modal', function () {
+                        $('#access-project-search').val('');
+                        filterGrantProjects();
+                    });
                     $('#access-select-all').on('click', function () {
                         $('.js-access-project-row:visible .js-access-project').prop('checked', true);
                     });
@@ -407,18 +671,135 @@
                         $('.js-off-project').prop('checked', false);
                     });
 
-                    $('.js-grant-one').on('click', function () {
-                        const id = String($(this).data('project-id'));
-                        $('.js-access-project').prop('checked', false);
-                        $('#grant-p-' + id).prop('checked', true);
-                        $('#access-tag-filter').val('');
-                        filterGrantProjects();
-                        const el = document.getElementById('accessModal');
-                        if (window.bootstrap && bootstrap.Modal) {
-                            bootstrap.Modal.getOrCreateInstance(el).show();
-                        } else {
-                            $(el).modal('show');
+                    $('#my-projects-table').on('click', '.js-grant-one', function () {
+                        if (typeof window.hideRelevanceActionTip === 'function') {
+                            window.hideRelevanceActionTip(this);
                         }
+                        const id = String($(this).attr('data-project-id') || '');
+                        $('.js-access-project').prop('checked', false);
+                        if (id) {
+                            $('#grant-p-' + id).prop('checked', true);
+                        }
+                        $('#access-tag-filter').val('');
+                        $('#access-project-search').val('');
+                        filterGrantProjects();
+                        $('#access-email').trigger('focus');
+                    });
+
+                    function syncPublicRowButton(projectId, url, expiresLabel, ttlDays) {
+                        const $btn = $('.js-public-open[data-project-id="' + projectId + '"]');
+                        $btn.attr('data-public-url', url || '');
+                        $btn.attr('data-public-expires', expiresLabel || '');
+                        if (ttlDays !== undefined && ttlDays !== null) {
+                            $btn.attr('data-public-ttl', String(ttlDays));
+                        }
+                    }
+
+                    function setPublicModalState(url, expiresLabel, ttlDays) {
+                        const has = !!url;
+                        $('#publicShareUrl').val(url || '');
+                        $('#publicShareCopy, #publicShareRevoke').prop('disabled', !has);
+                        $('#publicShareCreate').text(has ? i18n.refreshPublic : i18n.createPublicFull);
+                        $('#publicShareExpires').text(expiresLabel || '');
+                        if (ttlDays !== undefined && ttlDays !== null && $('#publicShareTtl option[value="' + ttlDays + '"]').length) {
+                            $('#publicShareTtl').val(String(ttlDays));
+                        }
+                    }
+
+                    $('#publicShareModal').on('show.bs.modal', function (event) {
+                        const btn = event.relatedTarget;
+                        if (!btn) {
+                            return;
+                        }
+                        if (typeof window.hideRelevanceActionTip === 'function') {
+                            window.hideRelevanceActionTip(btn);
+                        }
+                        const $btn = $(btn);
+                        const projectId = String($btn.attr('data-project-id') || '');
+                        const name = String($btn.attr('data-project-name') || '');
+                        $('#publicShareProjectId').val(projectId);
+                        $('#publicShareProjectName').text(name);
+                        setPublicModalState(
+                            $btn.attr('data-public-url') || '',
+                            $btn.attr('data-public-expires') || '',
+                            $btn.attr('data-public-ttl') || 30
+                        );
+                    });
+
+                    $('#publicShareCopy').on('click', function () {
+                        const input = document.getElementById('publicShareUrl');
+                        if (!input || !input.value) {
+                            return;
+                        }
+                        input.select();
+                        const done = function () { toastOk(i18n.copied); };
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(input.value).then(done).catch(function () {
+                                document.execCommand('copy');
+                                done();
+                            });
+                        } else {
+                            document.execCommand('copy');
+                            done();
+                        }
+                    });
+
+                    $('#publicShareCreate').on('click', function () {
+                        const projectId = $('#publicShareProjectId').val();
+                        if (!projectId) {
+                            return;
+                        }
+                        const $btn = $(this).prop('disabled', true);
+                        $.ajax({
+                            type: 'POST',
+                            url: routes.publicCreate,
+                            dataType: 'json',
+                            data: {
+                                _token: csrf(),
+                                project_id: projectId,
+                                ttl_days: $('#publicShareTtl').val(),
+                            },
+                            success: function (response) {
+                                if (response.code === 201) {
+                                    const label = response.expires_label || (response.expires_at ? (i18n.validUntil + ': ' + response.expires_at) : '');
+                                    setPublicModalState(response.url, label, response.ttl_days);
+                                    syncPublicRowButton(projectId, response.url, label, response.ttl_days);
+                                    toastOk(response.message);
+                                } else {
+                                    toastErr(response.message || i18n.loadFailed);
+                                }
+                            },
+                            error: function () { toastErr(i18n.loadFailed); },
+                            complete: function () { $btn.prop('disabled', false); },
+                        });
+                    });
+
+                    $('#publicShareRevoke').on('click', function () {
+                        const projectId = $('#publicShareProjectId').val();
+                        if (!projectId) {
+                            return;
+                        }
+                        const $btn = $(this).prop('disabled', true);
+                        $.ajax({
+                            type: 'POST',
+                            url: routes.publicRevoke,
+                            dataType: 'json',
+                            data: { _token: csrf(), project_id: projectId },
+                            success: function (response) {
+                                if (response.code === 201) {
+                                    setPublicModalState('', '', 30);
+                                    syncPublicRowButton(projectId, '', '', 30);
+                                    toastOk(response.message);
+                                } else {
+                                    toastErr(response.message || i18n.loadFailed);
+                                    $btn.prop('disabled', false);
+                                }
+                            },
+                            error: function () {
+                                toastErr(i18n.loadFailed);
+                                $btn.prop('disabled', false);
+                            },
+                        });
                     });
 
                     $('.set-access-button').on('click', function () {
@@ -446,7 +827,7 @@
                             success: function (response) {
                                 if (response.code === 201) {
                                     toastOk(response.message);
-                                    addChips(response.objects || [], response.user || {});
+                                    addShareRows(response.objects || [], response.user || {});
                                     if ((response.objects || []).length) {
                                         bootstrap.Modal.getInstance(document.getElementById('accessModal')).hide();
                                     }
@@ -522,7 +903,7 @@
                             success: function (response) {
                                 if (response.success && response.code === 200) {
                                     toastOk(response.message);
-                                    (response.objects || []).forEach(removeChip);
+                                    (response.objects || []).forEach(removeShareRow);
                                     bootstrap.Modal.getInstance(document.getElementById('offAccessModal')).hide();
                                     $('#off-project-list').html('<p class="text-secondary mb-0 js-off-placeholder">{{ __('Enter email and load the list.') }}</p>');
                                 } else {
@@ -570,7 +951,7 @@
                             success: function (response) {
                                 if (response.code === 201) {
                                     toastOk(response.message);
-                                    removeChip(shareId);
+                                    removeShareRow(shareId);
                                 } else {
                                     toastErr(response.message || i18n.loadFailed);
                                 }

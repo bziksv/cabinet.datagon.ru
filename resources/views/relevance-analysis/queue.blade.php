@@ -109,9 +109,9 @@
                             {!! Form::textarea("ignoredDomains", $config->ignored_domains,["class" => "form-control ignoredDomains"] ) !!}
                         </div>
 
-                        <div class="form-group required d-flex align-items-center">
+                        <div class="form-group required relevance-separator-row">
                             <span>{{ __('Cut the words shorter') }}</span>
-                            <input type="number" class="form form-control col-2 ml-1 mr-1" name="separator"
+                            <input type="number" class="form-control" name="separator"
                                    id="separator"
                                    value="{{ $config->separator }}">
                             <span>{{ __('symbols') }}</span>

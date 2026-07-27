@@ -281,14 +281,24 @@ class HistoryRelevanceController extends Controller
     public function getDetailsInfo(Request $request): JsonResponse
     {
         $part = (string) $request->input('part', 'full');
+        if (!in_array($part, ['full', 'meta', 'tables', 'sites'], true)) {
+            $part = 'full';
+        }
         $projectId = (int) $request->input('id');
         $started = microtime(true);
 
         try {
-            $history = RelevanceHistoryResult::where('project_id', '=', $request->id)->latest('updated_at')->first();
+            $lite = RelevanceHistoryResult::where('project_id', '=', $request->id)
+                ->latest('updated_at')
+                ->first(['id', 'project_id', 'compressed', 'cleaning']);
+
+            if ($lite === null) {
+                throw new \RuntimeException('history result missing');
+            }
 
             $admin = User::isUserAdmin();
-            $ownerId = $history->mainHistory->mainHistory->user_id;
+            // Не тянем html_main_page/sites через Eloquent-связи — только user_id.
+            $ownerId = (int) RelevanceHistory::where('id', '=', $lite->project_id)->value('user_id');
             $userId = Auth::id();
 
             $share = RelevanceSharing::where('user_id', '=', $userId)
@@ -302,7 +312,10 @@ class HistoryRelevanceController extends Controller
                     'message' => __("You don't have access to this object"),
                     'code' => 415
                 ]);
-            } elseif (!$history->compressed) {
+            }
+
+            if (!$lite->compressed) {
+                $history = RelevanceHistoryResult::where('id', '=', $lite->id)->first();
                 foreach ($history->getOriginal() as $key => $item) {
                     if ($key != 'id' && $key != 'project_id' && $key != 'created_at' && $key != 'updated_at' && $key != 'compressed' && $key != 'cleaning' && $key != 'hash') {
                         // Уже сжатый блоб (base64 gz) повторно не трогаем.
@@ -318,10 +331,15 @@ class HistoryRelevanceController extends Controller
 
                 $history->compressed = true;
                 $history->save();
-
-                $history = RelevanceHistoryResult::where('project_id', '=', $request->id)->latest('updated_at')->first();
             }
-            $history = Relevance::uncompress($history);
+
+            $columns = Relevance::historyResultColumnsForPart($part);
+            $query = RelevanceHistoryResult::where('id', '=', $lite->id);
+            if ($columns !== null) {
+                $query->select($columns);
+            }
+            $history = $query->first();
+            $history = Relevance::uncompress($history, $part);
             $history = Relevance::historyDetailsPart($history, $part);
 
         } catch (Throwable $exception) {

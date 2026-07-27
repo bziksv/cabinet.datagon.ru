@@ -54,11 +54,13 @@ function initPhrasesDataTable(count, words, onReady) {
         searching: true,
         dom: 'lBfrtip',
         orderCellsTop: false,
-        buttons: [
-            {extend: 'copy', text: words.copy || 'Копировать'},
-            {extend: 'csv', text: words.csv || 'CSV'},
-            {extend: 'excelHtml5', text: words.excel || 'Excel'},
-        ],
+        buttons: (typeof window.relevanceDtExportButtons === 'function')
+            ? window.relevanceDtExportButtons(words)
+            : [
+                {extend: 'copy', text: words.copy || 'Копировать'},
+                {extend: 'csv', text: words.csv || 'CSV'},
+                {extend: 'excelHtml5', text: words.excel || 'Excel'},
+            ],
         language: {
             paginate: {
                 first: '«',

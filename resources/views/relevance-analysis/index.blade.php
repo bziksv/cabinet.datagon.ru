@@ -174,9 +174,9 @@
                             </div>
                         </div>
 
-                        <div class="form-group required d-flex align-items-center">
+                        <div class="form-group required relevance-separator-row">
                             <span>{{ __('Cut the words shorter') }}</span>
-                            <input type="number" class="form form-control col-2 ml-1 mr-1" name="separator"
+                            <input type="number" class="form-control" name="separator"
                                    id="separator"
                                    value="{{ $config->separator }}">
                             <span>{{ __('symbols') }}</span>
@@ -505,9 +505,12 @@
                                style="width: 100% !important;">
                             <thead>
                             <tr style="position: relative; z-index: 100">
-                                <th class="сol-1">
-                                    <span class="text-muted" style="font-weight: 400">
-                                        {{ __("You can delete a word from the table if it has been worked out") }}
+                                <th class="col-1 text-center" data-export-title="">
+                                    <span class="__helper-link ui_tooltip_w">
+                                        <i class="fa fa-question-circle"></i>
+                                        <span class="ui_tooltip __bottom">
+                                            <span class="ui_tooltip_content">{{ __("You can delete a word from the table if it has been worked out") }}</span>
+                                        </span>
                                     </span>
                                 </th>
                                 <th>{{ __('Word') }}</th>
@@ -614,6 +617,7 @@
 
         <script src="{{ asset('plugins/canvasjs/js/canvasjs.js') }}"></script>
         <script src="{{ asset('plugins/jqcloud/js/jqcloud-1.0.4.min.js') }}"></script>
+        <script src="{{ asset('plugins/relevance-analysis/scriptsV6/dtExportClean.js') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/scriptsV6/dtExportClean.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/scriptsV6/renderClouds.js') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/scriptsV6/renderClouds.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/scriptsV6/renderUnigramTable.js') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/scriptsV6/renderUnigramTable.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/scriptsV6/renderScannedSitesList.js') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/scriptsV6/renderScannedSitesList.js')) ?: time() }}"></script>

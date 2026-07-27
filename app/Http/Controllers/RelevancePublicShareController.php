@@ -83,20 +83,24 @@ class RelevancePublicShareController extends Controller
         }
 
         $part = (string) $request->input('part', 'full');
+        if (!in_array($part, ['full', 'meta', 'tables', 'sites'], true)) {
+            $part = 'full';
+        }
 
         try {
-            $history = RelevanceHistoryResult::where('project_id', '=', $historyRow->id)
+            $lite = RelevanceHistoryResult::where('project_id', '=', $historyRow->id)
                 ->latest('updated_at')
-                ->first();
+                ->first(['id', 'project_id', 'compressed', 'cleaning']);
 
-            if ($history === null) {
+            if ($lite === null) {
                 return response()->json([
                     'code' => 415,
                     'message' => __('The data was lost'),
                 ]);
             }
 
-            if (!$history->compressed) {
+            if (!$lite->compressed) {
+                $history = RelevanceHistoryResult::where('id', '=', $lite->id)->first();
                 foreach ($history->getOriginal() as $key => $item) {
                     if ($key != 'id' && $key != 'project_id' && $key != 'created_at' && $key != 'updated_at' && $key != 'compressed' && $key != 'cleaning' && $key != 'hash') {
                         if (is_string($item) && $item !== '' && preg_match('/^[A-Za-z0-9+\/=]{32,}$/', $item) && @gzuncompress(base64_decode($item, true) ?: '') !== false) {
@@ -111,13 +115,16 @@ class RelevancePublicShareController extends Controller
 
                 $history->compressed = true;
                 $history->save();
-
-                $history = RelevanceHistoryResult::where('project_id', '=', $historyRow->id)
-                    ->latest('updated_at')
-                    ->first();
             }
 
-            $history = Relevance::uncompress($history);
+            $columns = Relevance::historyResultColumnsForPart($part);
+            $query = RelevanceHistoryResult::where('id', '=', $lite->id);
+            if ($columns !== null) {
+                $query->select($columns);
+            }
+            $history = $query->first();
+
+            $history = Relevance::uncompress($history, $part);
             $history = Relevance::historyDetailsPart($history, $part);
         } catch (Throwable $exception) {
             return response()->json([

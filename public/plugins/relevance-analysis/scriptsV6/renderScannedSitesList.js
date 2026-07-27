@@ -134,7 +134,9 @@ function renderScannedSitesList(words, sites, avgCoveragePercent, count, hide, b
             bSortable: false, aTargets: [8]
         }],
         dom: 'lBfrtip',
-        buttons: ['copy', 'csv', 'excel'],
+        buttons: (typeof window.relevanceDtExportButtons === 'function')
+            ? window.relevanceDtExportButtons(words)
+            : ['copy', 'csv', 'excel'],
         language: {
             paginate: {
                 first: '«', last: '»', next: '»', previous: '«'
@@ -190,7 +192,13 @@ function renderScannedSitesList(words, sites, avgCoveragePercent, count, hide, b
             $('#showOrHideIgnoredSites').trigger('click');
         }
 
-        $('#scanned-sites_wrapper > .dt-buttons').after("<button class='btn btn-secondary ml-1 click_tracking' data-click='Copy links sites'" + " id='copySites' style='cursor: pointer'>" + words.copyLinks + "</button>")
+        var $copySitesBtn = $("<button type='button' class='btn btn-secondary click_tracking' data-click='Copy links sites' id='copySites'>" + words.copyLinks + "</button>");
+        var $dtButtons = $('#scanned-sites_wrapper > .dt-buttons');
+        if ($dtButtons.length) {
+            $dtButtons.append($copySitesBtn);
+        } else {
+            $('#scanned-sites_wrapper .dataTables_length').after($copySitesBtn);
+        }
 
         $('#copySites').click(function () {
             let sites = ''

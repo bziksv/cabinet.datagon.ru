@@ -2713,7 +2713,51 @@ class Relevance
         RelevanceProgress::where('hash', $this->scanHash)->update(['error' => 1]);
     }
 
-    public static function uncompress($history)
+    /**
+     * Колонки relevance_history_result для частичного get-details-history.
+     * Не тянем longtext sites/clouds, пока они не нужны.
+     *
+     * @return string[]|null null = все колонки
+     */
+    public static function historyResultColumnsForPart(string $part): ?array
+    {
+        $base = ['id', 'project_id', 'cleaning', 'compressed', 'updated_at', 'created_at'];
+
+        switch ($part) {
+            case 'meta':
+                return array_merge($base, [
+                    'avg',
+                    'main_page',
+                ]);
+            case 'tables':
+                return array_merge($base, [
+                    'avg',
+                    'main_page',
+                    'unigram_table',
+                    'phrases',
+                    'clouds_competitors',
+                    'clouds_main_page',
+                    'tf_comp_clouds',
+                    'recommendations',
+                    'avg_coverage_percent',
+                ]);
+            case 'sites':
+                return array_merge($base, [
+                    'sites',
+                    'avg_coverage_percent',
+                    'average_values',
+                ]);
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * @param mixed $history
+     * @param string $part full|meta|tables|sites
+     * @return array|null
+     */
+    public static function uncompress($history, string $part = 'full')
     {
         if (!isset($history)) {
             return null;
@@ -2731,127 +2775,225 @@ class Relevance
             return null;
         }
 
-        if (!$history['cleaning']) {
-                $clouds_competitors = json_decode(gzuncompress(base64_decode($history['clouds_competitors'])), true);
-                $clouds_main_page = json_decode(gzuncompress(base64_decode($history['clouds_main_page'])), true);
-                $avg = json_decode(gzuncompress(base64_decode($history['avg'])), true);
-                $main_page = json_decode(gzuncompress(base64_decode($history['main_page'])), true);
+        if (!in_array($part, ['full', 'meta', 'tables', 'sites'], true)) {
+            $part = 'full';
+        }
 
-                $data = [
-                    'clouds_competitors' => [
-                        'totalTf' => json_decode($clouds_competitors['totalTf'], true),
-                        'textTf' => json_decode($clouds_competitors['textTf'], true),
-                        'linkTf' => json_decode($clouds_competitors['linkTf'], true),
+        $wantMeta = ($part === 'full' || $part === 'meta');
+        $wantTables = ($part === 'full' || $part === 'tables');
+        $wantSites = ($part === 'full' || $part === 'sites');
+        // tables enrich: avg/main_page + оценка числа документов без longtext sites
+        $wantAvgMain = ($wantMeta || $wantTables);
+        $hasSitesColumn = array_key_exists('sites', $history) && $history['sites'] !== null && $history['sites'] !== '';
 
-                        'textAndLinks' => json_decode($clouds_competitors['textAndLinks'], true),
-                        'links' => json_decode($clouds_competitors['links'], true),
-                        'text' => json_decode($clouds_competitors['text'], true),
-                    ],
-                    'clouds_main_page' => [
-                        'totalTf' => json_decode($clouds_main_page['totalTf'], true),
-                        'textTf' => json_decode($clouds_main_page['textTf'], true),
-                        'linkTf' => json_decode($clouds_main_page['linkTf'], true),
-                        'textWithLinks' => json_decode($clouds_main_page['textWithLinks'], true),
-                        'links' => json_decode($clouds_main_page['links'], true),
-                        'text' => json_decode($clouds_main_page['text'], true),
-                    ],
-                    'avg' => [
-                        'countWords' => json_decode($avg['countWords'], true),
-                        'countSymbols' => json_decode($avg['countSymbols'], true),
-                    ],
-                    'main_page' => [
-                        'countWords' => json_decode($main_page['countWords'], true),
-                        'countSymbols' => json_decode($main_page['countSymbols'], true),
-                    ],
-
-                    'unigram_table' => json_decode(gzuncompress(base64_decode($history['unigram_table'])), true),
-                    'history_id' => $history['id'],
-                    'sites' => json_decode(gzuncompress(base64_decode($history['sites'])), true),
-                    'tf_comp_clouds' => json_decode(gzuncompress(base64_decode($history['tf_comp_clouds'])), true),
-                    'phrases' => json_decode(gzuncompress(base64_decode($history['phrases'])), true),
-                    'avg_coverage_percent' => json_decode(gzuncompress(base64_decode($history['avg_coverage_percent'])), true),
-                    'recommendations' => json_decode(gzuncompress(base64_decode($history['recommendations'])), true),
-                    'cleaning' => false
-                ];
-            } else {
-                $data = [
-                    'sites' => json_decode(gzuncompress(base64_decode($history['sites'])), true),
-                    'avg_coverage_percent' => json_decode(gzuncompress(base64_decode($history['avg_coverage_percent'])), true),
-                    'cleaning' => true
-                ];
+        if (!empty($history['cleaning'])) {
+            $data = [
+                'history_id' => $history['id'] ?? null,
+                'cleaning' => true,
+            ];
+            if ($wantSites && $hasSitesColumn) {
+                $data['sites'] = self::decodeGzJsonField($history['sites']);
             }
-
-            $data['average_values'] = json_decode($history['average_values'], true);
-
-            if (empty($data['cleaning'])) {
-                self::recalculateStoredTfidf($data);
-                self::ensureCloudTfidfScoresBeforeRemap($data);
-            }
-
-            $historyRequest = null;
-            $historyRow = null;
-            if (!empty($history['project_id'])) {
-                $historyRow = RelevanceHistory::find($history['project_id']);
-                if ($historyRow && !empty($historyRow->request)) {
-                    $historyRequest = json_decode($historyRow->request, true);
+            if ($wantSites || $wantMeta) {
+                if (array_key_exists('avg_coverage_percent', $history)) {
+                    $data['avg_coverage_percent'] = self::decodeGzJsonField($history['avg_coverage_percent'] ?? null);
                 }
-            }
-            if (is_array($historyRequest)) {
-                self::filterStoredDetailsExcludedWords($data, $historyRequest);
-            }
-
-            if (empty($data['cleaning']) && !empty($data['sites']) && is_array($data['sites'])) {
-                $storedPhrases = $data['phrases'] ?? null;
-                $shouldRebuildPhrases = self::shouldRebuildStoredPhrases($storedPhrases);
-
-                if ($shouldRebuildPhrases) {
-                    $sitesForPhrases = $data['sites'];
-                    $mainPageRawHtml = null;
-                    if ($historyRow && !empty($historyRow->html_main_page)) {
-                        $mainPageRawHtml = self::decodeStoredSiteHtml((string) $historyRow->html_main_page);
-                    }
-                    if (is_array($historyRequest)) {
-                        self::hydrateStoredSitesTextZones($sitesForPhrases, $historyRequest, $mainPageRawHtml);
-                    } else {
-                        self::hydrateStoredSitesTextZones($sitesForPhrases, [], $mainPageRawHtml);
-                    }
-
-                    $mainPageSite = self::mainPageFromSites($sitesForPhrases);
-                    $corpusZones = HybridRelevanceMetrics::corpusZoneStatsFromData($data);
-                    $data['phrases'] = self::buildPhrasesTableFromSites(
-                        $sitesForPhrases,
-                        $mainPageSite,
-                        $corpusZones,
-                        $data['unigram_table'] ?? null
-                    );
-                    if (is_array($historyRequest)) {
-                        $data['phrases'] = TextAnalyzer::filterExcludedFromPhrases(
-                            $data['phrases'],
-                            (string) ($historyRequest['listWords'] ?? '')
-                        );
-                    }
-                } else {
-                    self::enrichPhrasesHybridMetrics($data);
-                }
-            } elseif (!empty($data['phrases']) && is_array($data['phrases'])) {
-                self::enrichPhrasesHybridMetrics($data);
-            }
-
-            if (empty($data['cleaning'])) {
-                self::enrichUnigramHybridMetrics($data);
-                self::applyHybridTfCloudsFromUnigram($data);
-                self::applyHybridTfCompCloudsFromUnigram($data);
-                if (is_array($historyRequest)) {
-                    $excludeLookup = self::excludedWordsLookup($historyRequest);
-                    if ($excludeLookup && !empty($data['tf_comp_clouds']) && is_array($data['tf_comp_clouds'])) {
-                        foreach ($data['tf_comp_clouds'] as $site => $cloud) {
-                            $data['tf_comp_clouds'][$site] = self::filterCloudPayload($cloud, $excludeLookup);
-                        }
-                    }
+                if (array_key_exists('average_values', $history)) {
+                    $data['average_values'] = self::decodeJsonField($history['average_values'] ?? null);
                 }
             }
 
             return $data;
+        }
+
+        $data = [
+            'history_id' => $history['id'] ?? null,
+            'cleaning' => false,
+        ];
+
+        if ($wantAvgMain) {
+            $avg = self::decodeGzJsonField($history['avg'] ?? null) ?: [];
+            $main_page = self::decodeGzJsonField($history['main_page'] ?? null) ?: [];
+            $data['avg'] = [
+                'countWords' => self::decodeJsonField($avg['countWords'] ?? null),
+                'countSymbols' => self::decodeJsonField($avg['countSymbols'] ?? null),
+            ];
+            $data['main_page'] = [
+                'countWords' => self::decodeJsonField($main_page['countWords'] ?? null),
+                'countSymbols' => self::decodeJsonField($main_page['countSymbols'] ?? null),
+            ];
+            // доп. поля main_page (corpus sizes) — если лежали рядом
+            foreach (['mainPageTextWords', 'mainPageLinkWords', 'competitorTextWords', 'competitorLinkWords', 'competitorCorpusWords', 'avgCompetitorDocWords'] as $extraKey) {
+                if (isset($main_page[$extraKey])) {
+                    $data['main_page'][$extraKey] = $main_page[$extraKey];
+                }
+            }
+        }
+
+        if ($wantTables && array_key_exists('recommendations', $history)) {
+            $data['recommendations'] = self::decodeGzJsonField($history['recommendations'] ?? null) ?: [];
+        }
+
+        if (($wantSites || $wantTables) && array_key_exists('avg_coverage_percent', $history)) {
+            $data['avg_coverage_percent'] = self::decodeGzJsonField($history['avg_coverage_percent'] ?? null);
+        }
+        if ($wantSites && array_key_exists('average_values', $history)) {
+            $data['average_values'] = self::decodeJsonField($history['average_values'] ?? null);
+        }
+
+        if ($wantTables) {
+            $clouds_competitors = self::decodeGzJsonField($history['clouds_competitors'] ?? null) ?: [];
+            $clouds_main_page = self::decodeGzJsonField($history['clouds_main_page'] ?? null) ?: [];
+            $data['clouds_competitors'] = [
+                'totalTf' => self::decodeJsonField($clouds_competitors['totalTf'] ?? null),
+                'textTf' => self::decodeJsonField($clouds_competitors['textTf'] ?? null),
+                'linkTf' => self::decodeJsonField($clouds_competitors['linkTf'] ?? null),
+                'textAndLinks' => self::decodeJsonField($clouds_competitors['textAndLinks'] ?? null),
+                'links' => self::decodeJsonField($clouds_competitors['links'] ?? null),
+                'text' => self::decodeJsonField($clouds_competitors['text'] ?? null),
+            ];
+            $data['clouds_main_page'] = [
+                'totalTf' => self::decodeJsonField($clouds_main_page['totalTf'] ?? null),
+                'textTf' => self::decodeJsonField($clouds_main_page['textTf'] ?? null),
+                'linkTf' => self::decodeJsonField($clouds_main_page['linkTf'] ?? null),
+                'textWithLinks' => self::decodeJsonField($clouds_main_page['textWithLinks'] ?? null),
+                'links' => self::decodeJsonField($clouds_main_page['links'] ?? null),
+                'text' => self::decodeJsonField($clouds_main_page['text'] ?? null),
+            ];
+            $data['unigram_table'] = self::decodeGzJsonField($history['unigram_table'] ?? null) ?: [];
+            $data['phrases'] = self::decodeGzJsonField($history['phrases'] ?? null) ?: [];
+            $data['tf_comp_clouds'] = self::decodeGzJsonField($history['tf_comp_clouds'] ?? null);
+        }
+
+        if ($wantSites && $hasSitesColumn) {
+            $data['sites'] = self::decodeGzJsonField($history['sites']);
+        }
+
+        // Для tables без sites: stub-сайты по avg_coverage, чтобы BM25/IDF не считались от documentCount=1
+        $stubbedSites = false;
+        if ($wantTables && empty($data['sites']) && !empty($data['avg_coverage_percent']) && is_array($data['avg_coverage_percent'])) {
+            $n = count($data['avg_coverage_percent']);
+            if ($n > 0) {
+                $data['sites'] = array_fill(0, $n, ['ignored' => false]);
+                $stubbedSites = true;
+            }
+        }
+
+        if ($wantTables) {
+            self::recalculateStoredTfidf($data);
+            self::ensureCloudTfidfScoresBeforeRemap($data);
+        }
+
+        $historyRequest = null;
+        $historyRow = null;
+        if (($wantTables || $wantMeta) && !empty($history['project_id'])) {
+            $historyRow = RelevanceHistory::find($history['project_id']);
+            if ($historyRow && !empty($historyRow->request)) {
+                $historyRequest = json_decode($historyRow->request, true);
+            }
+        }
+        if ($wantTables && is_array($historyRequest)) {
+            self::filterStoredDetailsExcludedWords($data, $historyRequest);
+        }
+
+        if ($wantTables && !$stubbedSites && !empty($data['sites']) && is_array($data['sites'])) {
+            $storedPhrases = $data['phrases'] ?? null;
+            $shouldRebuildPhrases = self::shouldRebuildStoredPhrases($storedPhrases);
+
+            if ($shouldRebuildPhrases) {
+                $sitesForPhrases = $data['sites'];
+                $mainPageRawHtml = null;
+                if ($historyRow && !empty($historyRow->html_main_page)) {
+                    $mainPageRawHtml = self::decodeStoredSiteHtml((string) $historyRow->html_main_page);
+                }
+                if (is_array($historyRequest)) {
+                    self::hydrateStoredSitesTextZones($sitesForPhrases, $historyRequest, $mainPageRawHtml);
+                } else {
+                    self::hydrateStoredSitesTextZones($sitesForPhrases, [], $mainPageRawHtml);
+                }
+
+                $mainPageSite = self::mainPageFromSites($sitesForPhrases);
+                $corpusZones = HybridRelevanceMetrics::corpusZoneStatsFromData($data);
+                $data['phrases'] = self::buildPhrasesTableFromSites(
+                    $sitesForPhrases,
+                    $mainPageSite,
+                    $corpusZones,
+                    $data['unigram_table'] ?? null
+                );
+                if (is_array($historyRequest)) {
+                    $data['phrases'] = TextAnalyzer::filterExcludedFromPhrases(
+                        $data['phrases'],
+                        (string) ($historyRequest['listWords'] ?? '')
+                    );
+                }
+            } else {
+                self::enrichPhrasesHybridMetrics($data);
+            }
+        } elseif ($wantTables && !empty($data['phrases']) && is_array($data['phrases'])) {
+            self::enrichPhrasesHybridMetrics($data);
+        }
+
+        if ($wantTables) {
+            self::enrichUnigramHybridMetrics($data);
+            self::applyHybridTfCloudsFromUnigram($data);
+            self::applyHybridTfCompCloudsFromUnigram($data);
+            if (is_array($historyRequest)) {
+                $excludeLookup = self::excludedWordsLookup($historyRequest);
+                if ($excludeLookup && !empty($data['tf_comp_clouds']) && is_array($data['tf_comp_clouds'])) {
+                    foreach ($data['tf_comp_clouds'] as $site => $cloud) {
+                        $data['tf_comp_clouds'][$site] = self::filterCloudPayload($cloud, $excludeLookup);
+                    }
+                }
+            }
+        }
+
+        if ($stubbedSites) {
+            unset($data['sites']);
+        }
+
+        return $data;
+    }
+
+    /**
+     * @param mixed $value
+     * @return mixed
+     */
+    private static function decodeGzJsonField($value)
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (is_array($value)) {
+            return $value;
+        }
+        if (!is_string($value)) {
+            return null;
+        }
+        $raw = @gzuncompress(base64_decode($value, true) ?: '');
+        if ($raw === false || $raw === '') {
+            return null;
+        }
+
+        return json_decode($raw, true);
+    }
+
+    /**
+     * @param mixed $value
+     * @return mixed
+     */
+    private static function decodeJsonField($value)
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (is_array($value)) {
+            return $value;
+        }
+        if (!is_string($value)) {
+            return $value;
+        }
+
+        return json_decode($value, true);
     }
 
     public static function enrichPhrasesHybridMetrics(array &$data): void
@@ -3095,13 +3237,12 @@ class Relevance
                     'cleaning' => $data['cleaning'] ?? false,
                     'avg' => $data['avg'] ?? null,
                     'main_page' => $data['main_page'] ?? null,
-                    'recommendations' => $data['recommendations'] ?? [],
-                    'average_values' => $data['average_values'] ?? null,
-                    'avg_coverage_percent' => $data['avg_coverage_percent'] ?? null,
                 ];
             case 'sites':
                 return [
                     'sites' => $data['sites'] ?? [],
+                    'avg_coverage_percent' => $data['avg_coverage_percent'] ?? null,
+                    'average_values' => $data['average_values'] ?? null,
                 ];
             case 'tables':
                 return [
@@ -3110,6 +3251,8 @@ class Relevance
                     'clouds_competitors' => $data['clouds_competitors'] ?? null,
                     'clouds_main_page' => $data['clouds_main_page'] ?? null,
                     'tf_comp_clouds' => $data['tf_comp_clouds'] ?? null,
+                    'recommendations' => $data['recommendations'] ?? [],
+                    'history_id' => $data['history_id'] ?? null,
                 ];
             default:
                 return $data;

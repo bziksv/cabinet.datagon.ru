@@ -1,3 +1,20 @@
+/* «Обрезать слова короче N символов» — input не вылезает из модалки */
+.relevance-separator-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+    max-width: 100%;
+}
+
+.relevance-separator-row input[name="separator"],
+.relevance-separator-row #separator {
+    width: 4.5rem;
+    max-width: 4.5rem;
+    flex: 0 0 4.5rem;
+    min-width: 0;
+}
+
 a.paginate_button.current {
     background: #ebf0f5 !important;
 }
@@ -46,6 +63,7 @@ a.paginate_button.current {
     max-height: min(98vh, 1008px);
     overflow: auto;
     -webkit-overflow-scrolling: touch;
+    margin-top: 1rem;
     margin-bottom: 1rem;
 }
 
@@ -468,6 +486,7 @@ th {
     max-height: min(98vh, 1008px);
     overflow: auto;
     -webkit-overflow-scrolling: touch;
+    margin-top: 1rem;
     margin-bottom: 1rem;
 }
 
@@ -663,6 +682,7 @@ th {
     max-height: min(98vh, 1008px);
     overflow: auto;
     -webkit-overflow-scrolling: touch;
+    margin-top: 1rem;
     margin-bottom: 1rem;
 }
 
@@ -874,11 +894,21 @@ th {
 #phrases_wrapper .dt-buttons,
 #scanned-sites_wrapper .dt-buttons {
     margin-left: 20px;
+    margin-bottom: 0.75rem;
     float: left;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 0.4rem;
+}
+
+#unigram_wrapper .dataTables_length,
+#phrases_wrapper .dataTables_length,
+#scanned-sites_wrapper .dataTables_length,
+#unigram_wrapper .dataTables_filter,
+#phrases_wrapper .dataTables_filter,
+#scanned-sites_wrapper .dataTables_filter {
+    margin-bottom: 0.75rem;
 }
 
 /* Bootstrap btn-group inside DataTables Buttons sticks buttons together — separate them. */
@@ -890,7 +920,8 @@ th {
 #scanned-sites_wrapper .dt-buttons > .btn,
 #unigram_wrapper .dt-buttons > a.btn,
 #phrases_wrapper .dt-buttons > a.btn,
-#scanned-sites_wrapper .dt-buttons > a.btn {
+#scanned-sites_wrapper .dt-buttons > a.btn,
+#scanned-sites_wrapper #copySites {
     margin: 0;
     border-radius: 0.375rem !important;
     padding: 0.3rem 0.7rem;

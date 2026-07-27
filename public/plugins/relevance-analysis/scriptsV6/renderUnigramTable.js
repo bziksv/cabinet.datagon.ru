@@ -187,11 +187,18 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
 }
 
 function unigramExportButtons(words) {
+    if (typeof window.relevanceDtExportButtons === 'function') {
+        return window.relevanceDtExportButtons(words, {
+            // колонка «+» / expand без данных
+            columns: ':not(.unigram-expand-col)',
+        });
+    }
+
     return [
         {extend: 'copy', text: words.copy || 'Копировать'},
         {extend: 'csv', text: words.csv || 'CSV'},
         {extend: 'excel', text: words.excel || 'Excel'},
-    ]
+    ];
 }
 
 function syncUnigramHeaderSticky() {

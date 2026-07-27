@@ -52,9 +52,9 @@ function renderRecommendationsTable(recommendations, count, words) {
         "pageLength": count,
         "searching": true,
         dom: 'lBfrtip',
-        buttons: [
-            'copy', 'csv', 'excel'
-        ],
+        buttons: (typeof window.relevanceDtExportButtons === 'function')
+            ? window.relevanceDtExportButtons(words)
+            : ['copy', 'csv', 'excel'],
         language: {
             paginate: {
                 "first": "«",

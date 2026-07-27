@@ -6,7 +6,7 @@ var relevanceCloudBusy = false
 var relevanceCloudMaxWords = 100
 var relevanceCloudLeaderCount = 20
 var relevanceCloudSizeMinPx = 13
-var relevanceCloudSizeMaxPx = 38
+var relevanceCloudSizeMaxPx = 49 // было 38 (~+30% к верхнему размеру от коэффициента)
 var relevanceCloudVisualFloor = 0.2
 
 function relevanceCloudWeightLabel(kind) {
@@ -194,7 +194,8 @@ function relevanceCloudFontSizePx(visualRatio, text) {
 }
 
 function relevanceCloudFontSizeRem(visualRatio) {
-    return (0.82 + visualRatio * 1.55).toFixed(2)
+    // ~+30% к амплитуде (было 1.55)
+    return (0.82 + visualRatio * 2.02).toFixed(2)
 }
 
 function boxesOverlap(a, b, pad) {

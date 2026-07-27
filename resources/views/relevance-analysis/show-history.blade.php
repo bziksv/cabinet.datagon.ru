@@ -362,10 +362,13 @@
                                style="width: 100% !important;">
                             <thead>
                             <tr style="position: relative; z-index: 100">
-                                <th class="сol-1">
-                                <span class="text-muted" style="font-weight: 400">
-                                    {{ __("You can delete a word from the table if it has been worked out") }}
-                                </span>
+                                <th class="col-1 text-center" data-export-title="">
+                                    <span class="__helper-link ui_tooltip_w">
+                                        <i class="fa fa-question-circle"></i>
+                                        <span class="ui_tooltip __bottom">
+                                            <span class="ui_tooltip_content">{{ __("You can delete a word from the table if it has been worked out") }}</span>
+                                        </span>
+                                    </span>
                                 </th>
                                 <th>{{ __('Word') }}</th>
                                 <th>Tf</th>
@@ -483,9 +486,9 @@
                                 </div>
                             </div>
 
-                            <div class="form-group required d-flex align-items-center">
+                            <div class="form-group required relevance-separator-row">
                                 <span>{{ __('Cut the words shorter') }}</span>
-                                <input type="number" class="form form-control col-2 ml-1 mr-1" name="separator"
+                                <input type="number" class="form-control" name="separator"
                                        id="separator"
                                        value="{{ $object['request']['separator'] }}">
                                 <span>{{ __('symbols') }}</span>
@@ -687,6 +690,7 @@
         <script src="{{ asset('plugins/datatables/buttons/html5.min.js') }}"></script>
 
         <script src="{{ asset('plugins/clipboard/index.min.js') }}"></script>
+        <script src="{{ asset('plugins/relevance-analysis/scriptsV6/dtExportClean.js') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/scriptsV6/dtExportClean.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/scriptsV6/renderClouds.js') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/scriptsV6/renderClouds.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/scriptsV6/renderUnigramTable.js') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/scriptsV6/renderUnigramTable.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/scriptsV6/renderScannedSitesList.js') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/scriptsV6/renderScannedSitesList.js')) ?: time() }}"></script>
@@ -750,10 +754,8 @@
                 $('#preloaderBlock').hide()
             }
 
-            function successRequest(history, config) {
-                hideHistoryPreloaders()
-
-                let localization = {
+            function historyDetailsLocalization() {
+                return {
                     search: "{{ __('Search') }}",
                     show: "{{ __('show') }}",
                     records: "{{ __('records') }}",
@@ -778,35 +780,84 @@
                     successCopied: "{{ __('Success copied') }}",
                     recommendations: "{{ __('Recommendations for your page') }}",
                 };
+            }
 
-                if (!history.cleaning) {
-                    try {
-                        renderTextTable(history.avg, history.main_page)
-                        renderRecommendationsTable(history.recommendations, config.recommendations_count, localization)
-                        renderUnigramTable(
-                            history.unigram_table,
-                            config.ltp_count,
-                            localization,
-                            history.history_id,
-                            @json((bool) ($object['request']['searchPassages'] ?? false))
-                        );
-                        renderPhrasesTable(history.phrases, config.ltps_count, localization)
-                        renderClouds(history.clouds_competitors, history.clouds_main_page, history.tf_comp_clouds, false);
-                        $('.sites').css({
-                            'margin-top': '50px',
-                        });
-                    } catch (e) {
-                        console.error('relevance show-history render', e)
-                        $('#preloaderStatus').text("{{ __('An error has occurred, repeat the request.') }}")
-                    }
-                } else {
+            function historyDetailsUrl() {
+                return @if(!empty($publicShareToken))
+                    "{{ route('relevance.public.share.details', $publicShareToken) }}"
+                @else
+                    "{{ route('get.details.info') }}"
+                @endif;
+            }
+
+            function fetchHistoryDetailsPart(part, timeoutMs) {
+                return $.ajax({
+                    type: "POST",
+                    dataType: "json",
+                    timeout: timeoutMs || 120000,
+                    url: historyDetailsUrl(),
+                    data: {
+                        _token: $('meta[name="csrf-token"]').attr('content'),
+                        id: {{ $id }},
+                        part: part,
+                    },
+                });
+            }
+
+            function showHistoryDetailsError(message) {
+                hideHistoryPreloaders()
+                $('#preloaderBlock').show()
+                $('#preloaderStatus').text(message || "{{ __('An error has occurred, repeat the request.') }}")
+                $('#preloaderBlock').find('img').hide()
+            }
+
+            function renderHistoryMeta(history, config) {
+                if (history.cleaning) {
                     $('.toast-top-right.success-message').show(300)
                     $('#toast-message').html("{{ __('Your history has been uploaded successfully, but its data has been partially deleted.') }}")
                     setTimeout(function () {
                         $('.toast-top-right.success-message').hide(300)
                     }, 10000)
+                    return;
                 }
 
+                try {
+                    renderTextTable(history.avg, history.main_page)
+                } catch (e) {
+                    console.error('relevance show-history meta', e)
+                }
+            }
+
+            function renderHistoryTables(history, config) {
+                if (history.cleaning) {
+                    return;
+                }
+
+                var localization = historyDetailsLocalization();
+                try {
+                    if (history.recommendations) {
+                        renderRecommendationsTable(history.recommendations, config.recommendations_count, localization)
+                    }
+                    renderUnigramTable(
+                        history.unigram_table,
+                        config.ltp_count,
+                        localization,
+                        history.history_id,
+                        @json((bool) ($object['request']['searchPassages'] ?? false))
+                    );
+                    renderPhrasesTable(history.phrases, config.ltps_count, localization)
+                    renderClouds(history.clouds_competitors, history.clouds_main_page, history.tf_comp_clouds, false);
+                    $('.sites').css({
+                        'margin-top': '50px',
+                    });
+                } catch (e) {
+                    console.error('relevance show-history tables', e)
+                    $('#tablesPreloaderStatus').text("{{ __('An error has occurred, repeat the request.') }}")
+                }
+            }
+
+            function renderHistorySites(history, config) {
+                var localization = historyDetailsLocalization();
                 renderScannedSitesList(
                     localization,
                     history.sites,
@@ -827,6 +878,96 @@
                 }, 1500)
             }
 
+            function successRequest(history, config) {
+                hideHistoryPreloaders()
+                renderHistoryMeta(history, config)
+                renderHistoryTables(history, config)
+                renderHistorySites(history, config)
+            }
+
+            function loadHistoryDetailsProgressive() {
+                var config = null;
+                var meta = null;
+
+                $('#preloaderStatus').text("{{ __('Load..') }}")
+
+                fetchHistoryDetailsPart('meta', 60000)
+                    .done(function (response) {
+                        if (response.code !== 200) {
+                            showHistoryDetailsError(response.message)
+                            if (response.code === 415) {
+                                $('.toast-top-right.error-message').show(300)
+                                $('#message-error-info').html(response.message)
+                                setTimeout(function () {
+                                    $('.toast-top-right.error-message').hide(300)
+                                }, 10000)
+                            }
+                            return;
+                        }
+
+                        config = response.config || {}
+                        meta = response.history || {}
+                        hideHistoryPreloaders()
+                        renderHistoryMeta(meta, config)
+
+                        if (meta.cleaning) {
+                            $('#tablesPreloader').show()
+                            $('#tablesPreloaderStatus').text("{{ __('Load..') }}")
+                            fetchHistoryDetailsPart('sites', 120000)
+                                .done(function (sitesResponse) {
+                                    $('#tablesPreloader').hide()
+                                    if (sitesResponse.code === 200) {
+                                        renderHistorySites(sitesResponse.history || {}, config)
+                                    } else {
+                                        showHistoryDetailsError(sitesResponse.message)
+                                    }
+                                })
+                                .fail(function () {
+                                    showHistoryDetailsError()
+                                })
+                            return;
+                        }
+
+                        $('#tablesPreloader').show()
+                        $('#tablesPreloaderStatus').text("{{ __('Processing of received data..') }}")
+
+                        fetchHistoryDetailsPart('tables', 120000)
+                            .done(function (tablesResponse) {
+                                if (tablesResponse.code !== 200) {
+                                    $('#tablesPreloader').hide()
+                                    showHistoryDetailsError(tablesResponse.message)
+                                    return;
+                                }
+
+                                var tables = tablesResponse.history || {}
+                                tables.history_id = tables.history_id || meta.history_id
+                                renderHistoryTables(tables, config)
+                                $('#tablesPreloaderStatus').text("{{ __('Load..') }}")
+
+                                fetchHistoryDetailsPart('sites', 120000)
+                                    .done(function (sitesResponse) {
+                                        $('#tablesPreloader').hide()
+                                        if (sitesResponse.code === 200) {
+                                            renderHistorySites(sitesResponse.history || {}, config)
+                                        } else {
+                                            showHistoryDetailsError(sitesResponse.message)
+                                        }
+                                    })
+                                    .fail(function () {
+                                        $('#tablesPreloader').hide()
+                                        showHistoryDetailsError()
+                                    })
+                            })
+                            .fail(function () {
+                                $('#tablesPreloader').hide()
+                                showHistoryDetailsError()
+                            })
+                    })
+                    .fail(function () {
+                        showHistoryDetailsError()
+                    })
+            }
+
             $(document).ready(function () {
                 if ($('#main_history_table').length) {
                     $('#main_history_table').DataTable({
@@ -844,39 +985,7 @@
                     });
                 }
 
-                $.ajax({
-                    type: "POST",
-                    dataType: "json",
-                    timeout: 120000,
-                    url: @if(!empty($publicShareToken))
-                        "{{ route('relevance.public.share.details', $publicShareToken) }}"
-                    @else
-                        "{{ route('get.details.info') }}"
-                    @endif,
-                    data: {
-                        _token: $('meta[name="csrf-token"]').attr('content'),
-                        id: {{ $id }},
-                    },
-                    success: function (response) {
-                        hideHistoryPreloaders()
-                        if (response.code === 200) {
-                            successRequest(response.history, response.config)
-                        } else if (response.code === 415) {
-                            $('.toast-top-right.error-message').show(300)
-                            $('#message-error-info').html(response.message)
-                            $('#preloaderStatus').text(response.message)
-                            $('#preloaderBlock').find('img').hide()
-                            setTimeout(function () {
-                                $('.toast-top-right.error-message').hide(300)
-                            }, 10000)
-                        }
-                    },
-                    error: function () {
-                        hideHistoryPreloaders()
-                        $('#preloaderStatus').text("{{ __('An error has occurred, repeat the request.') }}")
-                        $('#preloaderBlock').find('img').hide()
-                    },
-                });
+                loadHistoryDetailsProgressive();
 
                 $('#repeat-queue-scan').click(function () {
                     $.ajax({

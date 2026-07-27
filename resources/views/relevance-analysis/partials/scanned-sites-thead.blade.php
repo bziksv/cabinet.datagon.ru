@@ -1,7 +1,7 @@
 <thead class="scanned-sites-thead">
 <tr class="scanned-sites-thead__titles" id="scanned-sites-row">
     <th class="scanned-sites-th-pos">{{ __('Position in the top') }}</th>
-    <th class="scanned-sites-th-domain">{{ __('Domain') }}</th>
+    <th class="scanned-sites-th-domain">{{ __('Landing page') }}</th>
     <th class="scanned-sites-th-metric">
         {{ __('Total score') }}
         @if($admin)

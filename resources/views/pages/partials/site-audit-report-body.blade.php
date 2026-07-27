@@ -137,8 +137,14 @@
                                 @if($referrerCount > 5)
                                     <div class="text-muted">ещё {{ $referrerCount - 5 }}…</div>
                                 @endif
+                                @if(!empty($rowMeta['from_sitemap']))
+                                    <div class="text-muted mt-1">также в sitemap</div>
+                                @endif
+                            @elseif(!empty($rowMeta['from_sitemap']))
+                                <span title="URL попал в краул из sitemap.xml, а не из внутренней ссылки HTML">из sitemap</span>
+                                <div class="text-muted">внутренних ссылок в крауле нет</div>
                             @else
-                                <span class="text-muted">не найдено в ссылках краула</span>
+                                <span class="text-muted" title="Не из HTML-ссылок сохранённых страниц; мог быть seed/корень/ручной список">не из ссылок HTML</span>
                             @endif
                         </td>
                     @endif

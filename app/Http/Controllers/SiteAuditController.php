@@ -420,7 +420,8 @@ class SiteAuditController extends Controller
         if ($showReferrers && $rows instanceof \Illuminate\Support\Collection && $rows->isNotEmpty()) {
             $targetUrls = $rows->pluck('url')->filter()->unique()->values()->all();
             $refMap = SiteAuditLinkReferrers::forCrawl((int) $crawl->id, $targetUrls);
-            $rows = $rows->map(function ($row) use ($refMap) {
+            $inSitemap = SiteAuditLinkReferrers::inSitemapFlags($crawl, $targetUrls);
+            $rows = $rows->map(function ($row) use ($refMap, $inSitemap) {
                 $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
                 $refs = $refMap[(string) $row->url] ?? [];
                 // broken_internal_link already has meta.from — merge
@@ -432,6 +433,7 @@ class SiteAuditController extends Controller
                 }
                 $meta['referrers'] = array_slice($refs, 0, 12);
                 $meta['referrer_count'] = count($refs);
+                $meta['from_sitemap'] = ! empty($inSitemap[(string) $row->url]);
                 $row->meta_json = $meta;
 
                 return $row;

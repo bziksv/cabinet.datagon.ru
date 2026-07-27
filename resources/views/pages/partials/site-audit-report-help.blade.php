@@ -19,6 +19,7 @@
             <span class="cabinet-sa-help__label">Откуда ссылки</span>
             <span class="cabinet-sa-help__text">
                 Колонка «Откуда ссылаются» — страницы краула, где в HTML есть ссылка на этот URL.
+                Если написано «из sitemap» — URL взяли из sitemap.xml при старте обхода (не из кликабельной ссылки).
                 Обратный отчёт:
                 <a href="{{ route('pages.site-audit.report.show', [$crawl->id, 'page_has_broken_links']) }}">Страницы с битыми ссылками</a>
                 (там URL = страница-источник, в деталях — битые цели).

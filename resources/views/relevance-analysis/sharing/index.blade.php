@@ -7,7 +7,7 @@
     @slot('css')
         <link rel="stylesheet" type="text/css"
               href="{{ asset('plugins/keyword-generator/css/font-awesome-4.7.0/css/font-awesome.css') }}"/>
-        <link rel="stylesheet" type="text/css" href="{{ asset('plugins/common/css/datatable.css') }}"/>
+        {{-- common/datatable.css не подключаем: PNG-спрайты sort_*.png конфликтуют со стрелками ↑↓ из dataTables.bootstrap4 --}}
         @include('layouts.partials.vendor-datatables-css', ['bundle' => 'rb-min'])
         <link rel="stylesheet" type="text/css" href="{{ asset('plugins/toastr/toastr.css') }}"/>
         <link rel="stylesheet" type="text/css"

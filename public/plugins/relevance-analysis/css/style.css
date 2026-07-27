@@ -919,8 +919,10 @@ th {
 
 #my-projects-table thead th.sorting,
 #my-projects-table thead th.sorting_asc,
-#my-projects-table thead th.sorting_desc {
-    position: relative;
+#my-projects-table thead th.sorting_desc,
+#my-projects-table thead th.sorting_asc_disabled,
+#my-projects-table thead th.sorting_desc_disabled {
+    position: relative !important;
 }
 
 #my-projects-table td.sharing-table__actions {
@@ -1010,7 +1012,8 @@ th {
 
 .cabinet-ra-stats table.dataTable.table-sm thead > tr > th:not(.sorting_disabled),
 #users_projects.table-sm thead > tr > th:not(.sorting_disabled),
-#user_jobs_table.table-sm thead > tr > th:not(.sorting_disabled) {
+#user_jobs_table.table-sm thead > tr > th:not(.sorting_disabled),
+#my-projects-table thead > tr > th:not(.sorting_disabled) {
     padding-right: 1.9rem !important;
 }
 
@@ -1044,7 +1047,13 @@ th {
 #my-projects-table.table-sm thead .sorting_asc:before,
 #my-projects-table.table-sm thead .sorting_asc:after,
 #my-projects-table.table-sm thead .sorting_desc:before,
-#my-projects-table.table-sm thead .sorting_desc:after {
+#my-projects-table.table-sm thead .sorting_desc:after,
+#my-projects-table thead .sorting:before,
+#my-projects-table thead .sorting:after,
+#my-projects-table thead .sorting_asc:before,
+#my-projects-table thead .sorting_asc:after,
+#my-projects-table thead .sorting_desc:before,
+#my-projects-table thead .sorting_desc:after {
     top: 50% !important;
     bottom: auto !important;
     transform: translateY(-50%);
@@ -1061,7 +1070,10 @@ th {
 #users_projects.table-sm thead .sorting_desc:before,
 #user_jobs_table.table-sm thead .sorting:before,
 #user_jobs_table.table-sm thead .sorting_asc:before,
-#user_jobs_table.table-sm thead .sorting_desc:before {
+#user_jobs_table.table-sm thead .sorting_desc:before,
+#my-projects-table thead .sorting:before,
+#my-projects-table thead .sorting_asc:before,
+#my-projects-table thead .sorting_desc:before {
     right: 1.05em !important;
 }
 
@@ -1073,7 +1085,10 @@ th {
 #users_projects.table-sm thead .sorting_desc:after,
 #user_jobs_table.table-sm thead .sorting:after,
 #user_jobs_table.table-sm thead .sorting_asc:after,
-#user_jobs_table.table-sm thead .sorting_desc:after {
+#user_jobs_table.table-sm thead .sorting_desc:after,
+#my-projects-table thead .sorting:after,
+#my-projects-table thead .sorting_asc:after,
+#my-projects-table thead .sorting_desc:after {
     right: 0.35em !important;
 }
 

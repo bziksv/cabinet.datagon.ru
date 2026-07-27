@@ -381,7 +381,7 @@
                     if (statusEl) {
                         statusEl.textContent = j.status_label || j.status;
                         statusEl.className = 'cabinet-sa-status cabinet-sa-status--' +
-                            (j.status === 'done' ? 'done' : (j.status === 'failed' ? 'failed' : 'run'));
+                            (j.status === 'done' ? 'done' : ((j.status === 'failed' || j.status === 'cancelled') ? 'failed' : 'run'));
                     }
                     var prog = row.querySelector('[data-sa-progress]');
                     if (prog) {
@@ -389,7 +389,7 @@
                         var total = j.pages_total || 0;
                         var pct = j.progress_pct || (total > 0 ? Math.round(100 * fetched / total) : 0);
                         var st = j.status || '';
-                        var isFailed = st === 'failed';
+                        var isFailed = st === 'failed' || st === 'cancelled';
                         var finished = !!j.finished;
                         var indeterminate = !finished && (total < 1 || st === 'queued' || st === 'queued_wait' || st === 'discovering');
                         var barClass, fill, label, hint;
@@ -404,7 +404,7 @@
                             fill = total > 0 ? Math.round(100 * fetched / Math.max(1, total)) : 0;
                             if (fill < 1) fill = 100;
                             label = fetched + '/' + total;
-                            hint = 'ошибка';
+                            hint = st === 'cancelled' ? 'остановлен' : 'ошибка';
                         } else if (indeterminate) {
                             barClass = 'progress-bar progress-bar-striped progress-bar-animated bg-warning';
                             fill = 100;
@@ -437,35 +437,47 @@
                         row.setAttribute('data-finished', '1');
                         row.classList.remove('cabinet-sa-row--active');
                         var actions = row.querySelector('.cabinet-sa-row-actions');
-                        if (actions && !actions.querySelector('form')) {
-                            var domain = (row.querySelector('td.fw-medium') || {}).textContent || 'проекта';
-                            domain = String(domain).trim() || 'проекта';
-                            var repeat = document.createElement('form');
-                            repeat.method = 'POST';
-                            repeat.action = '{{ url('site-audit/crawl') }}/' + j.id + '/repeat';
-                            repeat.className = 'd-inline';
-                            repeat.onsubmit = function () {
-                                return confirm('Повторить краул для ' + domain + ' с теми же настройками?');
-                            };
-                            var syncHidden = @json(app()->environment('local'))
-                                ? '<input type="hidden" name="sync" value="' + syncFlag() + '">'
-                                : '';
-                            repeat.innerHTML =
-                                '<input type="hidden" name="_token" value="' + token + '">' +
-                                syncHidden +
-                                '<button type="submit" class="btn btn-sm btn-outline-secondary">Повторить</button>';
-                            actions.appendChild(repeat);
+                        if (actions) {
+                            // Убрать «Стоп» — иначе !querySelector('form') блокирует «Повторить»
+                            actions.querySelectorAll('form').forEach(function (form) {
+                                var action = (form.getAttribute('action') || '');
+                                var btn = form.querySelector('button');
+                                var isStop = action.indexOf('/cancel') !== -1
+                                    || (btn && /Стоп/.test(btn.textContent || ''));
+                                if (isStop) {
+                                    form.remove();
+                                }
+                            });
+                            if (!actions.querySelector('form[action*="/repeat"]')) {
+                                var domain = (row.querySelector('td.fw-medium') || {}).textContent || 'проекта';
+                                domain = String(domain).trim() || 'проекта';
+                                var repeat = document.createElement('form');
+                                repeat.method = 'POST';
+                                repeat.action = '{{ url('site-audit/crawl') }}/' + j.id + '/repeat';
+                                repeat.className = 'd-inline';
+                                repeat.onsubmit = function () {
+                                    return confirm('Повторить краул для ' + domain + ' с теми же настройками?');
+                                };
+                                var syncHidden = @json(app()->environment('local'))
+                                    ? '<input type="hidden" name="sync" value="' + syncFlag() + '">'
+                                    : '';
+                                repeat.innerHTML =
+                                    '<input type="hidden" name="_token" value="' + token + '">' +
+                                    syncHidden +
+                                    '<button type="submit" class="btn btn-sm btn-outline-secondary">Повторить</button>';
+                                actions.appendChild(repeat);
 
-                            var del = document.createElement('form');
-                            del.method = 'POST';
-                            del.action = '{{ url('site-audit/crawl') }}/' + j.id;
-                            del.className = 'd-inline';
-                            del.onsubmit = function () { return confirm('Удалить краул #' + j.id + '?'); };
-                            del.innerHTML =
-                                '<input type="hidden" name="_token" value="' + token + '">' +
-                                '<input type="hidden" name="_method" value="DELETE">' +
-                                '<button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>';
-                            actions.appendChild(del);
+                                var del = document.createElement('form');
+                                del.method = 'POST';
+                                del.action = '{{ url('site-audit/crawl') }}/' + j.id;
+                                del.className = 'd-inline';
+                                del.onsubmit = function () { return confirm('Удалить краул #' + j.id + '?'); };
+                                del.innerHTML =
+                                    '<input type="hidden" name="_token" value="' + token + '">' +
+                                    '<input type="hidden" name="_method" value="DELETE">' +
+                                    '<button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>';
+                                actions.appendChild(del);
+                            }
                         }
                     }
                 }

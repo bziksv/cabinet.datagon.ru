@@ -35,7 +35,9 @@
                         <div class="d-flex justify-content-between align-items-start gap-2">
                             <div>
                                 <h4 class="h6 mb-0">{{ $item->user->name }}</h4>
-                                <small class="text-secondary">{{ $item->created_at->diffForHumans() }}</small>
+                                <small class="text-secondary">
+                                    <time datetime="{{ $item->created_at->toIso8601String() }}">{{ $item->created_at->format('d.m.Y H:i') }}</time>
+                                </small>
                             </div>
                             @if($item->user_id === \Illuminate\Support\Facades\Auth::id() || $admin)
                                 <div class="btn-group btn-group-sm flex-shrink-0">
@@ -95,7 +97,7 @@
                                                     @endif
                                                 </span>
                                                 <small class="text-secondary flex-shrink-0">
-                                                    {{ $comment->created_at->diffForHumans() }}
+                                                    <time datetime="{{ $comment->created_at->toIso8601String() }}">{{ $comment->created_at->format('d.m.Y H:i') }}</time>
                                                 </small>
                                             </div>
                                             @if($comment->user_id === \Illuminate\Support\Facades\Auth::id() || $admin)

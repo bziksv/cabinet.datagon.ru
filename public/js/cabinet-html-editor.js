@@ -478,6 +478,7 @@
         }
 
         var syncingFromSource = false;
+        var syncingFromEditor = false;
 
         function updateMeta(html) {
             if (!metaEl) {
@@ -494,41 +495,57 @@
         }
 
         function writeHtmlSource(html) {
+            html = html || '';
             if (codeMirror) {
                 if (codeMirror.getValue() === html) {
+                    updateMeta(html);
                     return;
                 }
-                var scrollInfo = codeMirror.getScrollInfo();
-                var cursor = codeMirror.getCursor();
-                codeMirror.setValue(html || '');
-                codeMirror.setCursor(cursor);
-                codeMirror.scrollTo(scrollInfo.left, scrollInfo.top);
+                // setValue генерирует change → раньше это через debounce звало editor.setData
+                // и сбрасывало курсор в визуальном редакторе при паузе в наборе.
+                syncingFromEditor = true;
+                try {
+                    var scrollInfo = codeMirror.getScrollInfo();
+                    var cursor = codeMirror.getCursor();
+                    codeMirror.setValue(html);
+                    codeMirror.setCursor(cursor);
+                    codeMirror.scrollTo(scrollInfo.left, scrollInfo.top);
+                } finally {
+                    syncingFromEditor = false;
+                }
+                updateMeta(html);
                 return;
             }
-            sourceEl.value = html;
-        }
-
-        function syncToSource() {
-            if (syncingFromSource) {
-                return;
+            if (sourceEl.value !== html) {
+                sourceEl.value = html;
             }
-            var html = editor.getData();
-            writeHtmlSource(html);
             updateMeta(html);
         }
+
+        var syncToSource = debounce(function () {
+            if (syncingFromSource || syncingFromEditor) {
+                return;
+            }
+            writeHtmlSource(editor.getData());
+        }, 200);
 
         var editorApi = {
             getHtml: function () {
                 return editor.getData();
             },
             setHtml: function (html) {
-                editor.setData(html);
-                syncToSource();
+                syncingFromSource = true;
+                editor.setData(html || '', {
+                    callback: function () {
+                        syncingFromSource = false;
+                        writeHtmlSource(editor.getData());
+                    },
+                });
             },
         };
 
         editor.on('instanceReady', function () {
-            syncToSource();
+            writeHtmlSource(editor.getData());
             initSplitLayout(split, editor, codeMirror);
             if (codeMirror) {
                 refreshHtmlCodeMirror(codeMirror, split.classList.contains('cabinet-he-split--stacked'));
@@ -538,18 +555,39 @@
         });
         editor.on('change', syncToSource);
         editor.on('mode', syncToSource);
-        editor.on('blur', syncToSource);
+        editor.on('blur', function () {
+            if (syncingFromSource || syncingFromEditor) {
+                return;
+            }
+            writeHtmlSource(editor.getData());
+        });
 
         var syncToEditor = debounce(function () {
-            syncingFromSource = true;
+            if (syncingFromEditor || syncingFromSource) {
+                return;
+            }
             var html = readHtmlSource();
-            editor.setData(html);
-            syncingFromSource = false;
-            updateMeta(html);
-        }, 400);
+            // setData всегда сбрасывает selection — не трогаем CKEditor без реальной правки HTML.
+            if (editor.getData() === html) {
+                updateMeta(html);
+                return;
+            }
+            syncingFromSource = true;
+            editor.setData(html, {
+                callback: function () {
+                    syncingFromSource = false;
+                    updateMeta(html);
+                },
+            });
+        }, 450);
 
         if (codeMirror) {
-            codeMirror.on('change', syncToEditor);
+            codeMirror.on('change', function () {
+                if (syncingFromEditor) {
+                    return;
+                }
+                syncToEditor();
+            });
         } else {
             sourceEl.addEventListener('input', syncToEditor);
         }

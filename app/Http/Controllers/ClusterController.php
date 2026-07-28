@@ -459,7 +459,14 @@ class ClusterController extends Controller
             'id', 'show'
         ]);
 
-        if (!$cluster || !(($cluster->user_id == Auth::id() || User::isUserAdmin()) && $cluster->show === 1)) {
+        if (!$cluster) {
+            return null;
+        }
+
+        // show=0 = «не в Мои проекты», но владелец должен открывать прямую ссылку
+        // (ТГ/email после завершения, просмотр сразу после анализа).
+        $canAccess = User::isUserAdmin() || (int) $cluster->user_id === (int) Auth::id();
+        if (! $canAccess) {
             return null;
         }
 

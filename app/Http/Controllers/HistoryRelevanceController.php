@@ -907,15 +907,26 @@ class HistoryRelevanceController extends Controller
             ]);
         }
 
+        // Результаты (average_values) пишутся после создания строки истории —
+        // без них UI рисует «голые» цифры без заливки.
+        if ($latest !== null) {
+            $latest->loadMissing(['results:id,project_id,average_values']);
+            $avgRaw = $latest->results ? ($latest->results->average_values ?? null) : null;
+            if ($avgRaw === null || $avgRaw === '') {
+                return response()->json([
+                    'message' => 'wait',
+                    'code' => 200,
+                ]);
+            }
+        }
+
         try {
             return response()->json([
                 'message' => 'success',
                 'code' => 200,
                 'completedHistoryId' => $latest ? (int) $latest->id : (int) $object->id,
-                'newObject' => $latest ? [
-                    'id' => (int) $latest->id,
-                    'last_check' => $latest->last_check,
-                ] : null,
+                // Полная строка для #history_table (row.add); show-history берёт только id.
+                'newObject' => $latest ? $this->formatHistoryTableRow($latest) : null,
             ]);
         } catch (Throwable $e) {
             return response()->json([
@@ -924,6 +935,40 @@ class HistoryRelevanceController extends Controller
             ]);
         }
 
+    }
+
+    /**
+     * Компактный payload строки истории без тяжёлых полей (request/html/sites).
+     */
+    private function formatHistoryTableRow(RelevanceHistory $history): array
+    {
+        $history->loadMissing(['results:id,project_id,average_values']);
+
+        $averageValues = $history->results ? ($history->results->average_values ?? null) : null;
+        if ($averageValues !== null && $averageValues !== '') {
+            $averageValues = json_decode($averageValues, true);
+        } else {
+            $averageValues = null;
+        }
+
+        return [
+            'id' => (int) $history->id,
+            'last_check' => $history->last_check,
+            'comment' => (string) ($history->comment ?? ''),
+            'phrase' => $history->phrase,
+            'region' => $history->region,
+            'region_name' => \App\Common::getRegionName((string) $history->region),
+            'main_link' => $history->main_link,
+            'position' => $history->position,
+            'points' => $history->points,
+            'coverage' => $history->coverage,
+            'coverage_tf' => $history->coverage_tf,
+            'width' => $history->width,
+            'density' => $history->density,
+            'calculate' => (bool) $history->calculate,
+            'state' => (int) $history->state,
+            'average_values' => $averageValues,
+        ];
     }
 
     private function reconcileQueueState(RelevanceHistory $object): void

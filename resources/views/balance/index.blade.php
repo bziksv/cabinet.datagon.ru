@@ -510,42 +510,56 @@
             })();
         </script>
 
-        @if($response)
+        @if($response == 'success')
             <script>
                 (function () {
+                    var ymCounter = 89500732;
+
+                    function showPaymentSuccessModal() {
+                        var modalEl = document.getElementById('balance-success-modal');
+                        if (!modalEl) {
+                            return;
+                        }
+                        if (window.bootstrap && bootstrap.Modal) {
+                            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                            return;
+                        }
+                        if (window.jQuery && typeof jQuery(modalEl).modal === 'function') {
+                            jQuery(modalEl).modal('show');
+                        }
+                    }
+
+                    function firePaymentGoal() {
+                        if (typeof ym === 'function') {
+                            ym(ymCounter, 'reachGoal', 'success_payment_1231');
+                        }
+                    }
+
                     var url = new URL(window.location.href);
                     var invId = url.searchParams.get('InvId');
-                    if (invId === null) {
-                        var block = document.getElementById('counting-metrics-block');
-                        if (block) {
-                            block.remove();
-                        }
-                        return;
+                    var payload = {
+                        _token: $('meta[name="csrf-token"]').attr('content'),
+                    };
+                    if (invId !== null && invId !== '') {
+                        payload.id = invId;
                     }
+
                     $.ajax({
                         type: 'post',
                         dataType: 'json',
                         url: "{{ route('counting.metrics') }}",
-                        data: {
-                            _token: $('meta[name="csrf-token"]').attr('content'),
-                            id: invId,
-                        },
+                        data: payload,
                         success: function (response) {
                             if (response.click) {
-                                $('.modal').modal('show');
-                                $('#counting-metrics').trigger('click');
+                                firePaymentGoal();
                             }
-                            $('#counting-metrics-block').remove();
+                            showPaymentSuccessModal();
+                        },
+                        error: function () {
+                            showPaymentSuccessModal();
                         },
                     });
                 })();
-            </script>
-        @else
-            <script>
-                var block = document.getElementById('counting-metrics-block');
-                if (block) {
-                    block.remove();
-                }
             </script>
         @endif
     @endslot

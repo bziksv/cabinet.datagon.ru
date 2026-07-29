@@ -939,7 +939,7 @@
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script src="{{ asset('js/cabinet-select2-defaults.js') }}"></script>
         <!-- DataTables  & Plugins -->
-        <script src="{{ asset('plugins/relevance-analysis/history/childHistoryTable.js') }}"></script>
+        <script src="{{ asset('plugins/relevance-analysis/history/childHistoryTable.js') }}?v={{ @filemtime(public_path('plugins/relevance-analysis/history/childHistoryTable.js')) ?: time() }}"></script>
         <script src="{{ asset('plugins/relevance-analysis/history/common.js') }}"></script>
         <script src="{{ asset('plugins/datatables/jquery.dataTables.min.js') }}"></script>
         @include('layouts.partials.vendor-datatables-js', ['bundle' => 'rb-min'])
@@ -2129,6 +2129,7 @@
             function getTextResult(result, ideal) {
                 return "{{ __('The landing page received') }}" + ' <b>' + result + '</b>.<br> ' + '{{ __('Recommended value')}}' + ' <b>' + ideal + '.</b>';
             }
+            window.relevanceHistoryGetTextResult = getTextResult;
         </script>
     @endslot
 @endcomponent

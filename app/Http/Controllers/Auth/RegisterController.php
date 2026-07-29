@@ -120,6 +120,14 @@ class RegisterController extends Controller
         return $user;
     }
 
+    /**
+     * Цель Метрики novaja_registracija_1231 — только после успешного создания аккаунта.
+     */
+    protected function registered(Request $request, $user)
+    {
+        return redirect($this->redirectPath())->with('ym_registered', true);
+    }
+
     protected function prepareMetrics($metrics)
     {
         try {

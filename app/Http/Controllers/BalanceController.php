@@ -96,20 +96,35 @@ class BalanceController extends Controller
 
     public function countingMetrics(Request $request): JsonResponse
     {
-        $balance = Balance::where('id', '=', $request->input('id'))
-            ->where('user_id', '=', Auth::id())
-            ->where('counting', '=', 0)->first();
+        $userId = Auth::id();
+        $invId = $request->input('id');
 
-        if (isset($balance)) {
-            $balance->counting = 1;
-            $balance->save();
-            return response()->json([
-                'click' => true
-            ]);
+        $query = Balance::query()
+            ->where('user_id', '=', $userId)
+            ->where('counting', '=', 0);
+
+        if ($invId !== null && $invId !== '') {
+            $balance = (clone $query)->where('id', '=', $invId)->first();
         } else {
+            // Без InvId в SuccessURL — берём последнее успешное непомеченное пополнение.
+            $balance = (clone $query)
+                ->where('status', '=', 1)
+                ->orderByDesc('id')
+                ->first();
+        }
+
+        if ($balance === null) {
             return response()->json([
-                'click' => false
+                'click' => false,
             ]);
         }
+
+        $balance->counting = 1;
+        $balance->save();
+
+        return response()->json([
+            'click' => true,
+            'balance_id' => (int) $balance->id,
+        ]);
     }
 }

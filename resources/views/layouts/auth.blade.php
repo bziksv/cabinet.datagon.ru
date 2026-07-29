@@ -28,5 +28,6 @@
 @yield('js')
 
 @include('layouts.partials.yandex-metrika')
+@include('layouts.partials.yandex-metrika-goals')
 </body>
 </html>

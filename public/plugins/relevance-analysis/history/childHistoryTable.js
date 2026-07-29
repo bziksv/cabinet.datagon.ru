@@ -388,44 +388,103 @@ function checkAnalyseProgress(id) {
                     '<span class="text-muted">Произошла ошибка, повторите попытку или обратитесь к администратору</span>'
                 );
             } else if (response.message === 'success') {
+                let newObject = response.newObject
+                if (!newObject || !newObject.id) {
+                    $('#history-state-' + id).html(
+                        '<button type="button" class="btn btn-secondary get-history-info" data-order="' + id + '"' +
+                        '   data-bs-toggle="modal" data-bs-target="#staticBackdrop"> Повторить анализ' +
+                        '</button>' +
+                        '<a href="/show-history/' + id + '" target="_blank" class="btn btn-secondary mt-3"> Подробная информация</a>'
+                    )
+                    getHistoryInfo()
+                    return
+                }
+
+                let avg = newObject.average_values || null
+                // Без avg — ждём saveHistoryResult (иначе «голые» цифры без заливки).
+                if (!avg || avg.points == null) {
+                    setTimeout(function () {
+                        checkAnalyseProgress(id)
+                    }, 2000)
+                    return
+                }
+
                 $('#history-state-' + id).html(
                     '<button type="button" class="btn btn-secondary get-history-info" data-order="' + id + '"' +
                     '   data-bs-toggle="modal" data-bs-target="#staticBackdrop"> Повторить анализ' +
                     '</button>' +
                     '<a href="/show-history/' + id + '" target="_blank" class="btn btn-secondary mt-3"> Подробная информация</a>'
-                );
+                )
 
-                let table = $('#history_table').DataTable();
-                let newObject = response.newObject
+                // Та же запись (обновили in-place) — новую строку не добавляем.
+                if (String(newObject.id) === String(id)) {
+                    getHistoryInfo()
+                    return
+                }
 
-                table.row.add({
-                    0: newObject['last_check'],
-                    1: '<textarea style="height: 160px;" data-target="' + newObject['id'] + '" class="history-comment form form-control"></textarea>',
-                    2: newObject['phrase'],
-                    3: (newObject['region_name'] || getRegionName(newObject['region'])),
-                    4: newObject['main_link'],
-                    5: newObject['position'] === 0 ? 'Не попал в топ 100' : newObject['position'],
-                    6: newObject['points'],
-                    7: newObject['coverage'],
-                    8: newObject['coverage_tf'],
-                    9: newObject['width'],
-                    10: newObject['density'],
-                    11: '<div class="d-flex justify-content-center">' +
-                        '    <div class="__helper-link ui_tooltip_w">' +
-                        '        <div class="custom-control custom-switch custom-switch-off-danger custom-switch-on-success">' +
-                        '            <input checked onclick="changeState(' + $(this) + ')" type="checkbox"' +
-                        '                   class="custom-control-input switch" id="calculate-project-' + newObject['id'] + '" name="noIndex"' +
-                        '                   data-target="' + newObject['id'] + '"> ' +
-                        '               <label class="custom-control-label" for="calculate-project-' + newObject['id'] + '"></label></div>' +
-                        '    </div>' +
-                        '</div>',
-                    12: '<div id="history-state-' + newObject['id'] + '">' +
-                        '       <button type="button" class="btn btn-secondary get-history-info" data-order="' + newObject['id'] + '" data-bs-toggle="modal" data-bs-target="#staticBackdrop"> Повторить анализ </button>' +
-                        '       <a href="/show-history/' + newObject['id'] + '" target="_blank" class="btn btn-secondary mt-3"> Подробная информация</a>' +
-                        '</div>'
-                });
+                // Уже есть строка с этим id (повторный poll / redraw).
+                if ($('#history_table').find('[data-target="' + newObject.id + '"], #history-state-' + newObject.id).length) {
+                    getHistoryInfo()
+                    return
+                }
 
-                table.draw()
+                // Без phrase/link — битый payload; не создаём пустую строку (DataTables tn/4).
+                if (newObject.phrase === undefined && newObject.main_link === undefined) {
+                    getHistoryInfo()
+                    return
+                }
+
+                if (!$.fn.DataTable.isDataTable('#history_table')) {
+                    getHistoryInfo()
+                    return
+                }
+
+                let table = $('#history_table').DataTable()
+                let phrase = newObject.phrase
+                if (phrase == null || phrase === '') {
+                    phrase = 'Анализ без ключевого слова'
+                }
+                let position = Number(newObject.position) === 0
+                    ? 'Не попал в топ 100'
+                    : (newObject.position != null ? newObject.position : '')
+                let region = newObject.region_name || (typeof getRegionName === 'function' ? getRegionName(newObject.region) : '') || ''
+                let checked = newObject.calculate ? 'checked' : ''
+
+                let $tr = $('<tr class="render"></tr>')
+                $tr.append('<td>' + (newObject.last_check || '') + '</td>')
+                $tr.append(
+                    '<td><textarea style="height: 160px;" data-target="' + newObject.id +
+                    '" class="history-comment form form-control">' + (newObject.comment || '') +
+                    '</textarea></td>'
+                )
+                $tr.append('<td>' + phrase + '</td>')
+                $tr.append('<td>' + region + '</td>')
+                $tr.append('<td>' + (newObject.main_link || '') + '</td>')
+                $tr.append('<td data-order="' + (newObject.position != null ? newObject.position : '') + '">' + position + '</td>')
+                $tr.append(buildHistoryMetricCells(newObject, avg))
+
+                $tr.append(
+                    '<td><div class="d-flex justify-content-center">' +
+                    '  <div class="__helper-link ui_tooltip_w">' +
+                    '    <div class="custom-control custom-switch custom-switch-off-danger custom-switch-on-success">' +
+                    '      <input ' + checked + ' onclick="changeState($(this))" type="checkbox"' +
+                    '             class="custom-control-input switch" id="calculate-project-' + newObject.id + '" name="noIndex"' +
+                    '             data-target="' + newObject.id + '">' +
+                    '      <label class="custom-control-label" for="calculate-project-' + newObject.id + '"></label>' +
+                    '    </div>' +
+                    '  </div>' +
+                    '</div></td>'
+                )
+                $tr.append(
+                    '<td id="history-state-' + newObject.id + '">' +
+                    '  <button type="button" class="btn btn-secondary get-history-info" data-order="' + newObject.id +
+                    '" data-bs-toggle="modal" data-bs-target="#staticBackdrop"> Повторить анализ </button>' +
+                    '  <a href="/show-history/' + newObject.id + '" target="_blank" class="btn btn-secondary mt-3"> Подробная информация</a>' +
+                    '</td>'
+                )
+
+                table.row.add($tr[0]).draw(false)
+                getHistoryInfo()
             }
 
         },
@@ -674,4 +733,45 @@ function getColor(result, ideal) {
     }
 
     return 'rgba(220,53,69,0.5)';
+}
+
+function getTextResult(result, ideal) {
+    if (typeof window.relevanceHistoryGetTextResult === 'function') {
+        return window.relevanceHistoryGetTextResult(result, ideal)
+    }
+    return 'Посадочная страница получила <b>' + result + '</b>.<br> Рекомендованное значение <b>' + ideal + '.</b>'
+}
+
+/**
+ * Ячейки баллов/охвата с заливкой — как при полной перезагрузке get-stories.
+ */
+function buildHistoryMetricCells(values, avg) {
+    let points = values.points
+    let coverage = values.coverage
+    let coverageTf = values.coverage_tf
+    let width = values.width
+    let density = values.density
+
+    if (!avg || avg.points == null || typeof getColor !== 'function') {
+        return '' +
+            '<td>' + (points != null ? points : '') + '</td>' +
+            '<td data-order="' + (coverage != null ? coverage : '') + '">' + (coverage != null ? coverage : '') + '</td>' +
+            '<td data-order="' + (coverageTf != null ? coverageTf : '') + '">' + (coverageTf != null ? coverageTf : '') + '</td>' +
+            '<td data-order="' + (width != null ? width : '') + '">' + (width != null ? width : '') + '</td>' +
+            '<td data-order="' + (density != null ? density : '') + '">' + (density != null ? density : '') + '</td>'
+    }
+
+    function cell(value, ideal) {
+        let v = value != null ? value : ''
+        let rounded = Math.round(ideal)
+        return '<td data-order="' + v + '" style="background: ' + getColor(value, rounded) + '">' +
+            getTextResult(value, rounded) + '</td>'
+    }
+
+    return '' +
+        cell(points, avg.points) +
+        cell(coverage, avg.coverage) +
+        cell(coverageTf, avg.coverageTf) +
+        cell(width, avg.width) +
+        cell(density, avg.densityPercent)
 }

@@ -101,6 +101,7 @@
 @yield('js')
 @if(!$isWhiteLabel)
     @include('layouts.partials.yandex-metrika')
+    @include('layouts.partials.yandex-metrika-goals')
 @endif
 </body>
 </html>

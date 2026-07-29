@@ -1327,36 +1327,41 @@ th {
 /* Не переопределять Bootstrap .row / .col / .container — ломает DataTables и сетку модуля */
 
 .loader {
-    width: 100px;
-    height: 100px;
+    width: 48px;
+    height: 48px;
     border-radius: 100%;
     position: relative;
-    margin: 0 auto;
+    margin: 0.5rem auto 0;
 }
 
-#loader-1 {
-    display: flex;
-    justify-content: center;
-}
-
-#loader-1:before,
-#loader-1:after {
-    content: "";
-    position: absolute;
-    width: 50%;
-    height: 50%;
-    border-radius: 100%;
-    border: 10px solid transparent;
+/* Колесо обработки в истории релевантности */
+.loader.relevance-history-spinner,
+#loader-1.loader {
+    display: block;
+    box-sizing: border-box;
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(90, 98, 104, 0.25);
     border-top-color: #5a6268;
+    border-radius: 50%;
+    animation: relevance-history-spin 0.75s linear infinite !important;
+    animation-duration: 0.75s !important;
+    animation-iteration-count: infinite !important;
 }
 
-#loader-1:before {
-    z-index: 50;
-    animation: spin 1s infinite;
+/* Старые псевдоэлементы больше не нужны — глушим, чтобы не было «двойного» кольца */
+.loader.relevance-history-spinner:before,
+.loader.relevance-history-spinner:after,
+#loader-1.loader:before,
+#loader-1.loader:after {
+    content: none;
+    display: none;
 }
 
-#loader-1:after {
-    border: 10px solid #ccc;
+@keyframes relevance-history-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 @keyframes spin {
@@ -1372,6 +1377,16 @@ th {
         -ms-transform: rotate(360deg);
         -o-transform: rotate(360deg);
         transform: rotate(360deg);
+    }
+}
+
+/* AdminLTE/BS: prefers-reduced-motion обнуляет animation — для статуса «Обрабатывается» оставляем вращение */
+@media (prefers-reduced-motion: reduce) {
+    .loader.relevance-history-spinner,
+    #loader-1.loader {
+        animation: relevance-history-spin 0.75s linear infinite !important;
+        animation-duration: 0.75s !important;
+        animation-iteration-count: infinite !important;
     }
 }
 

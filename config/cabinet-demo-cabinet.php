@@ -34,8 +34,11 @@ return [
      */
     'relevance_source_max_age_days' => env('DEMO_CABINET_RELEVANCE_MAX_AGE_DAYS'),
 
-    /** Fallback, если ещё нет снимка релевантности (иначе → /show-history/{id}) */
-    'home_path' => '/history',
+    /**
+     * Куда вести после входа в демо (/demo-cabinet).
+     * Раньше приоритетом был /show-history/{id} — теперь главная.
+     */
+    'home_path' => env('DEMO_CABINET_HOME_PATH', '/'),
 
     /** URL регистрации с маркетинга */
     'register_hint' => 'https://titlo.ru/register/',

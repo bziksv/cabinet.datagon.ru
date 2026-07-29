@@ -492,15 +492,11 @@ class DemoCabinet
 
     /**
      * Куда вести после входа в демо.
+     * Главная кабинета — обзор модулей; готовые отчёты открываются из меню.
      */
     public static function homePath(?User $user = null): string
     {
-        $showcase = self::relevanceShowcasePath($user);
-        if ($showcase) {
-            return $showcase;
-        }
-
-        return (string) config('cabinet-demo-cabinet.home_path', '/history');
+        return (string) config('cabinet-demo-cabinet.home_path', '/');
     }
 
     /**

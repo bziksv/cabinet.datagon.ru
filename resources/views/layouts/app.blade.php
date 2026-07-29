@@ -41,14 +41,14 @@
                 @endif
                 @if(session('demo_cabinet_welcome'))
                     <div class="alert alert-info">
-                        Вы в демо-кабинете. Сейчас открыта <strong>история анализа релевантности</strong> —
-                        откройте проект <em>demo-shop.ru</em> и снимок проверки, чтобы увидеть полный отчёт.
-                        Также есть готовые результаты в
-                        <a href="{{ url('/search-suggestions') }}">подсказках</a>,
-                        <a href="{{ url('/domain-records') }}">записях домена</a>,
-                        <a href="{{ url('/site-types') }}">типах сайтов</a>,
-                        <a href="{{ url('/phrase-commerce') }}">гео и коммерции</a>.
-                        Форма «Анализатор» пустая намеренно — в демо запуски отключены.
+                        Вы в демо-кабинете — только просмотр готовых результатов, запуски отключены.
+                        Откройте модуль в меню: например
+                        <a href="{{ url('/history') }}">историю релевантности</a>
+                        (проект <em>demo-shop.ru</em>),
+                        <a href="{{ url('/search-suggestions') }}">подсказки</a>,
+                        <a href="{{ url('/domain-records') }}">записи домена</a>,
+                        <a href="{{ url('/site-types') }}">типы сайтов</a>,
+                        <a href="{{ url('/phrase-commerce') }}">гео и коммерцию</a>.
                     </div>
                 @endif
                 @yield('content')

@@ -236,6 +236,9 @@ class BacklinkController extends Controller
         $link = LinkTracking::findOrFail($id);
         $projectId = (int) $link->project_tracking_id;
         $project = ProjectTracking::findOrFail($projectId);
+        if ($project->user_id !== Auth::id() && ! User::isUserAdmin()) {
+            return abort(403);
+        }
         if ($project->total_link > 0) {
             $project->decrement('total_link');
         }
@@ -244,6 +247,46 @@ class BacklinkController extends Controller
         flash()->overlay(__('Link was successfully deleted'), ' ')->success();
 
         return Redirect::route('show.backlink', $projectId);
+    }
+
+    public function removeLinks(Request $request, $id): RedirectResponse
+    {
+        $project = ProjectTracking::findOrFail($id);
+        if ($project->user_id !== Auth::id() && ! User::isUserAdmin()) {
+            return abort(403);
+        }
+
+        $ids = $request->input('ids', []);
+        if (! is_array($ids)) {
+            $ids = [];
+        }
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static function ($v) {
+            return $v > 0;
+        })));
+
+        if (count($ids) === 0) {
+            flash()->overlay(__('Backlink bulk delete empty'), ' ')->error();
+
+            return Redirect::route('show.backlink', $project->id);
+        }
+
+        $deleted = LinkTracking::query()
+            ->where('project_tracking_id', $project->id)
+            ->whereIn('id', $ids)
+            ->delete();
+
+        if ($deleted > 0) {
+            $left = (int) LinkTracking::query()
+                ->where('project_tracking_id', $project->id)
+                ->count();
+            $project->total_link = $left;
+            $project->save();
+            BacklinkChecker::recountProject((int) $project->id);
+        }
+
+        flash()->overlay(__('Backlink bulk delete done', ['count' => $deleted]), ' ')->success();
+
+        return Redirect::route('show.backlink', $project->id);
     }
 
     public function store(Request $request): RedirectResponse

@@ -151,6 +151,7 @@ class BacklinkDemoService
     {
         $issueNeedles = [
             'Link not found',
+            'The donor page does not exist',
             'The donor site does not exist',
             'Link have attribute nofollow',
             'Link placed in noindex',

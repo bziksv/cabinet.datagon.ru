@@ -37,7 +37,7 @@ class BacklinkChecker
         $html = BacklinkHtmlMatcher::fetchHtml((string) $link->site_donor);
 
         if (! $html) {
-            $this->error = 'The donor site does not exist';
+            $this->error = 'The donor page does not exist';
             $this->persist($link, true);
 
             return true;
@@ -61,17 +61,11 @@ class BacklinkChecker
             ? 'Link found (anchorless).'
             : 'Link found, anchor matches.';
 
-        if (! empty($hit['in_comment_noindex'])) {
-            if ($link->noindex) {
-                $this->noIndex = $anchorless
-                    ? 'Link found (anchorless), link placed in noindex.'
-                    : 'Link found, anchor matches, link placed in noindex.';
-            } else {
-                $this->noIndex = $this->result;
-            }
-        } else {
-            // Контроль noindex=да: предупреждение, но не «проблемная» для счётчика.
-            $this->noIndex = 'Link not placed in noindex.';
+        // Контроль=да: проверяем отсутствие noindex/nofollow. Наличие — предупреждение (не broken).
+        if ($link->noindex) {
+            $this->noIndex = ! empty($hit['in_comment_noindex'])
+                ? 'Link placed in noindex.'
+                : 'Link not placed in noindex.';
         }
 
         if ($link->nofollow) {
@@ -104,7 +98,7 @@ class BacklinkChecker
 
     /**
      * Выровнять флаг broken по тексту статуса (после старых cron-прогонов).
-     * Успех («ссылка найдена») важнее хвоста «донор не существует» в склеенном статусе.
+     * Успех («ссылка найдена») важнее хвоста «страница-донор не существует» в склеенном статусе.
      */
     public static function repairBrokenFlags(?int $projectTrackingId = null): int
     {
@@ -143,7 +137,7 @@ class BacklinkChecker
             return false;
         }
 
-        // Склеенные статусы cron: «найдена … Сайт донор не существует» → это успех + мусор.
+        // Склеенные статусы cron: «найдена … страница-донор не существует» → это успех + мусор.
         if (
             mb_strpos($s, 'link found') !== false
             || mb_strpos($s, 'ссылка найдена') !== false
@@ -159,6 +153,77 @@ class BacklinkChecker
             || mb_strpos($s, 'не существует') !== false
             || mb_strpos($s, 'anchor does not match') !== false
             || mb_strpos($s, 'анкор не совпадает') !== false;
+    }
+
+    /**
+     * Метаданные для фильтров таблицы проекта.
+     *
+     * @return array{presence: string, nofollow: string, noindex: string}
+     *   presence: found|broken|unchecked
+     *   nofollow/noindex: yes|no|na
+     */
+    public static function statusFilterMeta(string $status, $broken = null): array
+    {
+        $raw = trim((string) $status);
+        if ($raw === '1' || $raw === 'true') {
+            $raw = 'Link found, anchor matches.';
+        }
+
+        $s = mb_strtolower($raw);
+        $looksFound = mb_strpos($s, 'link found') !== false
+            || mb_strpos($s, 'ссылка найдена') !== false
+            || mb_strpos($s, 'anchorless') !== false
+            || mb_strpos($s, 'безанкорн') !== false
+            || mb_strpos($s, 'anchor matches') !== false;
+
+        if (self::statusMeansHardBroken($raw)) {
+            $presence = 'broken';
+        } elseif ($looksFound) {
+            $presence = 'found';
+        } elseif ((int) $broken === 1) {
+            $presence = 'broken';
+        } elseif (
+            $s === ''
+            || $s === '0'
+            || $s === 'not checked'
+            || mb_strpos($s, 'не проверен') !== false
+        ) {
+            $presence = 'unchecked';
+        } else {
+            $presence = 'unchecked';
+        }
+
+        $nofollow = 'na';
+        if (
+            (mb_strpos($s, 'have attribute nofollow') !== false && mb_strpos($s, 'not have') === false)
+            || (mb_strpos($s, 'имеет атрибут nofollow') !== false && mb_strpos($s, 'не имеет') === false)
+        ) {
+            $nofollow = 'yes';
+        } elseif (
+            mb_strpos($s, 'not have attribute nofollow') !== false
+            || mb_strpos($s, 'не имеет атрибут nofollow') !== false
+        ) {
+            $nofollow = 'no';
+        }
+
+        $noindex = 'na';
+        if (
+            (mb_strpos($s, 'placed in noindex') !== false && mb_strpos($s, 'not placed') === false)
+            || (mb_strpos($s, 'помещена в noindex') !== false && mb_strpos($s, 'не помещена') === false)
+        ) {
+            $noindex = 'yes';
+        } elseif (
+            mb_strpos($s, 'not placed in noindex') !== false
+            || mb_strpos($s, 'не помещена в noindex') !== false
+        ) {
+            $noindex = 'no';
+        }
+
+        return [
+            'presence' => $presence,
+            'nofollow' => $nofollow,
+            'noindex' => $noindex,
+        ];
     }
 
     protected function persist(LinkTracking $target, bool $broken): void

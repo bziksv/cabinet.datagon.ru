@@ -47,7 +47,7 @@ class LinkAnalyser
         $html = BacklinkHtmlMatcher::fetchHtml((string) $project->site_donor);
 
         if (! $html) {
-            $this->error = 'The donor site does not exist';
+            $this->error = 'The donor page does not exist';
         } else {
             $this->searchLink($html, $project);
         }
@@ -103,14 +103,11 @@ class LinkAnalyser
             ? 'Link found (anchorless).'
             : 'Link found, anchor matches.';
 
-        if (! empty($hit['in_comment_noindex'])) {
-            $this->noIndex = $project->noindex
-                ? ($anchorless
-                    ? 'Link found (anchorless), link placed in noindex.'
-                    : 'Link found, anchor matches, link placed in noindex.')
-                : $this->result;
-        } else {
-            $this->noIndex = 'Link not placed in noindex.';
+        // Контроль=да: проверяем отсутствие noindex/nofollow. Наличие — предупреждение.
+        if ($project->noindex) {
+            $this->noIndex = ! empty($hit['in_comment_noindex'])
+                ? 'Link placed in noindex.'
+                : 'Link not placed in noindex.';
         }
 
         if ($project->nofollow) {

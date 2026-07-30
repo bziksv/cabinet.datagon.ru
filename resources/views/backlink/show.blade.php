@@ -113,7 +113,8 @@
                         <div class="cabinet-bl-kpi__value">{{ number_format($linksTotal, 0, ',', ' ') }}</div>
                         <div class="cabinet-bl-kpi__label">{{ __('Backlink links total') }}</div>
                     </div>
-                    <div class="cabinet-bl-kpi{{ $linksBroken > 0 ? ' cabinet-bl-kpi--danger' : '' }}">
+                    <div class="cabinet-bl-kpi{{ $linksBroken > 0 ? ' cabinet-bl-kpi--danger' : '' }}"
+                         @if($linksBroken > 0) role="button" tabindex="0" data-bl-quick-filter="broken" title="{{ __('Backlink filter broken') }}" @endif>
                         <div class="cabinet-bl-kpi__value">{{ number_format($linksBroken, 0, ',', ' ') }}</div>
                         <div class="cabinet-bl-kpi__label">{{ __('Backlink links broken') }}</div>
                         <div class="cabinet-bl-kpi__hint small text-secondary">{{ __('Backlink links broken hint') }}</div>
@@ -154,11 +155,69 @@
                 <p class="mb-0">{{ __('Backlink empty links') }}</p>
             </div>
         @else
+            <div class="cabinet-bl-filters card border shadow-sm mb-0" id="cabinet-bl-filters">
+                <div class="card-body py-3">
+                    <div class="cabinet-bl-filters__groups">
+                        <div class="cabinet-bl-filter-group" data-bl-filter-group="presence">
+                            <span class="cabinet-bl-filter-group__label">{{ __('Backlink filter presence') }}</span>
+                            <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="{{ __('Backlink filter presence') }}">
+                                <button type="button" class="btn btn-outline-secondary active" data-bl-filter="presence" data-bl-value="all">{{ __('Backlink filter all') }}</button>
+                                <button type="button" class="btn btn-outline-secondary" data-bl-filter="presence" data-bl-value="found">{{ __('Backlink filter found') }}</button>
+                                <button type="button" class="btn btn-outline-secondary" data-bl-filter="presence" data-bl-value="broken">{{ __('Backlink filter broken') }}</button>
+                                <button type="button" class="btn btn-outline-secondary" data-bl-filter="presence" data-bl-value="unchecked">{{ __('Backlink filter unchecked') }}</button>
+                            </div>
+                        </div>
+                        <div class="cabinet-bl-filter-group" data-bl-filter-group="nofollow">
+                            <span class="cabinet-bl-filter-group__label">nofollow</span>
+                            <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="nofollow">
+                                <button type="button" class="btn btn-outline-secondary active" data-bl-filter="nofollow" data-bl-value="all">{{ __('Backlink filter all') }}</button>
+                                <button type="button" class="btn btn-outline-secondary" data-bl-filter="nofollow" data-bl-value="yes">{{ __('Backlink filter attr yes') }}</button>
+                                <button type="button" class="btn btn-outline-secondary" data-bl-filter="nofollow" data-bl-value="no">{{ __('Backlink filter attr no') }}</button>
+                            </div>
+                        </div>
+                        <div class="cabinet-bl-filter-group" data-bl-filter-group="noindex">
+                            <span class="cabinet-bl-filter-group__label">noindex</span>
+                            <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="noindex">
+                                <button type="button" class="btn btn-outline-secondary active" data-bl-filter="noindex" data-bl-value="all">{{ __('Backlink filter all') }}</button>
+                                <button type="button" class="btn btn-outline-secondary" data-bl-filter="noindex" data-bl-value="yes">{{ __('Backlink filter attr yes') }}</button>
+                                <button type="button" class="btn btn-outline-secondary" data-bl-filter="noindex" data-bl-value="no">{{ __('Backlink filter attr no') }}</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="cabinet-bl-filters__meta mt-2 d-flex flex-wrap align-items-center gap-2">
+                        <span class="small text-secondary" id="cabinet-bl-filter-count"></span>
+                        <button type="button" class="btn btn-sm btn-link text-decoration-none px-1 d-none" id="cabinet-bl-filter-reset">{{ __('Backlink filter reset') }}</button>
+                    </div>
+                </div>
+            </div>
+
+            <form action="{{ route('delete.links', $project->id) }}"
+                  method="post"
+                  id="cabinet-bl-bulk-form"
+                  class="cabinet-bl-bulk-bar d-none"
+                  onsubmit='return confirm(@json(__('Backlink bulk delete confirm')))'>
+                @csrf
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="small fw-semibold" id="cabinet-bl-bulk-count">0</span>
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-trash me-1" aria-hidden="true"></i>{{ __('Backlink bulk delete') }}
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="cabinet-bl-bulk-clear">{{ __('Backlink bulk clear') }}</button>
+                </div>
+            </form>
+
             <div class="cabinet-bl-table-wrap">
-                <table class="table table-sm cabinet-bl-table" aria-describedby="cabinet-bl-links-caption">
+                <table class="table table-sm cabinet-bl-table" id="cabinet-bl-links-table" aria-describedby="cabinet-bl-links-caption">
                     <caption id="cabinet-bl-links-caption" class="visually-hidden">{{ __('Backlink links in project') }}</caption>
                     <thead>
                     <tr>
+                        <th class="cabinet-bl-col-check">
+                            <input type="checkbox"
+                                   class="form-check-input"
+                                   id="cabinet-bl-select-all"
+                                   aria-label="{{ __('Backlink select all visible') }}"
+                                   title="{{ __('Backlink select all visible') }}">
+                        </th>
                         <th class="cabinet-bl-col-wide">{{ __('Backlink col donor') }}</th>
                         <th class="cabinet-bl-col-wide">{{ __('Backlink col acceptor') }}</th>
                         <th>{{ __('Backlink col anchorless short') }}</th>
@@ -177,8 +236,24 @@
                                 (string) $link->anchor,
                                 (string) $link->link
                             );
+                            $filterMeta = \App\Services\Backlink\BacklinkChecker::statusFilterMeta(
+                                (string) ($link->status ?? ''),
+                                $link->broken ?? null
+                            );
                         @endphp
-                        <tr id="{{ $link->id }}">
+                        <tr id="{{ $link->id }}"
+                            class="cabinet-bl-link-row"
+                            data-bl-presence="{{ $filterMeta['presence'] }}"
+                            data-bl-nofollow="{{ $filterMeta['nofollow'] }}"
+                            data-bl-noindex="{{ $filterMeta['noindex'] }}">
+                            <td class="cabinet-bl-td-check">
+                                <input type="checkbox"
+                                       class="form-check-input cabinet-bl-row-check"
+                                       name="ids[]"
+                                       value="{{ $link->id }}"
+                                       form="cabinet-bl-bulk-form"
+                                       aria-label="{{ __('Backlink select link') }}">
+                            </td>
                             <td>
                                 {!! Form::textarea('site_donor', $link->site_donor, [
                                     'class' => 'form-control backlink cabinet-bl-cell-textarea',
@@ -253,6 +328,9 @@
                     @endforeach
                     </tbody>
                 </table>
+                <p class="cabinet-bl-filter-empty text-center text-secondary small py-4 mb-0 d-none" id="cabinet-bl-filter-empty">
+                    {{ __('Backlink filter empty') }}
+                </p>
             </div>
         @endif
     </div>
@@ -450,6 +528,112 @@
 
                     if ($progress.data('busy') === 1 || $progress.data('busy') === '1') {
                         pollProgress();
+                    }
+
+                    var filters = { presence: 'all', nofollow: 'all', noindex: 'all' };
+                    var $rows = $page.find('.cabinet-bl-link-row');
+                    var $selectAll = $('#cabinet-bl-select-all');
+                    var $bulkForm = $('#cabinet-bl-bulk-form');
+                    var $bulkCount = $('#cabinet-bl-bulk-count');
+                    var $filterCount = $('#cabinet-bl-filter-count');
+                    var $filterEmpty = $('#cabinet-bl-filter-empty');
+                    var $filterReset = $('#cabinet-bl-filter-reset');
+                    var countTpl = @json(__('Backlink filter shown', ['shown' => ':shown', 'total' => ':total']));
+                    var selectedTpl = @json(__('Backlink bulk selected', ['count' => ':count']));
+
+                    function visibleRows() {
+                        return $rows.filter(':visible');
+                    }
+
+                    function updateBulkBar() {
+                        var selected = $page.find('.cabinet-bl-row-check:checked').length;
+                        $bulkCount.text(selectedTpl.replace(':count', selected));
+                        $bulkForm.toggleClass('d-none', selected === 0);
+                        var $visibleChecks = visibleRows().find('.cabinet-bl-row-check');
+                        var visTotal = $visibleChecks.length;
+                        var visChecked = $visibleChecks.filter(':checked').length;
+                        $selectAll.prop('checked', visTotal > 0 && visChecked === visTotal);
+                        $selectAll.prop('indeterminate', visChecked > 0 && visChecked < visTotal);
+                    }
+
+                    function applyFilters() {
+                        var shown = 0;
+                        $rows.each(function () {
+                            var $row = $(this);
+                            var ok = true;
+                            ['presence', 'nofollow', 'noindex'].forEach(function (key) {
+                                var want = filters[key];
+                                if (want !== 'all' && $row.attr('data-bl-' + key) !== want) {
+                                    ok = false;
+                                }
+                            });
+                            $row.toggle(ok);
+                            if (!ok) {
+                                $row.find('.cabinet-bl-row-check').prop('checked', false);
+                            } else {
+                                shown++;
+                            }
+                        });
+                        $filterCount.text(countTpl.replace(':shown', shown).replace(':total', $rows.length));
+                        var filtered = filters.presence !== 'all' || filters.nofollow !== 'all' || filters.noindex !== 'all';
+                        $filterReset.toggleClass('d-none', !filtered);
+                        $filterEmpty.toggleClass('d-none', shown > 0);
+                        $page.find('#cabinet-bl-links-table').toggleClass('d-none', shown === 0);
+                        updateBulkBar();
+                    }
+
+                    $page.on('click', '[data-bl-filter]', function () {
+                        var $btn = $(this);
+                        var key = $btn.data('bl-filter');
+                        var value = String($btn.data('bl-value'));
+                        filters[key] = value;
+                        $btn.closest('.cabinet-bl-filter-group')
+                            .find('[data-bl-filter="' + key + '"]')
+                            .removeClass('active');
+                        $btn.addClass('active');
+                        applyFilters();
+                    });
+
+                    $filterReset.on('click', function () {
+                        filters = { presence: 'all', nofollow: 'all', noindex: 'all' };
+                        $page.find('[data-bl-filter]').removeClass('active');
+                        $page.find('[data-bl-filter][data-bl-value="all"]').addClass('active');
+                        applyFilters();
+                    });
+
+                    $page.on('click keydown', '[data-bl-quick-filter]', function (e) {
+                        if (e.type === 'keydown' && e.which !== 13 && e.which !== 32) {
+                            return;
+                        }
+                        e.preventDefault();
+                        var value = String($(this).data('bl-quick-filter'));
+                        filters.presence = value;
+                        $page.find('[data-bl-filter="presence"]').removeClass('active');
+                        $page.find('[data-bl-filter="presence"][data-bl-value="' + value + '"]').addClass('active');
+                        applyFilters();
+                        var el = document.getElementById('cabinet-bl-filters');
+                        if (el) {
+                            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                    });
+
+                    $selectAll.on('change', function () {
+                        var checked = $(this).prop('checked');
+                        visibleRows().find('.cabinet-bl-row-check').prop('checked', checked);
+                        updateBulkBar();
+                    });
+
+                    $page.on('change', '.cabinet-bl-row-check', function () {
+                        updateBulkBar();
+                    });
+
+                    $('#cabinet-bl-bulk-clear').on('click', function () {
+                        $page.find('.cabinet-bl-row-check').prop('checked', false);
+                        updateBulkBar();
+                    });
+
+                    if ($rows.length) {
+                        applyFilters();
                     }
                 });
             })();

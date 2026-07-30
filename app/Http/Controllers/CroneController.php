@@ -142,7 +142,7 @@ class CroneController extends Controller
         $this->result = [];
         $html = $this->curlInit($page_url);
         if ($html == false) {
-            $this->result['error'] = __('The donor site does not exist');
+            $this->result['error'] = __('The donor page does not exist');
 
             return;
         }

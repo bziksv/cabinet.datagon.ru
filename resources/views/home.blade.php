@@ -11,6 +11,7 @@
         @include('home.partials.layout-switcher', ['activeVariant' => 1])
         @include('home.partials.hero', ['summary' => $summary])
         @include('home.partials.stats', ['summary' => $summary])
+        @include('home.partials.seo-checklist-due', ['seoChecklistDue' => $seoChecklistDue ?? null])
         @include('home.partials.modules', ['modules' => $modules])
     </div>
 @endsection

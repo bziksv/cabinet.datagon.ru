@@ -50,6 +50,51 @@
                     @endif
                 </a>
             </li>
+            @if(!empty($seoChecklistNavVisible))
+                <li class="nav-item d-none d-md-block">
+                    <a class="nav-link @if(request()->routeIs('pages.seo-checklist*')) active @endif"
+                       href="{{ route('pages.seo-checklist.chronicle') }}"
+                       title="{{ $seoChecklistModuleTitle ?? __('SEO Checklist') }}">
+                        <i class="bi bi-clipboard-check me-1" aria-hidden="true"></i>
+                        {{ $seoChecklistModuleTitle ?? __('SEO Checklist') }}
+                        @if(($seoChecklistDueCount ?? 0) > 0)
+                            <span class="navbar-badge badge @if(($seoChecklistOverdueCount ?? 0) > 0) text-bg-danger @else text-bg-warning @endif ms-1"
+                                  title="{{ __('Overdue and due soon tasks') }}">
+                                {{ $seoChecklistDueCount > 99 ? '99+' : $seoChecklistDueCount }}
+                            </span>
+                        @endif
+                    </a>
+                </li>
+            @endif
+            @if(!empty($seoChecklistActiveTimer))
+                <li class="nav-item d-none d-md-block cabinet-sc-header-timer-item"
+                    id="cabinet-sc-header-timer"
+                    data-sc-header-timer
+                    data-started-at="{{ $seoChecklistActiveTimer['started_at'] }}"
+                    data-base-seconds="{{ (int) $seoChecklistActiveTimer['time_spent_seconds'] }}"
+                    data-stop-url="{{ $seoChecklistActiveTimer['stop_url'] }}"
+                    data-csrf="{{ csrf_token() }}">
+                    <div class="cabinet-sc-header-timer" role="status">
+                        <a href="{{ $seoChecklistActiveTimer['url'] }}"
+                           class="cabinet-sc-header-timer__link"
+                           title="{{ $seoChecklistActiveTimer['title'] }}">
+                            <i class="bi bi-stopwatch" aria-hidden="true"></i>
+                            <span class="cabinet-sc-header-timer__domain">{{ $seoChecklistActiveTimer['domain'] }}</span>
+                            <span class="cabinet-sc-header-timer__sep" aria-hidden="true">·</span>
+                            <span class="cabinet-sc-header-timer__title">{{ \Illuminate\Support\Str::limit($seoChecklistActiveTimer['title'], 24) }}</span>
+                            <span class="cabinet-sc-header-timer__elapsed" data-sc-header-elapsed>
+                                {{ \App\Services\SeoChecklist\SeoChecklistService::formatDuration((int) $seoChecklistActiveTimer['display_seconds']) }}
+                            </span>
+                        </a>
+                        <button type="button"
+                                class="cabinet-sc-header-timer__stop"
+                                data-sc-header-timer-stop
+                                title="{{ __('Stop timer') }}">
+                            {{ __('Timer stop') }}
+                        </button>
+                    </div>
+                </li>
+            @endif
         </ul>
 
         <ul class="navbar-nav ms-auto align-items-center">

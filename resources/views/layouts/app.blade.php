@@ -89,6 +89,7 @@
 <script src="{{ asset('js/cabinet-bs5-shim.js') }}"></script>
 <script src="{{ asset('js/cabinet-select2-defaults.js') }}?v={{ @filemtime(public_path('js/cabinet-select2-defaults.js')) ?: time() }}"></script>
 <script src="{{ asset('js/cabinet-lte3-widgets.js') }}"></script>
+<script src="{{ asset('js/cabinet-seo-checklist-header-timer.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-header-timer.js')) ?: time() }}"></script>
 
 @if(request()->route()->parameter('statistic_project_id') !== null)
     <script>

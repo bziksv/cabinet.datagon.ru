@@ -12,6 +12,7 @@
         @include('home.partials.layout-switcher', ['activeVariant' => 4])
         @include('home.partials.hero', ['summary' => $summary])
         @include('home.partials.stats', ['summary' => $summary])
+        @include('home.partials.seo-checklist-due', ['seoChecklistDue' => $seoChecklistDue ?? null])
         @include('home-cards-v2.partials.sites', ['userSites' => $userSites ?? []])
         @include('home-cards-v2.partials.modules', ['modules' => $modules])
     </div>

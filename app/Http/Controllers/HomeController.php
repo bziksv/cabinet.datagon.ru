@@ -72,6 +72,7 @@ class HomeController extends Controller
             'modules' => $modules,
             'featuredModules' => array_slice($modules, 0, 2),
             'listModules' => array_slice($modules, 2),
+            'seoChecklistDue' => $this->seoChecklistDueData(),
             'userSites' => [
                 'sites' => [],
                 'archived' => [],
@@ -90,6 +91,25 @@ class HomeController extends Controller
         }
 
         return $data;
+    }
+
+    /**
+     * @return array{count:int,overdue:int,soon:int,items:\Illuminate\Support\Collection}
+     */
+    protected function seoChecklistDueData(): array
+    {
+        $empty = ['count' => 0, 'overdue' => 0, 'soon' => 0, 'items' => collect()];
+        $userId = Auth::id();
+        if (!$userId || !\App\SeoChecklist\SeoChecklistProject::tableReady()) {
+            return $empty;
+        }
+
+        try {
+            return app(\App\Services\SeoChecklist\SeoChecklistService::class)
+                ->dueAlertsForUser((int) $userId);
+        } catch (\Throwable $e) {
+            return $empty;
+        }
     }
 
     public function archiveUserSite(Request $request): JsonResponse

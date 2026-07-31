@@ -229,6 +229,13 @@ class YandexMetrikaService
             return ['ok' => false, 'message' => __('Invalid domain')];
         }
 
+        try {
+            app(\App\Services\SeoChecklist\SeoChecklistService::class)
+                ->syncMetrikaForDomain($userId, $domain);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
         return [
             'ok' => true,
             'binding' => [

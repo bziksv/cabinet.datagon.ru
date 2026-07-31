@@ -130,6 +130,104 @@
     border-radius: 50rem;
 }
 
+#header-nav-bar.cabinet-header .cabinet-sc-header-timer-item {
+    display: flex;
+    align-items: center;
+}
+
+.cabinet-sc-header-timer {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    max-width: min(26rem, 42vw);
+    min-height: 2.75rem;
+    padding: 0 0.15rem;
+    box-sizing: border-box;
+}
+
+.cabinet-sc-header-timer__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-width: 0;
+    max-width: 100%;
+    height: 1.85rem;
+    padding: 0 0.55rem;
+    border-radius: 0.45rem;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #065f46 !important;
+    text-decoration: none !important;
+    font-size: 0.8125rem;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.cabinet-sc-header-timer__link:hover {
+    background: #d1fae5;
+    color: #064e3b !important;
+}
+
+.cabinet-sc-header-timer__link .bi {
+    flex: 0 0 auto;
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
+.cabinet-sc-header-timer__domain {
+    flex: 0 0 auto;
+    font-weight: 650;
+}
+
+.cabinet-sc-header-timer__sep {
+    flex: 0 0 auto;
+    color: #6b7280;
+}
+
+.cabinet-sc-header-timer__title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #374151;
+}
+
+.cabinet-sc-header-timer__elapsed {
+    flex: 0 0 auto;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #047857;
+}
+
+.cabinet-sc-header-timer__stop {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.85rem;
+    padding: 0 0.65rem;
+    border: 1px solid #f87171;
+    border-radius: 0.45rem;
+    background: #fff;
+    color: #b91c1c;
+    font-size: 0.75rem;
+    font-weight: 650;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.cabinet-sc-header-timer__stop:hover {
+    background: #fef2f2;
+    border-color: #ef4444;
+    color: #991b1b;
+}
+
+.cabinet-sc-header-timer__stop:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
 .cabinet-header-limits-hint.is-empty {
     display: none !important;
 }

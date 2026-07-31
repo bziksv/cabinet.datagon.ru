@@ -10,11 +10,13 @@ class SeoChecklistTemplate extends Model
     protected $table = 'seo_checklist_templates';
 
     protected $fillable = [
-        'user_id', 'code', 'title', 'description', 'is_system',
+        'user_id', 'code', 'title', 'description', 'stages_json', 'is_system', 'skip_weekends',
     ];
 
     protected $casts = [
         'is_system' => 'boolean',
+        'skip_weekends' => 'boolean',
+        'stages_json' => 'array',
     ];
 
     public function tasks(): HasMany
@@ -22,6 +24,11 @@ class SeoChecklistTemplate extends Model
         return $this->hasMany(SeoChecklistTemplateTask::class, 'template_id')
             ->orderBy('stage_sort')
             ->orderBy('sort');
+    }
+
+    public function projects(): HasMany
+    {
+        return $this->hasMany(SeoChecklistProject::class, 'template_id');
     }
 
     public static function systemDefault(): ?self

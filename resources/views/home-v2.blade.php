@@ -10,6 +10,8 @@
     <div class="cabinet-home-v2-page">
         @include('home.partials.layout-switcher', ['activeVariant' => 2])
 
+        @include('home.partials.seo-checklist-due', ['seoChecklistDue' => $seoChecklistDue ?? null])
+
         <div class="row g-3">
             <div class="col-lg-4 cabinet-home-v2-sidebar">
                 @include('home-v2.partials.sidebar', ['summary' => $summary])

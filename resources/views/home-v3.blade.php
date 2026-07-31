@@ -11,6 +11,7 @@
         @include('home.partials.layout-switcher', ['activeVariant' => 3])
 
         @include('home-v3.partials.kpi-strip', ['summary' => $summary])
+        @include('home.partials.seo-checklist-due', ['seoChecklistDue' => $seoChecklistDue ?? null])
 
         <div class="card shadow-sm mb-3 cabinet-home-v3-search-card">
             <div class="card-body py-3">

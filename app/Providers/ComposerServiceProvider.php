@@ -11,6 +11,7 @@ use App\ViewComposers\LimitsComposer;
 use App\ViewComposers\MenuComposer;
 use App\ViewComposers\StatisticsComposer;
 use App\ViewComposers\FeatureIdeaBadgeComposer;
+use App\ViewComposers\SeoChecklistDueBadgeComposer;
 use App\ViewComposers\SupportInboxBadgeComposer;
 use App\ViewComposers\TelegramConnectPromptComposer;
 use App\ViewComposers\UserPanelComposer;
@@ -46,6 +47,7 @@ class ComposerServiceProvider extends ServiceProvider
         view()->composer('layouts.partials.app-header', CountUnreadNewsComposer::class);
         view()->composer('layouts.partials.app-header', SupportInboxBadgeComposer::class);
         view()->composer('layouts.partials.app-header', FeatureIdeaBadgeComposer::class);
+        view()->composer('layouts.partials.app-header', SeoChecklistDueBadgeComposer::class);
         view()->composer('navigation.sidebar', MenuComposer::class);
         view()->composer('layouts.app', StatisticsComposer::class);
         view()->composer('layouts.app', TelegramConnectPromptComposer::class);

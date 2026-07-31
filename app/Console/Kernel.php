@@ -99,6 +99,9 @@ class Kernel extends ConsoleKernel
 
         $schedule->command('telegram:poll-updates')->everyMinute();
 
+        // SEO-чеклист: сброс monthly/weekly задач в начале периода
+        $schedule->command('seo-checklist:reset-recurring')->dailyAt('01:20');
+
         // $schedule->command('inspire')
         //          ->hourly();
 

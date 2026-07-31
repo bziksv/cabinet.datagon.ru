@@ -76,7 +76,9 @@ class HomeUserSites
             ],
             [
                 'key' => 'seo-checklist',
-                'title' => __('SEO Checklist'),
+                'title' => \App\SeoChecklist\SeoChecklistUserPreference::moduleTitleFor(
+                    Auth::check() ? (int) Auth::id() : null
+                ),
                 'short' => __('Checklist short'),
                 'create_url' => url('/seo-checklist'),
                 'kind' => 'module',
@@ -418,8 +420,23 @@ class HomeUserSites
             return;
         }
 
+        $teamIds = [];
+        if (\App\SeoChecklist\SeoChecklistTeam::tableReady()) {
+            $teamIds = \App\SeoChecklist\SeoChecklistTeamMember::query()
+                ->where('user_id', $userId)
+                ->pluck('team_id')
+                ->all();
+        }
+
         SeoChecklistProject::query()
-            ->where('user_id', $userId)
+            ->where(function ($q) use ($userId, $teamIds) {
+                $q->where('user_id', $userId)
+                    ->orWhere('owner_user_id', $userId)
+                    ->orWhere('pm_user_id', $userId);
+                if (!empty($teamIds)) {
+                    $q->orWhereIn('team_id', $teamIds);
+                }
+            })
             ->where('status', 'active')
             ->orderByDesc('id')
             ->limit(self::PER_SOURCE_LIMIT)

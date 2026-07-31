@@ -3,6 +3,7 @@
 namespace App\ViewComposers;
 
 use App\MenuItemsPosition;
+use App\SeoChecklist\SeoChecklistUserPreference;
 use App\Services\MenuProjectRegistry;
 use App\Support\CabinetAdminMenu;
 use App\Support\CabinetSidebarMenu;
@@ -48,7 +49,7 @@ class MenuComposer
                     if ($user->hasRole($access)) {
                         $modules[$key][] = [
                             'id' => $elem['id'],
-                            'title' => __($elem['title']),
+                            'title' => $this->moduleDisplayTitle($elem),
                             'description' => $elem['description'],
                             'link' => localize_cabinet_url($elem['link']),
                             'icon' => $elem['icon'],
@@ -60,7 +61,7 @@ class MenuComposer
                 if ($user->hasRole($access)) {
                     $modules[] = [
                         'id' => $item['id'],
-                        'title' => __($item['title']),
+                        'title' => $this->moduleDisplayTitle($item),
                         'description' => $item['description'],
                         'link' => localize_cabinet_url($item['link']),
                         'icon' => $item['icon'],
@@ -96,5 +97,19 @@ class MenuComposer
         }
 
         return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function moduleDisplayTitle(array $item): string
+    {
+        $titleKey = (string) ($item['title'] ?? '');
+        $link = (string) ($item['link'] ?? '');
+        if ($titleKey === 'SEO Checklist' || strpos($link, 'seo-checklist') !== false) {
+            return SeoChecklistUserPreference::moduleTitleFor((int) Auth::id());
+        }
+
+        return __($titleKey);
     }
 }

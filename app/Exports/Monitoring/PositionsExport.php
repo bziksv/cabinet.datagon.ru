@@ -142,10 +142,31 @@ class PositionsExport implements FromView, WithDefaultStyles, WithEvents, WithSt
                     }
                     $this->data['data'][$ek][$fk] = $col;
                 } else {
-                    $this->data['data'][$ek][$fk] = trim(strip_tags($field));
+                    $this->data['data'][$ek][$fk] = $this->plainCellText($fk, $field);
                 }
             }
         }
+    }
+
+    /**
+     * HTML ячейки «Запрос» содержит иконку целевого URL; strip_tags иначе оставляет «Целевой URL».
+     */
+    private function plainCellText($key, $field): string
+    {
+        if (!is_string($field)) {
+            return is_scalar($field) ? (string) $field : '';
+        }
+
+        if ($key === 'query' && preg_match('/class="query-string"[^>]*>\s*(.*?)\s*</su', $field, $m)) {
+            return html_entity_decode(trim($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
+
+        $text = trim(strip_tags($field));
+        if ($key === 'query') {
+            $text = preg_replace('/\s*(?:Целевой URL|Target URL)\s*$/u', '', $text) ?? $text;
+        }
+
+        return trim($text);
     }
 
     private function formatPosition(string $field): array

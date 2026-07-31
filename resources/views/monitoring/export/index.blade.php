@@ -18,9 +18,17 @@
             </tr>
         </thead>
         <tbody>
+            @php $wordNum = 0; @endphp
             @foreach($data['data'] as $ek => $query)
+                @php
+                    // Итоговые строки финансового отчёта — без №, нумеруем только запросы.
+                    $isWordRow = is_object($query) && (
+                        (method_exists($query, 'has') && $query->has('query'))
+                        || (isset($query['query']))
+                    );
+                @endphp
                 <tr>
-                    <td>{{ $loop->iteration }}</td>
+                    <td>{{ $isWordRow ? (++$wordNum) : '' }}</td>
                     @foreach($query as $fk => $field)
                         @if(is_array($field))
                             <td style="background-color: {{ $field['color'] }}">

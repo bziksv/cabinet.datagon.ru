@@ -45,34 +45,11 @@ class AttributeExport
     protected function setTotalSum($budget)
     {
         $total = $this->collection['data']->pluck('mastered')->sum();
-        $columnKeys = $this->collection['columns']->keys()->values();
+        $count = $this->collection['columns']->count();
 
-        if ($columnKeys->isEmpty()) {
-            return;
-        }
-
-        $labelKey = $columnKeys->first();
-        $valueKey = $this->collection['columns']->has('mastered')
-            ? 'mastered'
-            : $columnKeys->last();
-
-        $this->collection['data']->push($this->summaryRow($columnKeys, $labelKey, $valueKey, 'Выведено фраз на сумму:', $total));
-        $this->collection['data']->push($this->summaryRow($columnKeys, $labelKey, $valueKey, 'Максимальный бюджет:', $budget));
-    }
-
-    /**
-     * @param \Illuminate\Support\Collection $columnKeys
-     * @param mixed $value
-     */
-    private function summaryRow($columnKeys, string $labelKey, string $valueKey, string $label, $value): Collection
-    {
-        $row = $columnKeys->mapWithKeys(static function ($key) {
-            return [$key => ''];
-        });
-        $row[$labelKey] = $label;
-        $row[$valueKey] = $value;
-
-        return $row;
+        // Итоги — в конце таблицы (pad слева), не в колонке «Запрос».
+        $this->collection['data']->push(collect(['Выведено фраз на сумму:', $total])->pad(-$count, ''));
+        $this->collection['data']->push(collect(['Максимальный бюджет:', $budget])->pad(-$count, ''));
     }
 
     protected function url()

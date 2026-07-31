@@ -65,6 +65,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/', 'HomeController@index')->name('home');
     Route::get('/home/variant-2', 'HomeController@variant2')->name('home.variant2');
     Route::get('/home/variant-3', 'HomeController@variant3')->name('home.variant3');
+    Route::get('/home/variant-4', 'HomeController@variant4')->name('home.variant4');
+    Route::post('/home/sites/archive', 'HomeController@archiveUserSite')->name('home.sites.archive');
+    Route::post('/home/sites/hide', 'HomeController@hideUserSite')->name('home.sites.hide');
+    Route::post('/home/sites/restore', 'HomeController@restoreUserSite')->name('home.sites.restore');
+
+    Route::get('/yandex-metrika/connect', 'YandexMetrikaController@connect')->name('yandex-metrika.connect');
+    Route::get('/yandex-metrika/callback', 'YandexMetrikaController@callback')->name('yandex-metrika.callback');
+    Route::get('/yandex-metrika/status', 'YandexMetrikaController@status')->name('yandex-metrika.status');
+    Route::get('/yandex-metrika/counters', 'YandexMetrikaController@counters')->name('yandex-metrika.counters');
+    Route::get('/yandex-metrika/binding', 'YandexMetrikaController@binding')->name('yandex-metrika.binding');
+    Route::post('/yandex-metrika/bind', 'YandexMetrikaController@bind')->name('yandex-metrika.bind');
+    Route::post('/yandex-metrika/unbind', 'YandexMetrikaController@unbind')->name('yandex-metrika.unbind');
+    Route::post('/yandex-metrika/disconnect', 'YandexMetrikaController@disconnect')->name('yandex-metrika.disconnect');
 
     Route::resource('main-projects', 'MainProjectsController');
     Route::get('/main-projects/statistics/{project}', 'MainProjectsController@statistics')->name('main-projects.statistics');
@@ -247,6 +260,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('site-audit/crawl/{id}/ignore/restore', 'SiteAuditController@restoreIgnore')->name('pages.site-audit.ignore.restore')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/note', 'SiteAuditController@saveFindingNote')->name('pages.site-audit.note')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/note/clear', 'SiteAuditController@clearFindingNote')->name('pages.site-audit.note.clear')->middleware('permission:Site audit');
+
+    Route::get('seo-checklist', 'SeoChecklistController@index')->name('pages.seo-checklist')->middleware('permission:SEO Checklist');
+    Route::post('seo-checklist', 'SeoChecklistController@store')->name('pages.seo-checklist.store')->middleware('permission:SEO Checklist');
+    Route::get('seo-checklist/{id}', 'SeoChecklistController@show')->name('pages.seo-checklist.show')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
+    Route::post('seo-checklist/{id}/archive', 'SeoChecklistController@archive')->name('pages.seo-checklist.archive')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
+    Route::post('seo-checklist/{id}/items/{itemId}/status', 'SeoChecklistController@updateItemStatus')->name('pages.seo-checklist.item.status')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
+    Route::post('seo-checklist/{id}/items/{itemId}/notes', 'SeoChecklistController@addNote')->name('pages.seo-checklist.item.notes')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
+    Route::post('seo-checklist/{id}/items/{itemId}/subtasks', 'SeoChecklistController@addSubtask')->name('pages.seo-checklist.item.subtasks')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
 
     Route::get('search-suggestions', 'SearchSuggestionsController@index')->name('pages.search-suggestions')->middleware('permission:Search suggestions');
     Route::post('search-suggestions/collect', 'SearchSuggestionsController@collect')->name('pages.search-suggestions.collect')->middleware('permission:Search suggestions');

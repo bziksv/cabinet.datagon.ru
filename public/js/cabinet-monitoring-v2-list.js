@@ -840,6 +840,12 @@
             if (u && u.name) {
                 parts.push(u.name);
             }
+            if (u && u.status_name) {
+                parts.push(u.status_name);
+            }
+            if (u && u.status_code) {
+                parts.push(u.status_code);
+            }
             if (u && u.role_title) {
                 parts.push(u.role_title);
             }
@@ -1027,6 +1033,43 @@
         return s;
     }
 
+    function userMembershipLabel(u) {
+        const statusName = (u && u.status_name) || '';
+        const statusCode = (u && u.status_code) || '';
+        if (statusName && statusCode && statusCode !== 'EMPTY') {
+            return statusName;
+        }
+        if (statusName) {
+            return statusName;
+        }
+        if (u && u.role_title) {
+            return u.role_title;
+        }
+        return '';
+    }
+
+    function userStatusBadge(u) {
+        const code = ((u && u.status_code) || '').toUpperCase();
+        if (!code || code === 'EMPTY') {
+            return {
+                text: '—',
+                mod: 'empty',
+                title: userMembershipLabel(u) || '',
+            };
+        }
+        const short =
+            code === 'OWNER'
+                ? 'OWN'
+                : code === 'PROJECT_MANAGER' || code === 'PM'
+                  ? 'PM'
+                  : code;
+        return {
+            text: short,
+            mod: code.toLowerCase(),
+            title: userMembershipLabel(u) || code,
+        };
+    }
+
     function renderUsers(users) {
         if (!users || !users.length) {
             return '';
@@ -1037,9 +1080,12 @@
                     'list-inline-item position-relative' + (u.can_change_status ? ' change-user-status' : '');
                 const avatarClass =
                     'cabinet-mon-v2-avatar table-avatar img-circle' +
-                    (u.is_admin ? ' admin-monitoring' : '');
+                    (u.is_admin || u.is_project_admin ? ' admin-monitoring' : '');
                 const initials = escHtml(u.initials || '?');
                 const imgSrc = avatarImageSrc(u.image);
+                const membership = userMembershipLabel(u);
+                const tip = membership ? u.name + ' — ' + membership : u.name;
+                const badge = userStatusBadge(u);
                 let html =
                     '<li class="' +
                     liClass +
@@ -1048,9 +1094,14 @@
                     '" project-id="' +
                     u.project_id +
                     '" data-bs-toggle="tooltip" title="' +
-                    escHtml(u.name + ' — ' + (u.role_title || '')) +
+                    escHtml(tip) +
                     '">';
-                html += '<span class="' + avatarClass + '" role="img" aria-label="' + escHtml(u.name) + '">';
+                html +=
+                    '<span class="' +
+                    avatarClass +
+                    '" role="img" aria-label="' +
+                    escHtml(tip) +
+                    '">';
                 html += '<span class="cabinet-mon-v2-avatar__initials">' + initials + '</span>';
                 if (imgSrc) {
                     html +=
@@ -1059,6 +1110,14 @@
                         '" alt="" loading="lazy" decoding="async">';
                 }
                 html += '</span>';
+                html +=
+                    '<span class="cabinet-mon-v2-user-status cabinet-mon-v2-user-status--' +
+                    escHtml(badge.mod) +
+                    '" title="' +
+                    escHtml(badge.title) +
+                    '">' +
+                    escHtml(badge.text) +
+                    '</span>';
                 if (u.can_detach) {
                     html +=
                         '<span class="badge badge-secondary navbar-badge detach-user" data-id="' +

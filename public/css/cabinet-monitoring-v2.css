@@ -1395,6 +1395,57 @@ button.cabinet-mon-v2-favicon-btn {
     visibility: hidden;
 }
 
+.cabinet-mon-v2-page .user-list > .list-inline-item,
+.cabinet-mon-v2-card__users .user-list > .list-inline-item {
+    margin-right: 0.55rem;
+    margin-bottom: 0.35rem;
+    padding-bottom: 0.7rem;
+}
+
+.cabinet-mon-v2-user-status {
+    position: absolute;
+    left: 50%;
+    bottom: -0.15rem;
+    transform: translateX(-50%);
+    z-index: 2;
+    min-width: 1.55rem;
+    padding: 0.05rem 0.28rem;
+    border-radius: 0.35rem;
+    background: #334155;
+    color: #fff;
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap;
+    box-shadow: 0 0 0 1px #fff;
+    pointer-events: none;
+}
+
+.cabinet-mon-v2-user-status--owner {
+    background: #0f766e;
+}
+
+.cabinet-mon-v2-user-status--tl {
+    background: #1d4ed8;
+}
+
+.cabinet-mon-v2-user-status--pm {
+    background: #7c3aed;
+}
+
+.cabinet-mon-v2-user-status--seo {
+    background: #c2410c;
+}
+
+.cabinet-mon-v2-user-status--empty {
+    background: #94a3b8;
+    min-width: 0.9rem;
+    padding-left: 0.2rem;
+    padding-right: 0.2rem;
+}
+
 .cabinet-mon-v2-engines {
     display: inline-flex;
     flex-wrap: wrap;

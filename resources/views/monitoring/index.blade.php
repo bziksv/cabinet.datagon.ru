@@ -92,6 +92,45 @@
                 border-color: #138496;
             }
 
+            .projects .user-list > .list-inline-item {
+                position: relative;
+                margin-right: 0.55rem;
+                margin-bottom: 0.45rem;
+                padding-bottom: 0.75rem;
+            }
+
+            .cabinet-mon-user-status-badge {
+                position: absolute;
+                left: 50%;
+                bottom: -0.1rem;
+                transform: translateX(-50%);
+                z-index: 2;
+                min-width: 1.55rem;
+                padding: 0.05rem 0.28rem;
+                border-radius: 0.35rem;
+                background: #334155;
+                color: #fff;
+                font-size: 0.55rem;
+                font-weight: 700;
+                letter-spacing: 0.02em;
+                line-height: 1.2;
+                text-align: center;
+                white-space: nowrap;
+                box-shadow: 0 0 0 1px #fff;
+                pointer-events: none;
+            }
+
+            .cabinet-mon-user-status-badge--owner { background: #0f766e; }
+            .cabinet-mon-user-status-badge--tl { background: #1d4ed8; }
+            .cabinet-mon-user-status-badge--pm { background: #7c3aed; }
+            .cabinet-mon-user-status-badge--seo { background: #c2410c; }
+            .cabinet-mon-user-status-badge--empty {
+                background: #94a3b8;
+                min-width: 0.9rem;
+                padding-left: 0.2rem;
+                padding-right: 0.2rem;
+            }
+
             .cabinet-mon-v2-child-chart-controls__row {
                 display: flex;
                 flex-wrap: wrap;

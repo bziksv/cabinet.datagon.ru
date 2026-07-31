@@ -304,7 +304,21 @@ class MonitoringKeywordsController extends Controller
         }
 
         if ($this->mode == 'finance') {
-            $mastered = new Mastered($collectionPositions);
+            $priceByKeyword = collect();
+            $engineID = $this->regions->pluck('id')->first();
+            if ($engineID && $keyword->relationLoaded('prices')) {
+                $priceRow = $keyword->prices->firstWhere('monitoring_searchengine_id', (int) $engineID)
+                    ?: $keyword->prices->first();
+                if ($priceRow) {
+                    $priceByKeyword->put((int) $keyword->id, $priceRow);
+                }
+            }
+            $mastered = new Mastered(
+                $collectionPositions instanceof \Illuminate\Support\Collection
+                    ? $collectionPositions->values()
+                    : collect($collectionPositions)->values(),
+                $priceByKeyword
+            );
         }
 
         $top1 = $top3 = $top5 = $top10 = $top20 = $top50 = $top100 = 0;

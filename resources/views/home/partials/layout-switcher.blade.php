@@ -14,4 +14,8 @@
        class="btn btn-sm {{ $activeVariant === 3 ? 'btn-primary' : 'btn-outline-secondary' }}">
         <i class="bi bi-app-indicator me-1"></i>{{ __('Layout hub') }}
     </a>
+    <a href="{{ route('home.variant4') }}"
+       class="btn btn-sm {{ $activeVariant === 4 ? 'btn-primary' : 'btn-outline-secondary' }}">
+        <i class="bi bi-columns-gap me-1"></i>{{ __('Layout cards v2') }}
+    </a>
 </div>

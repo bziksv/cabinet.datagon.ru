@@ -18,7 +18,7 @@ class MonitoringProjectListSerializer
     private const CACHE_TTL_SECONDS = 120;
 
     /** Смена схемы ответа — сброс старого кэша с пустыми снимками. */
-    private const CACHE_KEY_SUFFIX = 's18';
+    private const CACHE_KEY_SUFFIX = 's19';
 
     /** Фоновая догрузка метрик — отдельный endpoint, не в list. */
     /** Один проект за HTTP — иначе таймаут 90 с на тяжёлых ProjectData. */
@@ -410,6 +410,11 @@ class MonitoringProjectListSerializer
             $statusId = (int) ($member->pivot->status ?? 0);
             $status = $this->statusById->get($statusId);
             $role = $member->roles->first();
+            $statusCode = $status ? (string) $status->code : '';
+            $statusName = $status ? (string) $status->name : __('Without status');
+            if ($statusCode === '' || $statusCode === 'EMPTY') {
+                $statusName = __('Without status');
+            }
 
             return [
                 'id' => $member->id,
@@ -417,7 +422,9 @@ class MonitoringProjectListSerializer
                 'initials' => self::initials($member->name, $member->last_name),
                 'image' => $member->image,
                 'is_admin' => $role && $role->name === 'admin_monitoring',
-                'status_code' => $status ? $status->code : '',
+                'is_project_admin' => (int) ($member->pivot->admin ?? 0) >= 1,
+                'status_code' => $statusCode,
+                'status_name' => $statusName,
                 'role_title' => $role ? ($role->title ?? '') : '',
                 'can_detach' => $perms['detach_user'] && $member->id !== $authId,
                 'can_change_status' => $perms['change_status'],

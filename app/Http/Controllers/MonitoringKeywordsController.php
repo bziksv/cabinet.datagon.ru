@@ -304,21 +304,37 @@ class MonitoringKeywordsController extends Controller
         }
 
         if ($this->mode == 'finance') {
-            $priceByKeyword = collect();
+            $priceByKeyword = null;
             $engineID = $this->regions->pluck('id')->first();
-            if ($engineID && $keyword->relationLoaded('prices')) {
-                $priceRow = $keyword->prices->firstWhere('monitoring_searchengine_id', (int) $engineID)
-                    ?: $keyword->prices->first();
-                if ($priceRow) {
-                    $priceByKeyword->put((int) $keyword->id, $priceRow);
-                }
+            $priceRow = null;
+            if ($engineID) {
+                $prices = $keyword->relationLoaded('prices') ? $keyword->prices : $keyword->prices()->get();
+                $priceRow = $prices->firstWhere('monitoring_searchengine_id', (int) $engineID)
+                    ?: $prices->first();
             }
-            $mastered = new Mastered(
-                $collectionPositions instanceof \Illuminate\Support\Collection
-                    ? $collectionPositions->values()
-                    : collect($collectionPositions)->values(),
-                $priceByKeyword
-            );
+            if ($priceRow) {
+                $priceByKeyword = collect([(int) $keyword->id => $priceRow]);
+            }
+
+            $positionsForMastered = $collectionPositions instanceof \Illuminate\Support\Collection
+                ? $collectionPositions->values()
+                : collect($collectionPositions)->values();
+
+            // Подстраховка: на гидратированных позициях keyword_id мог не проставиться.
+            $positionsForMastered->each(function ($position) use ($keyword) {
+                if (!is_object($position)) {
+                    return;
+                }
+                if (empty($position->monitoring_keyword_id)) {
+                    $position->setAttribute('monitoring_keyword_id', (int) $keyword->id);
+                }
+                $position->query_id = (int) ($position->monitoring_keyword_id ?: $keyword->id);
+                if (empty($position->engine_id) && !empty($position->monitoring_searchengine_id)) {
+                    $position->engine_id = (int) $position->monitoring_searchengine_id;
+                }
+            });
+
+            $mastered = new Mastered($positionsForMastered, $priceByKeyword);
         }
 
         $top1 = $top3 = $top5 = $top10 = $top20 = $top50 = $top100 = 0;
@@ -890,13 +906,14 @@ class MonitoringKeywordsController extends Controller
         $this->queries->each(function ($keyword) use ($rows) {
             $items = ($rows->get($keyword->id) ?? collect())->map(function ($row) {
                 $model = new MonitoringPosition([
-                    'monitoring_keyword_id' => $row->monitoring_keyword_id,
                     'monitoring_searchengine_id' => $row->monitoring_searchengine_id,
                     'position' => $row->position,
                     'url' => $row->url,
                     'target' => $row->target,
                     'created_at' => $row->created_at,
                 ]);
+                // monitoring_keyword_id не в $fillable — иначе Mastered/«Освоено» всегда 0.
+                $model->setAttribute('monitoring_keyword_id', (int) $row->monitoring_keyword_id);
                 $model->id = (int) $row->id;
                 $model->exists = true;
                 $model->created_at = Carbon::parse($row->created_at);

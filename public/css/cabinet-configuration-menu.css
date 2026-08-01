@@ -167,6 +167,18 @@
     font-size: 0.9375rem;
 }
 
+.cabinet-menu-config-page .cabinet-menu-config-item--admin {
+    border-color: rgba(255, 193, 7, 0.45);
+    background: rgba(255, 193, 7, 0.06);
+}
+
+.cabinet-menu-config-page .cabinet-menu-config-item__admin-badge {
+    flex-shrink: 0;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
 .cabinet-menu-config-page .cabinet-menu-config-group__rename {
     display: none;
     gap: 0.35rem;

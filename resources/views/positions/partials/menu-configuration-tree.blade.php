@@ -62,17 +62,31 @@
                         @if($k === 'configurationInfo')
                             @continue
                         @endif
-                        <li class="moved-item" data-id="{{ $elem['id'] }}" data-name="{{ $elem['title'] }}">
+                        @php $elemAdminOnly = cabinet_menu_item_is_admin_only($elem['access'] ?? null); @endphp
+                        <li class="moved-item @if($elemAdminOnly) cabinet-menu-config-item--admin @endif"
+                            data-id="{{ $elem['id'] }}"
+                            data-name="{{ $elem['title'] }}">
                             <span class="handle ui-sortable-handle" aria-hidden="true"><i class="bi bi-grip-vertical"></i></span>
                             <span class="cabinet-menu-config-item__label">{{ __($elem['title']) }}</span>
+                            @if($elemAdminOnly)
+                                <span class="badge rounded-pill text-bg-warning cabinet-menu-config-item__admin-badge"
+                                      title="{{ __('Menu configuration admin only tip') }}">{{ __('Menu configuration admin only badge') }}</span>
+                            @endif
                         </li>
                     @endforeach
                 </ol>
             </li>
         @else
-            <li class="moved-item cabinet-menu-config-item--solo" data-id="{{ $item['id'] }}" data-name="{{ $item['title'] }}">
+            @php $itemAdminOnly = cabinet_menu_item_is_admin_only($item['access'] ?? null); @endphp
+            <li class="moved-item cabinet-menu-config-item--solo @if($itemAdminOnly) cabinet-menu-config-item--admin @endif"
+                data-id="{{ $item['id'] }}"
+                data-name="{{ $item['title'] }}">
                 <span class="handle ui-sortable-handle" aria-hidden="true"><i class="bi bi-grip-vertical"></i></span>
                 <span class="cabinet-menu-config-item__label">{{ __($item['title']) }}</span>
+                @if($itemAdminOnly)
+                    <span class="badge rounded-pill text-bg-warning cabinet-menu-config-item__admin-badge"
+                          title="{{ __('Menu configuration admin only tip') }}">{{ __('Menu configuration admin only badge') }}</span>
+                @endif
             </li>
         @endif
     @endforeach

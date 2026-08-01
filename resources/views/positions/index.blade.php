@@ -70,6 +70,7 @@
                                 <li>{{ __('Menu configuration tip drag') }}</li>
                                 <li>{{ __('Menu configuration tip eye') }}</li>
                                 <li>{{ __('Menu configuration tip chevron') }}</li>
+                                <li>{{ __('Menu configuration tip admin badge') }}</li>
                                 <li>{{ __('Menu configuration tip save') }}</li>
                                 <li>{{ __('Menu configuration tip sidebar refresh') }}</li>
                             </ul>

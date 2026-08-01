@@ -66,6 +66,35 @@ if (! function_exists('cabinet_skip_heavy_web')) {
     }
 }
 
+if (! function_exists('cabinet_menu_item_is_admin_only')) {
+    /**
+     * Пункт меню доступен только ролям admin / Super Admin (без пользовательских тарифов).
+     *
+     * @param  array<int, string>|string|null  $access
+     */
+    function cabinet_menu_item_is_admin_only($access): bool
+    {
+        if (is_string($access)) {
+            $decoded = json_decode($access, true);
+            $access = is_array($decoded) ? $decoded : [];
+        }
+
+        if (! is_array($access) || $access === []) {
+            return false;
+        }
+
+        $adminRoles = ['admin', 'Super Admin'];
+
+        foreach ($access as $role) {
+            if (! in_array((string) $role, $adminRoles, true)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+
 if (! function_exists('localize_cabinet_url')) {
     /**
      * Ссылки main_projects в БД часто абсолютные на lk.redbox.su (общая БД с legacy).

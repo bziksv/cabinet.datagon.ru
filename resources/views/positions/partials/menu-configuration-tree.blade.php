@@ -1,6 +1,8 @@
 @php
     use App\Support\MenuConfigurationDomId;
+    use App\User;
     $emptyHint = $emptyHint ?? __('Drag modules here or create a group');
+    $showAdminMarks = User::isUserAdmin();
 @endphp
 
 <ol class="nested_with_switch vertical cabinet-menu-config-tree" id="cabinetMenuConfigTree">
@@ -62,7 +64,7 @@
                         @if($k === 'configurationInfo')
                             @continue
                         @endif
-                        @php $elemAdminOnly = cabinet_menu_item_is_admin_only($elem['access'] ?? null); @endphp
+                        @php $elemAdminOnly = $showAdminMarks && cabinet_menu_item_is_admin_only($elem['access'] ?? null); @endphp
                         <li class="moved-item @if($elemAdminOnly) cabinet-menu-config-item--admin @endif"
                             data-id="{{ $elem['id'] }}"
                             data-name="{{ $elem['title'] }}">
@@ -77,7 +79,7 @@
                 </ol>
             </li>
         @else
-            @php $itemAdminOnly = cabinet_menu_item_is_admin_only($item['access'] ?? null); @endphp
+            @php $itemAdminOnly = $showAdminMarks && cabinet_menu_item_is_admin_only($item['access'] ?? null); @endphp
             <li class="moved-item cabinet-menu-config-item--solo @if($itemAdminOnly) cabinet-menu-config-item--admin @endif"
                 data-id="{{ $item['id'] }}"
                 data-name="{{ $item['title'] }}">

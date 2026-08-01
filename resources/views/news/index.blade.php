@@ -40,18 +40,20 @@
                                 </small>
                             </div>
                             @if($item->user_id === \Illuminate\Support\Facades\Auth::id() || $admin)
-                                <div class="btn-group btn-group-sm flex-shrink-0">
+                                <div class="cabinet-news-post__actions flex-shrink-0" role="group" aria-label="{{ __('Actions') }}">
                                     <a href="{{ route('edit.news', $item->id) }}"
-                                       class="btn btn-outline-secondary btn-sm"
+                                       class="btn btn-sm cabinet-news-post__action"
                                        title="{{ __('Edit') }}">
-                                        <i class="fa fa-edit"></i>
+                                        <i class="bi bi-pencil" aria-hidden="true"></i>
+                                        <span class="visually-hidden">{{ __('Edit') }}</span>
                                     </a>
                                     <button type="button"
-                                            class="btn btn-outline-secondary btn-sm"
+                                            class="btn btn-sm cabinet-news-post__action cabinet-news-post__action--danger"
                                             data-bs-toggle="modal"
                                             data-bs-target="#remove-news-{{ $item->id }}"
                                             title="{{ __('Remove') }}">
-                                        <i class="fas fa-times"></i>
+                                        <i class="bi bi-trash" aria-hidden="true"></i>
+                                        <span class="visually-hidden">{{ __('Remove') }}</span>
                                     </button>
                                 </div>
                             @endif

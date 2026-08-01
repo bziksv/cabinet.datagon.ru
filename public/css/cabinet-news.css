@@ -61,3 +61,40 @@
     color: var(--bs-danger) !important;
     border-color: var(--bs-danger) !important;
 }
+
+/* Как cabinet-mon-row-actions в мониторинге */
+.cabinet-news-post__actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.125rem;
+    opacity: 0.55;
+    transition: opacity 0.12s ease;
+}
+
+.cabinet-news-post:hover .cabinet-news-post__actions,
+.cabinet-news-post__actions:focus-within {
+    opacity: 1;
+}
+
+.cabinet-news-post__action {
+    padding: 0.1rem 0.3rem;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    box-shadow: none;
+    line-height: 1;
+    font-size: 0.75rem;
+}
+
+.cabinet-news-post__action:hover,
+.cabinet-news-post__action:focus {
+    color: #475569;
+    background: #e2e8f0;
+    box-shadow: none;
+}
+
+.cabinet-news-post__action--danger:hover,
+.cabinet-news-post__action--danger:focus {
+    color: #b91c1c;
+    background: #fee2e2;
+}

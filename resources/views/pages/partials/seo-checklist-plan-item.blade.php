@@ -59,16 +59,16 @@
                         aria-label="{{ __('Status') }}">
                     @foreach($statusLabels as $value => $label)
                         @php
-                            $disableDone = $value === 'done' && (
-                                ($item->status === 'review' && !$canApprove)
-                                || ($item->status !== 'review' && !$canManage)
-                            );
+                            $hideClosed = in_array($value, ['done', 'skip'], true)
+                                && !$canApprove
+                                && $item->status !== $value;
                         @endphp
-                        <option value="{{ $value }}"
-                                @if($item->status === $value) selected @endif
-                                @if($disableDone) disabled @endif>
-                            {{ $label }}
-                        </option>
+                        @if(!$hideClosed)
+                            <option value="{{ $value }}"
+                                    @if($item->status === $value) selected @endif>
+                                {{ $label }}
+                            </option>
+                        @endif
                     @endforeach
                 </select>
             @endif

@@ -53,7 +53,7 @@
             @if(!empty($seoChecklistNavVisible))
                 <li class="nav-item d-none d-md-block">
                     <a class="nav-link @if(request()->routeIs('pages.seo-checklist*')) active @endif"
-                       href="{{ route('pages.seo-checklist.chronicle') }}"
+                       href="{{ route('pages.seo-checklist.chronicle', ['view' => 'unread']) }}"
                        title="{{ $seoChecklistModuleTitle ?? __('SEO Checklist') }}">
                         <i class="bi bi-clipboard-check me-1" aria-hidden="true"></i>
                         {{ $seoChecklistModuleTitle ?? __('SEO Checklist') }}

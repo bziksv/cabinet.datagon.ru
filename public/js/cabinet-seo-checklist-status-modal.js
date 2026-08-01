@@ -34,7 +34,16 @@
         return checked ? checked.value : null;
     }
 
+    function syncSelectionUi() {
+        if (!listEl) return;
+        listEl.querySelectorAll('.cabinet-sc-status-modal__option').forEach(function (opt) {
+            var input = opt.querySelector('input');
+            opt.classList.toggle('is-selected', !!(input && input.checked));
+        });
+    }
+
     function syncNoteVisibility() {
+        syncSelectionUi();
         if (!noteWrap) return;
         var value = selectedValue();
         var need = !!(value && commentStatuses[value]);
@@ -68,22 +77,44 @@
         listEl.innerHTML = '';
         options.forEach(function (opt, idx) {
             var id = 'scStatusPick_' + idx;
+            var value = String(opt.value || '');
             var label = document.createElement('label');
-            label.className = 'cabinet-sc-status-modal__option';
+            label.className = 'cabinet-sc-status-modal__option cabinet-sc-status-modal__option--' + value;
             label.setAttribute('for', id);
+            label.setAttribute('data-status', value);
+
             var input = document.createElement('input');
             input.type = 'radio';
             input.name = 'scStatusPick';
             input.id = id;
-            input.value = opt.value;
+            input.value = value;
             if (opt.value === defaultValue || (!defaultValue && idx === 0)) {
                 input.checked = true;
             }
             input.addEventListener('change', syncNoteVisibility);
-            var span = document.createElement('span');
-            span.textContent = opt.label;
+
+            var mark = document.createElement('span');
+            mark.className = 'cabinet-sc-status-modal__radio';
+            mark.setAttribute('aria-hidden', 'true');
+
+            var text = document.createElement('span');
+            text.className = 'cabinet-sc-status-modal__text';
+
+            var title = document.createElement('span');
+            title.className = 'cabinet-sc-status-modal__name';
+            title.textContent = opt.label;
+
+            text.appendChild(title);
+            if (opt.hint) {
+                var hint = document.createElement('span');
+                hint.className = 'cabinet-sc-status-modal__hint';
+                hint.textContent = opt.hint;
+                text.appendChild(hint);
+            }
+
             label.appendChild(input);
-            label.appendChild(span);
+            label.appendChild(mark);
+            label.appendChild(text);
             listEl.appendChild(label);
         });
         syncNoteVisibility();

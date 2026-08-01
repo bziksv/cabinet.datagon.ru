@@ -1,5 +1,6 @@
 @component('component.card', [
     'title' => \App\SeoChecklist\SeoChecklistUserPreference::moduleTitleFor(auth()->id()),
+    'documentTitle' => cabinet_sc_document_title(__('Projects')),
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">

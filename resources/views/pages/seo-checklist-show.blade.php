@@ -1,5 +1,6 @@
 @component('component.card', [
     'title' => \App\SeoChecklist\SeoChecklistUserPreference::moduleTitleFor(auth()->id()),
+    'documentTitle' => cabinet_sc_document_title($project->domain ?: ($project->title ?: __('Projects'))),
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('css/cabinet-seo-checklist.css') }}?v={{ @filemtime(public_path('css/cabinet-seo-checklist.css')) ?: time() }}">
@@ -53,6 +54,18 @@
          data-i18n-timer-start-short="{{ e(__('Timer start')) }}"
          data-i18n-timer-stop-short="{{ e(__('Timer stop')) }}">
 
+        @include('pages.partials.seo-checklist-nav', [
+            'scTab' => 'project',
+            'scContextProject' => $project,
+            'scMyTasksCount' => $myTasksCount ?? null,
+            'scReviewCount' => $reviewCount ?? null,
+            'scShowReviewTab' => $showReviewTab ?? false,
+            'scUnreadNotesCount' => $unreadNotesCount ?? null,
+            'scProjectsCount' => $projectsCount ?? null,
+            'scTeamCount' => $teamCount ?? null,
+            'scTemplatesCount' => $templatesCount ?? null,
+        ])
+
         @if(session('success'))
             <div class="alert alert-success py-2 px-3 small">{{ session('success') }}</div>
         @endif
@@ -62,7 +75,6 @@
 
         <div class="cabinet-sc-show-head">
             <div>
-                <a href="{{ route('pages.seo-checklist') }}" class="cabinet-sc-back small">← {{ __('All checklists') }}</a>
                 <h1 class="cabinet-sc-hero__title mb-1">
                     <a href="https://{{ $project->domain }}" target="_blank" rel="noopener noreferrer" class="cabinet-sc-domain-link">
                         {{ $project->title ?: $project->domain }}
@@ -418,14 +430,15 @@
                                         <select class="form-select form-select-sm" data-sc-status aria-label="{{ __('Status') }}">
                                             @foreach($statusLabels as $value => $label)
                                                 @php
-                                                    $disableDone = $value === 'done' && (
-                                                        ($item->status === 'review' && empty($canApproveReview))
-                                                        || ($item->status !== 'review' && empty($canManage))
-                                                    );
+                                                    // done/skip — только PM/аудитор (или уже закрытая задача, чтобы статус был виден)
+                                                    $hideClosed = in_array($value, ['done', 'skip'], true)
+                                                        && empty($canApproveReview)
+                                                        && $item->status !== $value;
                                                 @endphp
-                                                <option value="{{ $value }}"
-                                                        @if($item->status === $value) selected @endif
-                                                        @if($disableDone) disabled @endif>{{ $label }}</option>
+                                                @if(!$hideClosed)
+                                                    <option value="{{ $value }}"
+                                                            @if($item->status === $value) selected @endif>{{ $label }}</option>
+                                                @endif
                                             @endforeach
                                         </select>
                                         <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-toggle-notes title="{{ __('Notes') }}">

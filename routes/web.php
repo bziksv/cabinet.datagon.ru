@@ -269,6 +269,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('seo-checklist/chronicle/read', 'SeoChecklistController@markChronicleNotesRead')->name('pages.seo-checklist.chronicle.read')->middleware('permission:SEO Checklist');
     Route::post('seo-checklist/module-title', 'SeoChecklistController@updateModuleTitle')->name('pages.seo-checklist.module-title')->middleware('permission:SEO Checklist');
     Route::get('seo-checklist/time', 'SeoChecklistController@timesheet')->name('pages.seo-checklist.timesheet')->middleware('permission:SEO Checklist');
+    Route::get('seo-checklist/time/export', 'SeoChecklistController@timesheetExport')->name('pages.seo-checklist.timesheet.export')->middleware('permission:SEO Checklist');
     Route::get('seo-checklist/team', 'SeoChecklistController@team')->name('pages.seo-checklist.team')->middleware('permission:SEO Checklist');
     Route::post('seo-checklist/teams', 'SeoChecklistController@storeTeam')->name('pages.seo-checklist.teams.store')->middleware('permission:SEO Checklist');
     Route::post('seo-checklist/teams/{teamId}', 'SeoChecklistController@updateTeamMeta')->name('pages.seo-checklist.teams.update')->middleware('permission:SEO Checklist')->where('teamId', '[0-9]+');

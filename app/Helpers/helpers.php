@@ -170,6 +170,27 @@ if (! function_exists('cabinet_page_title')) {
     }
 }
 
+if (! function_exists('cabinet_sc_document_title')) {
+    /**
+     * Title SEO-чеклиста: «Хроника — Чек лист» (+ бренд добавит cabinet_page_title).
+     *
+     * @param  string|null  $section  Подраздел (Хроника, Проекты, домен проекта…)
+     * @param  int|null  $userId
+     */
+    function cabinet_sc_document_title(?string $section = null, ?int $userId = null): string
+    {
+        $module = \App\SeoChecklist\SeoChecklistUserPreference::moduleTitleFor(
+            $userId ?? (auth()->check() ? (int) auth()->id() : null)
+        );
+        $section = trim((string) $section);
+        if ($section === '') {
+            return $module;
+        }
+
+        return $section . ' — ' . $module;
+    }
+}
+
 if (! function_exists('db_admin_date_column_label')) {
     /**
      * Человекочитаемая подпись колонки даты на /admin/database.

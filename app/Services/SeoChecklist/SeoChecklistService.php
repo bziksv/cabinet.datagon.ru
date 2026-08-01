@@ -2053,11 +2053,12 @@ class SeoChecklistService
             return ['ok' => false, 'message' => __('Project not found')];
         }
 
-        if ($status === 'done') {
-            if ($from !== 'review' && !$this->canManageProject($project, $userId)) {
+        if ($status === 'done' || $status === 'skip') {
+            // Закрытие задачи — только PM/аудитор и только из «На проверку»
+            if ($from !== 'review') {
                 return ['ok' => false, 'message' => __('Send to review first')];
             }
-            if ($from === 'review' && !$this->canApproveReview($project, $userId)) {
+            if (!$this->canApproveReview($project, $userId)) {
                 return ['ok' => false, 'message' => __('Only PM or auditor can approve')];
             }
         }
@@ -2238,13 +2239,28 @@ class SeoChecklistService
      * @param  array<int, int>|int|null  $projectFilter  один id, список id или null
      * @param  array<int, int>|int|null  $authorFilter
      */
+    /**
+     * Хроника.
+     *
+     * @param  bool|string  $presetOrUnread  true/false (legacy unreadOnly) или preset: unread|notes|all
+     * @return array{items:\Illuminate\Support\Collection,unread_notes:\Illuminate\Support\Collection,unread_count:int,preset:string}
+     */
     public function chronicleForUser(
         int $userId,
         $projectFilter = null,
         $authorFilter = null,
-        bool $unreadOnly = false,
+        $presetOrUnread = 'all',
         int $limit = 80
     ): array {
+        if (is_bool($presetOrUnread)) {
+            $preset = $presetOrUnread ? 'unread' : 'all';
+        } else {
+            $preset = (string) $presetOrUnread;
+        }
+        if (!in_array($preset, ['unread', 'notes', 'all'], true)) {
+            $preset = 'all';
+        }
+
         $projectIds = $this->accessibleProjectsQuery($userId)
             ->where('status', 'active')
             ->pluck('id');
@@ -2257,6 +2273,7 @@ class SeoChecklistService
             'items' => collect(),
             'unread_notes' => collect(),
             'unread_count' => 0,
+            'preset' => $preset,
         ];
         if ($projectIds->isEmpty()) {
             return $empty;
@@ -2285,11 +2302,12 @@ class SeoChecklistService
             $unreadNotes = $noteQuery->limit(60)->get();
         }
 
-        if ($unreadOnly) {
+        if ($preset === 'unread') {
             return [
                 'items' => collect(),
                 'unread_notes' => $unreadNotes,
                 'unread_count' => $unreadCount,
+                'preset' => $preset,
             ];
         }
 
@@ -2302,6 +2320,10 @@ class SeoChecklistService
             if ($authorIds !== []) {
                 $logQuery->whereIn('user_id', $authorIds);
             }
+            // «Заметки» — без мусора по сменам статусов
+            if ($preset === 'notes') {
+                $logQuery->where('type', 'note');
+            }
             $items = $logQuery->limit($limit)->get();
         }
 
@@ -2309,6 +2331,7 @@ class SeoChecklistService
             'items' => $items,
             'unread_notes' => $unreadNotes,
             'unread_count' => $unreadCount,
+            'preset' => $preset,
         ];
     }
 
@@ -2671,14 +2694,108 @@ class SeoChecklistService
     /**
      * @param  array<int, int>|int|null  $projectFilter
      */
-    public function timesheetForUser(int $userId, ?string $from = null, ?string $to = null, $projectFilter = null): array
+    /**
+     * Может ли смотреть чужой учёт (PM/аудитор/менеджер хотя бы одного проекта).
+     */
+    public function canViewTeamTimesheet(int $userId): bool
     {
-        $empty = ['days' => [], 'total' => 0];
-        if ($userId < 1 || !Schema::hasTable('seo_checklist_item_time_logs')) {
+        if ($userId < 1) {
+            return false;
+        }
+        $projects = $this->accessibleProjectsQuery($userId)
+            ->where('status', 'active')
+            ->get(['id', 'user_id', 'owner_user_id', 'pm_user_id', 'team_id']);
+        foreach ($projects as $project) {
+            if ($this->canManageProject($project, $userId) || $this->canApproveReview($project, $userId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Авторы с логами на проектах, где viewer — менеджер/PM/аудитор.
+     *
+     * @return \Illuminate\Support\Collection<int, User>
+     */
+    public function timesheetAuthorOptions(int $viewerId)
+    {
+        if (!$this->canViewTeamTimesheet($viewerId) || !Schema::hasTable('seo_checklist_item_time_logs')) {
+            return collect();
+        }
+
+        $managedIds = [];
+        $projects = $this->accessibleProjectsQuery($viewerId)
+            ->where('status', 'active')
+            ->get(['id', 'user_id', 'owner_user_id', 'pm_user_id', 'team_id']);
+        foreach ($projects as $project) {
+            if ($this->canManageProject($project, $viewerId) || $this->canApproveReview($project, $viewerId)) {
+                $managedIds[] = (int) $project->id;
+            }
+        }
+        if ($managedIds === []) {
+            return collect();
+        }
+
+        $userIds = SeoChecklistItemTimeLog::query()
+            ->whereHas('item', function ($q) use ($managedIds) {
+                $q->whereIn('project_id', $managedIds)->whereNull('parent_id');
+            })
+            ->distinct()
+            ->pluck('user_id')
+            ->filter()
+            ->unique()
+            ->values();
+        if ($userIds->isEmpty()) {
+            return collect();
+        }
+
+        return User::query()
+            ->whereIn('id', $userIds->all())
+            ->orderBy('name')
+            ->orderBy('email')
+            ->get(['id', 'name', 'email', 'last_name']);
+    }
+
+    /**
+     * Учёт времени: дни/задачи, сводка, график, % и активный таймер.
+     *
+     * @param  array<int, int>|int|string|null  $projectFilter
+     * @param  array<int, int>|int|string|null  $userFilter
+     * @return array<string, mixed>
+     */
+    public function timesheetForUser(
+        int $viewerId,
+        ?string $from = null,
+        ?string $to = null,
+        $projectFilter = null,
+        string $groupBy = 'day',
+        $userFilter = null
+    ): array {
+        $groupBy = $groupBy === 'task' ? 'task' : 'day';
+        $empty = [
+            'group_by' => $groupBy,
+            'days' => [],
+            'tasks' => [],
+            'total' => 0,
+            'summary' => [
+                'total' => 0,
+                'formatted_total' => self::formatDuration(0),
+                'days_count' => 0,
+                'avg_per_day' => 0,
+                'formatted_avg' => self::formatDuration(0),
+                'top_tasks' => [],
+            ],
+            'chart' => [],
+            'active_item_id' => null,
+            'show_user' => false,
+        ];
+        if ($viewerId < 1 || !Schema::hasTable('seo_checklist_item_time_logs')) {
             return $empty;
         }
 
-        $projectIds = $this->accessibleProjectsQuery($userId)
+        $projectIds = $this->accessibleProjectsQuery($viewerId)
             ->where('status', 'active')
             ->pluck('id');
         $filterProjects = $this->normalizeIdList($projectFilter);
@@ -2689,22 +2806,89 @@ class SeoChecklistService
             return $empty;
         }
 
+        $canTeam = $this->canViewTeamTimesheet($viewerId);
+        $filterUsers = $this->normalizeIdList($userFilter);
+        if (!$canTeam) {
+            $filterUsers = [$viewerId];
+        } elseif ($filterUsers === []) {
+            $filterUsers = [$viewerId];
+        } else {
+            $allowedAuthors = $this->timesheetAuthorOptions($viewerId)->pluck('id')->map(static function ($id) {
+                return (int) $id;
+            })->all();
+            $allowedAuthors[] = $viewerId;
+            $filterUsers = array_values(array_intersect($filterUsers, array_values(array_unique($allowedAuthors))));
+            if ($filterUsers === []) {
+                $filterUsers = [$viewerId];
+            }
+        }
+        $showUser = count($filterUsers) > 1 || ($canTeam && !(count($filterUsers) === 1 && (int) $filterUsers[0] === $viewerId));
+
         $fromDate = $from ? \Carbon\Carbon::parse($from)->startOfDay() : now()->subDays(30)->startOfDay();
         $toDate = $to ? \Carbon\Carbon::parse($to)->endOfDay() : now()->endOfDay();
 
         $logs = SeoChecklistItemTimeLog::query()
-            ->where('user_id', $userId)
+            ->whereIn('user_id', $filterUsers)
             ->whereNotNull('ended_at')
             ->whereBetween('started_at', [$fromDate, $toDate])
             ->whereHas('item', function ($q) use ($projectIds) {
                 $q->whereIn('project_id', $projectIds->all())->whereNull('parent_id');
             })
-            ->with(['item:id,title,project_id', 'item.project:id,domain,title'])
+            ->with([
+                'user:id,name,email,last_name',
+                'item:id,title,project_id',
+                'item.project:id,domain,title',
+            ])
             ->orderByDesc('started_at')
-            ->limit(2000)
+            ->limit(4000)
             ->get();
 
-        $byDay = [];
+        /** @var array<string, array<string, mixed>> $cells */
+        $cells = [];
+        $addCell = static function (
+            array &$cells,
+            int $logUserId,
+            string $userLabel,
+            ?int $itemId,
+            string $title,
+            string $domain,
+            ?int $projectId,
+            string $date,
+            int $seconds,
+            bool $isActive = false
+        ): void {
+            if ($seconds < 1 || $date === '') {
+                return;
+            }
+            $key = $logUserId . '|' . ($itemId ?: 0) . '|' . $date;
+            if (!isset($cells[$key])) {
+                $cells[$key] = [
+                    'user_id' => $logUserId,
+                    'user_label' => $userLabel,
+                    'item_id' => $itemId,
+                    'title' => $title,
+                    'domain' => $domain,
+                    'project_id' => $projectId,
+                    'date' => $date,
+                    'seconds' => 0,
+                    'is_active' => false,
+                ];
+            }
+            $cells[$key]['seconds'] += $seconds;
+            if ($isActive) {
+                $cells[$key]['is_active'] = true;
+            }
+        };
+
+        $userLabelOf = static function ($user, int $fallbackId): string {
+            if (!$user) {
+                return '#' . $fallbackId;
+            }
+            $name = trim((string) (($user->name ?? '') . ' ' . ($user->last_name ?? '')));
+
+            return $name !== '' ? $name : (string) ($user->email ?: ('#' . $fallbackId));
+        };
+
         foreach ($logs as $log) {
             $date = $log->work_date
                 ? $log->work_date->toDateString()
@@ -2712,30 +2896,33 @@ class SeoChecklistService
             if (!$date) {
                 continue;
             }
-            if (!isset($byDay[$date])) {
-                $byDay[$date] = ['seconds' => 0, 'entries' => []];
-            }
-            $seconds = max(0, (int) $log->duration_seconds);
-            $byDay[$date]['seconds'] += $seconds;
             $item = $log->item;
             $project = $item ? $item->project : null;
-            $key = ($item ? $item->id : 0) . ':' . $date;
-            if (!isset($byDay[$date]['entries'][$key])) {
-                $byDay[$date]['entries'][$key] = [
-                    'item_id' => $item ? $item->id : null,
-                    'title' => $item ? $item->title : '—',
-                    'domain' => $project ? $project->domain : '—',
-                    'project_id' => $project ? $project->id : null,
-                    'seconds' => 0,
-                ];
-            }
-            $byDay[$date]['entries'][$key]['seconds'] += $seconds;
+            $uid = (int) $log->user_id;
+            $addCell(
+                $cells,
+                $uid,
+                $userLabelOf($log->user, $uid),
+                $item ? (int) $item->id : null,
+                $item ? (string) $item->title : '—',
+                $project ? (string) $project->domain : '—',
+                $project ? (int) $project->id : null,
+                $date,
+                max(0, (int) $log->duration_seconds)
+            );
         }
 
-        // Текущий таймер
-        $active = $this->activeTimerForUser($userId);
-        if ($active && $active['item'] && $projectIds->contains((int) $active['item']->project_id)) {
+        $activeItemId = null;
+        foreach ($filterUsers as $uid) {
+            $active = $this->activeTimerForUser((int) $uid);
+            if (!$active || !$active['item'] || !$projectIds->contains((int) $active['item']->project_id)) {
+                continue;
+            }
+            if ((int) $uid === $viewerId) {
+                $activeItemId = (int) $active['item']->id;
+            }
             $start = $active['log']->started_at ?: now();
+            $user = $active['log']->relationLoaded('user') ? $active['log']->user : User::query()->find($uid);
             foreach ($this->splitTimeRangeByDay($start, now()) as $segment) {
                 $date = $segment['work_date'];
                 $dateCarbon = \Carbon\Carbon::parse($date);
@@ -2745,50 +2932,248 @@ class SeoChecklistService
                 if ($filterProjects !== [] && !in_array((int) $active['item']->project_id, $filterProjects, true)) {
                     continue;
                 }
-                if (!isset($byDay[$date])) {
-                    $byDay[$date] = ['seconds' => 0, 'entries' => []];
-                }
-                $seconds = (int) $segment['duration_seconds'];
-                $byDay[$date]['seconds'] += $seconds;
                 $item = $active['item'];
                 $project = $active['project'];
-                $key = $item->id . ':' . $date;
-                if (!isset($byDay[$date]['entries'][$key])) {
-                    $byDay[$date]['entries'][$key] = [
-                        'item_id' => $item->id,
-                        'title' => $item->title,
-                        'domain' => $project ? $project->domain : '—',
-                        'project_id' => $project ? $project->id : null,
-                        'seconds' => 0,
-                    ];
-                }
-                $byDay[$date]['entries'][$key]['seconds'] += $seconds;
+                $addCell(
+                    $cells,
+                    (int) $uid,
+                    $userLabelOf($user, (int) $uid),
+                    (int) $item->id,
+                    (string) $item->title,
+                    $project ? (string) $project->domain : '—',
+                    $project ? (int) $project->id : null,
+                    $date,
+                    (int) $segment['duration_seconds'],
+                    true
+                );
             }
         }
 
-        krsort($byDay);
-        $days = [];
         $total = 0;
-        foreach ($byDay as $date => $bucket) {
-            $total += (int) $bucket['seconds'];
+        foreach ($cells as $cell) {
+            $total += (int) $cell['seconds'];
+        }
+        $pctOf = static function (int $seconds) use ($total): float {
+            return $total > 0 ? round(100 * $seconds / $total, 1) : 0.0;
+        };
+
+        $byDayMap = [];
+        $byTaskMap = [];
+        foreach ($cells as $cell) {
+            $date = $cell['date'];
+            if (!isset($byDayMap[$date])) {
+                $byDayMap[$date] = ['seconds' => 0, 'entries' => []];
+            }
+            $byDayMap[$date]['seconds'] += (int) $cell['seconds'];
+            $dayEntryKey = $cell['user_id'] . ':' . ($cell['item_id'] ?: 0);
+            if (!isset($byDayMap[$date]['entries'][$dayEntryKey])) {
+                $byDayMap[$date]['entries'][$dayEntryKey] = [
+                    'user_id' => $cell['user_id'],
+                    'user_label' => $cell['user_label'],
+                    'item_id' => $cell['item_id'],
+                    'title' => $cell['title'],
+                    'domain' => $cell['domain'],
+                    'project_id' => $cell['project_id'],
+                    'seconds' => 0,
+                    'is_active' => false,
+                ];
+            }
+            $byDayMap[$date]['entries'][$dayEntryKey]['seconds'] += (int) $cell['seconds'];
+            if (!empty($cell['is_active'])) {
+                $byDayMap[$date]['entries'][$dayEntryKey]['is_active'] = true;
+            }
+
+            $taskKey = ($cell['item_id'] ?: ('t:' . md5($cell['title'] . '|' . $cell['domain'])))
+                . '|u:' . $cell['user_id'];
+            if (!isset($byTaskMap[$taskKey])) {
+                $byTaskMap[$taskKey] = [
+                    'user_id' => $cell['user_id'],
+                    'user_label' => $cell['user_label'],
+                    'item_id' => $cell['item_id'],
+                    'title' => $cell['title'],
+                    'domain' => $cell['domain'],
+                    'project_id' => $cell['project_id'],
+                    'seconds' => 0,
+                    'is_active' => false,
+                    'entries' => [],
+                ];
+            }
+            $byTaskMap[$taskKey]['seconds'] += (int) $cell['seconds'];
+            if (!empty($cell['is_active'])) {
+                $byTaskMap[$taskKey]['is_active'] = true;
+            }
+            if (!isset($byTaskMap[$taskKey]['entries'][$date])) {
+                $byTaskMap[$taskKey]['entries'][$date] = [
+                    'date' => $date,
+                    'label' => \Carbon\Carbon::parse($date)->format('d.m.Y'),
+                    'seconds' => 0,
+                    'is_active' => false,
+                ];
+            }
+            $byTaskMap[$taskKey]['entries'][$date]['seconds'] += (int) $cell['seconds'];
+            if (!empty($cell['is_active'])) {
+                $byTaskMap[$taskKey]['entries'][$date]['is_active'] = true;
+            }
+        }
+
+        ksort($byDayMap);
+        $chart = [];
+        $chartMax = 1;
+        foreach ($byDayMap as $date => $bucket) {
+            $sec = (int) $bucket['seconds'];
+            if ($sec > $chartMax) {
+                $chartMax = $sec;
+            }
+            $chart[] = [
+                'date' => $date,
+                'label' => \Carbon\Carbon::parse($date)->format('d.m'),
+                'seconds' => $sec,
+                'formatted' => self::formatDuration($sec),
+                'pct_bar' => 0,
+            ];
+        }
+        foreach ($chart as &$point) {
+            $point['pct_bar'] = (int) round(100 * $point['seconds'] / $chartMax);
+        }
+        unset($point);
+
+        krsort($byDayMap);
+        $days = [];
+        foreach ($byDayMap as $date => $bucket) {
             $entries = array_values($bucket['entries']);
             usort($entries, static function ($a, $b) {
                 return ($b['seconds'] <=> $a['seconds']);
             });
             foreach ($entries as &$entry) {
                 $entry['formatted'] = self::formatDuration((int) $entry['seconds']);
+                $entry['pct'] = $pctOf((int) $entry['seconds']);
             }
             unset($entry);
+            $daySec = (int) $bucket['seconds'];
             $days[] = [
                 'date' => $date,
                 'label' => \Carbon\Carbon::parse($date)->format('d.m.Y'),
-                'seconds' => (int) $bucket['seconds'],
-                'formatted' => self::formatDuration((int) $bucket['seconds']),
+                'seconds' => $daySec,
+                'formatted' => self::formatDuration($daySec),
+                'pct' => $pctOf($daySec),
                 'entries' => $entries,
             ];
         }
 
-        return ['days' => $days, 'total' => $total];
+        uasort($byTaskMap, static function ($a, $b) {
+            return ($b['seconds'] <=> $a['seconds']);
+        });
+        $tasks = [];
+        foreach ($byTaskMap as $bucket) {
+            $entries = array_values($bucket['entries']);
+            usort($entries, static function ($a, $b) {
+                return strcmp((string) $b['date'], (string) $a['date']);
+            });
+            foreach ($entries as &$entry) {
+                $entry['formatted'] = self::formatDuration((int) $entry['seconds']);
+                $entry['pct'] = $pctOf((int) $entry['seconds']);
+            }
+            unset($entry);
+            $taskSec = (int) $bucket['seconds'];
+            $tasks[] = [
+                'user_id' => $bucket['user_id'],
+                'user_label' => $bucket['user_label'],
+                'item_id' => $bucket['item_id'],
+                'title' => $bucket['title'],
+                'domain' => $bucket['domain'],
+                'project_id' => $bucket['project_id'],
+                'seconds' => $taskSec,
+                'formatted' => self::formatDuration($taskSec),
+                'pct' => $pctOf($taskSec),
+                'is_active' => !empty($bucket['is_active']),
+                'entries' => $entries,
+            ];
+        }
+
+        // Топ задач без разреза по user (для сводки)
+        $topAgg = [];
+        foreach ($cells as $cell) {
+            $k = (string) ($cell['item_id'] ?: ('t:' . md5($cell['title'] . '|' . $cell['domain'])));
+            if (!isset($topAgg[$k])) {
+                $topAgg[$k] = [
+                    'item_id' => $cell['item_id'],
+                    'title' => $cell['title'],
+                    'domain' => $cell['domain'],
+                    'project_id' => $cell['project_id'],
+                    'seconds' => 0,
+                ];
+            }
+            $topAgg[$k]['seconds'] += (int) $cell['seconds'];
+        }
+        uasort($topAgg, static function ($a, $b) {
+            return ($b['seconds'] <=> $a['seconds']);
+        });
+        $topTasks = [];
+        foreach (array_slice(array_values($topAgg), 0, 3) as $row) {
+            $topTasks[] = [
+                'item_id' => $row['item_id'],
+                'title' => $row['title'],
+                'domain' => $row['domain'],
+                'project_id' => $row['project_id'],
+                'seconds' => (int) $row['seconds'],
+                'formatted' => self::formatDuration((int) $row['seconds']),
+                'pct' => $pctOf((int) $row['seconds']),
+            ];
+        }
+
+        $daysCount = count($byDayMap);
+        $avg = $daysCount > 0 ? (int) round($total / $daysCount) : 0;
+
+        return [
+            'group_by' => $groupBy,
+            'days' => $days,
+            'tasks' => $tasks,
+            'total' => $total,
+            'summary' => [
+                'total' => $total,
+                'formatted_total' => self::formatDuration($total),
+                'days_count' => $daysCount,
+                'avg_per_day' => $avg,
+                'formatted_avg' => self::formatDuration($avg),
+                'top_tasks' => $topTasks,
+            ],
+            'chart' => $chart,
+            'active_item_id' => $activeItemId,
+            'show_user' => $showUser,
+        ];
+    }
+
+    /**
+     * Плоские строки для CSV-экспорта учёта времени.
+     *
+     * @param  array<int, int>|int|string|null  $projectFilter
+     * @param  array<int, int>|int|string|null  $userFilter
+     * @return array<int, array<string, string|int>>
+     */
+    public function timesheetExportRows(
+        int $viewerId,
+        ?string $from = null,
+        ?string $to = null,
+        $projectFilter = null,
+        $userFilter = null
+    ): array {
+        $data = $this->timesheetForUser($viewerId, $from, $to, $projectFilter, 'day', $userFilter);
+        $rows = [];
+        foreach ($data['days'] as $day) {
+            foreach ($day['entries'] as $entry) {
+                $rows[] = [
+                    'date' => $day['date'],
+                    'user' => (string) ($entry['user_label'] ?? ''),
+                    'domain' => (string) ($entry['domain'] ?? ''),
+                    'title' => (string) ($entry['title'] ?? ''),
+                    'seconds' => (int) ($entry['seconds'] ?? 0),
+                    'duration' => (string) ($entry['formatted'] ?? ''),
+                    'pct' => (string) ($entry['pct'] ?? '0'),
+                ];
+            }
+        }
+
+        return $rows;
     }
 
     public static function formatDuration(int $seconds): string

@@ -165,9 +165,9 @@ class SeoChecklistController extends Controller
 
         $projectIds = $this->requestIdList($request, 'project_ids', 'project_id');
         $authorIds = $this->requestIdList($request, 'author_ids', 'author_id');
-        $unreadOnly = $request->boolean('unread');
+        $preset = $this->chroniclePresetFromRequest($request);
 
-        $data = $this->service->chronicleForUser($userId, $projectIds, $authorIds, $unreadOnly);
+        $data = $this->service->chronicleForUser($userId, $projectIds, $authorIds, $preset);
         $plan = $this->service->workPlanForUser($userId);
         $projects = $this->service->accessibleProjectsQuery($userId)
             ->where('status', 'active')
@@ -180,7 +180,8 @@ class SeoChecklistController extends Controller
             'authors' => $this->service->chronicleAuthorOptions($userId),
             'filterProjectIds' => $projectIds,
             'filterAuthorIds' => $authorIds,
-            'filterUnread' => $unreadOnly,
+            'filterPreset' => $preset,
+            'filterUnread' => $preset === 'unread',
             'statusLabels' => $this->statusLabels(),
             'projectsCount' => $projects->count(),
             'teamCount' => $this->service->teamsForUser($userId)->count(),
@@ -190,6 +191,21 @@ class SeoChecklistController extends Controller
             'showReviewTab' => $this->service->canSeeReviewQueue($userId),
             'unreadNotesCount' => (int) ($data['unread_count'] ?? 0),
         ]);
+    }
+
+    private function chroniclePresetFromRequest(Request $request): string
+    {
+        // Legacy: ?unread=1
+        if ($request->has('unread') && $request->boolean('unread')) {
+            return 'unread';
+        }
+
+        $preset = (string) $request->input('view', 'unread');
+        if (!in_array($preset, ['unread', 'notes', 'all'], true)) {
+            return 'unread';
+        }
+
+        return $preset;
     }
 
     public function markChronicleNotesRead(Request $request): RedirectResponse
@@ -212,9 +228,8 @@ class SeoChecklistController extends Controller
         foreach ($this->requestIdList($request, 'author_ids', 'author_id') as $id) {
             $query['author_ids'][] = $id;
         }
-        if ($request->boolean('unread')) {
-            $query['unread'] = 1;
-        }
+        $preset = $this->chroniclePresetFromRequest($request);
+        $query['view'] = $preset;
 
         return redirect()
             ->route('pages.seo-checklist.chronicle', $query)
@@ -244,11 +259,17 @@ class SeoChecklistController extends Controller
         $userId = (int) Auth::id();
         $this->service->ensureSystemTemplate();
 
-        $from = $request->input('from') ?: now()->subDays(30)->toDateString();
-        $to = $request->input('to') ?: now()->toDateString();
+        [$from, $to, $period] = $this->timesheetPeriodFromRequest($request);
         $projectIds = $this->requestIdList($request, 'project_ids', 'project_id');
+        $userIds = $this->requestIdList($request, 'user_ids', 'user_id');
+        $groupBy = (string) $request->input('group', 'day');
+        if (!in_array($groupBy, ['day', 'task'], true)) {
+            $groupBy = 'day';
+        }
 
-        $data = $this->service->timesheetForUser($userId, $from, $to, $projectIds);
+        $canTeam = $this->service->canViewTeamTimesheet($userId);
+        $authors = $canTeam ? $this->service->timesheetAuthorOptions($userId) : collect();
+        $data = $this->service->timesheetForUser($userId, $from, $to, $projectIds, $groupBy, $userIds);
         $plan = $this->service->workPlanForUser($userId);
         $projects = $this->service->accessibleProjectsQuery($userId)
             ->where('status', 'active')
@@ -259,9 +280,14 @@ class SeoChecklistController extends Controller
         return view('pages.seo-checklist-timesheet', [
             'timesheet' => $data,
             'projects' => $projects,
+            'authors' => $authors,
+            'canTeamTimesheet' => $canTeam,
             'filterFrom' => $from,
             'filterTo' => $to,
+            'filterPeriod' => $period,
             'filterProjectIds' => $projectIds,
+            'filterUserIds' => $userIds,
+            'filterGroup' => $groupBy,
             'projectsCount' => $projects->count(),
             'teamCount' => $this->service->teamsForUser($userId)->count(),
             'templatesCount' => $this->service->templatesForUser($userId)->count(),
@@ -270,6 +296,75 @@ class SeoChecklistController extends Controller
             'showReviewTab' => $this->service->canSeeReviewQueue($userId),
             'unreadNotesCount' => (int) ($chronicle['unread_count'] ?? 0),
         ]);
+    }
+
+    public function timesheetExport(Request $request)
+    {
+        $userId = (int) Auth::id();
+        $this->service->ensureSystemTemplate();
+
+        [$from, $to] = $this->timesheetPeriodFromRequest($request);
+        $projectIds = $this->requestIdList($request, 'project_ids', 'project_id');
+        $userIds = $this->requestIdList($request, 'user_ids', 'user_id');
+        $rows = $this->service->timesheetExportRows($userId, $from, $to, $projectIds, $userIds);
+
+        $filename = 'timesheet-' . $from . '-' . $to . '.csv';
+        $callback = static function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            if ($out === false) {
+                return;
+            }
+            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+            fputcsv($out, ['date', 'user', 'domain', 'task', 'seconds', 'duration', 'pct'], ';');
+            foreach ($rows as $row) {
+                fputcsv($out, [
+                    $row['date'],
+                    $row['user'],
+                    $row['domain'],
+                    $row['title'],
+                    $row['seconds'],
+                    $row['duration'],
+                    $row['pct'],
+                ], ';');
+            }
+            fclose($out);
+        };
+
+        return response()->stream($callback, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+    }
+
+    /**
+     * @return array{0:string,1:string,2:string}
+     */
+    private function timesheetPeriodFromRequest(Request $request): array
+    {
+        $period = (string) $request->input('period', '');
+        if (!in_array($period, ['today', 'week', 'month', '30d', 'custom'], true)) {
+            $period = $request->filled('from') || $request->filled('to') ? 'custom' : '30d';
+        }
+
+        if ($period === 'today') {
+            $day = now()->toDateString();
+
+            return [$day, $day, $period];
+        }
+        if ($period === 'week') {
+            return [now()->startOfWeek()->toDateString(), now()->toDateString(), $period];
+        }
+        if ($period === 'month') {
+            return [now()->startOfMonth()->toDateString(), now()->toDateString(), $period];
+        }
+        if ($period === '30d') {
+            return [now()->subDays(30)->toDateString(), now()->toDateString(), $period];
+        }
+
+        $from = $request->input('from') ?: now()->subDays(30)->toDateString();
+        $to = $request->input('to') ?: now()->toDateString();
+
+        return [$from, $to, 'custom'];
     }
 
     public function itemTimeBreakdown(int $id, int $itemId): JsonResponse
@@ -972,6 +1067,11 @@ class SeoChecklistController extends Controller
         }
 
         $teams = $canManage ? $this->service->teamsForUser($authId) : collect();
+        $plan = $this->service->workPlanForUser($authId);
+        $chronicle = $this->service->chronicleForUser($authId, null, null, true, 1);
+        $projectsCount = $this->service->accessibleProjectsQuery($authId)
+            ->where('status', 'active')
+            ->count();
 
         return view('pages.seo-checklist-show', [
             'project' => $project,
@@ -988,6 +1088,13 @@ class SeoChecklistController extends Controller
             'teams' => $teams,
             'teamRoleLabels' => \App\SeoChecklist\SeoChecklistTeam::roleLabels(),
             'timerUserId' => $authId,
+            'projectsCount' => $projectsCount,
+            'teamCount' => $this->service->teamsForUser($authId)->count(),
+            'templatesCount' => $this->service->templatesForUser($authId)->count(),
+            'myTasksCount' => (int) ($plan['count'] ?? 0),
+            'reviewCount' => $this->service->reviewQueueForUser($authId)->count(),
+            'showReviewTab' => $this->service->canSeeReviewQueue($authId),
+            'unreadNotesCount' => (int) ($chronicle['unread_count'] ?? 0),
         ]);
     }
 

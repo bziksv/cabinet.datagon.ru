@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', $title)
+@section('title', $documentTitle ?? $title)
 
 @section('css')
     {{ $css ?? null }}

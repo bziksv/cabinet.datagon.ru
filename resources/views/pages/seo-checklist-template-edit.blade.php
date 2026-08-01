@@ -1,5 +1,6 @@
 @component('component.card', [
     'title' => \App\SeoChecklist\SeoChecklistUserPreference::moduleTitleFor(auth()->id()),
+    'documentTitle' => cabinet_sc_document_title($template->title ?: __('Templates')),
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('css/cabinet-seo-checklist.css') }}?v={{ @filemtime(public_path('css/cabinet-seo-checklist.css')) ?: time() }}">
@@ -17,7 +18,8 @@
          data-i18n-delete-stage="{{ e(__('Delete this stage?')) }}"
          data-i18n-stage-has-tasks="{{ e(__('Stage has tasks')) }}">
         @include('pages.partials.seo-checklist-nav', [
-            'scTab' => 'templates',
+            'scTab' => 'template',
+            'scContextTemplate' => $template,
             'scMyTasksCount' => $myTasksCount ?? null,
             'scReviewCount' => $reviewCount ?? null,
             'scShowReviewTab' => $showReviewTab ?? false,
@@ -29,7 +31,6 @@
 
         <div class="cabinet-sc-show-head">
             <div>
-                <a href="{{ route('pages.seo-checklist.templates') }}" class="cabinet-sc-back small">← {{ __('SEO checklist templates') }}</a>
                 <h1 class="cabinet-sc-hero__title mb-1">{{ $template->title }}</h1>
                 <p class="small text-secondary mb-0">
                     {{ __('Used in :count projects', ['count' => (int) ($usageCount ?? 0)]) }}

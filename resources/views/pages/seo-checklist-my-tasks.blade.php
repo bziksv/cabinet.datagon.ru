@@ -1,5 +1,6 @@
 @component('component.card', [
     'title' => \App\SeoChecklist\SeoChecklistUserPreference::moduleTitleFor(auth()->id()),
+    'documentTitle' => cabinet_sc_document_title(__('My tasks')),
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('css/cabinet-seo-checklist.css') }}?v={{ @filemtime(public_path('css/cabinet-seo-checklist.css')) ?: time() }}">

@@ -107,11 +107,14 @@
     function askStatusAfterStop(itemEl) {
         var select = itemEl.querySelector('[data-sc-status]');
         if (!select) return;
+        var canApprove = (itemEl.getAttribute('data-can-approve') || root.getAttribute('data-can-approve')) === '1';
         var options = [];
         var defaultValue = 'rework';
         var hasRework = false;
         Array.prototype.forEach.call(select.options, function (opt) {
             if (opt.disabled || !opt.value || opt.value === 'todo') return;
+            // «Выполнено» только PM/аудитору — после стопа таймера обычным ролям не предлагаем
+            if ((opt.value === 'done' || opt.value === 'skip') && !canApprove) return;
             options.push({ value: opt.value, label: String(opt.textContent || '').trim() });
             if (opt.value === 'rework') hasRework = true;
         });

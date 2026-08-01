@@ -8,7 +8,6 @@
     @endif
 
     @slot('css')
-        <link rel="stylesheet" href="{{ asset('plugins/scroll/style.css') }}"/>
         <link rel="stylesheet" href="{{ asset('css/cabinet-news.css') }}"/>
     @endslot
 
@@ -20,10 +19,16 @@
 
     @isset($news[0])
         <div class="cabinet-news-feed position-relative">
-            <div class="scroll-to d-flex flex-column">
-                <a href="#header-nav-bar" class="fa fa-arrow-circle-up scroll_arrow text-muted" aria-label="Up"></a>
-                <a href="#main-footer" class="fa fa-arrow-circle-down scroll_arrow text-muted" aria-label="Down"></a>
-            </div>
+            <nav class="cabinet-news-scroll-nav" aria-label="Прокрутка страницы">
+                <button type="button" class="cabinet-news-scroll-nav__btn" data-news-scroll="up"
+                        title="Прокрутить страницу вверх" aria-label="Прокрутить страницу вверх">
+                    <i class="fas fa-chevron-up" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="cabinet-news-scroll-nav__btn" data-news-scroll="down"
+                        title="Прокрутить страницу вниз" aria-label="Прокрутить страницу вниз">
+                    <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                </button>
+            </nav>
 
             @foreach($news as $item)
                 <article class="cabinet-news-post d-flex gap-3 pb-4 mb-4 border-bottom" id="news-{{ $item->id }}">
@@ -166,10 +171,10 @@
             (function ($) {
                 var roleLabel = @json($admin ? __('Admin') : __('User'));
 
-                $('.scroll_arrow').on('click', function (e) {
-                    e.preventDefault();
-                    var anchor = $(this).attr('href');
-                    $('html, body').stop().animate({scrollTop: $(anchor).offset().top - 60}, 800);
+                $('[data-news-scroll]').on('click', function () {
+                    var dir = $(this).data('news-scroll');
+                    var top = dir === 'up' ? 0 : $(document).height();
+                    $('html, body').stop().animate({scrollTop: top}, 450);
                 });
 
                 $('.remove-news').on('click', function () {

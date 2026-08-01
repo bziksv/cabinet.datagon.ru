@@ -53,8 +53,70 @@
     min-height: 2.5rem;
 }
 
-.cabinet-news-feed .scroll-to {
-    z-index: 10;
+/* Как cabinet-mon-scroll-nav в мониторинге */
+.cabinet-news-scroll-nav {
+    position: fixed;
+    right: 1.25rem;
+    bottom: 1.25rem;
+    z-index: 1080;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    pointer-events: none;
+}
+
+.cabinet-news-scroll-nav__btn {
+    pointer-events: auto;
+    width: 2.75rem;
+    height: 2.75rem;
+    padding: 0;
+    border: 1px solid rgba(98, 125, 152, 0.28);
+    border-radius: 999px;
+    background: linear-gradient(165deg, #ffffff 0%, #eef2f7 100%);
+    color: #627d98;
+    box-shadow:
+        0 10px 24px rgba(15, 23, 42, 0.14),
+        0 2px 6px rgba(15, 23, 42, 0.08);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+        transform 0.16s ease,
+        box-shadow 0.16s ease,
+        background-color 0.16s ease,
+        color 0.16s ease;
+}
+
+.cabinet-news-scroll-nav__btn i {
+    font-size: 0.95rem;
+}
+
+.cabinet-news-scroll-nav__btn:hover {
+    transform: translateY(-1px);
+    background: #627d98;
+    border-color: #627d98;
+    color: #fff;
+    box-shadow:
+        0 14px 28px rgba(15, 23, 42, 0.18),
+        0 4px 10px rgba(15, 23, 42, 0.1);
+}
+
+.cabinet-news-scroll-nav__btn:active {
+    transform: translateY(0);
+}
+
+@media (max-width: 767.98px) {
+    .cabinet-news-scroll-nav {
+        right: 0.85rem;
+        bottom: 0.85rem;
+    }
+
+    .cabinet-news-scroll-nav__btn {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
 }
 
 .like-news.text-danger {

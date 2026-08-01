@@ -62,16 +62,11 @@ class NewsController extends Controller
         NewsBadge::markNewsSeen((int) Auth::id());
         NewsBadge::markCommentsSeenForAdmin((int) Auth::id());
 
-        $newsQuery = News::query()
+        $news = News::query()
             ->with($this->newsIndexRelations())
-            ->orderByDesc('created_at');
+            ->orderByDesc('created_at')
+            ->paginate(20);
 
-        // Local + удалённая БД: не тянуть все новости и все комментарии.
-        if (cabinet_skip_heavy_web()) {
-            $news = $newsQuery->limit(15)->get();
-        } else {
-            $news = $newsQuery->get();
-        }
         $admin = NewsController::isUserAdmin();
         if ($admin) {
             JavaScript::put([

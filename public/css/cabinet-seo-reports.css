@@ -1951,6 +1951,65 @@
 .cabinet-sr-builder__picked {
     cursor: grab;
     background: #fff;
+    flex-wrap: wrap;
+}
+
+.cabinet-sr-builder__metrics {
+    flex: 1 1 100%;
+    margin: 0.15rem 0 0;
+    border-top: 1px dashed rgba(15, 23, 42, 0.08);
+    padding-top: 0.35rem;
+}
+
+.cabinet-sr-builder__metrics > summary {
+    cursor: pointer;
+    list-style: none;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #64748b;
+    user-select: none;
+}
+
+.cabinet-sr-builder__metrics > summary::-webkit-details-marker {
+    display: none;
+}
+
+.cabinet-sr-builder__metrics > summary::before {
+    content: '▸ ';
+    color: #94a3b8;
+}
+
+.cabinet-sr-builder__metrics[open] > summary::before {
+    content: '▾ ';
+}
+
+.cabinet-sr-builder__metrics-count {
+    font-weight: 600;
+    color: #94a3b8;
+}
+
+.cabinet-sr-builder__metrics-list {
+    display: grid;
+    gap: 0.2rem;
+    margin-top: 0.4rem;
+    padding: 0.45rem 0.5rem;
+    border-radius: 0.5rem;
+    background: #f8fafc;
+}
+
+.cabinet-sr-builder__metric {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    margin: 0;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #334155;
+    cursor: pointer;
+}
+
+.cabinet-sr-builder__metric input {
+    margin-top: 0.15rem;
 }
 
 .cabinet-sr-builder__picked.is-dragging {

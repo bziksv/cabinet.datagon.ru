@@ -18,6 +18,9 @@
         : (is_array($project->settings_json ?? null) ? $project->settings_json : []);
     $mirrorDomains = is_array($projectSettings['mirror_domains'] ?? null) ? $projectSettings['mirror_domains'] : [];
     $confirmedOnly = !empty($projectSettings['confirmed_sources_only']);
+    $metricOn = static function (string $section, string $metric) use ($projectSettings): bool {
+        return \App\SeoReports\SeoReportMetricRegistry::enabled($projectSettings, $section, $metric);
+    };
     $kpiLabels = [
         'visits' => __('Visits'),
         'users' => __('Users'),
@@ -238,6 +241,7 @@
                 @endif
                 <div class="cabinet-sr-kpi-grid">
                     @foreach($kpiLabels as $metric => $label)
+                        @continue(!$metricOn('traffic', $metric))
                         @php
                             $kpi = $traffic['kpis'][$metric] ?? null;
                             $value = $kpi['value'] ?? null;
@@ -276,11 +280,11 @@
                 @php
                     $trafficComment = $comments['traffic'] ?? ($traffic['auto_comment'] ?? null);
                 @endphp
-                @if($trafficComment)
+                @if($trafficComment && $metricOn('traffic', 'comment'))
                     <p class="cabinet-sr-comment mt-2">{{ $trafficComment }}</p>
                 @endif
 
-                @if(!empty($traffic['series_users']))
+                @if(!empty($traffic['series_users']) && $metricOn('traffic', 'series_users'))
                     <div class="cabinet-sr-spark mt-3">
                         @php
                             $seriesUsers = $traffic['series_users'];
@@ -296,7 +300,7 @@
                     <p class="small text-secondary mb-0 mt-1">{{ __('Users by day') }}</p>
                 @endif
 
-                @if(!empty($traffic['channels']))
+                @if(!empty($traffic['channels']) && $metricOn('traffic', 'channels'))
                     <h3 class="h6 mt-3">{{ __('Channels') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -335,7 +339,7 @@
                     @endif
                 @endif
 
-                @if(!empty($traffic['channel_months']))
+                @if(!empty($traffic['channel_months']) && $metricOn('traffic', 'channel_months'))
                     <h3 class="h6 mt-3">{{ __('Channels by month') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -360,7 +364,7 @@
                     </div>
                 @endif
 
-                @if(!empty($traffic['sources']))
+                @if(!empty($traffic['sources']) && $metricOn('traffic', 'sources'))
                     <h3 class="h6 mt-3">{{ __('Traffic sources') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -385,7 +389,7 @@
                 @endif
 
                 @php $search = $traffic['search'] ?? null; @endphp
-                @if(is_array($search))
+                @if(is_array($search) && $metricOn('traffic', 'search'))
                     <h3 class="h6 mt-3">{{ __('Search traffic') }}</h3>
                     <div class="cabinet-sr-kpi-grid">
                         @foreach(['visits' => __('Visits'), 'users' => __('Users'), 'bounce_rate' => __('Bounce rate'), 'page_depth' => __('Page depth')] as $metric => $label)
@@ -455,7 +459,7 @@
                     @endif
                 @endif
 
-                @if(!empty($traffic['devices']))
+                @if(!empty($traffic['devices']) && $metricOn('traffic', 'devices'))
                     <h3 class="h6 mt-3">{{ __('Devices') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -492,7 +496,7 @@
                     </div>
                 @endif
 
-                @if(!empty($traffic['geo']))
+                @if(!empty($traffic['geo']) && $metricOn('traffic', 'geo'))
                     <h3 class="h6 mt-3">{{ __('Geography') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -531,7 +535,7 @@
                     </div>
                 @endif
 
-                @if(!empty($traffic['landings']))
+                @if(!empty($traffic['landings']) && $metricOn('traffic', 'landings'))
                     <h3 class="h6 mt-3">{{ __('Top landing pages') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -561,7 +565,7 @@
                     </div>
                 @endif
 
-                @if(!empty($traffic['landings_search']))
+                @if(!empty($traffic['landings_search']) && $metricOn('traffic', 'landings_search'))
                     <h3 class="h6 mt-3">{{ __('Top landing pages from search') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -583,7 +587,7 @@
                     </div>
                 @endif
 
-                @if(!empty($traffic['landings_social']))
+                @if(!empty($traffic['landings_social']) && $metricOn('traffic', 'landings_social'))
                     <h3 class="h6 mt-3">{{ __('Top landing pages from social') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -609,6 +613,7 @@
                     $sum = $positions['summary'] ?? [];
                     $dyn = $positions['dynamics'] ?? [];
                 @endphp
+                @if($metricOn('positions', 'summary'))
                 <div class="cabinet-sr-kpi-grid">
                     @foreach(['top3' => 'TOP-3', 'top10' => 'TOP-10', 'top30' => 'TOP-30', 'top100' => 'TOP-100'] as $k => $label)
                         <div class="cabinet-sr-kpi">
@@ -620,7 +625,8 @@
                         </div>
                     @endforeach
                 </div>
-                @if(!empty($dyn['pairs']))
+                @endif
+                @if(!empty($dyn['pairs']) && $metricOn('positions', 'dynamics'))
                     <div class="cabinet-sr-kpi-grid mt-2">
                         <div class="cabinet-sr-kpi">
                             <div class="cabinet-sr-kpi__label">{{ __('Improved') }}</div>
@@ -636,7 +642,7 @@
                         </div>
                     </div>
                 @endif
-                @if(!empty($positions['top_baskets']))
+                @if(!empty($positions['top_baskets']) && $metricOn('positions', 'top_baskets'))
                     <h3 class="h6 mt-3">{{ __('TOP baskets') }}</h3>
                     <div class="cabinet-sr-bars">
                         @php $maxB = max(1, max(array_column($positions['top_baskets'], 'value') ?: [1])); @endphp
@@ -648,7 +654,7 @@
                         @endforeach
                     </div>
                 @endif
-                @if(!empty($positions['visibility_by_engine']))
+                @if(!empty($positions['visibility_by_engine']) && $metricOn('positions', 'visibility_by_engine'))
                     <h3 class="h6 mt-3">{{ __('Visibility by search engine') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -675,7 +681,7 @@
                         </table>
                     </div>
                 @endif
-                @if(!empty($positions['visibility_series']))
+                @if(!empty($positions['visibility_series']) && $metricOn('positions', 'visibility_series'))
                     <h3 class="h6 mt-3">{{ __('Visibility TOP-10') }}</h3>
                     <div class="cabinet-sr-spark" aria-hidden="true">
                         @php
@@ -695,8 +701,13 @@
                         @endif
                     </p>
                 @endif
-                @if(!empty($positions['phrases']['improved']) || !empty($positions['phrases']['worsened']))
+                @if(
+                    ($metricOn('positions', 'phrases_improved') && !empty($positions['phrases']['improved']))
+                    || ($metricOn('positions', 'phrases_worsened') && !empty($positions['phrases']['worsened']))
+                )
                     @foreach(['improved' => __('Improved queries'), 'worsened' => __('Worsened queries')] as $bucket => $title)
+                        @continue($bucket === 'improved' && !$metricOn('positions', 'phrases_improved'))
+                        @continue($bucket === 'worsened' && !$metricOn('positions', 'phrases_worsened'))
                         @if(!empty($positions['phrases'][$bucket]))
                             <h3 class="h6 mt-3">{{ $title }}</h3>
                             <div class="table-responsive">
@@ -726,7 +737,7 @@
                         @endif
                     @endforeach
                 @endif
-                @if(!empty($positions['by_engine']))
+                @if(!empty($positions['by_engine']) && $metricOn('positions', 'by_engine'))
                     <div class="table-responsive mt-3">
                         <table class="cabinet-sr-data-table">
                             <thead>
@@ -752,7 +763,7 @@
                         </table>
                     </div>
                 @endif
-                @if(!empty($positions['quick_wins']))
+                @if(!empty($positions['quick_wins']) && $metricOn('positions', 'quick_wins'))
                     <h3 class="h6 mt-3">{{ __('Quick wins') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -777,7 +788,7 @@
                         </table>
                     </div>
                 @endif
-                @if(!empty($positions['risk']))
+                @if(!empty($positions['risk']) && $metricOn('positions', 'risk'))
                     <h3 class="h6 mt-3">{{ __('Risk list') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -804,7 +815,7 @@
                         </table>
                     </div>
                 @endif
-                @if(!empty($positions['groups']))
+                @if(!empty($positions['groups']) && $metricOn('positions', 'groups'))
                     <h3 class="h6 mt-3">{{ __('Keyword groups') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -825,7 +836,7 @@
                         </table>
                     </div>
                 @endif
-                @if(!empty($positions['competitors']['urls']))
+                @if(!empty($positions['competitors']['urls']) && $metricOn('positions', 'competitors'))
                     <h3 class="h6 mt-3">{{ __('Competitors from monitoring') }}</h3>
                     <ul class="cabinet-sr-bullets">
                         @foreach($positions['competitors']['urls'] as $url)
@@ -843,7 +854,7 @@
                     <p class="cabinet-sr-comment mt-2">{{ $comments['positions'] }}</p>
                 @endif
             @elseif($key === 'conversions' && is_array($conversions))
-                @if(!empty($conversions['goals']))
+                @if(!empty($conversions['goals']) && $metricOn('conversions', 'goals'))
                     <h3 class="h6">{{ __('Conversions by goals') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -886,7 +897,7 @@
                     <p class="small text-secondary">{{ __('Cost per conversion needs ads spend') }}</p>
                 @endif
 
-                @if(!empty($conversions['channels_by_goal']))
+                @if(!empty($conversions['channels_by_goal']) && $metricOn('conversions', 'channels_by_goal'))
                     @foreach($conversions['channels_by_goal'] as $goalId => $channelRows)
                         @if(!empty($channelRows))
                             @php
@@ -934,7 +945,7 @@
                     @endforeach
                 @endif
 
-                @if(!empty($conversions['search_goals']))
+                @if(!empty($conversions['search_goals']) && $metricOn('conversions', 'search_goals'))
                     <h3 class="h6 mt-3">{{ __('Conversions from search') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -958,7 +969,7 @@
                     </div>
                 @endif
 
-                @if(!empty($conversions['ad_goals']))
+                @if(!empty($conversions['ad_goals']) && $metricOn('conversions', 'ad_goals'))
                     <h3 class="h6 mt-3">{{ __('Conversions from ads') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -982,7 +993,7 @@
                     </div>
                 @endif
 
-                @if(!empty($conversions['social_goals']))
+                @if(!empty($conversions['social_goals']) && $metricOn('conversions', 'social_goals'))
                     <h3 class="h6 mt-3">{{ __('Conversions from social') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -1107,6 +1118,7 @@
                 @if(!empty($direct['note']))
                     <p class="small text-secondary">{{ $direct['note'] }}</p>
                 @endif
+                @if($metricOn('direct', 'kpis'))
                 <div class="cabinet-sr-kpi-grid">
                     @foreach($kpiLabels as $metric => $label)
                         @php
@@ -1131,7 +1143,8 @@
                         </div>
                     @endforeach
                 </div>
-                @if(!empty($direct['spend']) && (isset($direct['spend']['cost']) || isset($direct['spend']['clicks'])))
+                @endif
+                @if(!empty($direct['spend']) && $metricOn('direct', 'spend') && (isset($direct['spend']['cost']) || isset($direct['spend']['clicks'])))
                     <div class="cabinet-sr-kpi-grid mt-2">
                         @foreach(['clicks' => __('Clicks'), 'cost' => __('Ad spend'), 'cpc' => 'CPC', 'ctr' => 'CTR'] as $sk => $sl)
                             <div class="cabinet-sr-kpi">
@@ -1147,7 +1160,7 @@
                         @endforeach
                     </div>
                 @endif
-                @if(!empty($direct['series_visits']))
+                @if(!empty($direct['series_visits']) && $metricOn('direct', 'series_visits'))
                     <div class="cabinet-sr-spark mt-3">
                         @php
                             $vals = array_values($direct['series_visits']);
@@ -1161,7 +1174,7 @@
                     </div>
                     <p class="small text-secondary mb-0 mt-1">{{ __('Ad visits by day') }}</p>
                 @endif
-                @if(!empty($direct['engines']))
+                @if(!empty($direct['engines']) && $metricOn('direct', 'engines'))
                     <h3 class="h6 mt-3">{{ __('Ad engines') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -1178,7 +1191,7 @@
                         </table>
                     </div>
                 @endif
-                @if(!empty($direct['campaigns']))
+                @if(!empty($direct['campaigns']) && $metricOn('direct', 'campaigns'))
                     <h3 class="h6 mt-3">{{ __('Campaigns') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -1195,7 +1208,7 @@
                         </table>
                     </div>
                 @endif
-                @if(!empty($direct['platforms']))
+                @if(!empty($direct['platforms']) && $metricOn('direct', 'platforms'))
                     <h3 class="h6 mt-3">{{ __('Ad platforms') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -1211,7 +1224,7 @@
                         </table>
                     </div>
                 @endif
-                @if(!empty($direct['phrases']))
+                @if(!empty($direct['phrases']) && $metricOn('direct', 'phrases'))
                     <h3 class="h6 mt-3">{{ __('Search phrases') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -1227,7 +1240,7 @@
                         </table>
                     </div>
                 @endif
-                @if(!empty($direct['landings']))
+                @if(!empty($direct['landings']) && $metricOn('direct', 'landings'))
                     <h3 class="h6 mt-3">{{ __('Top landing pages from ads') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -1243,7 +1256,7 @@
                         </table>
                     </div>
                 @endif
-                @if(!empty($direct['conversions']))
+                @if(!empty($direct['conversions']) && $metricOn('direct', 'conversions'))
                     <h3 class="h6 mt-3">{{ __('Conversions from ads') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -1260,7 +1273,7 @@
                         </table>
                     </div>
                 @endif
-                @if(!empty($direct['fix']))
+                @if(!empty($direct['fix']) && $metricOn('direct', 'fix'))
                     <h3 class="h6 mt-3">{{ __('What to fix') }}</h3>
                     <ul class="cabinet-sr-bullets">
                         @foreach($direct['fix'] as $hint)
@@ -1308,6 +1321,7 @@
                 @if(!empty($sc['note']))
                     <p class="small text-secondary">{{ $sc['note'] }}</p>
                 @endif
+                @if($metricOn($key, 'kpis'))
                 <div class="cabinet-sr-kpi-grid">
                     @foreach(['clicks' => __('Clicks'), 'impressions' => __('Impressions'), 'ctr' => 'CTR', 'position' => __('Avg. position')] as $sk => $sl)
                         <div class="cabinet-sr-kpi">
@@ -1322,7 +1336,8 @@
                         </div>
                     @endforeach
                 </div>
-                @if(!empty($sc['queries']))
+                @endif
+                @if(!empty($sc['queries']) && $metricOn($key, 'queries'))
                     <h3 class="h6 mt-3">{{ __('Top queries') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -1341,7 +1356,7 @@
                         </table>
                     </div>
                 @endif
-                @if(!empty($sc['pages']))
+                @if(!empty($sc['pages']) && $metricOn($key, 'pages'))
                     <h3 class="h6 mt-3">{{ __('Top pages') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -1363,6 +1378,7 @@
                 @if(!empty($gads['note']))
                     <p class="small text-secondary">{{ $gads['note'] }}</p>
                 @endif
+                @if($metricOn('google_ads', 'kpis'))
                 <div class="cabinet-sr-kpi-grid">
                     @foreach($kpiLabels as $metric => $label)
                         @php $kpi = $gads['kpis'][$metric] ?? null; $value = $kpi['value'] ?? null; @endphp
@@ -1380,7 +1396,8 @@
                         </div>
                     @endforeach
                 </div>
-                @if(!empty($gads['campaigns']))
+                @endif
+                @if(!empty($gads['campaigns']) && $metricOn('google_ads', 'campaigns'))
                     <h3 class="h6 mt-3">{{ __('Campaigns') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -1397,7 +1414,7 @@
                         </table>
                     </div>
                 @endif
-                @if(!empty($gads['landings']))
+                @if(!empty($gads['landings']) && $metricOn('google_ads', 'landings'))
                     <h3 class="h6 mt-3">{{ __('Top landing pages from ads') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -1410,7 +1427,7 @@
                         </table>
                     </div>
                 @endif
-                @if(!empty($gads['phrases']))
+                @if(!empty($gads['phrases']) && $metricOn('google_ads', 'phrases'))
                     <h3 class="h6 mt-3">{{ __('Search phrases') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">
@@ -1423,7 +1440,7 @@
                         </table>
                     </div>
                 @endif
-                @if(!empty($gads['conversions']))
+                @if(!empty($gads['conversions']) && $metricOn('google_ads', 'conversions'))
                     <h3 class="h6 mt-3">{{ __('Conversions from ads') }}</h3>
                     <div class="table-responsive">
                         <table class="cabinet-sr-data-table">

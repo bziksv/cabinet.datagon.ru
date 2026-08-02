@@ -22,6 +22,7 @@ class SeoReportProject extends Model
         'traffic_mode',
         'kpi_goals',
         'section_order',
+        'metric_toggles',
         'auto_generate',
         'remind_missing',
         'confirmed_sources_only',
@@ -178,6 +179,11 @@ class SeoReportProject extends Model
         }
 
         return $out;
+    }
+
+    public function metricEnabled(string $section, string $metric): bool
+    {
+        return SeoReportMetricRegistry::enabled($this->reportSettings(), $section, $metric);
     }
 
     public function brandingAgencyName(): ?string

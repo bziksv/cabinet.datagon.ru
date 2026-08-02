@@ -4,6 +4,7 @@ namespace App\Services\SeoReports;
 
 use App\SeoReports\SeoReportBrandColor;
 use App\SeoReports\SeoReportKpiGoals;
+use App\SeoReports\SeoReportMetricRegistry;
 use App\SeoReports\SeoReportProject;
 use App\SeoReports\SeoReportSectionRegistry;
 use App\SeoReports\SeoReportTemplate;
@@ -75,10 +76,15 @@ class SeoReportTemplateService
         if (empty($settings['full_catalog_seeded'])) {
             $template->section_toggles = SeoReportSectionRegistry::togglesForPreset('complex');
             $settings['section_order'] = SeoReportSectionRegistry::defaultOrder();
+            $settings['metric_toggles'] = SeoReportMetricRegistry::defaults();
             $settings['full_catalog_seeded'] = true;
             if (empty($settings['description'])) {
                 $settings['description'] = 'Базовый шаблон со всеми блоками. Подключайте к проектам или копируйте для особых клиентов.';
             }
+            $template->settings_json = $settings;
+            $dirty = true;
+        } elseif (empty($settings['metric_toggles'])) {
+            $settings['metric_toggles'] = SeoReportMetricRegistry::defaults();
             $template->settings_json = $settings;
             $dirty = true;
         }
@@ -110,6 +116,7 @@ class SeoReportTemplateService
             'traffic_mode' => 'all',
             'kpi_goals' => SeoReportKpiGoals::normalizeInput([]),
             'section_order' => SeoReportSectionRegistry::defaultOrder(),
+            'metric_toggles' => SeoReportMetricRegistry::defaults(),
             'auto_generate' => false,
             'remind_missing' => false,
             'confirmed_sources_only' => false,
@@ -181,6 +188,10 @@ class SeoReportTemplateService
         if (is_array($order) && $order !== []) {
             $settings['section_order'] = SeoReportSectionRegistry::orderedKeys(['section_order' => $order]);
         }
+        $settings['metric_toggles'] = $this->mergeMetricToggles(
+            $settings['metric_toggles'] ?? null,
+            $request->input('metric_toggles')
+        );
         $settings['auto_generate'] = $request->boolean('auto_generate');
         $settings['remind_missing'] = $request->boolean('remind_missing');
         $settings['confirmed_sources_only'] = $request->boolean('confirmed_sources_only');
@@ -254,6 +265,32 @@ class SeoReportTemplateService
             $q->where('id', '!=', $exceptId);
         }
         $q->update(['is_default' => false]);
+    }
+
+    /**
+     * @param mixed $existing
+     * @param mixed $posted
+     * @return array<string, array<string, bool>>
+     */
+    private function mergeMetricToggles($existing, $posted): array
+    {
+        $defaults = SeoReportMetricRegistry::defaults();
+        $existing = is_array($existing) ? $existing : [];
+        $posted = is_array($posted) ? $posted : [];
+
+        foreach ($defaults as $section => $metrics) {
+            // Posted only when section is currently selected in the builder.
+            $src = array_key_exists($section, $posted) && is_array($posted[$section])
+                ? $posted[$section]
+                : (is_array($existing[$section] ?? null) ? $existing[$section] : []);
+            foreach ($metrics as $key => $_on) {
+                if (array_key_exists($key, $src)) {
+                    $defaults[$section][$key] = !empty($src[$key]) && $src[$key] !== '0' && $src[$key] !== 0;
+                }
+            }
+        }
+
+        return $defaults;
     }
 
     private function presetTitle(string $preset): string

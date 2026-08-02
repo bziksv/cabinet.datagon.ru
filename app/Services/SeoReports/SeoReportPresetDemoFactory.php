@@ -125,6 +125,9 @@ class SeoReportPresetDemoFactory
                     'traffic_mode' => $settings['traffic_mode'] ?? 'all',
                     'auto_compare' => !empty($settings['auto_compare']),
                     'section_order' => $settings['section_order'] ?? SeoReportSectionRegistry::defaultOrder(),
+                    'metric_toggles' => \App\SeoReports\SeoReportMetricRegistry::normalize(
+                        $settings['metric_toggles'] ?? null
+                    ),
                 ]
             ),
             'agency_name' => $template->agency_name,

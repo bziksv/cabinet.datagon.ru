@@ -38,6 +38,8 @@
         // Keep group order stable
         $orderedGroups = array_keys($groupLabels);
         $kpiHints = collect(\App\SeoReports\SeoReportKpiGoals::wizardRows())->keyBy('type');
+        $metricCatalog = \App\SeoReports\SeoReportMetricRegistry::catalog();
+        $metricToggles = \App\SeoReports\SeoReportMetricRegistry::normalize($settings['metric_toggles'] ?? null);
     @endphp
 
     <div class="cabinet-sr-page">
@@ -185,7 +187,7 @@
                                 {{ __('Selected blocks') }}
                                 <span class="cabinet-sr-builder__count" data-sr-selected-count>{{ count($selectedKeys) }}</span>
                             </h2>
-                            <p class="cabinet-sr-builder__hint">{{ __('Selected blocks hint') }}</p>
+                            <p class="cabinet-sr-builder__hint">{{ __('Selected blocks hint with metrics') }}</p>
                         </div>
                     </div>
                     <div class="cabinet-sr-builder__scroll" data-sr-selected>
@@ -216,6 +218,28 @@
                                     </span>
                                 </span>
                                 <button type="button" class="cabinet-sr-builder__remove" data-sr-remove aria-label="{{ __('Remove') }}">×</button>
+                                @php $sectionMetrics = $metricCatalog[$key] ?? []; @endphp
+                                @if($sectionMetrics !== [])
+                                    <details class="cabinet-sr-builder__metrics" data-sr-metrics onclick="event.stopPropagation()">
+                                        <summary>
+                                            {{ __('Metrics in block') }}
+                                            <span class="cabinet-sr-builder__metrics-count" data-sr-metrics-count></span>
+                                        </summary>
+                                        <div class="cabinet-sr-builder__metrics-list">
+                                            @foreach($sectionMetrics as $metric)
+                                                <label class="cabinet-sr-builder__metric">
+                                                    <input type="hidden" name="metric_toggles[{{ $key }}][{{ $metric['key'] }}]" value="0">
+                                                    <input type="checkbox"
+                                                           name="metric_toggles[{{ $key }}][{{ $metric['key'] }}]"
+                                                           value="1"
+                                                           data-sr-metric-cb
+                                                        @if(!empty($metricToggles[$key][$metric['key']])) checked @endif>
+                                                    <span>{{ $metric['label'] }}</span>
+                                                </label>
+                                            @endforeach
+                                        </div>
+                                    </details>
+                                @endif
                             </div>
                         @endforeach
                         <p class="cabinet-sr-builder__empty" data-sr-selected-empty @if(count($selectedKeys) > 0) hidden @endif>
@@ -422,6 +446,8 @@
                 var availableEmpty = builder.querySelector('[data-sr-available-empty]');
                 var selectedEmpty = builder.querySelector('[data-sr-selected-empty]');
                 var groupLabels = @json($groupLabels);
+                var metricCatalog = @json($metricCatalog);
+                var metricsLabel = @json(__('Metrics in block'));
                 var dragEl = null;
 
                 function ensureGroup(groupKey) {
@@ -436,6 +462,16 @@
                     group.appendChild(title);
                     available.insertBefore(group, availableEmpty);
                     return group;
+                }
+
+                function syncMetricCounts(root) {
+                    (root || selected).querySelectorAll('[data-sr-metrics]').forEach(function (box) {
+                        var cbs = box.querySelectorAll('[data-sr-metric-cb]');
+                        var on = 0;
+                        cbs.forEach(function (cb) { if (cb.checked) on += 1; });
+                        var el = box.querySelector('[data-sr-metrics-count]');
+                        if (el) el.textContent = '· ' + on + '/' + cbs.length;
+                    });
                 }
 
                 function syncUi() {
@@ -460,6 +496,31 @@
                     });
                     var anyAvail = available.querySelectorAll('[data-sr-block]:not([hidden])').length > 0;
                     if (availableEmpty) availableEmpty.hidden = anyAvail;
+                    syncMetricCounts();
+                }
+
+                function metricsHtml(sectionKey) {
+                    var list = metricCatalog[sectionKey] || [];
+                    if (!list.length) return '';
+                    var html = '<details class="cabinet-sr-builder__metrics" data-sr-metrics>' +
+                        '<summary>' + metricsLabel + ' <span class="cabinet-sr-builder__metrics-count" data-sr-metrics-count></span></summary>' +
+                        '<div class="cabinet-sr-builder__metrics-list">';
+                    list.forEach(function (metric) {
+                        html += '<label class="cabinet-sr-builder__metric">' +
+                            '<input type="hidden" name="metric_toggles[' + sectionKey + '][' + metric.key + ']" value="0">' +
+                            '<input type="checkbox" name="metric_toggles[' + sectionKey + '][' + metric.key + ']" value="1" data-sr-metric-cb checked>' +
+                            '<span></span></label>';
+                    });
+                    html += '</div></details>';
+                    var wrap = document.createElement('div');
+                    wrap.innerHTML = html;
+                    var details = wrap.firstChild;
+                    list.forEach(function (metric, idx) {
+                        var span = details.querySelectorAll('.cabinet-sr-builder__metric span')[idx];
+                        if (span) span.textContent = metric.label;
+                    });
+                    details.addEventListener('click', function (e) { e.stopPropagation(); });
+                    return details;
                 }
 
                 function makePicked(from) {
@@ -491,6 +552,8 @@
                     el.querySelector('.cabinet-sr-builder__block-hint').textContent = hint;
                     el.querySelector('.cabinet-sr-builder__block-meta').textContent =
                         sourceLabel + (titlo ? ' · Titlo' : '');
+                    var metrics = metricsHtml(key);
+                    if (metrics) el.appendChild(metrics);
                     return el;
                 }
 
@@ -610,6 +673,12 @@
                 }
 
                 selected.querySelectorAll('[data-sr-picked]').forEach(bindDrag);
+                selected.querySelectorAll('[data-sr-metrics]').forEach(function (box) {
+                    box.addEventListener('click', function (e) { e.stopPropagation(); });
+                });
+                selected.addEventListener('change', function (e) {
+                    if (e.target && e.target.matches('[data-sr-metric-cb]')) syncMetricCounts();
+                });
 
                 var titleInput = document.querySelector('[data-sr-tpl-title]');
                 var agencyInput = document.querySelector('[data-sr-agency-name]');

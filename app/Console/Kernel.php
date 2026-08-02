@@ -102,6 +102,10 @@ class Kernel extends ConsoleKernel
         // SEO-чеклист: сброс monthly/weekly задач в начале периода
         $schedule->command('seo-checklist:reset-recurring')->dailyAt('01:20');
 
+        // SEO отчёты: автогенерация за прошлый месяц + напоминания
+        $schedule->command('seo-reports:generate-monthly')->monthlyOn(2, '06:30');
+        $schedule->command('seo-reports:remind-missing')->monthlyOn(5, '09:00');
+
         // $schedule->command('inspire')
         //          ->hourly();
 

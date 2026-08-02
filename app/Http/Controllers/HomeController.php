@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\ClickTracking;
 use App\HomeUserArchivedSite;
+use App\HomeUserSitesPreference;
 use App\Support\HomeDashboard;
 use App\Support\HomeModuleItemCounts;
 use App\Support\HomeUserSites;
@@ -21,43 +22,25 @@ class HomeController extends Controller
             return redirect('/login');
         }
 
-        return view('home', $this->dashboardViewData());
+        return view('home-cards-v2', $this->dashboardViewData(true, true));
     }
 
-    /**
-     * Альтернативный макет главной (bento + список модулей).
-     */
+    /** @deprecated Старые макеты главной — редирект на основную. */
     public function variant2()
     {
-        if (!Auth::check()) {
-            return redirect('/login');
-        }
-
-        return view('home-v2', $this->dashboardViewData());
+        return redirect()->route('home');
     }
 
-    /**
-     * Вариант 3: KPI-полоса + сетка иконок (app hub).
-     */
+    /** @deprecated Старые макеты главной — редирект на основную. */
     public function variant3()
     {
-        if (!Auth::check()) {
-            return redirect('/login');
-        }
-
-        return view('home-v3', $this->dashboardViewData());
+        return redirect()->route('home');
     }
 
-    /**
-     * Карточки v2: счётчики проектов/сохранений (не дефолт).
-     */
+    /** @deprecated Алиас бывшего /home/variant-4 — редирект на основную. */
     public function variant4()
     {
-        if (!Auth::check()) {
-            return redirect('/login');
-        }
-
-        return view('home-cards-v2', $this->dashboardViewData(true, true));
+        return redirect()->route('home');
     }
 
     protected function dashboardViewData(bool $withItemCounts = false, bool $withUserSites = false): array
@@ -145,6 +128,23 @@ class HomeController extends Controller
             'archived_total' => count(HomeUserArchivedSite::domainMapForUser($userId, HomeUserArchivedSite::KIND_ARCHIVED)),
             'hidden_total' => count(HomeUserArchivedSite::domainMapForUser($userId, HomeUserArchivedSite::KIND_HIDDEN)),
         ]);
+    }
+
+    public function saveSitesColumns(Request $request): JsonResponse
+    {
+        $userId = (int) Auth::id();
+        if ($userId < 1) {
+            return response()->json(['ok' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $columns = $request->input('columns', []);
+        if (!is_array($columns)) {
+            return response()->json(['ok' => false, 'message' => __('Invalid request')], 422);
+        }
+
+        $saved = HomeUserSitesPreference::saveColumns($userId, $columns);
+
+        return response()->json(['ok' => true, 'columns' => $saved]);
     }
 
     private function moveUserSite(Request $request, string $kind, string $action): JsonResponse

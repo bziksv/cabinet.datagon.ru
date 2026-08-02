@@ -3,6 +3,7 @@
 namespace App;
 
 use App\Services\MenuProjectRegistry;
+use App\Support\CabinetAdminMenu;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
@@ -36,7 +37,10 @@ class MenuItemsPosition extends Model
                 ->values()
                 ->all();
         } else {
-            $query = MainProject::query()->orderBy('position', 'asc')->select($columns);
+            $query = MainProject::query()
+                ->orderBy('position', 'asc')
+                ->select($columns)
+                ->whereNotIn('id', CabinetAdminMenu::PROJECT_IDS);
             if (User::isUserAdmin()) {
                 $items = $query->get()->toArray();
             } else {

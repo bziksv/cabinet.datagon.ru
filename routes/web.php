@@ -52,6 +52,15 @@ Route::get('public/share/site-audit/{token}/report/{code}/xlsx', 'SiteAuditPubli
 Route::get('public/share/site-audit/{token}/xlsx', 'SiteAuditPublicShareController@exportCrawlXlsx')->name('site-audit.public.share.xlsx');
 Route::get('public/share/site-audit/{token}/docx', 'SiteAuditPublicShareController@exportCrawlDocx')->name('site-audit.public.share.docx');
 Route::get('public/share/esenin-text-check/{token}', 'EseninTextCheckPublicShareController@show')->name('esenin.text.check.public.share.view');
+Route::get('r/{token}', 'SeoReportsPublicController@show')->name('seo-reports.public')->where('token', '[A-Za-z0-9]+');
+Route::post('r/{token}/pin', 'SeoReportsPublicController@unlock')->name('seo-reports.public.unlock')->where('token', '[A-Za-z0-9]+');
+Route::get('r/{token}/present', 'SeoReportsPublicController@present')->name('seo-reports.public.present')->where('token', '[A-Za-z0-9]+');
+Route::post('r/{token}/approve', 'SeoReportsPublicController@approve')->name('seo-reports.public.approve')->where('token', '[A-Za-z0-9]+');
+Route::post('r/{token}/react', 'SeoReportsPublicController@react')->name('seo-reports.public.react')->where('token', '[A-Za-z0-9]+');
+// HTML-превью пресетов: только демо-данные, без auth (иначе Simple Browser / новая вкладка = белый редирект на login)
+Route::get('seo-reports/presets/{preset}/demo', 'SeoReportsController@presetDemo')
+    ->name('pages.seo-reports.preset-demo')
+    ->where('preset', 'seo_only|seo_ads|complex');
 Route::post('/balance-add/result', 'BalanceAddController@result')->name('balance.add.result');
 Route::get('/email/open/trigger/{token}.png', 'TriggerCampaignEmailOpenController@pixel')->name('email.trigger.open');
 Route::get('/personal-data/ru', 'AccessController@getRuPersonalData');
@@ -69,6 +78,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/home/sites/archive', 'HomeController@archiveUserSite')->name('home.sites.archive');
     Route::post('/home/sites/hide', 'HomeController@hideUserSite')->name('home.sites.hide');
     Route::post('/home/sites/restore', 'HomeController@restoreUserSite')->name('home.sites.restore');
+    Route::post('/home/sites/columns', 'HomeController@saveSitesColumns')->name('home.sites.columns');
 
     Route::get('/yandex-metrika/connect', 'YandexMetrikaController@connect')->name('yandex-metrika.connect');
     Route::get('/yandex-metrika/callback', 'YandexMetrikaController@callback')->name('yandex-metrika.callback');
@@ -260,6 +270,40 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('site-audit/crawl/{id}/ignore/restore', 'SiteAuditController@restoreIgnore')->name('pages.site-audit.ignore.restore')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/note', 'SiteAuditController@saveFindingNote')->name('pages.site-audit.note')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/note/clear', 'SiteAuditController@clearFindingNote')->name('pages.site-audit.note.clear')->middleware('permission:Site audit');
+
+    Route::get('seo-reports', 'SeoReportsController@index')->name('pages.seo-reports')->middleware('permission:SEO Reports');
+    Route::get('seo-reports/templates', 'SeoReportsController@templates')->name('pages.seo-reports.templates')->middleware('permission:SEO Reports');
+    Route::post('seo-reports/templates', 'SeoReportsController@storeTemplate')->name('pages.seo-reports.templates.store')->middleware('permission:SEO Reports');
+    Route::get('seo-reports/templates/{id}/edit', 'SeoReportsController@editTemplate')->name('pages.seo-reports.templates.edit')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('seo-reports/templates/{id}', 'SeoReportsController@updateTemplate')->name('pages.seo-reports.templates.update')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('seo-reports/templates/{id}/duplicate', 'SeoReportsController@duplicateTemplate')->name('pages.seo-reports.templates.duplicate')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('seo-reports/templates/{id}/delete', 'SeoReportsController@destroyTemplate')->name('pages.seo-reports.templates.destroy')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('seo-reports', 'SeoReportsController@store')->name('pages.seo-reports.store')->middleware('permission:SEO Reports');
+    Route::post('seo-reports/batch-generate', 'SeoReportsController@batchGenerate')->name('pages.seo-reports.batch')->middleware('permission:SEO Reports');
+    Route::post('seo-reports/demo', 'SeoReportsController@createDemo')->name('pages.seo-reports.demo')->middleware('permission:SEO Reports');
+    Route::get('seo-reports/{id}', 'SeoReportsController@show')->name('pages.seo-reports.show')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::get('seo-reports/{id}/settings', 'SeoReportsController@settings')->name('pages.seo-reports.settings')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('seo-reports/{id}/settings', 'SeoReportsController@updateSettings')->name('pages.seo-reports.settings.update')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('seo-reports/{id}/settings/import-console', 'SeoReportsController@importSearchConsole')->name('pages.seo-reports.settings.import-console')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('seo-reports/{id}/settings/import-ads', 'SeoReportsController@importExternalAds')->name('pages.seo-reports.settings.import-ads')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('seo-reports/{id}/share', 'SeoReportsController@share')->name('pages.seo-reports.share')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('seo-reports/{id}/unshare', 'SeoReportsController@unshare')->name('pages.seo-reports.unshare')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('seo-reports/{id}/reports', 'SeoReportsController@storeReport')->name('pages.seo-reports.reports.store')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::get('seo-reports/{id}/reports/{reportId}', 'SeoReportsController@showReport')->name('pages.seo-reports.report')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::get('seo-reports/{id}/reports/{reportId}/status', 'SeoReportsController@reportStatus')->name('pages.seo-reports.report.status')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::get('seo-reports/{id}/reports/{reportId}/pdf', 'SeoReportsController@pdf')->name('pages.seo-reports.report.pdf')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::get('seo-reports/{id}/reports/{reportId}/docx', 'SeoReportsController@docx')->name('pages.seo-reports.report.docx')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::get('seo-reports/{id}/reports/{reportId}/pack', 'SeoReportsController@downloadPack')->name('pages.seo-reports.report.pack')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::post('seo-reports/{id}/reports/{reportId}/email', 'SeoReportsController@sendEmail')->name('pages.seo-reports.report.email')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::post('seo-reports/{id}/reports/{reportId}/regenerate', 'SeoReportsController@regenerate')->name('pages.seo-reports.report.regenerate')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::post('seo-reports/{id}/reports/{reportId}/publish', 'SeoReportsController@publish')->name('pages.seo-reports.report.publish')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::post('seo-reports/{id}/reports/{reportId}/clone', 'SeoReportsController@cloneReport')->name('pages.seo-reports.report.clone')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::get('seo-reports/{id}/reports/{reportId}/positions.csv', 'SeoReportsController@positionsCsv')->name('pages.seo-reports.report.positions-csv')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::post('seo-reports/{id}/reports/{reportId}/texts', 'SeoReportsController@updateTexts')->name('pages.seo-reports.report.texts')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::post('seo-reports/{id}/reports/{reportId}/share', 'SeoReportsController@updateShare')->name('pages.seo-reports.report.share')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::get('seo-reports/{id}/compare', 'SeoReportsController@compare')->name('pages.seo-reports.compare')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('seo-reports/{id}/archive', 'SeoReportsController@archive')->name('pages.seo-reports.archive')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('seo-reports/{id}/restore', 'SeoReportsController@restore')->name('pages.seo-reports.restore')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
 
     Route::get('seo-checklist', 'SeoChecklistController@index')->name('pages.seo-checklist')->middleware('permission:SEO Checklist');
     Route::post('seo-checklist', 'SeoChecklistController@store')->name('pages.seo-checklist.store')->middleware('permission:SEO Checklist');

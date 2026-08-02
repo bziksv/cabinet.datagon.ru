@@ -8,8 +8,6 @@
 
 @section('content')
     <div class="cabinet-home-v2-page">
-        @include('home.partials.layout-switcher', ['activeVariant' => 2])
-
         @include('home.partials.seo-checklist-due', ['seoChecklistDue' => $seoChecklistDue ?? null])
 
         <div class="row g-3">

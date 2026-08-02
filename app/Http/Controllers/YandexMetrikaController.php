@@ -185,7 +185,7 @@ class YandexMetrikaController extends Controller
 
     private function safeReturn($url): string
     {
-        $fallback = route('home.variant4');
+        $fallback = route('home');
         if (!is_string($url) || $url === '') {
             return $fallback;
         }

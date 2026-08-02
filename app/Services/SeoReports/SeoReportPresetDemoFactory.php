@@ -1,0 +1,646 @@
+<?php
+
+namespace App\Services\SeoReports;
+
+use App\SeoReports\SeoReport;
+use App\SeoReports\SeoReportBrandColor;
+use App\SeoReports\SeoReportKpiGoals;
+use App\SeoReports\SeoReportProject;
+use App\SeoReports\SeoReportSectionRegistry;
+use Carbon\Carbon;
+
+/**
+ * Полный демо-снимок HTML-отчёта для пресетов мастера (без записи в БД).
+ */
+class SeoReportPresetDemoFactory
+{
+    /**
+     * @return array{project:SeoReportProject,report:SeoReport,snapshot:array<string,mixed>,sections:list<array<string,mixed>>}
+     */
+    public function make(string $preset): array
+    {
+        if (!in_array($preset, ['seo_only', 'seo_ads', 'complex'], true)) {
+            $preset = 'seo_only';
+        }
+
+        $from = Carbon::today()->subMonthNoOverflow()->startOfMonth();
+        $to = $from->copy()->endOfMonth()->startOfDay();
+        $cFrom = $from->copy()->subMonthNoOverflow()->startOfMonth();
+        $cTo = $from->copy()->subMonthNoOverflow()->endOfMonth()->startOfDay();
+
+        $toggles = SeoReportSectionRegistry::togglesForPreset($preset);
+        $project = new SeoReportProject([
+            'id' => 0,
+            'user_id' => 0,
+            'domain' => 'demo-shop.titlo.ru',
+            'title' => 'Демо · ' . $this->presetTitle($preset),
+            'status' => 'active',
+            'section_toggles' => $toggles,
+            'settings_json' => [
+                'kpi_goals' => [
+                    'visits' => ['enabled' => true, 'target' => 15000],
+                    'users' => ['enabled' => true, 'target' => 9000],
+                    'top10' => ['enabled' => true, 'target' => 40],
+                    'conversions' => ['enabled' => true, 'target' => 200],
+                ],
+            ],
+            'agency_name' => 'Агентство Titlo',
+            'agency_address' => 'Москва',
+            'agency_email' => 'hello@titlo.ru',
+            'agency_phone' => '+7 (495) 000-00-00',
+            'brand_color' => '#1d4ed8',
+            'manager_name' => 'Анна Менеджерова',
+            'manager_phone' => '+7 (999) 123-45-67',
+            'manager_email' => 'anna@agency.example',
+            'metrika_counter_id' => 48001034,
+            'monitoring_project_id' => 744,
+        ]);
+
+        $report = new SeoReport([
+            'id' => 0,
+            'project_id' => 0,
+            'status' => SeoReport::STATUS_READY,
+            'period_from' => $from,
+            'period_to' => $to,
+            'compare_from' => $cFrom,
+            'compare_to' => $cTo,
+            'summary_text' => $this->summaryFor($preset),
+            'work_done_text' => "• Оптимизация title/description на 18 посадочных\n• Расширение семантики TOP-20 (+42 фразы)\n• Правки сниппетов по выгрузке GSC",
+            'work_plan_text' => "• Усилить быстрые победы (позиции 8–20)\n• Пересобрать коммерческие посадочные из risk-листа\n• Проверить конверсии с рекламы и соцсетей",
+            'generated_at' => now(),
+            'comments_json' => [
+                'workflow_status' => 'client',
+                'recommendations' => "P1: усилить упавшие запросы\nP2: снизить отказы на /services",
+            ],
+            'public_token' => 'demo',
+        ]);
+        $report->setRelation('project', $project);
+
+        $snapshot = $this->snapshot($project, $report, $preset);
+        $sections = $this->sections($toggles);
+
+        return [
+            'project' => $project,
+            'report' => $report,
+            'snapshot' => $snapshot,
+            'sections' => $sections,
+            'preset' => $preset,
+            'preset_title' => $this->presetTitle($preset),
+        ];
+    }
+
+    public function presetTitle(string $preset): string
+    {
+        $map = [
+            'seo_only' => 'Только SEO',
+            'seo_ads' => 'SEO + реклама',
+            'complex' => 'Комплексный',
+        ];
+
+        return $map[$preset] ?? $preset;
+    }
+
+    private function summaryFor(string $preset): string
+    {
+        if ($preset === 'complex') {
+            return "Комплексный отчёт по продвижению demo-shop.titlo.ru показывает результат сразу по нескольким направлениям: SEO, контекст, таргет, SMM, конверсии, звонки и продажи.\n\n"
+                . "• SEO: выросли поисковый трафик, видимость и позиции по коммерческим запросам.\n"
+                . "• Контекст: Директ и Google Ads дают заявки, но часть посадочных с высоким отказом.\n"
+                . "• Таргет и SMM: VK Ads + сообщество усиливают охват и вовлечённость (ER 4,2%).\n"
+                . "• Продажи: ecommerce +11% выручки, звонки стабильны.\n\n"
+                . "Главный вывод: рост складывается из связки каналов. Следующий фокус — посадочные из рекламы и risk-лист позиций.";
+        }
+        if ($preset === 'seo_ads') {
+            return "Отчёт SEO + реклама для demo-shop.titlo.ru: органика держит рост, контекст требует точечных правок.\n\n"
+                . "• Поисковый трафик и TOP-10 растут.\n"
+                . "• Директ: отказы выше нормы — проверить соответствие объявлений и посадочных.\n"
+                . "• Google Ads и GSC дают дополнительные клики по коммерческим запросам.\n\n"
+                . "Фокус следующего месяца — снизить bounce в рекламе и усилить быстрые победы 8–20.";
+        }
+
+        return "SEO-отчёт по demo-shop.titlo.ru за период: органика, позиции и выполненные работы.\n\n"
+            . "• Визиты +8,3%, поисковый канал — основной драйвер роста.\n"
+            . "• В TOP-10 сейчас 42 запроса (+5).\n"
+            . "• Приоритет: усилить посадочные из risk-листа и быстрые победы на позициях 8–20.";
+    }
+
+    /**
+     * @param array<string,bool> $toggles
+     * @return list<array<string,mixed>>
+     */
+    private function sections(array $toggles): array
+    {
+        $catalog = SeoReportSectionRegistry::all();
+        $out = [];
+        foreach (SeoReportSectionRegistry::orderedKeys([]) as $key) {
+            if (empty($toggles[$key])) {
+                continue;
+            }
+            $meta = $catalog[$key] ?? null;
+            if (!$meta) {
+                continue;
+            }
+            $out[] = [
+                'key' => $key,
+                'title' => $meta['title'],
+                'group' => $meta['group'],
+                'source' => $meta['source'],
+                'enabled' => true,
+                'source_status' => SeoReportSectionRegistry::SOURCE_STATUS_OK,
+                'client_visible' => true,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function snapshot(SeoReportProject $project, SeoReport $report, string $preset): array
+    {
+        $series = [];
+        $day = optional($report->period_from)->copy() ?: Carbon::today()->startOfMonth();
+        $end = optional($report->period_to)->copy() ?: Carbon::today();
+        $i = 0;
+        while ($day->lte($end) && $i < 31) {
+            $series[$day->format('Y-m-d')] = 120 + ($i % 7) * 18 + ($i * 3);
+            $day->addDay();
+            $i++;
+        }
+
+        $snap = [
+            'generated_at' => now()->toIso8601String(),
+            'is_demo' => true,
+            'demo_preset' => $preset,
+            'quality' => 'full',
+            'requires_publish' => false,
+            'published_at' => now()->toIso8601String(),
+            'cover' => [
+                'title' => 'SEO-отчёт · ' . $project->domain,
+                'domain' => $project->domain,
+                'period_label' => optional($report->period_from)->format('d.m.Y')
+                    . ' — ' . optional($report->period_to)->format('d.m.Y'),
+                'compare_label' => optional($report->compare_from)->format('d.m.Y')
+                    . ' — ' . optional($report->compare_to)->format('d.m.Y'),
+                'agency' => [
+                    'name' => $project->agency_name,
+                    'brand_color' => SeoReportBrandColor::normalize($project->brand_color),
+                    'email' => $project->agency_email,
+                    'phone' => $project->agency_phone,
+                ],
+                'manager' => [
+                    'name' => $project->manager_name,
+                    'email' => $project->manager_email,
+                    'phone' => $project->manager_phone,
+                ],
+                'data_as_of' => now()->toIso8601String(),
+            ],
+            'progress' => [
+                'metrika' => 'ok',
+                'monitoring' => 'ok',
+                'conversions' => 'ok',
+            ],
+            'traffic' => [
+                'mode' => 'all',
+                'kpis' => [
+                    'visits' => ['value' => 12480, 'prev' => 11520, 'delta_pct' => 8.3],
+                    'users' => ['value' => 9820, 'prev' => 9250, 'delta_pct' => 6.1],
+                    'pageviews' => ['value' => 28600, 'prev' => 26100, 'delta_pct' => 9.6],
+                    'bounce_rate' => ['value' => 34.2, 'prev' => 36.1, 'delta_pct' => -5.3],
+                    'page_depth' => ['value' => 2.4, 'prev' => 2.3, 'delta_pct' => 4.3],
+                    'avg_visit_duration' => ['value' => 145, 'prev' => 140, 'delta_pct' => 3.6],
+                ],
+                'series_users' => $series,
+                'channels' => [
+                    ['name' => 'Поисковые системы', 'visits' => 7200, 'visits_prev' => 6600],
+                    ['name' => 'Прямые заходы', 'visits' => 2100, 'visits_prev' => 2050],
+                    ['name' => 'Социальные сети', 'visits' => 980, 'visits_prev' => 870],
+                    ['name' => 'Реклама', 'visits' => 1640, 'visits_prev' => 1720],
+                ],
+                'devices' => [
+                    ['name' => 'Смартфоны', 'visits' => 7800],
+                    ['name' => 'ПК', 'visits' => 3900],
+                    ['name' => 'Планшеты', 'visits' => 780],
+                ],
+                'geo' => [
+                    ['name' => 'Москва', 'visits' => 4200],
+                    ['name' => 'Санкт-Петербург', 'visits' => 1800],
+                    ['name' => 'Казань', 'visits' => 640],
+                ],
+                'landings' => [
+                    ['name' => '/', 'visits' => 3200, 'visits_delta_pct' => 12],
+                    ['name' => '/services', 'visits' => 1450, 'visits_delta_pct' => 28],
+                    ['name' => '/prices', 'visits' => 920, 'visits_delta_pct' => -4],
+                ],
+                'landings_social' => [
+                    ['name' => '/promo', 'visits' => 420],
+                    ['name' => '/blog/case', 'visits' => 210],
+                ],
+                'search' => [
+                    'kpis' => [
+                        'visits' => ['value' => 7200, 'delta_pct' => 9.1],
+                        'users' => ['value' => 6100, 'delta_pct' => 7.4],
+                    ],
+                ],
+                'auto_comment' => 'Поисковый трафик растёт, рекламный канал чуть просел — смотрите блок рекламы.',
+            ],
+            'positions' => [
+                'summary' => [
+                    'top3' => 12,
+                    'top10' => 42,
+                    'top30' => 120,
+                    'top100' => 210,
+                    'diff_top10' => '+5',
+                ],
+                'dynamics' => [
+                    'improved' => 34,
+                    'unchanged' => 80,
+                    'worsened' => 18,
+                    'pairs' => 2,
+                    'date_from' => optional($report->compare_to)->format('Y-m-d'),
+                    'date_to' => optional($report->period_to)->format('Y-m-d'),
+                ],
+                'phrases' => [
+                    'improved' => [
+                        [
+                            'query' => 'купить окна москва',
+                            'engine' => 'yandex',
+                            'pos_from' => 14,
+                            'pos_to' => 8,
+                            'delta' => -6,
+                            'url' => 'https://demo-shop.titlo.ru/services',
+                        ],
+                    ],
+                    'worsened' => [
+                        [
+                            'query' => 'пластиковые окна',
+                            'engine' => 'google',
+                            'pos_from' => 9,
+                            'pos_to' => 15,
+                            'delta' => 6,
+                            'url' => 'https://demo-shop.titlo.ru/',
+                        ],
+                    ],
+                ],
+                'top_baskets' => [
+                    ['label' => 'TOP-3', 'value' => 12, 'diff' => '+2'],
+                    ['label' => 'TOP-10', 'value' => 42, 'diff' => '+5'],
+                    ['label' => 'TOP-30', 'value' => 120, 'diff' => '+11'],
+                ],
+                'visibility_by_engine' => [
+                    ['engine' => 'yandex', 'region' => 'Москва', 'top10' => 38, 'words' => 180, 'pct' => 21.1],
+                    ['engine' => 'google', 'region' => 'Россия', 'top10' => 29, 'words' => 160, 'pct' => 18.1],
+                ],
+                'visibility_series' => [
+                    ['date' => optional($report->period_from)->format('Y-m-d'), 'pct' => 18.4, 'top10' => 33, 'words' => 180],
+                    ['date' => optional($report->period_from)->copy()->addDays(14)->format('Y-m-d'), 'pct' => 20.0, 'top10' => 36, 'words' => 180],
+                    ['date' => optional($report->period_to)->format('Y-m-d'), 'pct' => 21.1, 'top10' => 38, 'words' => 180],
+                ],
+                'by_engine' => [
+                    ['engine' => 'yandex', 'region' => 'Москва', 'words' => 180, 'top10' => 38, 'top100' => 140],
+                    ['engine' => 'google', 'region' => 'Россия', 'words' => 160, 'top10' => 29, 'top100' => 120],
+                ],
+                'quick_wins' => [
+                    [
+                        'query' => 'окна под ключ',
+                        'engine' => 'yandex',
+                        'pos_from' => 18,
+                        'pos_to' => 12,
+                        'delta' => -6,
+                        'url' => 'https://demo-shop.titlo.ru/services',
+                    ],
+                    [
+                        'query' => 'установка окон цена',
+                        'engine' => 'google',
+                        'pos_from' => 19,
+                        'pos_to' => 15,
+                        'delta' => -4,
+                        'url' => 'https://demo-shop.titlo.ru/prices',
+                    ],
+                ],
+                'risk' => [
+                    [
+                        'query' => 'ремонт окон',
+                        'engine' => 'yandex',
+                        'pos_from' => 7,
+                        'pos_to' => 19,
+                        'delta' => 12,
+                        'url' => 'https://demo-shop.titlo.ru/repair',
+                    ],
+                ],
+                'groups' => [
+                    ['id' => 1, 'name' => 'Коммерция', 'words' => 80, 'top10' => 28],
+                    ['id' => 2, 'name' => 'Инфо', 'words' => 40, 'top10' => 14],
+                ],
+                'competitors' => [
+                    'count' => 2,
+                    'urls' => ['competitor-a.example', 'competitor-b.example'],
+                ],
+                'note' => 'Демо-данные мониторинга позиций',
+                'data_as_of' => now()->toIso8601String(),
+            ],
+            'conversions' => [
+                'goals' => [[
+                    'id' => 1,
+                    'name' => 'Заявка',
+                    'reaches' => ['value' => 186, 'prev' => 178, 'delta_pct' => 4.5],
+                    'conversion_rate' => ['value' => 1.5, 'prev' => 1.5, 'delta_pct' => 0.0],
+                    'cost_per_conversion' => 420,
+                ]],
+                'search_goals' => [[
+                    'id' => 1,
+                    'name' => 'Заявка',
+                    'reaches' => 120,
+                    'conversion_rate' => 1.7,
+                ]],
+                'social_goals' => [[
+                    'id' => 1,
+                    'name' => 'Заявка',
+                    'reaches' => 12,
+                    'conversion_rate' => 1.1,
+                ]],
+                'ad_goals' => [[
+                    'id' => 1,
+                    'name' => 'Заявка',
+                    'reaches' => 54,
+                    'conversion_rate' => 1.9,
+                ]],
+                'comment' => 'Конверсии растут вместе с поисковым трафиком.',
+            ],
+            'gsc' => [
+                'source' => 'demo',
+                'note' => 'Демо Google Search Console',
+                'kpis' => ['clicks' => 4200, 'impressions' => 88000, 'ctr' => 4.8, 'position' => 12.4],
+                'queries' => [
+                    ['name' => 'купить окна', 'clicks' => 320, 'impressions' => 8200, 'ctr' => 3.9, 'position' => 8.2],
+                    ['name' => 'окна пвх', 'clicks' => 210, 'impressions' => 6100, 'ctr' => 3.4, 'position' => 11.1],
+                ],
+                'pages' => [
+                    ['name' => '/', 'clicks' => 900, 'impressions' => 18000],
+                    ['name' => '/services', 'clicks' => 420, 'impressions' => 9000],
+                ],
+            ],
+            'webmaster' => [
+                'source' => 'demo',
+                'note' => 'Демо Яндекс.Вебмастер',
+                'kpis' => ['clicks' => 5100, 'impressions' => 96000, 'ctr' => 5.3, 'position' => 9.8],
+                'queries' => [
+                    ['name' => 'окна москва', 'clicks' => 410, 'impressions' => 7000, 'ctr' => 5.9, 'position' => 6.4],
+                ],
+                'pages' => [
+                    ['name' => '/', 'clicks' => 1100, 'impressions' => 20000],
+                ],
+            ],
+            'insights' => [
+                'Визиты за период: 12 480 (+8,3% к прошлому периоду)',
+                'Позиции: ↑34 / →80 / ↓18 запросов',
+                'В TOP-10 сейчас: 42 (+5)',
+            ],
+            'anomalies' => [
+                ['date' => optional($report->period_from)->copy()->addDays(12)->format('Y-m-d'), 'value' => 980, 'z' => 2.6, 'direction' => 'up'],
+            ],
+            'recommendations' => [
+                ['priority' => 'P1', 'text' => 'Risk: «ремонт окон» упал с 7 до 19 — разобрать посадочную и выдачу.'],
+                ['priority' => 'P2', 'text' => 'Быстрые победы: 2 запроса на 8–20 — усилить title/контент.'],
+                ['priority' => 'P3', 'text' => 'Проверить конверсию посадочной /services при росте трафика.'],
+            ],
+            'scorecard' => [
+                ['key' => 'visits', 'label' => 'Визиты', 'value' => '12 480', 'delta' => '+8,3%', 'delta_class' => 'is-up', 'tone' => 'green'],
+                ['key' => 'top10', 'label' => 'TOP-10', 'value' => '42', 'delta' => '+5', 'delta_class' => 'is-up', 'tone' => 'green'],
+                ['key' => 'conv', 'label' => 'Заявки', 'value' => '186', 'delta' => '+4,5%', 'delta_class' => 'is-up', 'tone' => 'yellow'],
+            ],
+            'work_facts' => [
+                'Site Audit: средний балл 78, критичных 3',
+                'SEO-чеклист: закрыто 12 задач за период',
+                'Аптайм: 99,92%',
+            ],
+            'titlo_audit' => [
+                'project_id' => 1,
+                'crawl_id' => 1,
+                'finished_at' => now()->toIso8601String(),
+                'buckets' => [
+                    'critical' => 3,
+                    'other' => 7,
+                    'warning' => 11,
+                    'info' => 24,
+                ],
+                'note' => 'Демо Site Audit',
+            ],
+            'titlo_checklist' => [
+                'project_id' => 1,
+                'progress_done' => 42,
+                'progress_total' => 58,
+                'closed_in_period' => 12,
+                'overdue' => 2,
+                'note' => 'Демо SEO-чеклист',
+            ],
+            'titlo_relevance' => [
+                'project_id' => 1,
+                'count_checks' => 4,
+                'count_sites' => 12,
+                'avg_points' => 72.4,
+                'avg_position' => 9.8,
+                'last_check' => now()->toDateString(),
+                'note' => 'Демо релевантность',
+            ],
+            'titlo_uptime' => [
+                'project_id' => 1,
+                'uptime_percent' => 99.92,
+                'broken' => false,
+                'last_check' => now()->toDateTimeString(),
+                'domain_days_left' => 214,
+                'note' => 'Демо аптайм',
+            ],
+            'data_quality' => [
+                'level' => 'full',
+                'flags' => [],
+                'generated_at' => now()->toIso8601String(),
+            ],
+        ];
+
+        $snap['kpi_goals'] = SeoReportKpiGoals::evaluate(
+            SeoReportKpiGoals::fromSettings($project->settings_json),
+            $snap
+        );
+
+        if (in_array($preset, ['seo_ads', 'complex'], true)) {
+            $snap['direct'] = [
+                'source' => 'demo',
+                'note' => 'Демо Яндекс.Директ (из среза Метрики)',
+                'kpis' => [
+                    'visits' => ['value' => 920, 'delta_pct' => -3.2],
+                    'users' => ['value' => 780, 'delta_pct' => -2.1],
+                    'bounce_rate' => ['value' => 41.0, 'delta_pct' => 8.0],
+                    'page_depth' => ['value' => 1.6, 'delta_pct' => -4.0],
+                    'avg_visit_duration' => ['value' => 98, 'delta_pct' => -5.0],
+                ],
+                'landings' => [
+                    ['name' => '/services', 'visits' => 310],
+                    ['name' => '/prices', 'visits' => 180],
+                ],
+                'fix' => [
+                    'Высокий отказ в рекламном трафике — проверить посадочные и соответствие объявлений.',
+                ],
+            ];
+            $snap['google_ads'] = [
+                'source' => 'demo',
+                'note' => 'Демо Google Ads',
+                'kpis' => [
+                    'visits' => ['value' => 720, 'delta_pct' => 2.4],
+                    'users' => ['value' => 610, 'delta_pct' => 1.8],
+                    'bounce_rate' => ['value' => 38.0, 'delta_pct' => -1.0],
+                    'page_depth' => ['value' => 1.8, 'delta_pct' => 2.0],
+                    'avg_visit_duration' => ['value' => 110, 'delta_pct' => 1.0],
+                ],
+                'campaigns' => [
+                    ['name' => 'Brand · RU', 'visits' => 280, 'users' => 240],
+                    ['name' => 'Generic · Windows', 'visits' => 440, 'users' => 370],
+                ],
+                'landings' => [
+                    ['name' => '/promo', 'visits' => 190],
+                ],
+                'phrases' => [
+                    ['name' => 'окна купить', 'visits' => 90],
+                ],
+                'conversions' => [
+                    ['name' => 'Заявка', 'reaches' => 22, 'conversion_rate' => 3.1],
+                ],
+            ];
+            $snap['progress']['direct'] = 'ok';
+            $snap['progress']['google_ads'] = 'ok';
+            $snap['progress']['gsc'] = 'ok';
+            $snap['progress']['webmaster'] = 'ok';
+        }
+
+        if ($preset === 'complex') {
+            $snap['vk_ads'] = [
+                'source' => 'demo',
+                'note' => 'Демо VK Реклама',
+                'kpis' => [
+                    'reach' => 42000,
+                    'impressions' => 118000,
+                    'clicks' => 2400,
+                    'ctr' => 2.03,
+                    'cpc' => 18.5,
+                    'cpm' => 376,
+                    'spend' => 44400,
+                ],
+                'campaigns' => [
+                    ['name' => 'Лиды · Москва', 'impressions' => 70000, 'clicks' => 1500, 'ctr' => 2.1, 'spend' => 28000],
+                    ['name' => 'Ретаргет', 'impressions' => 48000, 'clicks' => 900, 'ctr' => 1.9, 'spend' => 16400],
+                ],
+                'ads' => [
+                    ['name' => 'Креатив A', 'impressions' => 40000, 'clicks' => 980, 'ctr' => 2.45],
+                    ['name' => 'Креатив B', 'impressions' => 35000, 'clicks' => 720, 'ctr' => 2.06],
+                ],
+                'demography' => [
+                    ['name' => 'ж 25–34', 'clicks' => 820, 'impressions' => 30000],
+                    ['name' => 'м 25–34', 'clicks' => 740, 'impressions' => 28000],
+                ],
+            ];
+            $snap['meta_ads'] = [
+                'source' => 'demo',
+                'note' => 'Демо Meta Ads',
+                'kpis' => [
+                    'reach' => 18000,
+                    'impressions' => 52000,
+                    'clicks' => 900,
+                    'ctr' => 1.73,
+                    'cpc' => 22.0,
+                    'cpm' => 380,
+                    'spend' => 19800,
+                ],
+                'campaigns' => [
+                    ['name' => 'Awareness', 'impressions' => 52000, 'clicks' => 900, 'ctr' => 1.73, 'spend' => 19800],
+                ],
+                'ads' => [
+                    ['name' => 'Carousel 1', 'impressions' => 52000, 'clicks' => 900, 'ctr' => 1.73],
+                ],
+                'demography' => [],
+            ];
+            $snap['vk_smm'] = [
+                'source' => 'demo',
+                'note' => 'Демо сообщества VK',
+                'kpis' => [
+                    'subscribers' => 12400,
+                    'reach' => 8600,
+                    'impressions' => 42000,
+                    'visitors' => 5100,
+                    'likes' => 980,
+                    'comments' => 140,
+                    'shares' => 95,
+                    'posts' => 18,
+                    'er' => 4.2,
+                ],
+                'dynamics' => [
+                    ['date' => optional($report->period_from)->format('Y-m-d'), 'subscribers' => 12100, 'reach' => 900, 'views' => 4200],
+                    ['date' => optional($report->period_to)->format('Y-m-d'), 'subscribers' => 12400, 'reach' => 1100, 'views' => 5100],
+                ],
+                'engagement' => ['likes' => 980, 'comments' => 140, 'shares' => 95, 'er' => 4.2],
+                'top_posts' => [
+                    ['name' => 'Кейс: рост заявок на 18%', 'likes' => 210, 'comments' => 28, 'shares' => 19, 'views' => 6400],
+                    ['name' => 'Акция на замер', 'likes' => 160, 'comments' => 22, 'shares' => 14, 'views' => 5200],
+                ],
+                'demography' => [
+                    ['name' => 'ж 25–34', 'clicks' => 3200],
+                    ['name' => 'м 25–34', 'clicks' => 2800],
+                ],
+                'post_stats' => [],
+            ];
+            $snap['ecommerce'] = [
+                'available' => true,
+                'users' => 4200,
+                'purchases' => 186,
+                'cr' => 4.4,
+                'revenue' => 1840000,
+                'aov' => 9892,
+                'rpv' => 438,
+                'note' => 'Демо ecommerce',
+                'by_source' => [
+                    ['name' => 'Поиск', 'purchases' => 110, 'revenue' => 980000],
+                    ['name' => 'Реклама', 'purchases' => 54, 'revenue' => 520000],
+                    ['name' => 'Соцсети', 'purchases' => 22, 'revenue' => 340000],
+                ],
+                'categories' => [
+                    ['name' => 'Окна ПВХ', 'purchases' => 96, 'revenue' => 920000],
+                    ['name' => 'Фурнитура', 'purchases' => 40, 'revenue' => 180000],
+                ],
+                'products' => [
+                    ['name' => 'Окно стандарт', 'purchases' => 64, 'revenue' => 520000],
+                    ['name' => 'Окно премиум', 'purchases' => 28, 'revenue' => 610000],
+                ],
+            ];
+            $snap['calls'] = [
+                'source' => 'demo',
+                'note' => 'Демо коллтрекинг Метрики',
+                'total' => 94,
+                'first' => 61,
+                'missed' => 8,
+                'talk_avg' => 186,
+                'hold_avg' => 22,
+                'by_channel' => [
+                    ['name' => 'Поиск', 'calls' => 48, 'missed' => 3],
+                    ['name' => 'Реклама', 'calls' => 31, 'missed' => 4],
+                    ['name' => 'Соцсети', 'calls' => 15, 'missed' => 1],
+                ],
+            ];
+            $snap['traffic']['ecommerce'] = $snap['ecommerce'];
+            $snap['progress']['vk_ads'] = 'ok';
+            $snap['progress']['meta_ads'] = 'ok';
+            $snap['progress']['vk_smm'] = 'ok';
+            $snap['progress']['ecommerce'] = 'ok';
+            $snap['progress']['calls'] = 'ok';
+            $snap['scorecard'][] = [
+                'key' => 'revenue',
+                'label' => 'Выручка',
+                'value' => '1,8 млн',
+                'delta' => '+11%',
+                'delta_class' => 'is-up',
+                'tone' => 'green',
+            ];
+        }
+
+        return $snap;
+    }
+}

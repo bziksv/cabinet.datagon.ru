@@ -15,6 +15,7 @@ use App\Project;
 use App\ProjectRelevanceHistory;
 use App\ProjectTracking;
 use App\SearchSuggestionsHistory;
+use App\SeoReports\SeoReportProject;
 use App\SiteAuditProject;
 use App\SiteTypesHistory;
 use App\TextUniquenessHistory;
@@ -127,6 +128,17 @@ class HomeModuleItemCounts
             return SiteAuditProject::query()->where('user_id', $userId)->count();
         });
 
+        $add('seo-reports', 'projects', static function () use ($userId) {
+            if (!Schema::hasTable('seo_report_projects')) {
+                return 0;
+            }
+
+            return SeoReportProject::query()
+                ->where('user_id', $userId)
+                ->where('status', 'active')
+                ->count();
+        });
+
         $add('text-analyzer', 'saved', static function () use ($userId) {
             return TextUniquenessHistory::query()->where('user_id', $userId)->count();
         });
@@ -188,6 +200,7 @@ class HomeModuleItemCounts
             'meta-tags' => true,
             'html-editor' => true,
             'site-audit' => true,
+            'seo-reports' => true,
             'text-analyzer' => true,
             'esenin-text-check' => true,
             'domain-records' => true,

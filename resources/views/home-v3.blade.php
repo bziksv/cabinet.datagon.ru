@@ -8,8 +8,6 @@
 
 @section('content')
     <div class="cabinet-home-v3-page">
-        @include('home.partials.layout-switcher', ['activeVariant' => 3])
-
         @include('home-v3.partials.kpi-strip', ['summary' => $summary])
         @include('home.partials.seo-checklist-due', ['seoChecklistDue' => $seoChecklistDue ?? null])
 

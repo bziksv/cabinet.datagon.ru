@@ -13,4 +13,7 @@ return [
     'api_base' => 'https://api-metrika.yandex.net',
     'scope' => 'metrika:read',
     'timeout' => 20,
+
+    /** Кэш колонки «Сегодня» на главной (секунды). Вчера/7д/30д — до конца суток. */
+    'visitors_cache_ttl' => (int) env('YANDEX_METRIKA_VISITORS_CACHE_TTL', 3600),
 ];

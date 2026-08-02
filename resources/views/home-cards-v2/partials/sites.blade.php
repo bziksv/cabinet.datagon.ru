@@ -16,14 +16,27 @@
             }
         }
     }
+    $visitsMeta = $sitesPayload['visits_meta'] ?? null;
+    $columnPrefs = $sitesPayload['columns'] ?? \App\HomeUserSitesPreference::defaultColumns();
     $hasAnySites = $sitesTotal > 0 || $archivedTotal > 0 || $hiddenTotal > 0
         || count($sites) > 0 || count($archivedSites) > 0 || count($hiddenSites) > 0;
+
+    $visitColumnsMeta = [
+        ['key' => 'visits_today', 'label' => __('Visits today short'), 'title' => __('Visits today')],
+        ['key' => 'visits_yesterday', 'label' => __('Visits yesterday short'), 'title' => __('Visits yesterday')],
+        ['key' => 'visits_sum7', 'label' => __('Visits sum 7 short'), 'title' => __('Visits sum 7')],
+        ['key' => 'visits_avg7', 'label' => __('Visits avg 7 short'), 'title' => __('Visits avg 7')],
+        ['key' => 'visits_sum30', 'label' => __('Visits sum 30 short'), 'title' => __('Visits sum 30')],
+        ['key' => 'visits_avg30', 'label' => __('Visits avg 30 short'), 'title' => __('Visits avg 30')],
+    ];
 @endphp
 
 <section class="cabinet-home-sites mb-4" id="cabinet-home-sites" aria-labelledby="cabinet-home-sites-title"
          data-archive-url="{{ route('home.sites.archive') }}"
          data-hide-url="{{ route('home.sites.hide') }}"
          data-restore-url="{{ route('home.sites.restore') }}"
+         data-columns-url="{{ route('home.sites.columns') }}"
+         data-columns='@json($columnPrefs)'
          data-metrika-connect-url="{{ route('yandex-metrika.connect') }}"
          data-metrika-status-url="{{ route('yandex-metrika.status') }}"
          data-metrika-counters-url="{{ route('yandex-metrika.counters') }}"
@@ -60,6 +73,15 @@
             </div>
         @else
             <div class="cabinet-home-sites-toolbar mb-3">
+                @if(is_array($visitsMeta) && !empty($visitsMeta['as_of_human']))
+                    <div class="cabinet-home-sites-visits-meta small text-secondary w-100 mb-2">
+                        <i class="bi bi-graph-up-arrow me-1" aria-hidden="true"></i>
+                        {{ __('Metrika visits as of', ['time' => $visitsMeta['as_of_human']]) }}
+                        @if(!empty($visitsMeta['next_today_human']))
+                            <span class="text-body-secondary">· {{ __('Metrika visits next today', ['time' => $visitsMeta['next_today_human']]) }}</span>
+                        @endif
+                    </div>
+                @endif
                 <div class="cabinet-home-sites-legend small text-secondary">
                     <span class="cabinet-home-sites-legend__item">
                         <span class="cabinet-home-sites-dot cabinet-home-sites-dot--on" aria-hidden="true"></span>
@@ -115,6 +137,57 @@
                                autocomplete="off"
                                aria-label="{{ __('Find a site') }}">
                     </div>
+                    <div class="dropdown cabinet-home-sites-columns-dropdown">
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                                id="cabinet-home-sites-columns-btn"
+                                data-bs-toggle="dropdown"
+                                data-bs-auto-close="outside"
+                                aria-expanded="false">
+                            <i class="bi bi-layout-three-columns" aria-hidden="true"></i>
+                            <span class="d-none d-md-inline ms-1">{{ __('Columns') }}</span>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end cabinet-home-sites-columns-menu p-2"
+                             id="cabinet-home-sites-columns-menu"
+                             role="menu"
+                             aria-labelledby="cabinet-home-sites-columns-btn">
+                            <p class="dropdown-header mb-1 px-2 py-0 small text-uppercase text-secondary">{{ __('Columns') }}</p>
+                            @php $modulesCountKey = 'modules_count'; @endphp
+                            <label class="dropdown-item-text d-flex align-items-center gap-2 py-1 px-2 mb-0"
+                                   for="cabinet-home-sites-col-{{ $modulesCountKey }}">
+                                <input type="checkbox"
+                                       class="form-check-input m-0 cabinet-home-sites-col-toggle"
+                                       id="cabinet-home-sites-col-{{ $modulesCountKey }}"
+                                       data-col="{{ $modulesCountKey }}"
+                                       @if(!empty($columnPrefs[$modulesCountKey])) checked @endif>
+                                <span class="small" title="{{ __('Modules count near domain') }}">{{ __('Modules count short') }}</span>
+                            </label>
+                            @foreach($visitColumnsMeta as $visitCol)
+                                @php $colKey = $visitCol['key']; @endphp
+                                <label class="dropdown-item-text d-flex align-items-center gap-2 py-1 px-2 mb-0"
+                                       for="cabinet-home-sites-col-{{ $colKey }}">
+                                    <input type="checkbox"
+                                           class="form-check-input m-0 cabinet-home-sites-col-toggle"
+                                           id="cabinet-home-sites-col-{{ $colKey }}"
+                                           data-col="{{ $colKey }}"
+                                           @if(!empty($columnPrefs[$colKey])) checked @endif>
+                                    <span class="small" title="{{ $visitCol['title'] }}">{{ $visitCol['label'] }}</span>
+                                </label>
+                            @endforeach
+                            @foreach($catalog as $catalogItem)
+                                @php $colKey = 'mod-' . $catalogItem['key']; @endphp
+                                <label class="dropdown-item-text d-flex align-items-center gap-2 py-1 px-2 mb-0"
+                                       for="cabinet-home-sites-col-{{ $colKey }}">
+                                    <input type="checkbox"
+                                           class="form-check-input m-0 cabinet-home-sites-col-toggle"
+                                           id="cabinet-home-sites-col-{{ $colKey }}"
+                                           data-col="{{ $colKey }}"
+                                           @if(!empty($columnPrefs[$colKey])) checked @endif>
+                                    <span class="small" title="{{ $catalogItem['title'] }}">{{ $catalogItem['short'] }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -136,26 +209,53 @@
                                 <table class="table table-hover align-middle mb-0 cabinet-home-sites-table">
                                     <thead>
                                     <tr>
-                                        <th scope="col" class="cabinet-home-sites-col-domain">{{ __('Domain') }}</th>
+                                        <th scope="col"
+                                            class="cabinet-home-sites-col-domain cabinet-home-sites-th-sort"
+                                            data-sites-sort="domain"
+                                            title="{{ __('Sort by column') }}">
+                                            <button type="button" class="cabinet-home-sites-sort-btn">
+                                                <span>{{ __('Domain') }}</span>
+                                                <i class="bi bi-arrow-down-up" aria-hidden="true"></i>
+                                            </button>
+                                        </th>
+                                        @foreach($visitColumnsMeta as $visitCol)
+                                            @php $colVisible = !empty($columnPrefs[$visitCol['key']]); @endphp
+                                            <th scope="col"
+                                                class="cabinet-home-sites-col-visits text-end cabinet-home-sites-th-sort{{ $colVisible ? '' : ' is-col-hidden' }}"
+                                                data-col="{{ $visitCol['key'] }}"
+                                                data-sites-sort="{{ $visitCol['key'] }}"
+                                                title="{{ $visitCol['title'] }}">
+                                                <button type="button" class="cabinet-home-sites-sort-btn">
+                                                    <span class="cabinet-home-sites-th-text">{{ $visitCol['label'] }}</span>
+                                                    <i class="bi bi-arrow-down-up" aria-hidden="true"></i>
+                                                </button>
+                                            </th>
+                                        @endforeach
                                         @foreach($catalog as $catalogItem)
                                             @php
                                                 $isIntegration = ($catalogItem['kind'] ?? 'module') === 'integration';
                                                 $supportsSync = (bool) ($catalogItem['supports_sync'] ?? false);
+                                                $modColKey = 'mod-' . $catalogItem['key'];
+                                                $colVisible = !empty($columnPrefs[$modColKey]);
                                             @endphp
                                             <th scope="col"
-                                                class="cabinet-home-sites-col-mod text-center {{ $isIntegration ? 'cabinet-home-sites-col-mod--integration' : '' }} {{ $supportsSync ? 'cabinet-home-sites-col-mod--sync' : '' }}"
+                                                class="cabinet-home-sites-col-mod text-center cabinet-home-sites-th-sort {{ $isIntegration ? 'cabinet-home-sites-col-mod--integration' : '' }} {{ $supportsSync ? 'cabinet-home-sites-col-mod--sync' : '' }}{{ $colVisible ? '' : ' is-col-hidden' }}"
+                                                data-col="{{ $modColKey }}"
+                                                data-sites-sort="mod-{{ $catalogItem['key'] }}"
                                                 title="{{ $catalogItem['title'] }}{{ $supportsSync ? (' — ' . __('Metrika sync planned')) : '' }}">
-                                                <span class="cabinet-home-sites-th-label">
-                                                    <span class="cabinet-home-sites-th-text">{{ $catalogItem['short'] }}</span>
-                                                    @if($supportsSync)
-                                                        <i class="bi bi-arrow-repeat cabinet-home-sites-sync-mark"
-                                                           title="{{ __('Metrika sync planned') }}"
-                                                           aria-hidden="true"></i>
-                                                    @endif
-                                                </span>
+                                                <button type="button" class="cabinet-home-sites-sort-btn">
+                                                    <span class="cabinet-home-sites-th-label">
+                                                        <span class="cabinet-home-sites-th-text">{{ $catalogItem['short'] }}</span>
+                                                        @if($supportsSync)
+                                                            <i class="bi bi-arrow-repeat cabinet-home-sites-sync-mark"
+                                                               title="{{ __('Metrika sync planned') }}"
+                                                               aria-hidden="true"></i>
+                                                        @endif
+                                                    </span>
+                                                    <i class="bi bi-arrow-down-up" aria-hidden="true"></i>
+                                                </button>
                                             </th>
                                         @endforeach
-                                        <th scope="col" class="text-nowrap d-none d-lg-table-cell">{{ __('Last activity') }}</th>
                                         <th scope="col" class="cabinet-home-sites-col-actions text-end">{{ __('Actions') }}</th>
                                     </tr>
                                     </thead>
@@ -163,27 +263,77 @@
                                     @foreach($panel['rows'] as $site)
                                         @php
                                             $metrikaSynced = false;
+                                            $modSort = [];
                                             foreach (($site['matrix'] ?? []) as $matrixCell) {
-                                                if (($matrixCell['key'] ?? '') === 'yandex-metrika') {
+                                                $mk = (string) ($matrixCell['key'] ?? '');
+                                                if (($matrixCell['kind'] ?? '') === 'integration') {
+                                                    $modSort[$mk] = !empty($matrixCell['synced']) ? 2 : 0;
+                                                } else {
+                                                    $modSort[$mk] = !empty($matrixCell['present']) ? 1 : 0;
+                                                    if (!empty($matrixCell['supports_sync']) && !empty($matrixCell['synced'])) {
+                                                        $modSort[$mk] = 2;
+                                                    }
+                                                }
+                                                if ($mk === 'yandex-metrika') {
                                                     $metrikaSynced = !empty($matrixCell['synced']);
-                                                    break;
                                                 }
                                             }
+                                            $visits = $site['visits'] ?? null;
+                                            $vToday = is_array($visits) && array_key_exists('today', $visits) ? $visits['today'] : null;
+                                            $vYesterday = is_array($visits) && array_key_exists('yesterday', $visits) ? $visits['yesterday'] : null;
+                                            $vSum7 = is_array($visits) && array_key_exists('sum_7', $visits) ? $visits['sum_7'] : null;
+                                            $vAvg7 = is_array($visits) && array_key_exists('avg_7', $visits) ? $visits['avg_7'] : null;
+                                            $vSum30 = is_array($visits) && array_key_exists('sum_30', $visits) ? $visits['sum_30'] : null;
+                                            $vAvg30 = is_array($visits) && array_key_exists('avg_30', $visits) ? $visits['avg_30'] : null;
                                         @endphp
                                         <tr data-cabinet-site-domain="{{ $site['domain'] }}"
                                             data-cabinet-site-mode="{{ $panel['mode'] }}"
-                                            data-metrika-synced="{{ $metrikaSynced ? '1' : '0' }}">
+                                            data-metrika-synced="{{ $metrikaSynced ? '1' : '0' }}"
+                                            data-sort-domain="{{ $site['domain'] }}"
+                                            data-sort-visits_today="{{ $vToday === null ? '' : $vToday }}"
+                                            data-sort-visits_yesterday="{{ $vYesterday === null ? '' : $vYesterday }}"
+                                            data-sort-visits_sum7="{{ $vSum7 === null ? '' : $vSum7 }}"
+                                            data-sort-visits_avg7="{{ $vAvg7 === null ? '' : $vAvg7 }}"
+                                            data-sort-visits_sum30="{{ $vSum30 === null ? '' : $vSum30 }}"
+                                            data-sort-visits_avg30="{{ $vAvg30 === null ? '' : $vAvg30 }}"
+                                            @foreach($modSort as $modKey => $modVal) data-sort-mod-{{ $modKey }}="{{ $modVal }}" @endforeach
+                                            data-sort-modules="{{ (int) ($site['modules_count'] ?? 0) }}">
                                             <td class="cabinet-home-sites-domain">
                                                 <a href="https://{{ $site['domain'] }}"
                                                    class="cabinet-home-sites-domain__host"
                                                    target="_blank"
                                                    rel="noopener noreferrer">{{ $site['domain'] }}</a>
-                                                <span class="badge text-bg-light border ms-1">{{ $site['modules_count'] }}/{{ $site['modules_total'] ?? $modulesTotal }}</span>
+                                                <span class="badge text-bg-light border ms-1 cabinet-home-sites-modules-badge{{ !empty($columnPrefs['modules_count']) ? '' : ' is-col-hidden' }}"
+                                                      data-col="modules_count"
+                                                      title="{{ __('Modules count near domain') }}">{{ $site['modules_count'] }}/{{ $site['modules_total'] ?? $modulesTotal }}</span>
                                             </td>
+                                            @foreach([
+                                                ['key' => 'visits_today', 'value' => $vToday],
+                                                ['key' => 'visits_yesterday', 'value' => $vYesterday],
+                                                ['key' => 'visits_sum7', 'value' => $vSum7],
+                                                ['key' => 'visits_avg7', 'value' => $vAvg7],
+                                                ['key' => 'visits_sum30', 'value' => $vSum30],
+                                                ['key' => 'visits_avg30', 'value' => $vAvg30],
+                                            ] as $visitCell)
+                                                @php
+                                                    $visitValue = $visitCell['value'];
+                                                    $colVisible = !empty($columnPrefs[$visitCell['key']]);
+                                                @endphp
+                                                <td class="cabinet-home-sites-col-visits text-end text-nowrap{{ $colVisible ? '' : ' is-col-hidden' }}"
+                                                    data-col="{{ $visitCell['key'] }}">
+                                                    @if($visitValue === null)
+                                                        <span class="text-secondary">—</span>
+                                                    @else
+                                                        {{ number_format((int) round((float) $visitValue), 0, ',', ' ') }}
+                                                    @endif
+                                                </td>
+                                            @endforeach
                                             @foreach($site['matrix'] as $cell)
                                                 @php
                                                     $isIntegration = ($cell['kind'] ?? 'module') === 'integration';
                                                     $supportsSync = (bool) ($cell['supports_sync'] ?? false);
+                                                    $modColKey = 'mod-' . ($cell['key'] ?? '');
+                                                    $colVisible = !empty($columnPrefs[$modColKey]);
                                                     if ($isIntegration) {
                                                         $dotClass = !empty($cell['synced'])
                                                             ? 'cabinet-home-sites-dot--sync-on'
@@ -205,7 +355,8 @@
                                                         }
                                                     }
                                                 @endphp
-                                                <td class="text-center cabinet-home-sites-col-mod {{ $isIntegration ? 'cabinet-home-sites-col-mod--integration' : '' }}">
+                                                <td class="text-center cabinet-home-sites-col-mod {{ $isIntegration ? 'cabinet-home-sites-col-mod--integration' : '' }}{{ $colVisible ? '' : ' is-col-hidden' }}"
+                                                    data-col="{{ $modColKey }}">
                                                     @if(($cell['key'] ?? '') === 'yandex-metrika')
                                                         <button type="button"
                                                                 class="cabinet-home-sites-dot {{ $dotClass }}"
@@ -225,23 +376,28 @@
                                                     @endif
                                                 </td>
                                             @endforeach
-                                            <td class="text-secondary small text-nowrap d-none d-lg-table-cell">
-                                                {{ $site['last_at_human'] ?: '—' }}
-                                            </td>
                                             <td class="text-end cabinet-home-sites-col-actions">
                                                 @if($panel['mode'] === 'active')
                                                     <div class="btn-group btn-group-sm" role="group">
                                                         <button type="button"
                                                                 class="btn btn-outline-secondary"
                                                                 data-cabinet-site-hide
-                                                                title="{{ __('Hide site') }}">
+                                                                data-bs-toggle="tooltip"
+                                                                data-bs-placement="top"
+                                                                data-bs-container="body"
+                                                                title="{{ __('Hide site') }}"
+                                                                aria-label="{{ __('Hide site') }}">
                                                             <i class="bi bi-eye-slash" aria-hidden="true"></i>
                                                             <span class="d-none d-xxl-inline">{{ __('Hide') }}</span>
                                                         </button>
                                                         <button type="button"
                                                                 class="btn btn-outline-secondary"
                                                                 data-cabinet-site-archive
-                                                                title="{{ __('Move to archive') }}">
+                                                                data-bs-toggle="tooltip"
+                                                                data-bs-placement="top"
+                                                                data-bs-container="body"
+                                                                title="{{ __('Move to archive') }}"
+                                                                aria-label="{{ __('Move to archive') }}">
                                                             <i class="bi bi-archive" aria-hidden="true"></i>
                                                             <span class="d-none d-xxl-inline">{{ __('To archive') }}</span>
                                                         </button>
@@ -250,7 +406,11 @@
                                                     <button type="button"
                                                             class="btn btn-sm btn-outline-primary"
                                                             data-cabinet-site-restore
-                                                            title="{{ __('Restore site') }}">
+                                                            data-bs-toggle="tooltip"
+                                                            data-bs-placement="top"
+                                                            data-bs-container="body"
+                                                            title="{{ __('Restore site') }}"
+                                                            aria-label="{{ __('Restore site') }}">
                                                         <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
                                                         <span class="d-none d-xl-inline">{{ __('Restore') }}</span>
                                                     </button>

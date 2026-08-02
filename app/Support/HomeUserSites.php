@@ -9,11 +9,14 @@ use App\DomainRecordsHistory;
 use App\EseninTextCheckSession;
 use App\HomeUserArchivedSite;
 use App\IndexCheckHistory;
+use App\HomeUserSitesPreference;
 use App\YandexMetrikaDomainCounter;
 use App\MonitoringProject;
 use App\ProjectRelevanceHistory;
 use App\SiteAuditProject;
 use App\SeoChecklist\SeoChecklistProject;
+use App\SeoReports\SeoReportProject;
+use App\Services\YandexMetrika\YandexMetrikaService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
@@ -81,6 +84,14 @@ class HomeUserSites
                 ),
                 'short' => __('Checklist short'),
                 'create_url' => url('/seo-checklist'),
+                'kind' => 'module',
+                'supports_sync' => false,
+            ],
+            [
+                'key' => 'seo-reports',
+                'title' => __('SEO Reports'),
+                'short' => __('SEO reports short'),
+                'create_url' => url('/seo-reports'),
                 'kind' => 'module',
                 'supports_sync' => false,
             ],
@@ -210,6 +221,7 @@ class HomeUserSites
             self::collectMonitoring($userId, $add);
             self::collectSiteAudit($userId, $add);
             self::collectSeoChecklist($userId, $add);
+            self::collectSeoReports($userId, $add);
             self::collectDomainInformation($userId, $add);
             self::collectSiteMonitoring($userId, $add);
             self::collectCluster($userId, $add);
@@ -275,6 +287,11 @@ class HomeUserSites
         $archived = self::hydrateSitesMatrix($archivedRaw, $catalog, $modulesTotal);
         $hidden = self::hydrateSitesMatrix($hiddenRaw, $catalog, $modulesTotal);
 
+        $visitsLoaded = self::loadPilotVisits($userId, array_merge($active, $archived, $hidden));
+        $active = self::attachVisits($active, $visitsLoaded['by_domain']);
+        $archived = self::attachVisits($archived, $visitsLoaded['by_domain']);
+        $hidden = self::attachVisits($hidden, $visitsLoaded['by_domain']);
+
         return [
             'sites' => $active,
             'archived' => $archived,
@@ -285,6 +302,8 @@ class HomeUserSites
             'shown' => count($active),
             'catalog' => $catalog,
             'modules_total' => $modulesTotal,
+            'visits_meta' => $visitsLoaded['meta'],
+            'columns' => HomeUserSitesPreference::columnsForUser($userId),
         ];
     }
 
@@ -306,6 +325,8 @@ class HomeUserSites
             'shown' => 0,
             'catalog' => $catalog,
             'modules_total' => self::countModuleColumns($catalog),
+            'visits_meta' => null,
+            'columns' => HomeUserSitesPreference::columnsForUser(Auth::check() ? (int) Auth::id() : 0),
         ];
     }
 
@@ -358,10 +379,69 @@ class HomeUserSites
             $site['matrix'] = $matrix;
             $site['modules_count'] = $presentCount;
             $site['modules_total'] = $modulesTotal;
-            $site['last_at_human'] = $site['last_at']
-                ? $site['last_at']->timezone(config('app.timezone'))->format('d.m.Y H:i')
-                : '';
+            $site['visits'] = null;
             unset($site['present'], $site['last_at']);
+        }
+        unset($site);
+
+        return $sites;
+    }
+
+    /**
+     * Посещаемость для всех доменов таблицы, у которых есть привязка Метрики (пакетно + кэш).
+     *
+     * @param array<int, array<string, mixed>> $sites
+     * @return array{by_domain: array<string, array<string, mixed>>, meta: ?array<string, mixed>}
+     */
+    private static function loadPilotVisits(int $userId, array $sites): array
+    {
+        $domains = [];
+        foreach ($sites as $site) {
+            $domain = (string) ($site['domain'] ?? '');
+            if ($domain !== '') {
+                $domains[] = $domain;
+            }
+        }
+        if ($domains === [] || $userId < 1) {
+            return ['by_domain' => [], 'meta' => null];
+        }
+
+        $out = [];
+        $meta = null;
+        try {
+            /** @var YandexMetrikaService $service */
+            $service = app(YandexMetrikaService::class);
+            $summaries = $service->visitorsSummariesForDomains($userId, $domains);
+            foreach ($summaries as $domain => $summary) {
+                if (!is_array($summary)) {
+                    continue;
+                }
+                $rowMeta = $summary['meta'] ?? null;
+                unset($summary['meta']);
+                $out[$domain] = $summary;
+                if (is_array($rowMeta) && !empty($rowMeta['as_of'])) {
+                    if ($meta === null || strcmp((string) $rowMeta['as_of'], (string) ($meta['as_of'] ?? '')) > 0) {
+                        $meta = $rowMeta;
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return ['by_domain' => $out, 'meta' => $meta];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $sites
+     * @param array<string, array<string, mixed>> $visitsByDomain
+     * @return array<int, array<string, mixed>>
+     */
+    private static function attachVisits(array $sites, array $visitsByDomain): array
+    {
+        foreach ($sites as &$site) {
+            $domain = (string) ($site['domain'] ?? '');
+            $site['visits'] = $visitsByDomain[$domain] ?? null;
         }
         unset($site);
 
@@ -448,6 +528,34 @@ class HomeUserSites
                     'seo-checklist',
                     url('/seo-checklist/' . (int) $row->id),
                     $row->last_activity_at ?: $row->updated_at,
+                    $label
+                );
+            });
+    }
+
+    /**
+     * @param callable(string,string,string,mixed,string):void $add
+     */
+    private static function collectSeoReports(int $userId, callable $add): void
+    {
+        if ($userId < 1 || !Schema::hasTable('seo_report_projects')) {
+            return;
+        }
+
+        SeoReportProject::query()
+            ->where('user_id', $userId)
+            ->where('status', 'active')
+            ->withCount('reports')
+            ->orderByDesc('updated_at')
+            ->limit(self::PER_SOURCE_LIMIT)
+            ->get()
+            ->each(static function ($row) use ($add) {
+                $label = (string) ((int) $row->reports_count);
+                $add(
+                    (string) $row->domain,
+                    'seo-reports',
+                    url('/seo-reports/' . (int) $row->id),
+                    $row->updated_at,
                     $label
                 );
             });

@@ -8,7 +8,6 @@
 
 @section('content')
     <div class="cabinet-home-page">
-        @include('home.partials.layout-switcher', ['activeVariant' => 1])
         @include('home.partials.hero', ['summary' => $summary])
         @include('home.partials.stats', ['summary' => $summary])
         @include('home.partials.seo-checklist-due', ['seoChecklistDue' => $seoChecklistDue ?? null])

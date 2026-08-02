@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\MainProject;
+use App\Support\CabinetAdminMenu;
 use App\User;
 use Illuminate\Support\Collection;
 
@@ -34,11 +35,19 @@ class MenuProjectRegistry
     }
 
     /**
+     * Пункты для настройки порядка сайдбара.
+     * Админ-шестерёнка (CabinetAdminMenu) сюда не входит — она отдельным меню.
+     *
      * @return Collection<int, MainProject>
      */
     public static function forSortMenu(): Collection
     {
-        $all = self::ensureAllLoaded();
+        $all = self::ensureAllLoaded()
+            ->reject(static function (MainProject $project) {
+                return CabinetAdminMenu::isExcludedProjectId($project->id);
+            })
+            ->values();
+
         if (User::isUserAdmin()) {
             return $all;
         }

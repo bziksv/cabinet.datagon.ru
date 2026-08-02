@@ -234,6 +234,29 @@ class LimitsComposer
                     'position' => 5,
                 ];
 
+            case 'SeoReportProjects':
+                return [
+                    'count' => (int) \App\SeoReports\SeoReportProject::query()
+                        ->where('user_id', $user->id)
+                        ->where('status', 'active')
+                        ->count(),
+                    'position' => 5,
+                ];
+
+            case 'SeoReportGenerations':
+                return [
+                    'count' => (int) \App\SeoReports\SeoReport::query()
+                        ->where('user_id', $user->id)
+                        ->whereNull('archived_from_report_id')
+                        ->where('created_at', '>=', Carbon::now()->startOfMonth())
+                        ->where(function ($q) {
+                            $q->whereNull('snapshot_json')
+                                ->orWhere('snapshot_json', 'not like', '%"is_demo":true%');
+                        })
+                        ->count(),
+                    'position' => 5,
+                ];
+
             case 'EseninTextCheck':
                 return [
                     'count' => \App\Support\EseninTextCheckLimits::usedForUser($user),

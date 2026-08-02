@@ -151,6 +151,18 @@ class TariffLimitRegistry
                 'enforcement' => self::ENFORCEMENT_STRICT,
             ],
             [
+                'code' => 'SeoReportProjects',
+                'module' => __('SEO Reports'),
+                'hint' => __('Number of active SEO report projects. Add values in tariff settings to enforce.'),
+                'enforcement' => self::ENFORCEMENT_STRICT,
+            ],
+            [
+                'code' => 'SeoReportGenerations',
+                'module' => __('SEO report generations'),
+                'hint' => __('Monthly SEO report generations (create/regenerate). 0 = blocked.'),
+                'enforcement' => self::ENFORCEMENT_STRICT,
+            ],
+            [
                 'code' => 'SiteAudit',
                 'module' => 'Аудит сайта (страниц/краул)',
                 'hint' => 'Макс. URL за один краул. Free 500 / Optimal 5000 / Ultimate 20000 / Maximum 50000.',

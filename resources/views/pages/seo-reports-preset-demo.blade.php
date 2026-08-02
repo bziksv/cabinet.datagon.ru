@@ -59,17 +59,30 @@
     </style>
 </head>
 <body class="cabinet-sr-public">
+    @php $templateId = $templateId ?? null; @endphp
     <div class="cabinet-sr-demo-banner">
         <div>
             <strong>{{ __('Demo report') }}:</strong> {{ $presetTitle }}
-            <span class="cabinet-sr-demo-banner__note">· {{ __('Filled HTML preview, not live client data') }}</span>
+            <span class="cabinet-sr-demo-banner__note">
+                · @if($templateId)
+                    {{ __('Template demo preview note') }}
+                @else
+                    {{ __('Filled HTML preview, not live client data') }}
+                @endif
+            </span>
         </div>
         <div class="cabinet-sr-demo-banner__actions">
-            @foreach(['seo_only' => 'Только SEO', 'seo_ads' => 'SEO + реклама', 'complex' => 'Комплексный'] as $key => $label)
-                <a href="{{ route('pages.seo-reports.preset-demo', ['preset' => $key]) }}"
-                   class="@if($preset === $key) is-active @endif"
-                   target="_self">{{ $label }}</a>
-            @endforeach
+            @if($templateId)
+                <a href="{{ route('pages.seo-reports.templates.edit', ['id' => $templateId]) }}"
+                   class="is-active"
+                   target="_self">{{ __('Back to template') }}</a>
+            @else
+                @foreach(['seo_only' => 'Только SEO', 'seo_ads' => 'SEO + реклама', 'complex' => 'Комплексный'] as $key => $label)
+                    <a href="{{ route('pages.seo-reports.preset-demo', ['preset' => $key]) }}"
+                       class="@if($preset === $key) is-active @endif"
+                       target="_self">{{ $label }}</a>
+                @endforeach
+            @endif
             <a href="{{ route('pages.seo-reports') }}">{{ __('Back to SEO Reports') }}</a>
         </div>
     </div>

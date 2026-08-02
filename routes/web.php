@@ -275,6 +275,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('seo-reports/templates', 'SeoReportsController@templates')->name('pages.seo-reports.templates')->middleware('permission:SEO Reports');
     Route::post('seo-reports/templates', 'SeoReportsController@storeTemplate')->name('pages.seo-reports.templates.store')->middleware('permission:SEO Reports');
     Route::get('seo-reports/templates/{id}/edit', 'SeoReportsController@editTemplate')->name('pages.seo-reports.templates.edit')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::get('seo-reports/templates/{id}/demo', 'SeoReportsController@templateDemo')->name('pages.seo-reports.templates.demo')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
     Route::post('seo-reports/templates/{id}', 'SeoReportsController@updateTemplate')->name('pages.seo-reports.templates.update')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
     Route::post('seo-reports/templates/{id}/duplicate', 'SeoReportsController@duplicateTemplate')->name('pages.seo-reports.templates.duplicate')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
     Route::post('seo-reports/templates/{id}/delete', 'SeoReportsController@destroyTemplate')->name('pages.seo-reports.templates.destroy')->middleware('permission:SEO Reports')->where('id', '[0-9]+');

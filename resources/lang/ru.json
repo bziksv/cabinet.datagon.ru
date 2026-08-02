@@ -6176,5 +6176,7 @@
     "Edit default template": "Редактировать основной",
     "Copy default template": "Копировать основной",
     "Create extra template from preset": "Создать дополнительный из пресета",
-    "Create extra template hint": "Нужен ещё один шаблон не из копии основного — выберите пресет. Основным он не станет."
+    "Create extra template hint": "Нужен ещё один шаблон не из копии основного — выберите пресет. Основным он не станет.",
+    "Template demo preview note": "превью по этому шаблону: блоки, KPI и брендинг",
+    "Back to template": "К шаблону"
 }

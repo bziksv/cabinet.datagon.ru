@@ -70,7 +70,7 @@
                 </div>
                 <div class="cabinet-sr-tpl-hero__actions">
                     <a class="btn btn-outline-secondary btn-sm"
-                       href="{{ route('pages.seo-reports.preset-demo', ['preset' => 'seo_only']) }}"
+                       href="{{ route('pages.seo-reports.templates.demo', ['id' => $template->id]) }}"
                        target="_blank" rel="noopener">{{ __('Open demo report') }}</a>
                     <button type="submit" class="btn btn-primary btn-sm">{{ __('Save template') }}</button>
                 </div>

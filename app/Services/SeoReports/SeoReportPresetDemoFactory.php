@@ -7,6 +7,7 @@ use App\SeoReports\SeoReportBrandColor;
 use App\SeoReports\SeoReportKpiGoals;
 use App\SeoReports\SeoReportProject;
 use App\SeoReports\SeoReportSectionRegistry;
+use App\SeoReports\SeoReportTemplate;
 use Carbon\Carbon;
 
 /**
@@ -100,6 +101,105 @@ class SeoReportPresetDemoFactory
         return $map[$preset] ?? $preset;
     }
 
+    /**
+     * Демо HTML по живому шаблону: секции, KPI, брендинг и менеджер из шаблона.
+     *
+     * @return array{project:SeoReportProject,report:SeoReport,snapshot:array<string,mixed>,sections:list<array<string,mixed>>,preset:string,preset_title:string,template_id:int}
+     */
+    public function makeFromTemplate(SeoReportTemplate $template): array
+    {
+        $toggles = $template->resolvedSectionToggles();
+        $settings = $template->reportSettings();
+        $preset = $this->presetForToggles($toggles);
+        $demo = $this->make($preset);
+
+        /** @var SeoReportProject $project */
+        $project = $demo['project'];
+        $project->fill([
+            'title' => 'Демо · ' . $template->title,
+            'section_toggles' => $toggles,
+            'settings_json' => array_merge(
+                is_array($project->settings_json) ? $project->settings_json : [],
+                [
+                    'kpi_goals' => $settings['kpi_goals'] ?? ($project->settings_json['kpi_goals'] ?? []),
+                    'traffic_mode' => $settings['traffic_mode'] ?? 'all',
+                    'auto_compare' => !empty($settings['auto_compare']),
+                    'section_order' => $settings['section_order'] ?? SeoReportSectionRegistry::defaultOrder(),
+                ]
+            ),
+            'agency_name' => $template->agency_name,
+            'agency_address' => $template->agency_address,
+            'agency_email' => $template->agency_email,
+            'agency_phone' => $template->agency_phone,
+            'agency_logo_path' => $template->agency_logo_path,
+            'brand_color' => $template->brand_color ?: '#1d4ed8',
+            'manager_name' => $template->manager_name,
+            'manager_phone' => $template->manager_phone,
+            'manager_email' => $template->manager_email,
+            'manager_avatar_path' => $template->manager_avatar_path,
+        ]);
+
+        $sections = $this->sections($toggles, $settings);
+        $snapshot = $demo['snapshot'];
+        $snapshot['demo_preset'] = 'template:' . $template->id;
+        $snapshot['demo_template_id'] = (int) $template->id;
+        $snapshot['cover']['title'] = 'SEO-отчёт · ' . $project->domain;
+        $snapshot['cover']['agency'] = [
+            'name' => $template->agency_name,
+            'address' => $template->agency_address,
+            'email' => $template->agency_email,
+            'phone' => $template->agency_phone,
+            'logo_url' => $template->agencyLogoUrl(),
+            'brand_color' => SeoReportBrandColor::normalize($template->brand_color ?: '#1d4ed8'),
+        ];
+        $snapshot['cover']['manager'] = [
+            'name' => $template->manager_name,
+            'email' => $template->manager_email,
+            'phone' => $template->manager_phone,
+            'avatar_url' => $template->managerAvatarUrl(),
+        ];
+        if (($settings['traffic_mode'] ?? 'all') === 'search_only' && isset($snapshot['traffic'])) {
+            $snapshot['traffic']['mode'] = 'search_only';
+        }
+        $snapshot['kpi_goals'] = SeoReportKpiGoals::evaluate(
+            SeoReportKpiGoals::fromSettings($project->settings_json),
+            $snapshot
+        );
+
+        return [
+            'project' => $project,
+            'report' => $demo['report'],
+            'snapshot' => $snapshot,
+            'sections' => $sections,
+            'preset' => 'template',
+            'preset_title' => (string) $template->title,
+            'template_id' => (int) $template->id,
+        ];
+    }
+
+    /**
+     * @param array<string,bool> $toggles
+     */
+    private function presetForToggles(array $toggles): string
+    {
+        $ads = ['direct', 'google_ads', 'vk_ads', 'meta_ads', 'vk_smm', 'ecommerce', 'calls'];
+        $hasAds = false;
+        foreach ($ads as $key) {
+            if (!empty($toggles[$key])) {
+                $hasAds = true;
+                break;
+            }
+        }
+        if ($hasAds && (!empty($toggles['ecommerce']) || !empty($toggles['calls']) || !empty($toggles['vk_smm']))) {
+            return 'complex';
+        }
+        if ($hasAds) {
+            return 'seo_ads';
+        }
+
+        return 'seo_only';
+    }
+
     private function summaryFor(string $preset): string
     {
         if ($preset === 'complex') {
@@ -126,13 +226,14 @@ class SeoReportPresetDemoFactory
 
     /**
      * @param array<string,bool> $toggles
+     * @param array<string,mixed>|null $settings
      * @return list<array<string,mixed>>
      */
-    private function sections(array $toggles): array
+    private function sections(array $toggles, ?array $settings = null): array
     {
         $catalog = SeoReportSectionRegistry::all();
         $out = [];
-        foreach (SeoReportSectionRegistry::orderedKeys([]) as $key) {
+        foreach (SeoReportSectionRegistry::orderedKeys($settings) as $key) {
             if (empty($toggles[$key])) {
                 continue;
             }

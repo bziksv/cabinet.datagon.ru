@@ -1062,6 +1062,32 @@ class SeoReportsController extends Controller
             'sections' => $demo['sections'],
             'preset' => $demo['preset'],
             'presetTitle' => $demo['preset_title'],
+            'templateId' => null,
+        ]);
+    }
+
+    /**
+     * HTML демо по конкретному шаблону (секции + брендинг шаблона).
+     *
+     * @return View|RedirectResponse
+     */
+    public function templateDemo(int $id)
+    {
+        $template = $this->findOwnedTemplate($id);
+        if (!$template) {
+            return redirect()->route('pages.seo-reports.templates')->with('error', __('Template not found'));
+        }
+
+        $demo = app(SeoReportPresetDemoFactory::class)->makeFromTemplate($template);
+
+        return view('pages.seo-reports-preset-demo', [
+            'project' => $demo['project'],
+            'report' => $demo['report'],
+            'snapshot' => $demo['snapshot'],
+            'sections' => $demo['sections'],
+            'preset' => $demo['preset'],
+            'presetTitle' => $demo['preset_title'],
+            'templateId' => $demo['template_id'],
         ]);
     }
 

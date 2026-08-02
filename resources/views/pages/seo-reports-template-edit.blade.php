@@ -133,7 +133,7 @@
                     <div class="cabinet-sr-builder__head">
                         <div>
                             <h2 class="cabinet-sr-builder__title">{{ __('Available blocks') }}</h2>
-                            <p class="cabinet-sr-builder__hint">{{ __('Available blocks hint') }}</p>
+                            <p class="cabinet-sr-builder__hint">{{ __('Available blocks hint with tips') }}</p>
                         </div>
                         <input type="search" class="form-control form-control-sm" data-sr-builder-search
                                placeholder="{{ __('Search blocks') }}" autocomplete="off">
@@ -151,13 +151,16 @@
                                             data-sr-block
                                             data-key="{{ $key }}"
                                             data-title="{{ $meta['title'] }}"
+                                            data-hint="{{ $meta['hint'] ?? '' }}"
                                             data-group="{{ $meta['group'] }}"
                                             data-source="{{ $meta['source'] }}"
                                             data-source-label="{{ \App\SeoReports\SeoReportSectionRegistry::sourceLabel($meta['source']) }}"
-                                            data-titlo="{{ ($meta['group'] ?? '') === 'titlo' ? '1' : '0' }}">
+                                            data-titlo="{{ ($meta['group'] ?? '') === 'titlo' ? '1' : '0' }}"
+                                            title="{{ $meta['hint'] ?? '' }}">
                                         <span class="cabinet-sr-builder__block-add" aria-hidden="true">+</span>
                                         <span class="cabinet-sr-builder__block-body">
                                             <span class="cabinet-sr-builder__block-title">{{ $meta['title'] }}</span>
+                                            <span class="cabinet-sr-builder__block-hint">{{ $meta['hint'] ?? '' }}</span>
                                             <span class="cabinet-sr-builder__block-meta">
                                                 {{ \App\SeoReports\SeoReportSectionRegistry::sourceLabel($meta['source']) }}
                                                 @if(($meta['group'] ?? '') === 'titlo')
@@ -193,15 +196,18 @@
                                  data-sr-picked
                                  data-key="{{ $key }}"
                                  data-title="{{ $meta['title'] }}"
+                                 data-hint="{{ $meta['hint'] ?? '' }}"
                                  data-group="{{ $meta['group'] }}"
                                  data-source="{{ $meta['source'] }}"
                                  data-source-label="{{ \App\SeoReports\SeoReportSectionRegistry::sourceLabel($meta['source']) }}"
-                                 data-titlo="{{ ($meta['group'] ?? '') === 'titlo' ? '1' : '0' }}">
+                                 data-titlo="{{ ($meta['group'] ?? '') === 'titlo' ? '1' : '0' }}"
+                                 title="{{ $meta['hint'] ?? '' }}">
                                 <span class="cabinet-sr-builder__drag" aria-hidden="true">⋮⋮</span>
                                 <input type="hidden" name="section_order[]" value="{{ $key }}">
                                 <input type="hidden" name="sections[{{ $key }}]" value="1">
                                 <span class="cabinet-sr-builder__block-body">
                                     <span class="cabinet-sr-builder__block-title">{{ $meta['title'] }}</span>
+                                    <span class="cabinet-sr-builder__block-hint">{{ $meta['hint'] ?? '' }}</span>
                                     <span class="cabinet-sr-builder__block-meta">
                                         {{ \App\SeoReports\SeoReportSectionRegistry::sourceLabel($meta['source']) }}
                                         @if(($meta['group'] ?? '') === 'titlo')
@@ -459,26 +465,30 @@
                 function makePicked(from) {
                     var key = from.getAttribute('data-key');
                     var title = from.getAttribute('data-title') || key;
+                    var hint = from.getAttribute('data-hint') || '';
                     var sourceLabel = from.getAttribute('data-source-label') || '';
                     var titlo = from.getAttribute('data-titlo') === '1';
                     var el = document.createElement('div');
                     el.className = 'cabinet-sr-builder__picked';
                     el.draggable = true;
                     el.setAttribute('data-sr-picked', '');
-                    ['key', 'title', 'group', 'source', 'source-label', 'titlo'].forEach(function (attr) {
+                    ['key', 'title', 'hint', 'group', 'source', 'source-label', 'titlo'].forEach(function (attr) {
                         var val = from.getAttribute('data-' + attr);
                         if (val != null) el.setAttribute('data-' + attr, val);
                     });
+                    if (hint) el.setAttribute('title', hint);
                     el.innerHTML =
                         '<span class="cabinet-sr-builder__drag" aria-hidden="true">⋮⋮</span>' +
                         '<input type="hidden" name="section_order[]" value="' + key + '">' +
                         '<input type="hidden" name="sections[' + key + ']" value="1">' +
                         '<span class="cabinet-sr-builder__block-body">' +
                             '<span class="cabinet-sr-builder__block-title"></span>' +
+                            '<span class="cabinet-sr-builder__block-hint"></span>' +
                             '<span class="cabinet-sr-builder__block-meta"></span>' +
                         '</span>' +
                         '<button type="button" class="cabinet-sr-builder__remove" data-sr-remove aria-label="Remove">×</button>';
                     el.querySelector('.cabinet-sr-builder__block-title').textContent = title;
+                    el.querySelector('.cabinet-sr-builder__block-hint').textContent = hint;
                     el.querySelector('.cabinet-sr-builder__block-meta').textContent =
                         sourceLabel + (titlo ? ' · Titlo' : '');
                     return el;
@@ -487,23 +497,27 @@
                 function makeAvailable(from) {
                     var key = from.getAttribute('data-key');
                     var title = from.getAttribute('data-title') || key;
+                    var hint = from.getAttribute('data-hint') || '';
                     var sourceLabel = from.getAttribute('data-source-label') || '';
                     var titlo = from.getAttribute('data-titlo') === '1';
                     var btn = document.createElement('button');
                     btn.type = 'button';
                     btn.className = 'cabinet-sr-builder__block';
                     btn.setAttribute('data-sr-block', '');
-                    ['key', 'title', 'group', 'source', 'source-label', 'titlo'].forEach(function (attr) {
+                    ['key', 'title', 'hint', 'group', 'source', 'source-label', 'titlo'].forEach(function (attr) {
                         var val = from.getAttribute('data-' + attr);
                         if (val != null) btn.setAttribute('data-' + attr, val);
                     });
+                    if (hint) btn.setAttribute('title', hint);
                     btn.innerHTML =
                         '<span class="cabinet-sr-builder__block-add" aria-hidden="true">+</span>' +
                         '<span class="cabinet-sr-builder__block-body">' +
                             '<span class="cabinet-sr-builder__block-title"></span>' +
+                            '<span class="cabinet-sr-builder__block-hint"></span>' +
                             '<span class="cabinet-sr-builder__block-meta"></span>' +
                         '</span>';
                     btn.querySelector('.cabinet-sr-builder__block-title').textContent = title;
+                    btn.querySelector('.cabinet-sr-builder__block-hint').textContent = hint;
                     btn.querySelector('.cabinet-sr-builder__block-meta').textContent =
                         sourceLabel + (titlo ? ' · Titlo' : '');
                     return btn;
@@ -535,8 +549,9 @@
                     var q = ((search && search.value) || '').toLowerCase().trim();
                     available.querySelectorAll('[data-sr-block]').forEach(function (b) {
                         var title = (b.getAttribute('data-title') || '').toLowerCase();
+                        var hint = (b.getAttribute('data-hint') || '').toLowerCase();
                         var source = (b.getAttribute('data-source-label') || '').toLowerCase();
-                        b.hidden = !!(q && title.indexOf(q) === -1 && source.indexOf(q) === -1);
+                        b.hidden = !!(q && title.indexOf(q) === -1 && hint.indexOf(q) === -1 && source.indexOf(q) === -1);
                     });
                     syncUi();
                 }

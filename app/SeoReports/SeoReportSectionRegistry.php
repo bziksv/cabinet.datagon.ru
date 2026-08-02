@@ -16,13 +16,14 @@ class SeoReportSectionRegistry
     public const SOURCE_STATUS_MANUAL = 'manual';
 
     /**
-     * @return array<string, array{title:string,group:string,source:string,default:bool,mvp:bool}>
+     * @return array<string, array{title:string,hint:string,group:string,source:string,default:bool,mvp:bool}>
      */
     public static function all(): array
     {
         return [
             'cover' => [
                 'title' => 'Обложка',
+                'hint' => 'Титул отчёта: период, логотип агентства, контакты менеджера.',
                 'group' => 'core',
                 'source' => 'manual',
                 'default' => true,
@@ -30,6 +31,7 @@ class SeoReportSectionRegistry
             ],
             'summary' => [
                 'title' => 'Резюме / ключевые выводы',
+                'hint' => 'Короткий текст для клиента: что выросло, что упало, главный фокус месяца.',
                 'group' => 'core',
                 'source' => 'manual',
                 'default' => true,
@@ -37,6 +39,7 @@ class SeoReportSectionRegistry
             ],
             'kpi_goals' => [
                 'title' => 'Цели и KPI',
+                'hint' => 'Светофор по целям: визиты, TOP-10, конверсии, выручка — факт vs план.',
                 'group' => 'core',
                 'source' => 'manual',
                 'default' => true,
@@ -44,6 +47,7 @@ class SeoReportSectionRegistry
             ],
             'traffic' => [
                 'title' => 'Трафик (Метрика)',
+                'hint' => 'Визиты, пользователи, отказы, каналы, устройства, гео и топ посадочных из Метрики.',
                 'group' => 'seo',
                 'source' => 'metrika',
                 'default' => true,
@@ -51,6 +55,7 @@ class SeoReportSectionRegistry
             ],
             'positions' => [
                 'title' => 'Позиции',
+                'hint' => 'Видимость, TOP-10, выросшие/упавшие запросы, быстрые победы и risk-лист из мониторинга.',
                 'group' => 'seo',
                 'source' => 'monitoring',
                 'default' => true,
@@ -58,6 +63,7 @@ class SeoReportSectionRegistry
             ],
             'work_done' => [
                 'title' => 'Выполненные работы',
+                'hint' => 'Свободный текст менеджера: что сделали за период (можно шаблонами работ).',
                 'group' => 'core',
                 'source' => 'manual',
                 'default' => true,
@@ -65,6 +71,7 @@ class SeoReportSectionRegistry
             ],
             'work_plan' => [
                 'title' => 'План работ',
+                'hint' => 'План на следующий период — клиент видит, что будет дальше.',
                 'group' => 'core',
                 'source' => 'manual',
                 'default' => true,
@@ -72,6 +79,7 @@ class SeoReportSectionRegistry
             ],
             'gsc' => [
                 'title' => 'Google Search Console',
+                'hint' => 'Клики, показы, CTR и топ запросов/страниц из GSC (API или CSV).',
                 'group' => 'seo',
                 'source' => 'gsc',
                 'default' => false,
@@ -79,6 +87,7 @@ class SeoReportSectionRegistry
             ],
             'webmaster' => [
                 'title' => 'Яндекс.Вебмастер',
+                'hint' => 'Данные Вебмастера по запросам и страницам (API или CSV).',
                 'group' => 'seo',
                 'source' => 'webmaster',
                 'default' => false,
@@ -86,6 +95,7 @@ class SeoReportSectionRegistry
             ],
             'conversions' => [
                 'title' => 'Конверсии',
+                'hint' => 'Цели Метрики: достижения, конверсия по каналам поиска / рекламы / соцсетей.',
                 'group' => 'seo',
                 'source' => 'metrika',
                 'default' => true,
@@ -93,6 +103,7 @@ class SeoReportSectionRegistry
             ],
             'direct' => [
                 'title' => 'Яндекс.Директ',
+                'hint' => 'Рекламный трафик Директа: визиты, отказы, посадочные и заметки по кампаниям.',
                 'group' => 'ads',
                 'source' => 'direct',
                 'default' => false,
@@ -100,6 +111,7 @@ class SeoReportSectionRegistry
             ],
             'google_ads' => [
                 'title' => 'Google Ads',
+                'hint' => 'Кампании Google Ads: визиты, посадочные, фразы и конверсии из среза.',
                 'group' => 'ads',
                 'source' => 'google_ads',
                 'default' => false,
@@ -107,6 +119,7 @@ class SeoReportSectionRegistry
             ],
             'vk_ads' => [
                 'title' => 'VK Реклама',
+                'hint' => 'Таргет VK: охваты, клики и эффективность (токен или CSV).',
                 'group' => 'ads',
                 'source' => 'vk_ads',
                 'default' => false,
@@ -114,6 +127,7 @@ class SeoReportSectionRegistry
             ],
             'meta_ads' => [
                 'title' => 'Meta Ads',
+                'hint' => 'Реклама Facebook / Instagram: расход и результат кампаний.',
                 'group' => 'ads',
                 'source' => 'meta_ads',
                 'default' => false,
@@ -121,6 +135,7 @@ class SeoReportSectionRegistry
             ],
             'vk_smm' => [
                 'title' => 'VK / SMM',
+                'hint' => 'Сообщество VK: охват, ER, топ-посты за период.',
                 'group' => 'smm',
                 'source' => 'vk_smm',
                 'default' => false,
@@ -128,6 +143,7 @@ class SeoReportSectionRegistry
             ],
             'ecommerce' => [
                 'title' => 'Ecommerce',
+                'hint' => 'Покупки и выручка из Метрики Ecommerce — для интернет-магазинов.',
                 'group' => 'commerce',
                 'source' => 'metrika',
                 'default' => false,
@@ -135,6 +151,7 @@ class SeoReportSectionRegistry
             ],
             'calls' => [
                 'title' => 'Звонки',
+                'hint' => 'Динамика звонков (коллтрекинг / ручной импорт) рядом с SEO и рекламой.',
                 'group' => 'commerce',
                 'source' => 'calls',
                 'default' => false,
@@ -142,6 +159,7 @@ class SeoReportSectionRegistry
             ],
             'titlo_audit' => [
                 'title' => 'Аудит сайта (Titlo)',
+                'hint' => 'Сводка Site Audit: критичные / предупреждения / инфо за период — наше преимущество.',
                 'group' => 'titlo',
                 'source' => 'site_audit',
                 'default' => true,
@@ -149,6 +167,7 @@ class SeoReportSectionRegistry
             ],
             'titlo_checklist' => [
                 'title' => 'SEO-чеклист (Titlo)',
+                'hint' => 'Прогресс чеклиста: закрыто за период, просрочки, общий % — связка с работой команды.',
                 'group' => 'titlo',
                 'source' => 'seo_checklist',
                 'default' => true,
@@ -156,6 +175,7 @@ class SeoReportSectionRegistry
             ],
             'titlo_relevance' => [
                 'title' => 'Релевантность (Titlo)',
+                'hint' => 'Средний балл релевантности и позиция по проверкам модуля Релевантность.',
                 'group' => 'titlo',
                 'source' => 'relevance',
                 'default' => true,
@@ -163,6 +183,7 @@ class SeoReportSectionRegistry
             ],
             'titlo_uptime' => [
                 'title' => 'Доступность (мониторинг)',
+                'hint' => 'Аптайм, инциденты и срок домена из мониторинга доступности.',
                 'group' => 'titlo',
                 'source' => 'site_monitoring',
                 'default' => true,
@@ -170,12 +191,20 @@ class SeoReportSectionRegistry
             ],
             'insights' => [
                 'title' => 'Инсайты Titlo',
+                'hint' => 'Автоматические выводы P1–P3 по трафику, позициям и модулям Titlo.',
                 'group' => 'titlo',
                 'source' => 'computed',
                 'default' => true,
                 'mvp' => true,
             ],
         ];
+    }
+
+    public static function hint(string $key): string
+    {
+        $all = self::all();
+
+        return (string) ($all[$key]['hint'] ?? '');
     }
 
     /**

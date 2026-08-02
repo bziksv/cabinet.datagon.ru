@@ -6178,5 +6178,6 @@
     "Create extra template from preset": "Создать дополнительный из пресета",
     "Create extra template hint": "Нужен ещё один шаблон не из копии основного — выберите пресет. Основным он не станет.",
     "Template demo preview note": "превью по этому шаблону: блоки, KPI и брендинг",
-    "Back to template": "К шаблону"
+    "Back to template": "К шаблону",
+    "Available blocks hint with tips": "Нажмите +, чтобы добавить. Под каждым блоком — что попадёт в отчёт клиенту."
 }

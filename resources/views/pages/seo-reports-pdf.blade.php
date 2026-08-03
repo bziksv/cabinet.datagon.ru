@@ -181,7 +181,7 @@
                 <tbody>
                 @foreach(array_slice($traffic['channels'], 0, 12) as $row)
                     <tr>
-                        <td>{{ $row['name'] }}</td>
+                        <td>{{ \App\SeoReports\SeoReportMetrikaLabels::label($row['name'] ?? '', $row['id'] ?? null) }}</td>
                         <td>{{ $fmt($row['visits'] ?? 0) }}</td>
                         <td>{{ $fmt($row['bounce_rate'] ?? 0, 1) }}%</td>
                         <td>{{ $fmt($row['page_depth'] ?? 0, 2) }}</td>
@@ -476,11 +476,37 @@
     </div>
 @endif
 
-@if(!empty($snapshot['titlo_audit']['buckets']))
-    @php $b = $snapshot['titlo_audit']['buckets']; @endphp
+@if(!empty($snapshot['titlo_audit']))
+    @php
+        $audit = $snapshot['titlo_audit'];
+        $b = is_array($audit['buckets'] ?? null) ? $audit['buckets'] : [];
+        $topIssues = is_array($audit['top_issues'] ?? null) ? array_slice($audit['top_issues'], 0, 6) : [];
+    @endphp
     <div class="section">
         <h2>Аудит сайта (Titlo)</h2>
-        <div class="meta">Критичных: {{ (int)($b['critical'] ?? 0) }} · прочих: {{ (int)($b['other'] ?? 0) }} · предупреждений: {{ (int)($b['warning'] ?? 0) }}</div>
+        @if(!empty($audit['summary']))
+            <div class="meta">{{ $audit['summary'] }}</div>
+        @endif
+        <div class="meta">
+            Страниц: {{ (int)($audit['pages_fetched'] ?? 0) }}
+            · грубые: {{ (int)($b['critical'] ?? 0) }}
+            · прочие: {{ (int)($b['other'] ?? 0) }}
+            · предупреждения: {{ (int)($b['warning'] ?? 0) }}
+        </div>
+        @if($topIssues !== [])
+            <table>
+                <thead><tr><th>Проблема</th><th>Важность</th><th>Кол-во</th></tr></thead>
+                <tbody>
+                @foreach($topIssues as $issue)
+                    <tr>
+                        <td>{{ $issue['title'] ?? $issue['code'] ?? '—' }}</td>
+                        <td>{{ $issue['severity_label'] ?? ($issue['severity'] ?? '') }}</td>
+                        <td>{{ (int)($issue['count'] ?? 0) }}</td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+        @endif
     </div>
 @endif
 @if(!empty($snapshot['titlo_checklist']))
@@ -491,10 +517,25 @@
     </div>
 @endif
 @if(!empty($snapshot['titlo_relevance']))
-    @php $rel = $snapshot['titlo_relevance']; @endphp
+    @php
+        $rel = $snapshot['titlo_relevance'];
+        $avgPoints = $rel['avg_points'] ?? null;
+        if ($avgPoints !== null && (float) $avgPoints > 0 && (float) $avgPoints < 3
+            && !empty($rel['count_checks']) && (int) $rel['count_checks'] > 1) {
+            $avgPoints = round((float) $avgPoints * (int) $rel['count_checks'], 1);
+        }
+    @endphp
     <div class="section">
         <h2>Релевантность (Titlo)</h2>
-        <div class="meta">Анализов: {{ (int)($rel['count_checks'] ?? 0) }} · ср. оценка: {{ $rel['avg_points'] !== null ? $fmt($rel['avg_points'], 1) : '—' }}</div>
+        @if(!empty($rel['summary']))
+            <div class="meta">{{ $rel['summary'] }}</div>
+        @endif
+        <div class="meta">
+            Балл: {{ $avgPoints !== null ? $fmt($avgPoints, 1) . '/100' : '—' }}
+            · позиция: {{ ($rel['avg_position'] ?? null) !== null ? $fmt($rel['avg_position'], 1) : '—' }}
+            · запросов/URL: {{ (int)($rel['count_sites'] ?? 0) }}
+            · проверок: {{ (int)($rel['count_checks'] ?? 0) }}
+        </div>
     </div>
 @endif
 @if(!empty($snapshot['titlo_uptime']))

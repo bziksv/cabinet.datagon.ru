@@ -13,7 +13,7 @@
             old('brand_color', $template->brand_color) ?: '#1d4ed8'
         );
         $selectedKeys = [];
-        $availableByGroup = [];
+        $offKeys = [];
         foreach ($orderKeys as $key) {
             $meta = $sectionCatalog[$key] ?? null;
             if (!$meta || $key === 'cover') {
@@ -22,24 +22,29 @@
             if (!empty($toggles[$key])) {
                 $selectedKeys[] = $key;
             } else {
-                $group = $meta['group'] ?? 'core';
-                $availableByGroup[$group][] = $key;
+                $offKeys[] = $key;
             }
         }
         foreach ($sectionCatalog as $key => $meta) {
-            if ($key === 'cover' || in_array($key, $selectedKeys, true)) {
+            if ($key === 'cover' || in_array($key, $selectedKeys, true) || in_array($key, $offKeys, true)) {
                 continue;
             }
-            $group = $meta['group'] ?? 'core';
-            if (!isset($availableByGroup[$group]) || !in_array($key, $availableByGroup[$group], true)) {
-                $availableByGroup[$group][] = $key;
-            }
+            $offKeys[] = $key;
         }
-        // Keep group order stable
-        $orderedGroups = array_keys($groupLabels);
         $kpiHints = collect(\App\SeoReports\SeoReportKpiGoals::wizardRows())->keyBy('type');
         $metricCatalog = \App\SeoReports\SeoReportMetricRegistry::catalog();
         $metricToggles = \App\SeoReports\SeoReportMetricRegistry::normalize($settings['metric_toggles'] ?? null);
+        $builderDefaults = [
+            'order' => array_values(array_filter(
+                \App\SeoReports\SeoReportSectionRegistry::defaultOrder(),
+                static function ($key) {
+                    return $key !== 'cover';
+                }
+            )),
+            'toggles' => \App\SeoReports\SeoReportSectionRegistry::defaultToggles(),
+            'metrics' => \App\SeoReports\SeoReportMetricRegistry::defaults(),
+        ];
+        unset($builderDefaults['toggles']['cover']);
     @endphp
 
     <div class="cabinet-sr-page">
@@ -93,158 +98,199 @@
                                maxlength="190"
                                placeholder="{{ __('Template description placeholder') }}">
                     </div>
+                    @php
+                        $trafficScope = \App\SeoReports\SeoReportTrafficScope::normalize($settings);
+                    @endphp
                     <div>
-                        <label class="form-label" for="srPeriod">{{ __('Default period') }}</label>
-                        <select class="form-select" id="srPeriod" name="default_period">
-                            <option value="prev_month" @if(($settings['default_period'] ?? '') === 'prev_month') selected @endif>
-                                {{ __('Previous calendar month') }}
+                        <label class="form-label" for="srTraffic">
+                            {{ __('Traffic in report') }}
+                            <i class="bi bi-question-circle text-muted ms-1"
+                               style="font-size:0.85em;cursor:help"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="top"
+                               title="{{ __('Traffic mode hint') }}"
+                               aria-label="{{ __('Traffic mode hint') }}"></i>
+                        </label>
+                        <select class="form-select" id="srTraffic" name="traffic_mode" data-sr-traffic-mode>
+                            <option value="search_only" @if($trafficScope['mode'] === 'search_only') selected @endif>
+                                {{ __('Traffic mode search only') }} ★
                             </option>
-                            <option value="last_30" @if(($settings['default_period'] ?? '') === 'last_30') selected @endif>
-                                {{ __('Last 30 days') }}
+                            <option value="all" @if($trafficScope['mode'] === 'all') selected @endif>
+                                {{ __('Traffic mode all sources') }}
+                            </option>
+                            <option value="custom" @if($trafficScope['mode'] === 'custom') selected @endif>
+                                {{ __('Traffic mode custom') }}
                             </option>
                         </select>
-                    </div>
-                    <div>
-                        <label class="form-label" for="srTraffic">{{ __('Traffic filter') }}</label>
-                        <select class="form-select" id="srTraffic" name="traffic_mode">
-                            <option value="all" @if(($settings['traffic_mode'] ?? 'all') !== 'search_only') selected @endif>
-                                {{ __('All channels') }}
-                            </option>
-                            <option value="search_only" @if(($settings['traffic_mode'] ?? '') === 'search_only') selected @endif>
-                                {{ __('Search only') }}
-                            </option>
-                        </select>
+                        <p class="small text-secondary mb-0 mt-1">{{ __('Traffic scope open metrics hint') }}</p>
                     </div>
                 </div>
+
+                @php
+                    $periodPreset = old('default_period', $settings['default_period'] ?? 'prev_month');
+                    $compareMode = old('compare_mode', $settings['compare_mode'] ?? 'previous_period');
+                    $autoCompare = old('auto_compare', !empty($settings['auto_compare']) || !array_key_exists('auto_compare', $settings));
+                @endphp
+                <div class="cabinet-sr-period" data-sr-period-settings>
+                    <div class="cabinet-sr-period__grid">
+                        <div>
+                            <label class="form-label" for="srPeriod">{{ __('Default period') }}</label>
+                            <select class="form-select" id="srPeriod" name="default_period" data-sr-period-preset>
+                                <option value="prev_month" @if($periodPreset === 'prev_month') selected @endif>
+                                    {{ __('Previous calendar month') }}
+                                </option>
+                                <option value="last_30" @if($periodPreset === 'last_30') selected @endif>
+                                    {{ __('Last 30 days') }}
+                                </option>
+                                <option value="calendar_month" @if($periodPreset === 'calendar_month') selected @endif>
+                                    {{ __('Specific calendar month') }}
+                                </option>
+                                <option value="custom" @if($periodPreset === 'custom') selected @endif>
+                                    {{ __('Custom dates') }}
+                                </option>
+                            </select>
+                            <p class="small text-secondary mb-0 mt-1">{{ __('Default period hint') }}</p>
+                        </div>
+                        <div data-sr-period-month @if($periodPreset !== 'calendar_month') hidden @endif>
+                            <label class="form-label" for="srPeriodMonth">{{ __('Report month') }}</label>
+                            <input type="month" class="form-control" id="srPeriodMonth" name="default_period_month"
+                                   value="{{ old('default_period_month', $settings['default_period_month'] ?? '') }}">
+                        </div>
+                        <div class="cabinet-sr-period__dates" data-sr-period-custom @if($periodPreset !== 'custom') hidden @endif>
+                            <div>
+                                <label class="form-label" for="srPeriodFrom">{{ __('Date from') }}</label>
+                                <input type="date" class="form-control" id="srPeriodFrom" name="default_period_from"
+                                       value="{{ old('default_period_from', $settings['default_period_from'] ?? '') }}">
+                            </div>
+                            <div>
+                                <label class="form-label" for="srPeriodTo">{{ __('Date to') }}</label>
+                                <input type="date" class="form-control" id="srPeriodTo" name="default_period_to"
+                                       value="{{ old('default_period_to', $settings['default_period_to'] ?? '') }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="cabinet-sr-period__compare">
+                        <label class="cabinet-sr-toggle-row mb-2">
+                            <input type="checkbox" name="auto_compare" value="1" data-sr-auto-compare
+                                @if($autoCompare) checked @endif>
+                            <span>{{ __('Compare with another period') }}</span>
+                        </label>
+                        <div data-sr-compare-fields @if(!$autoCompare) hidden @endif>
+                            <div class="cabinet-sr-period__grid">
+                                <div>
+                                    <label class="form-label" for="srCompareMode">{{ __('Compare mode') }}</label>
+                                    <select class="form-select" id="srCompareMode" name="compare_mode" data-sr-compare-mode>
+                                        <option value="previous_period" @if($compareMode === 'previous_period') selected @endif>
+                                            {{ __('Compare previous equal period') }}
+                                        </option>
+                                        <option value="previous_calendar_month" @if($compareMode === 'previous_calendar_month') selected @endif>
+                                            {{ __('Compare previous calendar month') }}
+                                        </option>
+                                        <option value="same_month_last_year" @if($compareMode === 'same_month_last_year') selected @endif>
+                                            {{ __('Compare same month last year') }}
+                                        </option>
+                                        <option value="calendar_month" @if($compareMode === 'calendar_month') selected @endif>
+                                            {{ __('Compare specific calendar month') }}
+                                        </option>
+                                        <option value="custom" @if($compareMode === 'custom') selected @endif>
+                                            {{ __('Compare custom dates') }}
+                                        </option>
+                                    </select>
+                                    <p class="small text-secondary mb-0 mt-1">{{ __('Compare mode hint') }}</p>
+                                </div>
+                                <div data-sr-compare-month @if($compareMode !== 'calendar_month') hidden @endif>
+                                    <label class="form-label" for="srCompareMonth">{{ __('Compare month') }}</label>
+                                    <input type="month" class="form-control" id="srCompareMonth" name="compare_month"
+                                           value="{{ old('compare_month', $settings['compare_month'] ?? '') }}">
+                                </div>
+                                <div class="cabinet-sr-period__dates" data-sr-compare-custom @if($compareMode !== 'custom') hidden @endif>
+                                    <div>
+                                        <label class="form-label" for="srCompareFrom">{{ __('Compare from') }}</label>
+                                        <input type="date" class="form-control" id="srCompareFrom" name="default_compare_from"
+                                               value="{{ old('default_compare_from', $settings['default_compare_from'] ?? '') }}">
+                                    </div>
+                                    <div>
+                                        <label class="form-label" for="srCompareTo">{{ __('Compare to') }}</label>
+                                        <input type="date" class="form-control" id="srCompareTo" name="default_compare_to"
+                                               value="{{ old('default_compare_to', $settings['default_compare_to'] ?? '') }}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="cabinet-sr-tpl-basics__flags">
                     <label class="cabinet-sr-toggle-row mb-0">
                         <input type="checkbox" name="is_default" value="1"
                             @if(old('is_default', $template->is_default)) checked @endif>
                         <span>{{ __('Default template for new projects') }}</span>
                     </label>
-                    <label class="cabinet-sr-toggle-row mb-0">
-                        <input type="checkbox" name="auto_compare" value="1"
-                            @if(!empty($settings['auto_compare'])) checked @endif>
-                        <span>{{ __('Auto compare previous period') }}</span>
-                    </label>
                 </div>
             </section>
 
-            <section class="cabinet-sr-builder" data-sr-builder>
-                <div class="cabinet-sr-builder__col" data-sr-builder-available-col>
+            <section class="cabinet-sr-builder" data-sr-builder data-sr-defaults='@json($builderDefaults)'>
+                <div class="cabinet-sr-builder__col cabinet-sr-builder__col--list">
                     <div class="cabinet-sr-builder__head">
-                        <div>
-                            <h2 class="cabinet-sr-builder__title">{{ __('Available blocks') }}</h2>
-                            <p class="cabinet-sr-builder__hint">{{ __('Available blocks hint with tips') }}</p>
-                        </div>
-                        <input type="search" class="form-control form-control-sm" data-sr-builder-search
-                               placeholder="{{ __('Search blocks') }}" autocomplete="off">
-                    </div>
-                    <div class="cabinet-sr-builder__scroll" data-sr-available>
-                        @foreach($orderedGroups as $groupKey)
-                            @php $keys = $availableByGroup[$groupKey] ?? []; @endphp
-                            <div class="cabinet-sr-builder__group" data-sr-group="{{ $groupKey }}"
-                                 @if($keys === []) hidden @endif>
-                                <div class="cabinet-sr-builder__group-title">{{ $groupLabels[$groupKey] ?? $groupKey }}</div>
-                                @foreach($keys as $key)
-                                    @php $meta = $sectionCatalog[$key]; @endphp
-                                    <button type="button"
-                                            class="cabinet-sr-builder__block"
-                                            data-sr-block
-                                            data-key="{{ $key }}"
-                                            data-title="{{ $meta['title'] }}"
-                                            data-hint="{{ $meta['hint'] ?? '' }}"
-                                            data-group="{{ $meta['group'] }}"
-                                            data-source="{{ $meta['source'] }}"
-                                            data-source-label="{{ \App\SeoReports\SeoReportSectionRegistry::sourceLabel($meta['source']) }}"
-                                            data-titlo="{{ ($meta['group'] ?? '') === 'titlo' ? '1' : '0' }}"
-                                            title="{{ $meta['hint'] ?? '' }}">
-                                        <span class="cabinet-sr-builder__block-add" aria-hidden="true">+</span>
-                                        <span class="cabinet-sr-builder__block-body">
-                                            <span class="cabinet-sr-builder__block-title">{{ $meta['title'] }}</span>
-                                            <span class="cabinet-sr-builder__block-hint">{{ $meta['hint'] ?? '' }}</span>
-                                            <span class="cabinet-sr-builder__block-meta">
-                                                {{ \App\SeoReports\SeoReportSectionRegistry::sourceLabel($meta['source']) }}
-                                                @if(($meta['group'] ?? '') === 'titlo')
-                                                    · Titlo
-                                                @endif
-                                            </span>
-                                        </span>
-                                    </button>
-                                @endforeach
-                            </div>
-                        @endforeach
-                        <p class="cabinet-sr-builder__empty" data-sr-available-empty hidden>
-                            {{ __('All blocks already in report') }}
-                        </p>
-                    </div>
-                </div>
-
-                <div class="cabinet-sr-builder__col cabinet-sr-builder__col--selected" data-sr-builder-selected-col>
-                    <div class="cabinet-sr-builder__head">
-                        <div>
+                        <div class="cabinet-sr-builder__head-top">
                             <h2 class="cabinet-sr-builder__title">
-                                {{ __('Selected blocks') }}
+                                {{ __('Report blocks') }}
                                 <span class="cabinet-sr-builder__count" data-sr-selected-count>{{ count($selectedKeys) }}</span>
                             </h2>
-                            <p class="cabinet-sr-builder__hint">{{ __('Selected blocks hint with metrics') }}</p>
+                            <button type="button"
+                                    class="btn btn-outline-secondary btn-sm cabinet-sr-builder__reset"
+                                    data-sr-reset-defaults
+                                    title="{{ __('Reset blocks defaults hint') }}">
+                                {{ __('Reset blocks defaults') }}
+                            </button>
                         </div>
-                    </div>
-                    <div class="cabinet-sr-builder__scroll" data-sr-selected>
-                        @foreach($selectedKeys as $key)
-                            @php $meta = $sectionCatalog[$key]; @endphp
-                            <div class="cabinet-sr-builder__picked"
-                                 draggable="true"
-                                 data-sr-picked
-                                 data-key="{{ $key }}"
-                                 data-title="{{ $meta['title'] }}"
-                                 data-hint="{{ $meta['hint'] ?? '' }}"
-                                 data-group="{{ $meta['group'] }}"
-                                 data-source="{{ $meta['source'] }}"
-                                 data-source-label="{{ \App\SeoReports\SeoReportSectionRegistry::sourceLabel($meta['source']) }}"
-                                 data-titlo="{{ ($meta['group'] ?? '') === 'titlo' ? '1' : '0' }}"
-                                 title="{{ $meta['hint'] ?? '' }}">
-                                <span class="cabinet-sr-builder__drag" aria-hidden="true">⋮⋮</span>
-                                <input type="hidden" name="section_order[]" value="{{ $key }}">
-                                <input type="hidden" name="sections[{{ $key }}]" value="1">
-                                <span class="cabinet-sr-builder__block-body">
-                                    <span class="cabinet-sr-builder__block-title">{{ $meta['title'] }}</span>
-                                    <span class="cabinet-sr-builder__block-hint">{{ $meta['hint'] ?? '' }}</span>
-                                    <span class="cabinet-sr-builder__block-meta">
-                                        {{ \App\SeoReports\SeoReportSectionRegistry::sourceLabel($meta['source']) }}
-                                        @if(($meta['group'] ?? '') === 'titlo')
-                                            · Titlo
-                                        @endif
-                                    </span>
-                                </span>
-                                <button type="button" class="cabinet-sr-builder__remove" data-sr-remove aria-label="{{ __('Remove') }}">×</button>
-                                @php $sectionMetrics = $metricCatalog[$key] ?? []; @endphp
-                                @if($sectionMetrics !== [])
-                                    <details class="cabinet-sr-builder__metrics" data-sr-metrics onclick="event.stopPropagation()">
-                                        <summary>
-                                            {{ __('Metrics in block') }}
-                                            <span class="cabinet-sr-builder__metrics-count" data-sr-metrics-count></span>
-                                        </summary>
-                                        <div class="cabinet-sr-builder__metrics-list">
-                                            @foreach($sectionMetrics as $metric)
-                                                <label class="cabinet-sr-builder__metric">
-                                                    <input type="hidden" name="metric_toggles[{{ $key }}][{{ $metric['key'] }}]" value="0">
-                                                    <input type="checkbox"
-                                                           name="metric_toggles[{{ $key }}][{{ $metric['key'] }}]"
-                                                           value="1"
-                                                           data-sr-metric-cb
-                                                        @if(!empty($metricToggles[$key][$metric['key']])) checked @endif>
-                                                    <span>{{ $metric['label'] }}</span>
-                                                </label>
-                                            @endforeach
-                                        </div>
-                                    </details>
-                                @endif
+                        <div class="cabinet-sr-builder__toolbar">
+                            <div class="cabinet-sr-builder__filters" data-sr-builder-filters>
+                                <button type="button" class="is-active" data-sr-filter="all">{{ __('Blocks filter all') }}</button>
+                                <button type="button" data-sr-filter="on">{{ __('Blocks filter on') }}</button>
+                                <button type="button" data-sr-filter="off">{{ __('Blocks filter off') }}</button>
                             </div>
-                        @endforeach
-                        <p class="cabinet-sr-builder__empty" data-sr-selected-empty @if(count($selectedKeys) > 0) hidden @endif>
-                            {{ __('Drag blocks here') }}
-                        </p>
+                            <input type="search" class="form-control form-control-sm cabinet-sr-builder__search" data-sr-builder-search
+                                   placeholder="{{ __('Search blocks and metrics') }}" autocomplete="off">
+                        </div>
+                        <p class="cabinet-sr-builder__hint">{{ __('Report blocks hint') }}</p>
+                    </div>
+                    <div class="cabinet-sr-builder__scroll" data-sr-list>
+                        <div class="cabinet-sr-builder__zone" data-sr-zone-on>
+                            <div class="cabinet-sr-builder__zone-title">{{ __('Blocks on') }}</div>
+                            @foreach($selectedKeys as $key)
+                                @include('pages.partials.seo-reports-template-block-row', [
+                                    'key' => $key,
+                                    'meta' => $sectionCatalog[$key],
+                                    'enabled' => true,
+                                    'metricCatalog' => $metricCatalog,
+                                    'metricToggles' => $metricToggles,
+                                    'groupLabels' => $groupLabels,
+                                    'settings' => $settings,
+                                ])
+                            @endforeach
+                            <p class="cabinet-sr-builder__empty" data-sr-on-empty @if(count($selectedKeys) > 0) hidden @endif>
+                                {{ __('No blocks enabled yet') }}
+                            </p>
+                        </div>
+                        <div class="cabinet-sr-builder__zone cabinet-sr-builder__zone--off" data-sr-zone-off>
+                            <div class="cabinet-sr-builder__zone-title">{{ __('Blocks off') }}</div>
+                            @foreach($offKeys as $key)
+                                @include('pages.partials.seo-reports-template-block-row', [
+                                    'key' => $key,
+                                    'meta' => $sectionCatalog[$key],
+                                    'enabled' => false,
+                                    'metricCatalog' => $metricCatalog,
+                                    'metricToggles' => $metricToggles,
+                                    'groupLabels' => $groupLabels,
+                                    'settings' => $settings,
+                                ])
+                            @endforeach
+                            <p class="cabinet-sr-builder__empty" data-sr-off-empty @if(count($offKeys) > 0) hidden @endif>
+                                {{ __('All blocks already in report') }}
+                            </p>
+                        </div>
                     </div>
                 </div>
 
@@ -252,18 +298,26 @@
                     <div class="cabinet-sr-builder__preview-card" style="--sr-accent: {{ $brandPreview }};">
                         <div class="cabinet-sr-builder__cover" data-sr-cover-preview>
                             <div class="cabinet-sr-builder__cover-accent"></div>
-                            <div class="cabinet-sr-builder__cover-agency" data-sr-cover-agency>
-                                {{ old('agency_name', $template->agency_name) ?: __('Your agency') }}
+                            <div class="cabinet-sr-builder__cover-brand">
+                                @if($template->agencyLogoUrl())
+                                    <img class="cabinet-sr-builder__cover-logo" src="{{ $template->agencyLogoUrl() }}" alt="">
+                                @endif
+                                <div class="cabinet-sr-builder__cover-agency" data-sr-cover-agency>
+                                    {{ old('agency_name', $template->agency_name) ?: __('Your agency') }}
+                                </div>
                             </div>
                             <div class="cabinet-sr-builder__cover-title" data-sr-cover-title>
                                 {{ old('title', $template->title) }}
                             </div>
                             <div class="cabinet-sr-builder__cover-meta">{{ __('Live cover preview') }}</div>
                         </div>
-                        <div class="cabinet-sr-builder__outline-label">{{ __('Report outline') }}</div>
+                        <div class="cabinet-sr-builder__outline-label">
+                            <span class="cabinet-sr-builder__outline-label-text">{{ __('Report outline') }}</span>
+                            <span class="cabinet-sr-builder__outline-count" data-sr-outline-count>{{ count($selectedKeys) }}</span>
+                        </div>
                         <ol class="cabinet-sr-builder__outline" data-sr-outline>
                             @foreach($selectedKeys as $key)
-                                <li>{{ $sectionCatalog[$key]['title'] ?? $key }}</li>
+                                <li data-key="{{ $key }}">{{ $sectionCatalog[$key]['title'] ?? $key }}</li>
                             @endforeach
                         </ol>
                         <p class="cabinet-sr-builder__preview-note mb-0">{{ __('Template preview note') }}</p>
@@ -435,192 +489,273 @@
     @slot('js')
         <script>
             (function () {
+                if (window.bootstrap && bootstrap.Tooltip) {
+                    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+                        new bootstrap.Tooltip(el);
+                    });
+                }
+
+                var periodBox = document.querySelector('[data-sr-period-settings]');
+                if (periodBox) {
+                    var periodPreset = periodBox.querySelector('[data-sr-period-preset]');
+                    var periodMonth = periodBox.querySelector('[data-sr-period-month]');
+                    var periodCustom = periodBox.querySelector('[data-sr-period-custom]');
+                    var autoCompare = periodBox.querySelector('[data-sr-auto-compare]');
+                    var compareFields = periodBox.querySelector('[data-sr-compare-fields]');
+                    var compareMode = periodBox.querySelector('[data-sr-compare-mode]');
+                    var compareMonth = periodBox.querySelector('[data-sr-compare-month]');
+                    var compareCustom = periodBox.querySelector('[data-sr-compare-custom]');
+
+                    function syncPeriodUi() {
+                        var p = periodPreset ? periodPreset.value : 'prev_month';
+                        if (periodMonth) periodMonth.hidden = p !== 'calendar_month';
+                        if (periodCustom) periodCustom.hidden = p !== 'custom';
+                        var on = !autoCompare || autoCompare.checked;
+                        if (compareFields) compareFields.hidden = !on;
+                        var m = compareMode ? compareMode.value : 'previous_period';
+                        if (compareMonth) compareMonth.hidden = !on || m !== 'calendar_month';
+                        if (compareCustom) compareCustom.hidden = !on || m !== 'custom';
+                    }
+                    if (periodPreset) periodPreset.addEventListener('change', syncPeriodUi);
+                    if (autoCompare) autoCompare.addEventListener('change', syncPeriodUi);
+                    if (compareMode) compareMode.addEventListener('change', syncPeriodUi);
+                    syncPeriodUi();
+                }
+
                 var builder = document.querySelector('[data-sr-builder]');
                 if (!builder) return;
 
-                var available = builder.querySelector('[data-sr-available]');
-                var selected = builder.querySelector('[data-sr-selected]');
+                var list = builder.querySelector('[data-sr-list]');
+                var zoneOn = builder.querySelector('[data-sr-zone-on]');
+                var zoneOff = builder.querySelector('[data-sr-zone-off]');
+                var onEmpty = builder.querySelector('[data-sr-on-empty]');
+                var offEmpty = builder.querySelector('[data-sr-off-empty]');
                 var search = builder.querySelector('[data-sr-builder-search]');
+                var filters = builder.querySelector('[data-sr-builder-filters]');
                 var outline = builder.querySelector('[data-sr-outline]');
+                var outlineCount = builder.querySelector('[data-sr-outline-count]');
                 var countEls = document.querySelectorAll('[data-sr-selected-count], [data-sr-sticky-count]');
-                var availableEmpty = builder.querySelector('[data-sr-available-empty]');
-                var selectedEmpty = builder.querySelector('[data-sr-selected-empty]');
-                var groupLabels = @json($groupLabels);
-                var metricCatalog = @json($metricCatalog);
-                var metricsLabel = @json(__('Metrics in block'));
+                var filterMode = 'all';
                 var dragEl = null;
+                var defaults = {};
+                try {
+                    defaults = JSON.parse(builder.getAttribute('data-sr-defaults') || '{}') || {};
+                } catch (e) {
+                    defaults = {};
+                }
+                var defaultOrder = Array.isArray(defaults.order) ? defaults.order : [];
+                var defaultToggles = defaults.toggles && typeof defaults.toggles === 'object' ? defaults.toggles : {};
+                var defaultMetrics = defaults.metrics && typeof defaults.metrics === 'object' ? defaults.metrics : {};
 
-                function ensureGroup(groupKey) {
-                    var group = available.querySelector('[data-sr-group="' + groupKey + '"]');
-                    if (group) return group;
-                    group = document.createElement('div');
-                    group.className = 'cabinet-sr-builder__group';
-                    group.setAttribute('data-sr-group', groupKey);
-                    var title = document.createElement('div');
-                    title.className = 'cabinet-sr-builder__group-title';
-                    title.textContent = groupLabels[groupKey] || groupKey;
-                    group.appendChild(title);
-                    available.insertBefore(group, availableEmpty);
-                    return group;
+                function focusOutlineKey(key) {
+                    if (!outline || !key) return;
+                    var li = outline.querySelector('[data-key="' + key.replace(/"/g, '\\"') + '"]');
+                    if (!li) {
+                        // Just scrolled off / removed — keep list readable at bottom when disabling last items
+                        outline.scrollTop = outline.scrollHeight;
+                        return;
+                    }
+                    if (typeof li.scrollIntoView === 'function') {
+                        li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    }
+                    li.classList.remove('is-flash');
+                    // restart animation
+                    void li.offsetWidth;
+                    li.classList.add('is-flash');
+                    window.setTimeout(function () { li.classList.remove('is-flash'); }, 900);
                 }
 
-                function syncMetricCounts(root) {
-                    (root || selected).querySelectorAll('[data-sr-metrics]').forEach(function (box) {
+                function rows() {
+                    return list.querySelectorAll('[data-sr-row]');
+                }
+
+                function syncMetricCounts() {
+                    list.querySelectorAll('[data-sr-metrics]').forEach(function (box) {
                         var cbs = box.querySelectorAll('[data-sr-metric-cb]');
                         var on = 0;
                         cbs.forEach(function (cb) { if (cb.checked) on += 1; });
                         var el = box.querySelector('[data-sr-metrics-count]');
-                        if (el) el.textContent = '· ' + on + '/' + cbs.length;
+                        if (el) el.textContent = on + '/' + cbs.length;
                     });
                 }
 
-                function syncUi() {
-                    var picked = selected.querySelectorAll('[data-sr-picked]');
-                    countEls.forEach(function (el) { el.textContent = String(picked.length); });
-                    if (selectedEmpty) selectedEmpty.hidden = picked.length > 0;
+                function applyMetricFilter(box, query) {
+                    if (!box) return 0;
+                    var q = (query || '').toLowerCase().trim();
+                    var visible = 0;
+                    box.querySelectorAll('[data-sr-metric]').forEach(function (metric) {
+                        var label = (metric.getAttribute('data-label') || '').toLowerCase();
+                        var ok = !q || label.indexOf(q) !== -1;
+                        metric.hidden = !ok;
+                        if (ok) visible += 1;
+                    });
+                    var empty = box.querySelector('[data-sr-metrics-empty]');
+                    if (empty) empty.hidden = visible > 0;
+                    return visible;
+                }
+
+                function countMetricHits(box, query) {
+                    if (!box || !query) return 0;
+                    var hits = 0;
+                    box.querySelectorAll('[data-sr-metric]').forEach(function (metric) {
+                        var label = (metric.getAttribute('data-label') || '').toLowerCase();
+                        if (label.indexOf(query) !== -1) hits += 1;
+                    });
+                    return hits;
+                }
+
+                function applyFilter() {
+                    var q = ((search && search.value) || '').toLowerCase().trim();
+                    rows().forEach(function (row) {
+                        var on = row.getAttribute('data-enabled') === '1';
+                        var title = (row.getAttribute('data-title') || '').toLowerCase();
+                        var hint = (row.getAttribute('data-hint') || '').toLowerCase();
+                        var source = (row.getAttribute('data-source-label') || '').toLowerCase();
+                        var metricsBox = row.querySelector('[data-sr-metrics]');
+                        var localSearch = metricsBox && metricsBox.querySelector('[data-sr-metrics-search]');
+                        var qLocal = ((localSearch && localSearch.value) || '').toLowerCase().trim();
+                        var metricHits = countMetricHits(metricsBox, q);
+                        var matchBlock = !q || title.indexOf(q) !== -1 || hint.indexOf(q) !== -1 || source.indexOf(q) !== -1;
+                        var matchQ = matchBlock || metricHits > 0;
+                        var matchF = filterMode === 'all' || (filterMode === 'on' && on) || (filterMode === 'off' && !on);
+                        row.hidden = !(matchQ && matchF);
+
+                        // Local search wins; else filter metrics by global q only when block matched via metrics
+                        var listQuery = qLocal || (!matchBlock && q ? q : '');
+                        applyMetricFilter(metricsBox, listQuery);
+                        if (metricsBox && ((qLocal && listQuery) || (!matchBlock && metricHits > 0))) {
+                            metricsBox.open = true;
+                        }
+                    });
+                    if (zoneOn) zoneOn.hidden = filterMode === 'off';
+                    if (zoneOff) zoneOff.hidden = filterMode === 'on';
+                }
+
+                function syncUi(focusKey) {
+                    var onRows = zoneOn.querySelectorAll('[data-sr-row][data-enabled="1"]');
+                    var offRows = zoneOff.querySelectorAll('[data-sr-row][data-enabled="0"]');
+                    countEls.forEach(function (el) { el.textContent = String(onRows.length); });
+                    if (outlineCount) outlineCount.textContent = String(onRows.length);
+                    if (onEmpty) onEmpty.hidden = onRows.length > 0;
+                    if (offEmpty) offEmpty.hidden = offRows.length > 0;
                     if (outline) {
                         outline.innerHTML = '';
-                        picked.forEach(function (item) {
+                        onRows.forEach(function (item) {
                             var li = document.createElement('li');
+                            var k = item.getAttribute('data-key') || '';
+                            if (k) li.setAttribute('data-key', k);
                             li.textContent = item.getAttribute('data-title') || '';
                             outline.appendChild(li);
                         });
                     }
-                    available.querySelectorAll('[data-sr-group]').forEach(function (group) {
-                        var blocks = group.querySelectorAll('[data-sr-block]');
-                        var visible = 0;
-                        blocks.forEach(function (b) {
-                            if (!b.hidden) visible += 1;
-                        });
-                        group.hidden = visible === 0;
-                    });
-                    var anyAvail = available.querySelectorAll('[data-sr-block]:not([hidden])').length > 0;
-                    if (availableEmpty) availableEmpty.hidden = anyAvail;
                     syncMetricCounts();
+                    applyFilter();
+                    if (focusKey) focusOutlineKey(focusKey);
                 }
 
-                function metricsHtml(sectionKey) {
-                    var list = metricCatalog[sectionKey] || [];
-                    if (!list.length) return '';
-                    var html = '<details class="cabinet-sr-builder__metrics" data-sr-metrics>' +
-                        '<summary>' + metricsLabel + ' <span class="cabinet-sr-builder__metrics-count" data-sr-metrics-count></span></summary>' +
-                        '<div class="cabinet-sr-builder__metrics-list">';
-                    list.forEach(function (metric) {
-                        html += '<label class="cabinet-sr-builder__metric">' +
-                            '<input type="hidden" name="metric_toggles[' + sectionKey + '][' + metric.key + ']" value="0">' +
-                            '<input type="checkbox" name="metric_toggles[' + sectionKey + '][' + metric.key + ']" value="1" data-sr-metric-cb checked>' +
-                            '<span></span></label>';
+                function applyRowEnabled(row, enabled, append) {
+                    if (!row) return;
+                    var key = row.getAttribute('data-key');
+                    var val = row.querySelector('[data-sr-section-val]');
+                    var order = row.querySelector('[data-sr-order]');
+                    var drag = row.querySelector('.cabinet-sr-builder__drag');
+                    var metrics = row.querySelector('[data-sr-metrics]');
+                    var toggle = row.querySelector('[data-sr-toggle]');
+
+                    row.setAttribute('data-enabled', enabled ? '1' : '0');
+                    row.classList.toggle('is-on', enabled);
+                    row.classList.toggle('is-off', !enabled);
+                    row.draggable = !!enabled;
+                    if (val) val.value = enabled ? '1' : '0';
+                    if (toggle) toggle.checked = !!enabled;
+                    if (drag) drag.hidden = !enabled;
+                    if (metrics) metrics.hidden = !enabled;
+
+                    if (enabled) {
+                        if (!order) {
+                            order = document.createElement('input');
+                            order.type = 'hidden';
+                            order.name = 'section_order[]';
+                            order.value = key;
+                            order.setAttribute('data-sr-order', '');
+                            row.insertBefore(order, row.querySelector('.cabinet-sr-builder__block-body'));
+                        } else {
+                            order.value = key;
+                        }
+                        if (append !== false) {
+                            if (onEmpty) zoneOn.insertBefore(row, onEmpty);
+                            else zoneOn.appendChild(row);
+                        }
+                        bindDrag(row);
+                    } else {
+                        if (order) order.parentNode.removeChild(order);
+                        if (append !== false) {
+                            if (offEmpty) zoneOff.insertBefore(row, offEmpty);
+                            else zoneOff.appendChild(row);
+                        }
+                    }
+                }
+
+                function setEnabled(row, enabled) {
+                    applyRowEnabled(row, enabled, true);
+                    syncUi(row ? row.getAttribute('data-key') : null);
+                }
+
+                function resetToDefaults() {
+                    if (defaultOrder.length === 0) return;
+                    if (!window.confirm(@json(__('Reset blocks defaults confirm')))) return;
+
+                    // 1) Показатели — как в базовом шаблоне (все вкл.)
+                    list.querySelectorAll('[data-sr-metric-cb]').forEach(function (cb) {
+                        var name = cb.getAttribute('name') || '';
+                        var secMatch = name.match(/metric_toggles\[([^\]]+)\]\[([^\]]+)\]/);
+                        if (!secMatch) {
+                            cb.checked = true;
+                            return;
+                        }
+                        var sec = secMatch[1];
+                        var key = secMatch[2];
+                        if (defaultMetrics[sec] && Object.prototype.hasOwnProperty.call(defaultMetrics[sec], key)) {
+                            cb.checked = !!defaultMetrics[sec][key];
+                        } else {
+                            cb.checked = true;
+                        }
                     });
-                    html += '</div></details>';
-                    var wrap = document.createElement('div');
-                    wrap.innerHTML = html;
-                    var details = wrap.firstChild;
-                    list.forEach(function (metric, idx) {
-                        var span = details.querySelectorAll('.cabinet-sr-builder__metric span')[idx];
-                        if (span) span.textContent = metric.label;
+
+                    // 2) Порядок и вкл/выкл блоков
+                    defaultOrder.forEach(function (key) {
+                        var row = list.querySelector('[data-sr-row][data-key="' + key + '"]');
+                        if (!row) return;
+                        var enabled = Object.prototype.hasOwnProperty.call(defaultToggles, key)
+                            ? !!defaultToggles[key]
+                            : false;
+                        applyRowEnabled(row, enabled, true);
                     });
-                    details.addEventListener('click', function (e) { e.stopPropagation(); });
-                    return details;
-                }
 
-                function makePicked(from) {
-                    var key = from.getAttribute('data-key');
-                    var title = from.getAttribute('data-title') || key;
-                    var hint = from.getAttribute('data-hint') || '';
-                    var sourceLabel = from.getAttribute('data-source-label') || '';
-                    var titlo = from.getAttribute('data-titlo') === '1';
-                    var el = document.createElement('div');
-                    el.className = 'cabinet-sr-builder__picked';
-                    el.draggable = true;
-                    el.setAttribute('data-sr-picked', '');
-                    ['key', 'title', 'hint', 'group', 'source', 'source-label', 'titlo'].forEach(function (attr) {
-                        var val = from.getAttribute('data-' + attr);
-                        if (val != null) el.setAttribute('data-' + attr, val);
+                    rows().forEach(function (row) {
+                        var key = row.getAttribute('data-key');
+                        if (defaultOrder.indexOf(key) !== -1) return;
+                        applyRowEnabled(row, false, true);
                     });
-                    if (hint) el.setAttribute('title', hint);
-                    el.innerHTML =
-                        '<span class="cabinet-sr-builder__drag" aria-hidden="true">⋮⋮</span>' +
-                        '<input type="hidden" name="section_order[]" value="' + key + '">' +
-                        '<input type="hidden" name="sections[' + key + ']" value="1">' +
-                        '<span class="cabinet-sr-builder__block-body">' +
-                            '<span class="cabinet-sr-builder__block-title"></span>' +
-                            '<span class="cabinet-sr-builder__block-hint"></span>' +
-                            '<span class="cabinet-sr-builder__block-meta"></span>' +
-                        '</span>' +
-                        '<button type="button" class="cabinet-sr-builder__remove" data-sr-remove aria-label="Remove">×</button>';
-                    el.querySelector('.cabinet-sr-builder__block-title').textContent = title;
-                    el.querySelector('.cabinet-sr-builder__block-hint').textContent = hint;
-                    el.querySelector('.cabinet-sr-builder__block-meta').textContent =
-                        sourceLabel + (titlo ? ' · Titlo' : '');
-                    var metrics = metricsHtml(key);
-                    if (metrics) el.appendChild(metrics);
-                    return el;
-                }
 
-                function makeAvailable(from) {
-                    var key = from.getAttribute('data-key');
-                    var title = from.getAttribute('data-title') || key;
-                    var hint = from.getAttribute('data-hint') || '';
-                    var sourceLabel = from.getAttribute('data-source-label') || '';
-                    var titlo = from.getAttribute('data-titlo') === '1';
-                    var btn = document.createElement('button');
-                    btn.type = 'button';
-                    btn.className = 'cabinet-sr-builder__block';
-                    btn.setAttribute('data-sr-block', '');
-                    ['key', 'title', 'hint', 'group', 'source', 'source-label', 'titlo'].forEach(function (attr) {
-                        var val = from.getAttribute('data-' + attr);
-                        if (val != null) btn.setAttribute('data-' + attr, val);
-                    });
-                    if (hint) btn.setAttribute('title', hint);
-                    btn.innerHTML =
-                        '<span class="cabinet-sr-builder__block-add" aria-hidden="true">+</span>' +
-                        '<span class="cabinet-sr-builder__block-body">' +
-                            '<span class="cabinet-sr-builder__block-title"></span>' +
-                            '<span class="cabinet-sr-builder__block-hint"></span>' +
-                            '<span class="cabinet-sr-builder__block-meta"></span>' +
-                        '</span>';
-                    btn.querySelector('.cabinet-sr-builder__block-title').textContent = title;
-                    btn.querySelector('.cabinet-sr-builder__block-hint').textContent = hint;
-                    btn.querySelector('.cabinet-sr-builder__block-meta').textContent =
-                        sourceLabel + (titlo ? ' · Titlo' : '');
-                    return btn;
-                }
-
-                function addBlock(blockEl) {
-                    if (!blockEl || !blockEl.getAttribute('data-key')) return;
-                    var key = blockEl.getAttribute('data-key');
-                    if (selected.querySelector('[data-sr-picked][data-key="' + key + '"]')) return;
-                    var picked = makePicked(blockEl);
-                    selected.insertBefore(picked, selectedEmpty);
-                    blockEl.parentNode && blockEl.parentNode.removeChild(blockEl);
-                    bindDrag(picked);
-                    syncUi();
-                    filterAvailable();
-                }
-
-                function removeBlock(pickedEl) {
-                    if (!pickedEl) return;
-                    var btn = makeAvailable(pickedEl);
-                    var group = ensureGroup(btn.getAttribute('data-group') || 'core');
-                    group.appendChild(btn);
-                    pickedEl.parentNode && pickedEl.parentNode.removeChild(pickedEl);
-                    syncUi();
-                    filterAvailable();
-                }
-
-                function filterAvailable() {
-                    var q = ((search && search.value) || '').toLowerCase().trim();
-                    available.querySelectorAll('[data-sr-block]').forEach(function (b) {
-                        var title = (b.getAttribute('data-title') || '').toLowerCase();
-                        var hint = (b.getAttribute('data-hint') || '').toLowerCase();
-                        var source = (b.getAttribute('data-source-label') || '').toLowerCase();
-                        b.hidden = !!(q && title.indexOf(q) === -1 && hint.indexOf(q) === -1 && source.indexOf(q) === -1);
-                    });
+                    filterMode = 'all';
+                    if (filters) {
+                        filters.querySelectorAll('[data-sr-filter]').forEach(function (b) {
+                            b.classList.toggle('is-active', b.getAttribute('data-sr-filter') === 'all');
+                        });
+                    }
+                    if (search) search.value = '';
                     syncUi();
                 }
 
                 function bindDrag(el) {
+                    if (el._srDragBound) return;
+                    el._srDragBound = true;
                     el.addEventListener('dragstart', function (e) {
+                        if (el.getAttribute('data-enabled') !== '1') {
+                            e.preventDefault();
+                            return;
+                        }
                         dragEl = el;
                         el.classList.add('is-dragging');
                         if (e.dataTransfer) {
@@ -630,54 +765,78 @@
                     });
                     el.addEventListener('dragend', function () {
                         el.classList.remove('is-dragging');
-                        selected.querySelectorAll('.is-drop-target').forEach(function (n) {
+                        zoneOn.querySelectorAll('.is-drop-target').forEach(function (n) {
                             n.classList.remove('is-drop-target');
                         });
                         dragEl = null;
+                        syncUi();
                     });
                 }
 
-                available.addEventListener('click', function (e) {
-                    var block = e.target.closest('[data-sr-block]');
-                    if (block) addBlock(block);
+                list.addEventListener('change', function (e) {
+                    var t = e.target;
+                    if (!t) return;
+                    if (t.matches('[data-sr-toggle]')) {
+                        setEnabled(t.closest('[data-sr-row]'), t.checked);
+                        return;
+                    }
+                    if (t.matches('[data-sr-metric-cb]')) syncMetricCounts();
                 });
 
-                selected.addEventListener('click', function (e) {
-                    var btn = e.target.closest('[data-sr-remove]');
-                    if (!btn) return;
-                    removeBlock(btn.closest('[data-sr-picked]'));
-                });
-
-                selected.addEventListener('dragover', function (e) {
+                zoneOn.addEventListener('dragover', function (e) {
                     e.preventDefault();
-                    var over = e.target.closest('[data-sr-picked]');
-                    selected.querySelectorAll('.is-drop-target').forEach(function (n) {
+                    if (!dragEl) return;
+                    var over = e.target.closest('[data-sr-row][data-enabled="1"]');
+                    zoneOn.querySelectorAll('.is-drop-target').forEach(function (n) {
                         n.classList.remove('is-drop-target');
                     });
-                    if (over && dragEl && over !== dragEl) {
+                    if (over && over !== dragEl) {
                         over.classList.add('is-drop-target');
                         var rect = over.getBoundingClientRect();
                         var before = (e.clientY - rect.top) < rect.height / 2;
-                        if (before) selected.insertBefore(dragEl, over);
-                        else selected.insertBefore(dragEl, over.nextSibling);
+                        if (before) zoneOn.insertBefore(dragEl, over);
+                        else zoneOn.insertBefore(dragEl, over.nextSibling);
                     }
                 });
 
-                selected.addEventListener('drop', function (e) {
+                zoneOn.addEventListener('drop', function (e) {
                     e.preventDefault();
                     syncUi();
                 });
 
-                if (search) {
-                    search.addEventListener('input', filterAvailable);
+                if (search) search.addEventListener('input', applyFilter);
+
+                if (filters) {
+                    filters.addEventListener('click', function (e) {
+                        var btn = e.target.closest('[data-sr-filter]');
+                        if (!btn) return;
+                        filterMode = btn.getAttribute('data-sr-filter') || 'all';
+                        filters.querySelectorAll('[data-sr-filter]').forEach(function (b) {
+                            b.classList.toggle('is-active', b === btn);
+                        });
+                        applyFilter();
+                    });
                 }
 
-                selected.querySelectorAll('[data-sr-picked]').forEach(bindDrag);
-                selected.querySelectorAll('[data-sr-metrics]').forEach(function (box) {
-                    box.addEventListener('click', function (e) { e.stopPropagation(); });
+                var resetBtn = builder.querySelector('[data-sr-reset-defaults]');
+                if (resetBtn) resetBtn.addEventListener('click', resetToDefaults);
+
+                list.addEventListener('input', function (e) {
+                    if (e.target && e.target.matches('[data-sr-metrics-search]')) {
+                        e.stopPropagation();
+                        applyFilter();
+                    }
                 });
-                selected.addEventListener('change', function (e) {
-                    if (e.target && e.target.matches('[data-sr-metric-cb]')) syncMetricCounts();
+
+                list.querySelectorAll('[data-sr-row][data-enabled="1"]').forEach(bindDrag);
+                list.querySelectorAll('[data-sr-metrics]').forEach(function (box) {
+                    box.addEventListener('click', function (e) {
+                        if (e.target && e.target.closest('[data-sr-metrics-search]')) {
+                            e.stopPropagation();
+                            return;
+                        }
+                        e.stopPropagation();
+                    });
                 });
 
                 var titleInput = document.querySelector('[data-sr-tpl-title]');
@@ -707,6 +866,68 @@
                 }
                 if (brandColor) brandColor.addEventListener('input', function () { syncBrand(brandColor.value); });
                 if (brandSwatch) brandSwatch.addEventListener('input', function () { syncBrand(brandSwatch.value); });
+
+                (function bindTrafficScope() {
+                    var modeSelect = document.querySelector('[data-sr-traffic-mode]');
+                    var scope = document.querySelector('[data-sr-traffic-scope]');
+                    if (!scope) return;
+                    var boxes = scope.querySelectorAll('[data-sr-traffic-ch]');
+                    var allIds = [];
+                    boxes.forEach(function (cb) { allIds.push(cb.value); });
+
+                    function selectedIds() {
+                        var out = [];
+                        boxes.forEach(function (cb) { if (cb.checked) out.push(cb.value); });
+                        return out.sort();
+                    }
+
+                    function setChecked(ids) {
+                        var map = {};
+                        (ids || []).forEach(function (id) { map[id] = true; });
+                        boxes.forEach(function (cb) { cb.checked = !!map[cb.value]; });
+                    }
+
+                    function syncModeFromChecks() {
+                        if (!modeSelect) return;
+                        var ids = selectedIds();
+                        var isAll = ids.length === allIds.length;
+                        var isSearch = ids.length === 1 && ids[0] === 'organic';
+                        modeSelect.value = isAll ? 'all' : (isSearch ? 'search_only' : 'custom');
+                    }
+
+                    function applyMode(mode) {
+                        if (mode === 'search_only') setChecked(['organic']);
+                        else if (mode === 'all') setChecked(allIds);
+                        else if (mode === 'organic_ad') setChecked(['organic', 'ad']);
+                        syncModeFromChecks();
+                    }
+
+                    if (modeSelect) {
+                        modeSelect.addEventListener('change', function () {
+                            applyMode(modeSelect.value);
+                            if (modeSelect.value === 'custom') {
+                                var trafficRow = list.querySelector('[data-sr-row][data-key="traffic"]');
+                                var details = trafficRow && trafficRow.querySelector('[data-sr-metrics]');
+                                if (details && !details.open) details.open = true;
+                            }
+                        });
+                    }
+
+                    scope.querySelectorAll('[data-sr-traffic-preset]').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            applyMode(btn.getAttribute('data-sr-traffic-preset') || 'search_only');
+                        });
+                    });
+
+                    boxes.forEach(function (cb) {
+                        cb.addEventListener('change', function () {
+                            if (selectedIds().length === 0) {
+                                cb.checked = true;
+                            }
+                            syncModeFromChecks();
+                        });
+                    });
+                })();
 
                 syncUi();
             })();

@@ -18,8 +18,16 @@ class SeoReportProject extends Model
     /** Keys that live on the report template (shared across projects). */
     public const TEMPLATE_SETTING_KEYS = [
         'default_period',
+        'default_period_month',
+        'default_period_from',
+        'default_period_to',
         'auto_compare',
+        'compare_mode',
+        'compare_month',
+        'default_compare_from',
+        'default_compare_to',
         'traffic_mode',
+        'traffic_channels',
         'kpi_goals',
         'section_order',
         'metric_toggles',

@@ -1088,6 +1088,7 @@ class YandexMetrikaService
             'accuracy' => 'full',
             'limit' => max(1, min(100, $limit)),
             'sort' => $sort,
+            'lang' => 'ru',
         ];
         if ($filters !== null && $filters !== '') {
             $query['filters'] = $filters;
@@ -1494,6 +1495,7 @@ class YandexMetrikaService
             'date2' => $date2,
             'accuracy' => 'full',
             'limit' => max(1, min(100, $limit)),
+            'lang' => 'ru',
         ];
         if ($dimension !== null && $dimension !== '') {
             $query['dimensions'] = $dimension;

@@ -79,7 +79,7 @@ class SeoReportSectionRegistry
             ],
             'gsc' => [
                 'title' => 'Google Search Console',
-                'hint' => 'Клики, показы, CTR и топ запросов/страниц из GSC (API или CSV).',
+                'hint' => 'Клики, показы, CTR и топ запросов/страниц из GSC через API.',
                 'group' => 'seo',
                 'source' => 'gsc',
                 'default' => false,
@@ -87,7 +87,7 @@ class SeoReportSectionRegistry
             ],
             'webmaster' => [
                 'title' => 'Яндекс.Вебмастер',
-                'hint' => 'Данные Вебмастера по запросам и страницам (API или CSV).',
+                'hint' => 'Данные Вебмастера по запросам и страницам через API.',
                 'group' => 'seo',
                 'source' => 'webmaster',
                 'default' => false,
@@ -119,7 +119,7 @@ class SeoReportSectionRegistry
             ],
             'vk_ads' => [
                 'title' => 'VK Реклама',
-                'hint' => 'Таргет VK: охваты, клики и эффективность (токен или CSV).',
+                'hint' => 'Таргет VK: охваты, клики и эффективность через API.',
                 'group' => 'ads',
                 'source' => 'vk_ads',
                 'default' => false,

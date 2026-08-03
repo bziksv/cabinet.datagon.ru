@@ -51,30 +51,99 @@
     <script>
         (function () {
             var reactUrl = @json(route('seo-reports.public.react', ['token' => $report->public_token]));
-            var token = document.querySelector('meta[name="csrf-token"]');
-            document.querySelectorAll('[data-sr-react]').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    var wrap = btn.closest('[data-sr-react-section]');
-                    var section = wrap ? wrap.getAttribute('data-sr-react-section') : '';
-                    var type = btn.getAttribute('data-sr-react') || '';
-                    var text = '';
-                    if (type === 'question' || type === 'clarify') {
-                        text = window.prompt(@json(__('Optional comment')), '') || '';
-                    }
-                    var body = new FormData();
-                    body.append('section', section);
-                    body.append('type', type);
-                    body.append('text', text);
-                    body.append('_token', @json(csrf_token()));
-                    fetch(reactUrl, { method: 'POST', body: body, credentials: 'same-origin' })
-                        .then(function (r) { return r.json(); })
-                        .then(function (j) {
-                            if (j && j.ok) {
-                                btn.classList.add('is-active');
-                            }
-                        })
-                        .catch(function () {});
+            var labels = {
+                question: @json(__('Ask a question')),
+                clarify: @json(__('Need clarification')),
+                sent: @json(__('SEO report react sent')),
+                fail: @json(__('SEO report react fail')),
+                sending: @json(__('Sending…'))
+            };
+
+            function setStatus(wrap, text, ok) {
+                var status = wrap.querySelector('[data-sr-react-status]');
+                if (!status) return;
+                status.hidden = !text;
+                status.textContent = text || '';
+                status.classList.toggle('is-ok', !!ok);
+                status.classList.toggle('is-fail', !ok && !!text);
+            }
+
+            function sendReaction(wrap, type, text, btn) {
+                var section = wrap.getAttribute('data-sr-react-section') || '';
+                var body = new FormData();
+                body.append('section', section);
+                body.append('type', type);
+                body.append('text', text || '');
+                body.append('_token', @json(csrf_token()));
+                setStatus(wrap, labels.sending, true);
+                if (btn) btn.disabled = true;
+                fetch(reactUrl, { method: 'POST', body: body, credentials: 'same-origin' })
+                    .then(function (r) { return r.json().then(function (j) { return { ok: r.ok && j && j.ok, j: j }; }); })
+                    .then(function (res) {
+                        if (btn) btn.disabled = false;
+                        if (res.ok) {
+                            wrap.querySelectorAll('[data-sr-react]').forEach(function (b) {
+                                b.classList.toggle('is-active', b === btn || (type === 'like' && b.getAttribute('data-sr-react') === 'like'));
+                            });
+                            if (btn) btn.classList.add('is-active');
+                            var form = wrap.querySelector('[data-sr-react-form]');
+                            if (form) form.hidden = true;
+                            setStatus(wrap, labels.sent, true);
+                        } else {
+                            setStatus(wrap, labels.fail, false);
+                        }
+                    })
+                    .catch(function () {
+                        if (btn) btn.disabled = false;
+                        setStatus(wrap, labels.fail, false);
+                    });
+            }
+
+            document.querySelectorAll('[data-sr-react-section]').forEach(function (wrap) {
+                var form = wrap.querySelector('[data-sr-react-form]');
+                var formLabel = wrap.querySelector('[data-sr-react-form-label]');
+                var textarea = wrap.querySelector('[data-sr-react-text]');
+                var pendingType = null;
+                var pendingBtn = null;
+
+                wrap.querySelectorAll('[data-sr-react]').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        var type = btn.getAttribute('data-sr-react') || '';
+                        if (type === 'like') {
+                            if (form) form.hidden = true;
+                            sendReaction(wrap, 'like', '', btn);
+                            return;
+                        }
+                        pendingType = type;
+                        pendingBtn = btn;
+                        if (formLabel) formLabel.textContent = labels[type] || '';
+                        if (textarea) {
+                            textarea.value = '';
+                            textarea.focus();
+                        }
+                        if (form) form.hidden = false;
+                        setStatus(wrap, '', true);
+                    });
                 });
+
+                var sendBtn = wrap.querySelector('[data-sr-react-send]');
+                var cancelBtn = wrap.querySelector('[data-sr-react-cancel]');
+                if (sendBtn) {
+                    sendBtn.addEventListener('click', function () {
+                        if (!pendingType) return;
+                        sendReaction(wrap, pendingType, textarea ? textarea.value : '', pendingBtn);
+                        pendingType = null;
+                        pendingBtn = null;
+                    });
+                }
+                if (cancelBtn) {
+                    cancelBtn.addEventListener('click', function () {
+                        if (form) form.hidden = true;
+                        pendingType = null;
+                        pendingBtn = null;
+                        setStatus(wrap, '', true);
+                    });
+                }
             });
         })();
     </script>

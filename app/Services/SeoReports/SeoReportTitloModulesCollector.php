@@ -7,7 +7,9 @@ use App\DomainMonitoring;
 use App\ProjectRelevanceHistory;
 use App\SeoChecklist\SeoChecklistItem;
 use App\SeoChecklist\SeoChecklistProject;
+use App\Services\SiteAudit\SiteAuditFindingPresenter;
 use App\SiteAuditCrawl;
+use App\SiteAuditFinding;
 use App\SiteAuditProject;
 use App\Support\HomeUserSites;
 use Carbon\Carbon;
@@ -51,6 +53,18 @@ class SeoReportTitloModulesCollector
         }
 
         $buckets = is_array($crawl->buckets_json) ? $crawl->buckets_json : [];
+        $critical = (int) ($buckets['critical'] ?? 0);
+        $other = (int) ($buckets['other'] ?? 0);
+        $warning = (int) ($buckets['warning'] ?? 0);
+        $info = (int) ($buckets['info'] ?? 0);
+        $pages = (int) ($crawl->pages_fetched ?: $crawl->pages_total ?: 0);
+        $topIssues = $this->auditTopIssues((int) $crawl->id, is_array($crawl->counts_json) ? $crawl->counts_json : []);
+
+        $summary = $critical > 0
+            ? __('SEO report audit summary critical', ['count' => $critical, 'pages' => $pages])
+            : ($warning > 0
+                ? __('SEO report audit summary warnings', ['count' => $warning, 'pages' => $pages])
+                : __('SEO report audit summary ok', ['pages' => $pages]));
 
         return [
             'ok' => true,
@@ -60,13 +74,24 @@ class SeoReportTitloModulesCollector
                 'project_id' => (int) $project->id,
                 'crawl_id' => (int) $crawl->id,
                 'finished_at' => optional($crawl->finished_at)->toIso8601String(),
+                'pages_fetched' => $pages,
                 'buckets' => [
-                    'critical' => (int) ($buckets['critical'] ?? 0),
-                    'other' => (int) ($buckets['other'] ?? 0),
-                    'warning' => (int) ($buckets['warning'] ?? 0),
-                    'info' => (int) ($buckets['info'] ?? 0),
+                    'critical' => $critical,
+                    'other' => $other,
+                    'warning' => $warning,
+                    'info' => $info,
                 ],
+                'bucket_labels' => [
+                    'critical' => SiteAuditFindingPresenter::severityLabel('critical'),
+                    'other' => SiteAuditFindingPresenter::severityLabel('other'),
+                    'warning' => SiteAuditFindingPresenter::severityLabel('warning'),
+                    'info' => SiteAuditFindingPresenter::severityLabel('info'),
+                ],
+                'top_issues' => $topIssues,
+                'summary' => $summary,
+                'hint' => __('SEO report audit hint'),
                 'open_url' => route('pages.site-audit.crawl.show', ['id' => $crawl->id]),
+                'public_url' => $crawl->publicShareUrl(),
             ],
         ];
     }
@@ -145,11 +170,29 @@ class SeoReportTitloModulesCollector
 
         $checks = (int) ($project->count_checks ?? 0);
         $sites = (int) ($project->count_sites ?? 0);
-        $points = (float) ($project->total_points ?? 0);
-        $avg = $checks > 0 ? round($points / max(1, $checks), 1) : null;
+        // total_points уже средний балл по уникальным проверкам (шкала ~0–100), не сумма.
+        $avgPoints = $project->total_points !== null ? round((float) $project->total_points, 1) : null;
+        $avgPosition = $project->avg_position !== null ? round((float) $project->avg_position, 1) : null;
 
         if ($checks < 1) {
             return $this->fail('empty', __('No relevance analyses yet'));
+        }
+
+        $scoreTone = 'neutral';
+        if ($avgPoints !== null) {
+            $scoreTone = $avgPoints >= 70 ? 'good' : ($avgPoints >= 40 ? 'warn' : 'bad');
+        }
+        $posTone = 'neutral';
+        if ($avgPosition !== null) {
+            $posTone = $avgPosition <= 10 ? 'good' : ($avgPosition <= 30 ? 'warn' : 'bad');
+        }
+
+        $summaryParts = [];
+        if ($avgPoints !== null) {
+            $summaryParts[] = __('SEO report relevance summary score', ['score' => $avgPoints]);
+        }
+        if ($avgPosition !== null) {
+            $summaryParts[] = __('SEO report relevance summary position', ['pos' => $avgPosition]);
         }
 
         return [
@@ -160,9 +203,13 @@ class SeoReportTitloModulesCollector
                 'project_id' => (int) $project->id,
                 'count_checks' => $checks,
                 'count_sites' => $sites,
-                'avg_points' => $avg,
-                'avg_position' => $project->avg_position !== null ? (float) $project->avg_position : null,
+                'avg_points' => $avgPoints,
+                'avg_position' => $avgPosition,
+                'score_tone' => $scoreTone,
+                'position_tone' => $posTone,
                 'last_check' => $project->last_check ? (string) $project->last_check : null,
+                'summary' => $summaryParts !== [] ? implode(' ', $summaryParts) : null,
+                'hint' => __('SEO report relevance hint'),
                 'open_url' => route('relevance.history'),
             ],
         ];
@@ -227,6 +274,77 @@ class SeoReportTitloModulesCollector
                 'open_url' => route('site.monitoring'),
             ],
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $counts
+     * @return list<array{code:string,title:string,severity:string,severity_label:string,count:int,what:?string}>
+     */
+    private function auditTopIssues(int $crawlId, array $counts): array
+    {
+        $rows = [];
+        if ($counts !== []) {
+            foreach ($counts as $code => $count) {
+                if (!is_string($code) || $code === '' || in_array($code, ['pages_with_canonical', 'click_depth_max'], true)) {
+                    continue;
+                }
+                $n = (int) $count;
+                if ($n < 1) {
+                    continue;
+                }
+                $meta = config('site_audit.findings.' . $code, []);
+                if (!is_array($meta) || $meta === []) {
+                    continue;
+                }
+                $severity = (string) ($meta['severity'] ?? 'info');
+                $rows[] = [
+                    'code' => $code,
+                    'title' => (string) ($meta['title'] ?? $code),
+                    'severity' => $severity,
+                    'severity_label' => SiteAuditFindingPresenter::severityLabel($severity),
+                    'count' => $n,
+                    'what' => isset($meta['description']) ? (string) $meta['description'] : null,
+                ];
+            }
+        } else {
+            try {
+                $grouped = SiteAuditFinding::query()
+                    ->where('crawl_id', $crawlId)
+                    ->selectRaw('code, severity, COUNT(*) as c')
+                    ->groupBy('code', 'severity')
+                    ->orderByDesc('c')
+                    ->limit(40)
+                    ->get();
+            } catch (Throwable $e) {
+                $grouped = collect();
+            }
+            foreach ($grouped as $row) {
+                $code = (string) $row->code;
+                $meta = config('site_audit.findings.' . $code, []);
+                $severity = (string) ($row->severity ?: ($meta['severity'] ?? 'info'));
+                $rows[] = [
+                    'code' => $code,
+                    'title' => (string) ($meta['title'] ?? $code),
+                    'severity' => $severity,
+                    'severity_label' => SiteAuditFindingPresenter::severityLabel($severity),
+                    'count' => (int) $row->c,
+                    'what' => isset($meta['description']) ? (string) $meta['description'] : null,
+                ];
+            }
+        }
+
+        $rank = ['critical' => 0, 'other' => 1, 'warning' => 2, 'info' => 3];
+        usort($rows, static function (array $a, array $b) use ($rank) {
+            $ra = $rank[$a['severity']] ?? 9;
+            $rb = $rank[$b['severity']] ?? 9;
+            if ($ra !== $rb) {
+                return $ra <=> $rb;
+            }
+
+            return $b['count'] <=> $a['count'];
+        });
+
+        return array_slice($rows, 0, 10);
     }
 
     /**

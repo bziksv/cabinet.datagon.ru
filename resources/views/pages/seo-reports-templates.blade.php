@@ -101,6 +101,7 @@
                             {{ __('Used in :count projects', ['count' => (int) $tpl->projects_count]) }}
                             · {{ count($enabledTitles) }} {{ __('sections') }}
                             · {{ $tpl->agency_name ?: __('No agency branding') }}
+                            · {{ $tpl->manager_name ?: __('No manager') }}
                         </p>
                         <div class="cabinet-sr-template-card__chips">
                             @foreach(array_slice($enabledTitles, 0, 6) as $sectionTitle)
@@ -121,7 +122,8 @@
                             </form>
                             @if((int) $tpl->projects_count === 0)
                                 <form method="post" action="{{ route('pages.seo-reports.templates.destroy', ['id' => $tpl->id]) }}" class="d-inline"
-                                      onsubmit="return confirm(@json(__('Delete this template?')));">
+                                      data-confirm="{{ __('Delete this template?') }}"
+                                      onsubmit="return confirm(this.dataset.confirm);">
                                     @csrf
                                     <button type="submit" class="btn btn-outline-danger btn-sm">{{ __('Delete') }}</button>
                                 </form>

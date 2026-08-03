@@ -5,9 +5,11 @@ namespace App\Services\SeoReports;
 use App\SeoReports\SeoReportBrandColor;
 use App\SeoReports\SeoReportKpiGoals;
 use App\SeoReports\SeoReportMetricRegistry;
+use App\SeoReports\SeoReportPeriodResolver;
 use App\SeoReports\SeoReportProject;
 use App\SeoReports\SeoReportSectionRegistry;
 use App\SeoReports\SeoReportTemplate;
+use App\SeoReports\SeoReportTrafficScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -111,9 +113,17 @@ class SeoReportTemplateService
         }
 
         $settings = [
-            'default_period' => 'prev_month',
+            'default_period' => SeoReportPeriodResolver::PERIOD_PREV_MONTH,
+            'default_period_month' => null,
+            'default_period_from' => null,
+            'default_period_to' => null,
             'auto_compare' => true,
-            'traffic_mode' => 'all',
+            'compare_mode' => SeoReportPeriodResolver::COMPARE_PREVIOUS_PERIOD,
+            'compare_month' => null,
+            'default_compare_from' => null,
+            'default_compare_to' => null,
+            'traffic_mode' => SeoReportTrafficScope::MODE_SEARCH,
+            'traffic_channels' => SeoReportTrafficScope::recommendedIds(),
             'kpi_goals' => SeoReportKpiGoals::normalizeInput([]),
             'section_order' => SeoReportSectionRegistry::defaultOrder(),
             'metric_toggles' => SeoReportMetricRegistry::defaults(),
@@ -178,11 +188,28 @@ class SeoReportTemplateService
 
         $settings = $template->reportSettings();
         $settings['description'] = trim((string) $request->input('description', '')) ?: null;
-        $settings['default_period'] = in_array($request->input('default_period'), ['prev_month', 'last_30', 'custom'], true)
-            ? (string) $request->input('default_period')
-            : 'prev_month';
-        $settings['auto_compare'] = $request->boolean('auto_compare');
-        $settings['traffic_mode'] = $request->input('traffic_mode') === 'search_only' ? 'search_only' : 'all';
+        $periodSettings = SeoReportPeriodResolver::normalizeSettingsInput([
+            'default_period' => $request->input('default_period'),
+            'default_period_month' => $request->input('default_period_month'),
+            'default_period_from' => $request->input('default_period_from'),
+            'default_period_to' => $request->input('default_period_to'),
+            'auto_compare' => $request->boolean('auto_compare'),
+            'compare_mode' => $request->input('compare_mode'),
+            'compare_month' => $request->input('compare_month'),
+            'default_compare_from' => $request->input('default_compare_from'),
+            'default_compare_to' => $request->input('default_compare_to'),
+        ]);
+        foreach ($periodSettings as $key => $value) {
+            $settings[$key] = $value;
+        }
+        $trafficScope = SeoReportTrafficScope::normalizeInput(
+            $request->input('traffic_mode'),
+            $request->input('traffic_channels')
+        );
+        $settings['traffic_mode'] = $trafficScope['mode'] === SeoReportTrafficScope::MODE_CUSTOM
+            ? SeoReportTrafficScope::MODE_CUSTOM
+            : $trafficScope['mode'];
+        $settings['traffic_channels'] = $trafficScope['channels'];
         $settings['kpi_goals'] = SeoReportKpiGoals::normalizeInput($request->input('kpi_goals'));
         $order = $request->input('section_order', []);
         if (is_array($order) && $order !== []) {

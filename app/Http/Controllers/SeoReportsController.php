@@ -9,6 +9,7 @@ use App\SeoReports\SeoReport;
 use App\SeoReports\SeoReportBindings;
 use App\SeoReports\SeoReportBrandColor;
 use App\SeoReports\SeoReportKpiGoals;
+use App\SeoReports\SeoReportPeriodResolver;
 use App\SeoReports\SeoReportPhraseLibrary;
 use App\SeoReports\SeoReportProject;
 use App\SeoReports\SeoReportSectionRegistry;
@@ -560,8 +561,22 @@ class SeoReportsController extends Controller
             return $blocked;
         }
 
-        $preset = (string) $request->input('period_preset', 'prev_month');
-        [$from, $to, $cFrom, $cTo] = $this->resolvePeriod($preset, $request);
+        $settings = method_exists($project, 'reportSettings')
+            ? $project->reportSettings()
+            : (is_array($project->settings_json) ? $project->settings_json : []);
+        [$from, $to, $cFrom, $cTo] = SeoReportPeriodResolver::resolve($settings, [
+            'period_preset' => $request->input('period_preset'),
+            'period_month' => $request->input('period_month'),
+            'period_from' => $request->input('period_from'),
+            'period_to' => $request->input('period_to'),
+            'auto_compare' => $request->has('auto_compare')
+                ? $request->boolean('auto_compare')
+                : ($settings['auto_compare'] ?? true),
+            'compare_mode' => $request->input('compare_mode'),
+            'compare_month' => $request->input('compare_month'),
+            'compare_from' => $request->input('compare_from'),
+            'compare_to' => $request->input('compare_to'),
+        ]);
 
         $report = SeoReport::query()->create([
             'project_id' => $project->id,
@@ -949,11 +964,6 @@ class SeoReportsController extends Controller
         }
         $ids = array_values(array_filter(array_map('intval', $ids)));
 
-        $from = Carbon::today()->subMonthNoOverflow()->startOfMonth();
-        $to = $from->copy()->endOfMonth()->startOfDay();
-        $cFrom = $from->copy()->subMonthNoOverflow()->startOfMonth();
-        $cTo = $cFrom->copy()->endOfMonth()->startOfDay();
-
         $count = 0;
         $projects = SeoReportProject::query()
             ->where('user_id', $userId)
@@ -963,6 +973,10 @@ class SeoReportsController extends Controller
 
         foreach ($projects as $project) {
             $settings = method_exists($project, 'reportSettings') ? $project->reportSettings() : (is_array($project->settings_json) ? $project->settings_json : []);
+            // Batch: always previous calendar month as report period; compare from template settings.
+            [$from, $to, $cFrom, $cTo] = SeoReportPeriodResolver::resolve($settings, [
+                'period_preset' => SeoReportPeriodResolver::PERIOD_PREV_MONTH,
+            ]);
             $exists = SeoReport::query()
                 ->where('project_id', $project->id)
                 ->whereDate('period_from', $from->toDateString())
@@ -984,8 +998,8 @@ class SeoReportsController extends Controller
                 'status' => SeoReport::STATUS_GENERATING,
                 'period_from' => $from,
                 'period_to' => $to,
-                'compare_from' => !empty($settings['auto_compare']) ? $cFrom : null,
-                'compare_to' => !empty($settings['auto_compare']) ? $cTo : null,
+                'compare_from' => $cFrom,
+                'compare_to' => $cTo,
                 'section_states' => $this->buildInitialSectionStates($project),
             ]);
             $report->ensurePublicToken();
@@ -1250,8 +1264,10 @@ class SeoReportsController extends Controller
                 ->with('error', __('Report not found'));
         }
 
-        $preset = 'prev_month';
-        [$from, $to, $cFrom, $cTo] = $this->resolvePeriod($preset, request());
+        $settings = method_exists($project, 'reportSettings')
+            ? $project->reportSettings()
+            : (is_array($project->settings_json) ? $project->settings_json : []);
+        [$from, $to, $cFrom, $cTo] = SeoReportPeriodResolver::resolve($settings);
 
         $report = SeoReport::query()->create([
             'project_id' => $project->id,
@@ -1495,101 +1511,6 @@ class SeoReportsController extends Controller
             ->with('error', __('Read-only access'));
     }
 
-    /**
-     * @return array{kpis:array<string,float|null>,queries:list<array<string,mixed>>,pages:list<array<string,mixed>>}|null
-     */
-    private function parseSearchConsoleCsv(string $path): ?array
-    {
-        $fh = fopen($path, 'r');
-        if ($fh === false) {
-            return null;
-        }
-        $header = fgetcsv($fh, 0, ',');
-        if ($header === false) {
-            // try semicolon
-            rewind($fh);
-            $header = fgetcsv($fh, 0, ';');
-        }
-        if (!is_array($header) || $header === []) {
-            fclose($fh);
-
-            return null;
-        }
-        // strip BOM
-        $header[0] = preg_replace('/^\xEF\xBB\xBF/', '', (string) $header[0]);
-        $map = [];
-        foreach ($header as $i => $col) {
-            $key = mb_strtolower(trim((string) $col));
-            $map[$key] = $i;
-        }
-        $pick = static function (array $map, array $aliases) {
-            foreach ($aliases as $a) {
-                if (isset($map[$a])) {
-                    return $map[$a];
-                }
-            }
-
-            return null;
-        };
-        $iQuery = $pick($map, ['query', 'запрос', 'top queries', 'queries']);
-        $iPage = $pick($map, ['page', 'страница', 'top pages', 'landing page', 'url']);
-        $iClicks = $pick($map, ['clicks', 'клики']);
-        $iImpr = $pick($map, ['impressions', 'показы']);
-        $iCtr = $pick($map, ['ctr']);
-        $iPos = $pick($map, ['position', 'позиция', 'avg. position', 'average position']);
-        if ($iClicks === null && $iImpr === null) {
-            fclose($fh);
-
-            return null;
-        }
-
-        $queries = [];
-        $pages = [];
-        $sumClicks = 0.0;
-        $sumImpr = 0.0;
-        $posWeighted = 0.0;
-        while (($row = fgetcsv($fh, 0, strpos(implode(',', $header), ';') !== false ? ';' : ',')) !== false) {
-            if (!is_array($row)) {
-                continue;
-            }
-            $clicks = $iClicks !== null ? (float) str_replace(['%', ',', ' '], ['', '.', ''], (string) ($row[$iClicks] ?? 0)) : 0.0;
-            $impr = $iImpr !== null ? (float) str_replace(['%', ',', ' '], ['', '.', ''], (string) ($row[$iImpr] ?? 0)) : 0.0;
-            $ctr = $iCtr !== null ? (float) str_replace(['%', ',', ' '], ['', '.', ''], (string) ($row[$iCtr] ?? 0)) : null;
-            $pos = $iPos !== null ? (float) str_replace(['%', ',', ' '], ['', '.', ''], (string) ($row[$iPos] ?? 0)) : null;
-            if ($ctr === null && $impr > 0) {
-                $ctr = round($clicks / $impr * 100, 2);
-            }
-            $sumClicks += $clicks;
-            $sumImpr += $impr;
-            if ($pos !== null && $impr > 0) {
-                $posWeighted += $pos * $impr;
-            }
-            $item = [
-                'clicks' => $clicks,
-                'impressions' => $impr,
-                'ctr' => $ctr,
-                'position' => $pos,
-            ];
-            if ($iQuery !== null && trim((string) ($row[$iQuery] ?? '')) !== '') {
-                $queries[] = $item + ['name' => trim((string) $row[$iQuery])];
-            } elseif ($iPage !== null && trim((string) ($row[$iPage] ?? '')) !== '') {
-                $pages[] = $item + ['name' => trim((string) $row[$iPage])];
-            }
-        }
-        fclose($fh);
-
-        return [
-            'kpis' => [
-                'clicks' => $sumClicks,
-                'impressions' => $sumImpr,
-                'ctr' => $sumImpr > 0 ? round($sumClicks / $sumImpr * 100, 2) : null,
-                'position' => $sumImpr > 0 ? round($posWeighted / $sumImpr, 2) : null,
-            ],
-            'queries' => $queries,
-            'pages' => $pages,
-        ];
-    }
-
     public function share(Request $request, int $id): RedirectResponse
     {
         $project = $this->findOwnedProject($id);
@@ -1650,73 +1571,6 @@ class SeoReportsController extends Controller
         return redirect()
             ->route('pages.seo-reports.show', ['id' => $project->id])
             ->with('success', __('Access revoked'));
-    }
-
-    public function importSearchConsole(Request $request, int $id): RedirectResponse
-    {
-        $project = $this->findOwnedProject($id);
-        if (!$project) {
-            return redirect()->route('pages.seo-reports')->with('error', __('Project not found'));
-        }
-        $source = $request->input('source') === 'webmaster' ? 'webmaster' : 'gsc';
-        $request->validate([
-            'csv' => 'required|file|mimes:csv,txt|max:2048',
-        ]);
-
-        $parsed = $this->parseSearchConsoleCsv($request->file('csv')->getRealPath());
-        if ($parsed === null || ($parsed['queries'] === [] && $parsed['pages'] === [])) {
-            return redirect()
-                ->route('pages.seo-reports.settings', ['id' => $project->id])
-                ->with('error', __('Could not parse CSV'));
-        }
-
-        $settings = is_array($project->settings_json) ? $project->settings_json : [];
-        $settings[$source . '_import'] = [
-            'imported_at' => now()->toIso8601String(),
-            'kpis' => $parsed['kpis'],
-            'queries' => array_slice($parsed['queries'], 0, 50),
-            'pages' => array_slice($parsed['pages'], 0, 50),
-        ];
-        $project->settings_json = $settings;
-        $project->save();
-
-        return redirect()
-            ->route('pages.seo-reports.settings', ['id' => $project->id])
-            ->with('success', __('Search console CSV imported'));
-    }
-
-    public function importExternalAds(Request $request, int $id): RedirectResponse
-    {
-        $project = $this->findOwnedProject($id);
-        if (!$project) {
-            return redirect()->route('pages.seo-reports')->with('error', __('Project not found'));
-        }
-        $source = (string) $request->input('source');
-        if (!in_array($source, ['vk_ads', 'meta_ads', 'vk_smm'], true)) {
-            return redirect()
-                ->route('pages.seo-reports.settings', ['id' => $project->id])
-                ->with('error', __('Unknown import source'));
-        }
-        $request->validate([
-            'csv' => 'required|file|mimes:csv,txt|max:4096',
-        ]);
-
-        $parsed = app(SeoReportExternalAdsCollector::class)
-            ->parseCsv($request->file('csv')->getRealPath(), $source);
-        if ($parsed === null) {
-            return redirect()
-                ->route('pages.seo-reports.settings', ['id' => $project->id])
-                ->with('error', __('Could not parse CSV'));
-        }
-
-        $settings = is_array($project->settings_json) ? $project->settings_json : [];
-        $settings[$source . '_import'] = $parsed;
-        $project->settings_json = $settings;
-        $project->save();
-
-        return redirect()
-            ->route('pages.seo-reports.settings', ['id' => $project->id])
-            ->with('success', __('Ads / SMM CSV imported'));
     }
 
     /**
@@ -1797,44 +1651,6 @@ class SeoReportsController extends Controller
         }
 
         return $out;
-    }
-
-    /**
-     * @return array{0:Carbon,1:Carbon,2:?Carbon,3:?Carbon}
-     */
-    private function resolvePeriod(string $preset, Request $request): array
-    {
-        if ($preset === 'last_30') {
-            $to = Carbon::today()->subDay();
-            $from = $to->copy()->subDays(29);
-            $cTo = $from->copy()->subDay();
-            $cFrom = $cTo->copy()->subDays(29);
-
-            return [$from, $to, $cFrom, $cTo];
-        }
-
-        if ($preset === 'custom'
-            && $request->filled('period_from')
-            && $request->filled('period_to')
-        ) {
-            $from = Carbon::parse((string) $request->input('period_from'))->startOfDay();
-            $to = Carbon::parse((string) $request->input('period_to'))->startOfDay();
-            if ($from->gt($to)) {
-                [$from, $to] = [$to, $from];
-            }
-            $days = $from->diffInDays($to) + 1;
-            $cTo = $from->copy()->subDay();
-            $cFrom = $cTo->copy()->subDays($days - 1);
-
-            return [$from, $to, $cFrom, $cTo];
-        }
-
-        $from = Carbon::today()->subMonthNoOverflow()->startOfMonth();
-        $to = $from->copy()->endOfMonth()->startOfDay();
-        $cFrom = $from->copy()->subMonthNoOverflow()->startOfMonth();
-        $cTo = $cFrom->copy()->endOfMonth()->startOfDay();
-
-        return [$from, $to, $cFrom, $cTo];
     }
 
     private function normalizePin($value): ?string

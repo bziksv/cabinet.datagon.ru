@@ -58,7 +58,10 @@
             @endphp
             <div class="cabinet-sr-actions">
                 @if(!empty($canEdit) && in_array($report->status, ['ready', 'approved_by_client', 'failed'], true))
-                    <form method="post" action="{{ route('pages.seo-reports.report.regenerate', ['id' => $project->id, 'reportId' => $report->id]) }}">
+                    <form method="post"
+                          action="{{ route('pages.seo-reports.report.regenerate', ['id' => $project->id, 'reportId' => $report->id]) }}"
+                          data-sr-busy-form
+                          data-sr-busy-label="{{ __('Generating report…') }}">
                         @csrf
                         <button type="submit" class="btn btn-outline-primary btn-sm">{{ __('Regenerate') }}</button>
                     </form>
@@ -93,7 +96,7 @@
 
         @if($report->status === 'generating')
             <div class="cabinet-sr-generating" data-sr-generating>
-                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                <div class="cabinet-sr-spinner" role="status" aria-hidden="true"></div>
                 <div>
                     <div class="fw-semibold">{{ __('Generating report…') }}</div>
                     <div class="small text-secondary">{{ __('SEO report generating hint') }}</div>
@@ -183,17 +186,44 @@
             @endphp
 
             @if($clientReactions !== [])
-                <div class="cabinet-sr-dq mb-3">
-                    <div class="cabinet-sr-dq__head">
-                        <span class="fw-semibold">{{ __('Client reactions') }}</span>
+                @php
+                    $sectionCatalog = \App\SeoReports\SeoReportSectionRegistry::all();
+                    $reactionTypeLabels = [
+                        'like' => __('Looks good'),
+                        'question' => __('Ask a question'),
+                        'clarify' => __('Need clarification'),
+                    ];
+                @endphp
+                <div class="cabinet-sr-client-feedback mb-3" id="sr-client-feedback">
+                    <div class="cabinet-sr-client-feedback__head">
+                        <div>
+                            <div class="cabinet-sr-client-feedback__title">{{ __('Client reactions') }}</div>
+                            <p class="cabinet-sr-client-feedback__hint mb-0">{{ __('SEO report client reactions next step') }}</p>
+                        </div>
+                        <span class="cabinet-sr-client-feedback__count">{{ count($clientReactions) }}</span>
                     </div>
-                    <ul class="cabinet-sr-dq__list">
+                    <ul class="cabinet-sr-client-feedback__list">
                         @foreach(array_reverse($clientReactions) as $reaction)
-                            <li>
-                                <strong>{{ $reaction['section'] ?? '—' }}</strong>
-                                · {{ $reaction['type'] ?? '' }}
-                                @if(!empty($reaction['text'])) — {{ $reaction['text'] }} @endif
-                                <span class="text-secondary">{{ $reaction['at'] ?? '' }}</span>
+                            @php
+                                $secKey = (string) ($reaction['section'] ?? '');
+                                $secTitle = $sectionCatalog[$secKey]['title'] ?? ($secKey !== '' ? $secKey : '—');
+                                $typeKey = (string) ($reaction['type'] ?? '');
+                                $typeTitle = $reactionTypeLabels[$typeKey] ?? $typeKey;
+                                $at = !empty($reaction['at'])
+                                    ? \Carbon\Carbon::parse($reaction['at'])->format('d.m.Y H:i')
+                                    : '';
+                            @endphp
+                            <li class="cabinet-sr-client-feedback__item cabinet-sr-client-feedback__item--{{ $typeKey }}">
+                                <div class="cabinet-sr-client-feedback__meta">
+                                    <strong>{{ $secTitle }}</strong>
+                                    <span>{{ $typeTitle }}</span>
+                                    @if($at !== '')
+                                        <time>{{ $at }}</time>
+                                    @endif
+                                </div>
+                                @if(!empty($reaction['text']))
+                                    <div class="cabinet-sr-client-feedback__text">{{ $reaction['text'] }}</div>
+                                @endif
                             </li>
                         @endforeach
                     </ul>
@@ -376,6 +406,18 @@
                         var phrase = btn.getAttribute('data-sr-phrase') || '';
                         area.value = (area.value ? area.value.replace(/\s+$/, '') + "\n\n" : '') + phrase;
                         area.focus();
+                    });
+                });
+
+                document.querySelectorAll('[data-sr-busy-form]').forEach(function (form) {
+                    form.addEventListener('submit', function () {
+                        var btn = form.querySelector('[type="submit"]');
+                        if (!btn || btn.disabled) return;
+                        btn.disabled = true;
+                        btn.setAttribute('aria-busy', 'true');
+                        var label = form.getAttribute('data-sr-busy-label') || btn.textContent;
+                        btn.innerHTML = '<span class="cabinet-sr-spinner cabinet-sr-spinner--sm" role="status" aria-hidden="true"></span>'
+                            + label;
                     });
                 });
 

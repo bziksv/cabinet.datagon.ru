@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\SeoReportClientReactionMail;
 use App\SeoReports\SeoReport;
 use App\SeoReports\SeoReportSectionRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
+use Throwable;
 
 class SeoReportsPublicController extends Controller
 {
@@ -22,15 +26,39 @@ class SeoReportsPublicController extends Controller
             ->first();
 
         if (!$report || !$report->project) {
-            abort(404, __('This public link has expired or does not exist.'));
+            return $this->unavailable(
+                __('Report unavailable'),
+                __('This public link has expired or does not exist.')
+            );
+        }
+
+        if ($report->status === SeoReport::STATUS_GENERATING) {
+            return $this->unavailable(
+                __('Generating report…'),
+                __('SEO report public generating hint'),
+                __('SEO report public generating wait')
+            );
+        }
+
+        if ($report->status === SeoReport::STATUS_FAILED) {
+            return $this->unavailable(
+                __('SEO report generation failed'),
+                $report->fail_reason ?: __('This public link has expired or does not exist.')
+            );
         }
 
         if (!in_array($report->status, [SeoReport::STATUS_READY, SeoReport::STATUS_APPROVED], true)) {
-            abort(404, __('This public link has expired or does not exist.'));
+            return $this->unavailable(
+                __('Report unavailable'),
+                __('This public link has expired or does not exist.')
+            );
         }
 
         if (!$this->isPublishedForClient($report)) {
-            abort(404, __('Report is not published yet'));
+            return $this->unavailable(
+                __('Report is not published yet'),
+                __('SEO report public not published hint')
+            );
         }
 
         $pin = trim((string) ($report->public_pin ?? ''));
@@ -88,12 +116,26 @@ class SeoReportsPublicController extends Controller
             abort(404, __('This public link has expired or does not exist.'));
         }
 
+        if ($report->status === SeoReport::STATUS_GENERATING) {
+            return $this->unavailable(
+                __('Generating report…'),
+                __('SEO report public generating hint'),
+                __('SEO report public generating wait')
+            );
+        }
+
         if (!in_array($report->status, [SeoReport::STATUS_READY, SeoReport::STATUS_APPROVED], true)) {
-            abort(404, __('This public link has expired or does not exist.'));
+            return $this->unavailable(
+                __('Report unavailable'),
+                __('This public link has expired or does not exist.')
+            );
         }
 
         if (!$this->isPublishedForClient($report)) {
-            abort(404, __('Report is not published yet'));
+            return $this->unavailable(
+                __('Report is not published yet'),
+                __('SEO report public not published hint')
+            );
         }
 
         $pin = trim((string) ($report->public_pin ?? ''));
@@ -111,9 +153,10 @@ class SeoReportsPublicController extends Controller
     {
         $report = SeoReport::query()
             ->where('public_token', $token)
+            ->with('project')
             ->first();
 
-        if (!$report || !$this->isPublishedForClient($report)) {
+        if (!$report || !$report->project || !$this->isPublishedForClient($report)) {
             return response()->json(['ok' => false], 404);
         }
 
@@ -130,7 +173,8 @@ class SeoReportsPublicController extends Controller
             return response()->json(['ok' => false], 422);
         }
         $section = trim((string) $request->input('section', ''));
-        if ($section === '' || strlen($section) > 64) {
+        $catalog = SeoReportSectionRegistry::all();
+        if ($section === '' || strlen($section) > 64 || !isset($catalog[$section])) {
             return response()->json(['ok' => false], 422);
         }
         $text = trim((string) $request->input('text', ''));
@@ -161,7 +205,58 @@ class SeoReportsPublicController extends Controller
         $report->snapshot_json = $snap;
         $report->save();
 
-        return response()->json(['ok' => true]);
+        $typeLabels = [
+            'like' => __('Looks good'),
+            'question' => __('Ask a question'),
+            'clarify' => __('Need clarification'),
+        ];
+        $sectionTitle = (string) ($catalog[$section]['title'] ?? $section);
+        $typeLabel = $typeLabels[$type] ?? $type;
+        $cabinetUrl = route('pages.seo-reports.report', [
+            'id' => $report->project_id,
+            'reportId' => $report->id,
+        ]);
+
+        $notifyTo = [];
+        $managerEmail = trim((string) (
+            $report->project->brandingManagerEmail()
+            ?: ($report->project->manager_email ?? '')
+        ));
+        if ($managerEmail !== '' && filter_var($managerEmail, FILTER_VALIDATE_EMAIL)) {
+            $notifyTo[] = $managerEmail;
+        }
+        $owner = $report->project->user ?? null;
+        $ownerEmail = $owner ? trim((string) ($owner->email ?? '')) : '';
+        if ($ownerEmail !== '' && filter_var($ownerEmail, FILTER_VALIDATE_EMAIL) && !in_array($ownerEmail, $notifyTo, true)) {
+            // Если менеджер не указан — письмо владельцу проекта в кабинете.
+            if ($notifyTo === []) {
+                $notifyTo[] = $ownerEmail;
+            }
+        }
+
+        foreach ($notifyTo as $email) {
+            try {
+                Mail::to($email)->send(new SeoReportClientReactionMail(
+                    $report->project,
+                    $report,
+                    $sectionTitle,
+                    $typeLabel,
+                    $text !== '' ? $text : null,
+                    $cabinetUrl
+                ));
+            } catch (Throwable $e) {
+                Log::warning('seo report client reaction mail failed', [
+                    'report_id' => $report->id,
+                    'email' => $email,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return response()->json([
+            'ok' => true,
+            'message' => __('SEO report react sent'),
+        ]);
     }
 
     public function approve(Request $request, string $token): RedirectResponse
@@ -254,6 +349,15 @@ class SeoReportsPublicController extends Controller
         }
 
         return !empty($snap['published_at']);
+    }
+
+    private function unavailable(string $title, string $message, ?string $hint = null): View
+    {
+        return view('pages.seo-reports-public-unavailable', [
+            'title' => $title,
+            'message' => $message,
+            'hint' => $hint,
+        ]);
     }
 
     private function pinSessionKey(string $token): string

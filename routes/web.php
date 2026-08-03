@@ -285,8 +285,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('seo-reports/{id}', 'SeoReportsController@show')->name('pages.seo-reports.show')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
     Route::get('seo-reports/{id}/settings', 'SeoReportsController@settings')->name('pages.seo-reports.settings')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
     Route::post('seo-reports/{id}/settings', 'SeoReportsController@updateSettings')->name('pages.seo-reports.settings.update')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
-    Route::post('seo-reports/{id}/settings/import-console', 'SeoReportsController@importSearchConsole')->name('pages.seo-reports.settings.import-console')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
-    Route::post('seo-reports/{id}/settings/import-ads', 'SeoReportsController@importExternalAds')->name('pages.seo-reports.settings.import-ads')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
     Route::post('seo-reports/{id}/share', 'SeoReportsController@share')->name('pages.seo-reports.share')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
     Route::post('seo-reports/{id}/unshare', 'SeoReportsController@unshare')->name('pages.seo-reports.unshare')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
     Route::post('seo-reports/{id}/reports', 'SeoReportsController@storeReport')->name('pages.seo-reports.reports.store')->middleware('permission:SEO Reports')->where('id', '[0-9]+');

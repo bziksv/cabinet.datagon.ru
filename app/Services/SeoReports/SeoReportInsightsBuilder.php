@@ -2,6 +2,8 @@
 
 namespace App\Services\SeoReports;
 
+use App\SeoReports\SeoReportMetrikaLabels;
+
 class SeoReportInsightsBuilder
 {
     /**
@@ -32,7 +34,7 @@ class SeoReportInsightsBuilder
             $channels = is_array($traffic['channels'] ?? null) ? $traffic['channels'] : [];
             if ($channels !== []) {
                 $top = $channels[0];
-                $out[] = 'Главный канал: ' . ($top['name'] ?? '—')
+                $out[] = 'Главный канал: ' . SeoReportMetrikaLabels::label($top['name'] ?? '', $top['id'] ?? null)
                     . ' (' . $this->fmtInt($top['visits'] ?? 0) . ' визитов)';
             }
 

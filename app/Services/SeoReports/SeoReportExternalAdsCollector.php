@@ -9,8 +9,8 @@ use GuzzleHttp\Client;
 use Throwable;
 
 /**
- * VK Ads / Meta Ads / VK SMM: CSV import (+ optional VK community API token).
- * Full OAuth apps can replace CSV later without changing snapshot shape.
+ * VK Ads / Meta Ads / VK SMM via API tokens (VK community live; ads API sync pending).
+ * Legacy *_import payloads in settings are still read if present.
  */
 class SeoReportExternalAdsCollector
 {
@@ -49,13 +49,13 @@ class SeoReportExternalAdsCollector
         $tokenHint = $this->hasTokenConfigured($key, $settings);
         $messages = [
             'vk_ads' => $tokenHint
-                ? __('Upload VK Ads CSV in settings (API sync later)')
+                ? __('VK Ads API sync pending')
                 : __('VK Ads is not connected'),
             'meta_ads' => $tokenHint
-                ? __('Upload Meta Ads CSV in settings (API sync later)')
+                ? __('Meta Ads API sync pending')
                 : __('Meta Ads is not connected'),
             'vk_smm' => $tokenHint
-                ? __('VK community token set — upload CSV or check API rights')
+                ? __('VK community API check rights')
                 : __('VK community is not connected'),
         ];
 
@@ -359,17 +359,11 @@ class SeoReportExternalAdsCollector
      */
     private function normalizeImportPayload(string $key, array $import, array $settings): array
     {
-        $notes = [
-            'vk_ads' => __('VK Ads from CSV (token/API sync later)'),
-            'meta_ads' => __('Meta Ads from CSV (Marketing API later)'),
-            'vk_smm' => __('VK community from CSV / token'),
-        ];
-
         return [
-            'source' => 'csv_import',
+            'source' => 'import',
             'account' => $settings[$key . '_account'] ?? ($settings['vk_smm_group_id'] ?? null),
             'imported_at' => $import['imported_at'] ?? null,
-            'note' => $notes[$key] ?? __('Data from CSV import'),
+            'note' => null,
             'kpis' => $import['kpis'] ?? [],
             'campaigns' => $import['campaigns'] ?? [],
             'ads' => $import['ads'] ?? [],

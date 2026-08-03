@@ -63,7 +63,9 @@ class SeoReportGeneratorService
         try {
             $toggles = $project->resolvedSectionToggles();
             $settings = $project->reportSettings();
-            $searchOnly = ($settings['traffic_mode'] ?? 'all') === 'search_only';
+            $trafficScope = \App\SeoReports\SeoReportTrafficScope::normalize($settings);
+            $trafficFilter = \App\SeoReports\SeoReportTrafficScope::metrikaFilter($trafficScope);
+            $searchOnly = $trafficScope['mode'] === \App\SeoReports\SeoReportTrafficScope::MODE_SEARCH;
 
             $sectionStates = [];
             $snapshot = [
@@ -115,7 +117,7 @@ class SeoReportGeneratorService
 
                 if ($key === 'traffic') {
                     $sourcesTried++;
-                    $traffic = $this->collectTraffic($project, $report, $searchOnly);
+                    $traffic = $this->collectTraffic($project, $report, $trafficFilter, $trafficScope);
                     $snapshot['progress']['metrika'] = $traffic['progress'];
                     if ($traffic['ok']) {
                         $sourcesOk++;
@@ -306,7 +308,7 @@ class SeoReportGeneratorService
                         $sourcesTried++;
                         $sourcesOk++;
                         $snapshot[$key] = [
-                            'source' => 'csv_import',
+                            'source' => 'import',
                             'property' => $source === 'gsc'
                                 ? ($settings['gsc_property'] ?? null)
                                 : ($settings['webmaster_host'] ?? null),
@@ -314,7 +316,7 @@ class SeoReportGeneratorService
                             'kpis' => $import['kpis'] ?? [],
                             'queries' => $import['queries'] ?? [],
                             'pages' => $import['pages'] ?? [],
-                            'note' => __('Data from CSV import (OAuth later)'),
+                            'note' => null,
                         ];
                         $snapshot['progress'][$source] = 'ok';
                         $sectionStates[$key] = [
@@ -329,10 +331,10 @@ class SeoReportGeneratorService
                             'source_status' => SeoReportSectionRegistry::SOURCE_STATUS_NOT_CONNECTED,
                             'message' => $source === 'gsc'
                                 ? ($hasProperty
-                                    ? __('Upload GSC CSV in settings or connect OAuth later')
+                                    ? __('Connect Google Search Console OAuth')
                                     : __('Google Search Console is not connected'))
                                 : ($hasProperty
-                                    ? __('Upload Webmaster CSV in settings or connect OAuth later')
+                                    ? __('Connect Yandex Webmaster OAuth')
                                     : __('Yandex Webmaster is not connected')),
                         ];
                     }
@@ -441,9 +443,10 @@ class SeoReportGeneratorService
                 $report->comments_json = $comments;
             }
 
-            $snapshot['requires_publish'] = true;
+            // Сразу доступен по публичной ссылке; «Опубликовать» остаётся для явного подтверждения при необходимости.
+            $snapshot['requires_publish'] = false;
             if (empty($snapshot['published_at'])) {
-                $snapshot['published_at'] = null;
+                $snapshot['published_at'] = Carbon::now()->toIso8601String();
             }
 
             $snapshot['audit_log'][] = [
@@ -507,10 +510,15 @@ class SeoReportGeneratorService
     }
 
     /**
+     * @param array{mode:string,channels:list<string>} $trafficScope
      * @return array{ok:bool,status:string,message?:string,progress:string,data?:array}
      */
-    private function collectTraffic(SeoReportProject $project, SeoReport $report, bool $searchOnly): array
-    {
+    private function collectTraffic(
+        SeoReportProject $project,
+        SeoReport $report,
+        ?string $filter,
+        array $trafficScope
+    ): array {
         $counterId = (int) $project->metrika_counter_id;
         $userId = (int) $project->user_id;
         if ($counterId < 1 || !$this->metrika->isConnected($userId)) {
@@ -533,7 +541,6 @@ class SeoReportGeneratorService
             ];
         }
 
-        $filter = $searchOnly ? self::ORGANIC_FILTER : null;
         $current = $this->metrika->sessionTotalsForPeriodFiltered($userId, $counterId, $date1, $date2, $filter);
         if ($current === null) {
             return [
@@ -556,7 +563,21 @@ class SeoReportGeneratorService
         }
 
         $kpis = $this->kpiBundle($current, $compare);
-        $series = $this->metrika->usersByDateForPeriod($userId, $counterId, $date1, $date2);
+        if ($filter === null || $filter === '') {
+            $series = $this->metrika->usersByDateForPeriod($userId, $counterId, $date1, $date2);
+        } else {
+            $seriesRows = $this->metrika->customDimensionRowsForPeriod(
+                $userId, $counterId, $date1, $date2, 'ym:s:date',
+                ['ym:s:users'], 40, $filter, 'ym:s:date'
+            ) ?: [];
+            $series = [];
+            foreach ($seriesRows as $row) {
+                $day = (string) ($row['name'] ?? '');
+                if ($day !== '') {
+                    $series[$day] = (int) round((float) (($row['metrics'][0] ?? 0)));
+                }
+            }
+        }
 
         $channels = $this->metrika->dimensionRowsForPeriod(
             $userId, $counterId, $date1, $date2, 'ym:s:lastTrafficSource', 15, $filter
@@ -654,7 +675,9 @@ class SeoReportGeneratorService
             'progress' => 'ok',
             'data' => [
                 'counter_id' => $counterId,
-                'mode' => $searchOnly ? 'search_only' : 'all',
+                'mode' => $trafficScope['mode'] ?? 'all',
+                'channels_scope' => $trafficScope['channels'] ?? [],
+                'scope_label' => \App\SeoReports\SeoReportTrafficScope::label($trafficScope),
                 'kpis' => $kpis,
                 'series_users' => $series ?: [],
                 'channels' => $channels,
@@ -1179,15 +1202,19 @@ class SeoReportGeneratorService
 
         if ($key === 'titlo_audit') {
             $r = $this->titloModules->collectAudit($userId, $domain);
-            if (!empty($r['ok']) && !empty($r['data']['buckets'])) {
-                $b = $r['data']['buckets'];
-                $r['fact'] = sprintf(
-                    'Аудит сайта: критичных %d, прочих %d, предупреждений %d (crawl #%d)',
-                    (int) $b['critical'],
-                    (int) $b['other'],
-                    (int) $b['warning'],
-                    (int) ($r['data']['crawl_id'] ?? 0)
-                );
+            if (!empty($r['ok']) && !empty($r['data'])) {
+                if (!empty($r['data']['summary'])) {
+                    $r['fact'] = (string) $r['data']['summary'];
+                } else {
+                    $b = is_array($r['data']['buckets'] ?? null) ? $r['data']['buckets'] : [];
+                    $r['fact'] = sprintf(
+                        'Аудит сайта: %d стр., грубые %d, прочие %d, предупреждения %d',
+                        (int) ($r['data']['pages_fetched'] ?? 0),
+                        (int) ($b['critical'] ?? 0),
+                        (int) ($b['other'] ?? 0),
+                        (int) ($b['warning'] ?? 0)
+                    );
+                }
             }
 
             return $r;
@@ -1214,11 +1241,16 @@ class SeoReportGeneratorService
         if ($key === 'titlo_relevance') {
             $r = $this->titloModules->collectRelevance($userId, $domain);
             if (!empty($r['ok'])) {
-                $r['fact'] = sprintf(
-                    'Релевантность: %d анализов, ср. оценка %s',
-                    (int) ($r['data']['count_checks'] ?? 0),
-                    $r['data']['avg_points'] !== null ? (string) $r['data']['avg_points'] : '—'
-                );
+                if (!empty($r['data']['summary'])) {
+                    $r['fact'] = (string) $r['data']['summary'];
+                } else {
+                    $r['fact'] = sprintf(
+                        'Релевантность: балл %s/100, ср. позиция %s, запросов/URL %d',
+                        $r['data']['avg_points'] !== null ? (string) $r['data']['avg_points'] : '—',
+                        $r['data']['avg_position'] !== null ? (string) $r['data']['avg_position'] : '—',
+                        (int) ($r['data']['count_sites'] ?? 0)
+                    );
+                }
             }
 
             return $r;

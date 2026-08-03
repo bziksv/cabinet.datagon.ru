@@ -5,10 +5,10 @@ namespace App\Console\Commands;
 use App\Jobs\GenerateSeoReportJob;
 use App\Mail\SeoReportShareMail;
 use App\SeoReports\SeoReport;
+use App\SeoReports\SeoReportPeriodResolver;
 use App\SeoReports\SeoReportProject;
 use App\SeoReports\SeoReportSectionRegistry;
 use App\Services\SeoReports\SeoReportGeneratorService;
-use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -21,18 +21,13 @@ class SeoReportsGenerateMonthlyCommand extends Command
 
     public function handle(SeoReportGeneratorService $generator): int
     {
-        $from = Carbon::today()->subMonthNoOverflow()->startOfMonth();
-        $to = $from->copy()->endOfMonth()->startOfDay();
-        $cFrom = $from->copy()->subMonthNoOverflow()->startOfMonth();
-        $cTo = $cFrom->copy()->endOfMonth()->startOfDay();
-
         $q = SeoReportProject::query()->where('status', 'active');
         if ($this->option('project')) {
             $q->where('id', (int) $this->option('project'));
         }
 
         $count = 0;
-        $q->orderBy('id')->chunkById(50, function ($projects) use ($from, $to, $cFrom, $cTo, $generator, &$count) {
+        $q->orderBy('id')->chunkById(50, function ($projects) use ($generator, &$count) {
             foreach ($projects as $project) {
                 $settings = method_exists($project, 'reportSettings')
                     ? $project->reportSettings()
@@ -40,6 +35,11 @@ class SeoReportsGenerateMonthlyCommand extends Command
                 if (empty($settings['auto_generate']) && !$this->option('force')) {
                     continue;
                 }
+
+                // Monthly cron: report = previous calendar month; compare follows template settings.
+                [$from, $to, $cFrom, $cTo] = SeoReportPeriodResolver::resolve($settings, [
+                    'period_preset' => SeoReportPeriodResolver::PERIOD_PREV_MONTH,
+                ]);
 
                 $exists = SeoReport::query()
                     ->where('project_id', $project->id)
@@ -58,8 +58,8 @@ class SeoReportsGenerateMonthlyCommand extends Command
                     'status' => SeoReport::STATUS_GENERATING,
                     'period_from' => $from,
                     'period_to' => $to,
-                    'compare_from' => !empty($settings['auto_compare']) ? $cFrom : null,
-                    'compare_to' => !empty($settings['auto_compare']) ? $cTo : null,
+                    'compare_from' => $cFrom,
+                    'compare_to' => $cTo,
                     'section_states' => $this->initialStates($project),
                     'public_pin' => isset($settings['default_pin']) ? (string) $settings['default_pin'] : null,
                 ]);

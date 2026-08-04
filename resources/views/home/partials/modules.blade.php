@@ -34,7 +34,12 @@
                                 {!! $module['icon'] !!}
                             </span>
                             <div class="min-w-0 flex-grow-1">
-                                <h3 class="h6 card-title mb-1 text-break">{{ $module['title'] }}</h3>
+                                <h3 class="h6 card-title mb-1 text-break">
+                                    {{ $module['title'] }}
+                                    @if(!empty($module['beta']))
+                                        @include('partials.cabinet-module-beta-badge')
+                                    @endif
+                                </h3>
                                 @if($module['external'])
                                     <span class="badge text-bg-light border">{{ __('External') }}</span>
                                 @endif

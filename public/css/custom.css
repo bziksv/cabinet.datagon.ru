@@ -1456,3 +1456,53 @@ a.bg-purple-light:focus, a.bg-purple-light:hover, button.bg-purple-light:focus, 
 .user-panel .info {
     white-space: normal;
 }
+
+/* --- Beta module badges / banners --- */
+.cabinet-module-beta-badge {
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 0.35rem;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    line-height: 1.2;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: #f59e0b;
+    color: #fff;
+    white-space: nowrap;
+}
+
+.cabinet-sidebar-menu .cabinet-module-beta-badge {
+    font-size: 8px;
+    padding: 1px 4px;
+    opacity: 0.95;
+}
+
+.cabinet-module-beta-banner {
+    background: #fffbeb;
+    border-color: #f59e0b !important;
+    color: #78350f;
+}
+
+.cabinet-module-beta-banner__badge {
+    flex-shrink: 0;
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: #f59e0b;
+    color: #fff;
+    line-height: 1.3;
+}
+
+.cabinet-module-beta-banner a {
+    font-weight: 600;
+    color: #92400e;
+    text-decoration: underline;
+}
+

@@ -6,6 +6,7 @@ use App\MenuItemsPosition;
 use App\SeoChecklist\SeoChecklistUserPreference;
 use App\Services\MenuProjectRegistry;
 use App\Support\CabinetAdminMenu;
+use App\Support\CabinetModuleBeta;
 use App\Support\CabinetSidebarMenu;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -20,9 +21,9 @@ class MenuComposer
         }
 
         if (cabinet_skip_heavy_web()) {
-            $stamp = MenuProjectRegistry::structureStamp() . ':' . (CabinetSidebarMenu::hideLegacyMonitoring() ? 'n32' : 'full');
-            $cached = session('cabinet_menu_modules_v9');
-            $cachedStamp = session('cabinet_menu_modules_v9_stamp');
+            $stamp = MenuProjectRegistry::structureStamp() . ':' . (CabinetSidebarMenu::hideLegacyMonitoring() ? 'n32' : 'full') . ':beta1';
+            $cached = session('cabinet_menu_modules_v10');
+            $cachedStamp = session('cabinet_menu_modules_v10_stamp');
             if (is_array($cached) && $cachedStamp === $stamp && $this->cachedMenuHasItems($cached)) {
                 $view->with('modules', CabinetSidebarMenu::filterModules(CabinetAdminMenu::filterModules($cached)));
 
@@ -47,24 +48,28 @@ class MenuComposer
                     $access = (is_null($elem['access'])) ? [] : $elem['access'];
 
                     if ($user->hasRole($access)) {
+                        $link = localize_cabinet_url($elem['link']);
                         $modules[$key][] = [
                             'id' => $elem['id'],
                             'title' => $this->moduleDisplayTitle($elem),
                             'description' => $elem['description'],
-                            'link' => localize_cabinet_url($elem['link']),
+                            'link' => $link,
                             'icon' => $elem['icon'],
+                            'beta' => CabinetModuleBeta::isBetaLink($link) || CabinetModuleBeta::isBetaLink($elem['link'] ?? null),
                         ];
                     }
                 }
             } else {
                 $access = (is_null($item['access'])) ? [] : $item['access'];
                 if ($user->hasRole($access)) {
+                    $link = localize_cabinet_url($item['link']);
                     $modules[] = [
                         'id' => $item['id'],
                         'title' => $this->moduleDisplayTitle($item),
                         'description' => $item['description'],
-                        'link' => localize_cabinet_url($item['link']),
+                        'link' => $link,
                         'icon' => $item['icon'],
+                        'beta' => CabinetModuleBeta::isBetaLink($link) || CabinetModuleBeta::isBetaLink($item['link'] ?? null),
                     ];
                 }
             }
@@ -74,8 +79,8 @@ class MenuComposer
 
         if (cabinet_skip_heavy_web()) {
             session([
-                'cabinet_menu_modules_v9' => $modules,
-                'cabinet_menu_modules_v9_stamp' => MenuProjectRegistry::structureStamp() . ':' . (CabinetSidebarMenu::hideLegacyMonitoring() ? 'n32' : 'full'),
+                'cabinet_menu_modules_v10' => $modules,
+                'cabinet_menu_modules_v10_stamp' => MenuProjectRegistry::structureStamp() . ':' . (CabinetSidebarMenu::hideLegacyMonitoring() ? 'n32' : 'full') . ':beta1',
             ]);
         }
 

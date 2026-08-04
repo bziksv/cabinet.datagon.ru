@@ -33,7 +33,12 @@
                         {!! $module['icon'] !!}
                     </span>
                     <span class="flex-grow-1 min-w-0">
-                        <span class="d-block fw-semibold text-truncate">{{ $module['title'] }}</span>
+                        <span class="d-block fw-semibold text-truncate">
+                            {{ $module['title'] }}
+                            @if(!empty($module['beta']))
+                                @include('partials.cabinet-module-beta-badge')
+                            @endif
+                        </span>
                         @if($module['description'])
                             <span class="d-block small text-secondary text-truncate">
                                 {{ $module['description'] }}

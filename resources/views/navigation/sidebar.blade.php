@@ -25,7 +25,12 @@
                            href="{{ $module['link'] }}"
                            @if($itemActive) aria-current="page" @endif>
                             <span class="nav-icon cabinet-sidebar-menu__icon">{!! $module['icon'] !!}</span>
-                            <p class="module-name mb-0">{{ $module['title'] }}</p>
+                            <p class="module-name mb-0">
+                                {{ $module['title'] }}
+                                @if(!empty($module['beta']))
+                                    @include('partials.cabinet-module-beta-badge')
+                                @endif
+                            </p>
                         </a>
                     </li>
                 @elseif(count($module) > 1)
@@ -51,7 +56,12 @@
                                        href="{{ $elem['link'] }}"
                                        @if($childActive) aria-current="page" @endif>
                                         <span class="nav-icon cabinet-sidebar-menu__icon">{!! $elem['icon'] !!}</span>
-                                        <p class="module-name mb-0">{{ $elem['title'] }}</p>
+                                        <p class="module-name mb-0">
+                                            {{ $elem['title'] }}
+                                            @if(!empty($elem['beta']))
+                                                @include('partials.cabinet-module-beta-badge')
+                                            @endif
+                                        </p>
                                     </a>
                                 </li>
                             @endforeach

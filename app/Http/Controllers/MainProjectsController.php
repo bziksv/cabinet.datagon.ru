@@ -177,7 +177,7 @@ class MainProjectsController extends Controller
     protected function clearModulesCache(): void
     {
         MenuItemsPosition::clearSortMenuCache();
-        session()->forget(['cabinet_menu_modules_v4', 'cabinet_menu_modules_v4_stamp', 'cabinet_home_modules_flat']);
+        session()->forget(['cabinet_menu_modules_v4', 'cabinet_menu_modules_v4_stamp', 'cabinet_menu_modules_v9', 'cabinet_menu_modules_v9_stamp', 'cabinet_menu_modules_v10', 'cabinet_menu_modules_v10_stamp', 'cabinet_home_modules_flat', 'cabinet_home_modules_flat_v2']);
     }
 
     public function statistics(MainProject $project, Request $request)

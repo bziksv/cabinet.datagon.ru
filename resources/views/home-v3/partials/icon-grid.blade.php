@@ -19,7 +19,12 @@
                     <span class="cabinet-home-v3-tile__icon" aria-hidden="true">
                         {!! $module['icon'] !!}
                     </span>
-                    <span class="cabinet-home-v3-tile__title">{{ $module['title'] }}</span>
+                    <span class="cabinet-home-v3-tile__title">
+                        {{ $module['title'] }}
+                        @if(!empty($module['beta']))
+                            @include('partials.cabinet-module-beta-badge')
+                        @endif
+                    </span>
                     @if($module['external'])
                         <span class="badge text-bg-light border mt-1" style="font-size: 0.65rem;">{{ __('External') }}</span>
                     @endif

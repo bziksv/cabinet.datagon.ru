@@ -6,6 +6,9 @@
     $srProjectsCount = $srProjectsCount ?? null;
 @endphp
 <div class="cabinet-sr-nav-shell">
+    @include('pages.partials.module-beta-banner', [
+        'moduleName' => __('SEO Reports'),
+    ])
     <nav class="cabinet-sr-tabs" aria-label="{{ __('SEO Reports') }}">
         <a href="{{ route('pages.seo-reports') }}"
            class="cabinet-sr-tabs__item @if($srProjectsTabActive) is-active @endif"

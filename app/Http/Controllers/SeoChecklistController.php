@@ -244,7 +244,14 @@ class SeoChecklistController extends Controller
 
         SeoChecklistUserPreference::saveModuleTitle((int) Auth::id(), $data['module_title'] ?? null);
         // Меню сайдбара кэширует подписи в сессии
-        session()->forget(['cabinet_menu_modules_v9', 'cabinet_menu_modules_v9_stamp']);
+        session()->forget([
+            'cabinet_menu_modules_v9',
+            'cabinet_menu_modules_v9_stamp',
+            'cabinet_menu_modules_v10',
+            'cabinet_menu_modules_v10_stamp',
+            'cabinet_home_modules_flat',
+            'cabinet_home_modules_flat_v2',
+        ]);
 
         return back()->with('success', __('Section name saved'));
     }

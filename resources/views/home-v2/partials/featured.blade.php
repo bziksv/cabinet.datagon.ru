@@ -14,7 +14,12 @@
                             <span class="cabinet-home-v2-featured__icon" aria-hidden="true">
                                 {!! $module['icon'] !!}
                             </span>
-                            <h3 class="h5 mb-2">{{ $module['title'] }}</h3>
+                            <h3 class="h5 mb-2">
+                                {{ $module['title'] }}
+                                @if(!empty($module['beta']))
+                                    @include('partials.cabinet-module-beta-badge')
+                                @endif
+                            </h3>
                             @if($module['description'])
                                 <p class="text-secondary small mb-auto pe-lg-4">
                                     {{ \Illuminate\Support\Str::limit($module['description'], $index === 0 ? 160 : 90) }}

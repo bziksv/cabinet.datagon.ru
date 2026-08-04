@@ -8,6 +8,9 @@
     $scTemplatesTabActive = in_array($scTab, ['templates', 'template'], true);
 @endphp
 <div class="cabinet-sc-nav-shell">
+    @include('pages.partials.module-beta-banner', [
+        'moduleName' => $scModuleTitle,
+    ])
     <nav class="cabinet-sc-tabs" aria-label="{{ $scModuleTitle }}">
         <a href="{{ route('pages.seo-checklist.chronicle', ((int) ($scUnreadNotesCount ?? 0) > 0) ? ['view' => 'unread'] : []) }}"
            class="cabinet-sc-tabs__item @if($scTab === 'chronicle') is-active @endif"

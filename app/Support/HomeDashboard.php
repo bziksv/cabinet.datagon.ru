@@ -54,7 +54,7 @@ class HomeDashboard
         }
 
         if (cabinet_skip_heavy_web()) {
-            $cached = session('cabinet_home_modules_flat');
+            $cached = session('cabinet_home_modules_flat_v2');
             if (is_array($cached)) {
                 return $cached;
             }
@@ -89,7 +89,7 @@ class HomeDashboard
         }));
 
         if (cabinet_skip_heavy_web()) {
-            session(['cabinet_home_modules_flat' => $flat]);
+            session(['cabinet_home_modules_flat_v2' => $flat]);
         }
 
         return $flat;
@@ -120,6 +120,7 @@ class HomeDashboard
             'icon' => $elem['icon'] ?? '<i class="bi bi-grid-3x3-gap"></i>',
             'color' => self::normalizeColor($elem['color'] ?? null),
             'external' => $external,
+            'beta' => CabinetModuleBeta::isBetaLink($link) || CabinetModuleBeta::isBetaLink($elem['link'] ?? null),
         ];
     }
 

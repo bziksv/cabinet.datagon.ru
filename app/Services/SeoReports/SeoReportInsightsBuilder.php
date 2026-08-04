@@ -262,7 +262,7 @@ class SeoReportInsightsBuilder
         if ($quick !== []) {
             $out[] = [
                 'priority' => 'P2',
-                'text' => 'Быстрые победы: ' . count($quick)
+                'text' => 'Почти в TOP-10 (позиции 8–20): ' . count($quick)
                     . ' запросов на 8–20 позициях — усилить title/контент для роста CTR.',
             ];
         }

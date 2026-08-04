@@ -58,9 +58,35 @@ Route::get('r/{token}/present', 'SeoReportsPublicController@present')->name('seo
 Route::post('r/{token}/approve', 'SeoReportsPublicController@approve')->name('seo-reports.public.approve')->where('token', '[A-Za-z0-9]+');
 Route::post('r/{token}/react', 'SeoReportsPublicController@react')->name('seo-reports.public.react')->where('token', '[A-Za-z0-9]+');
 // HTML-превью пресетов: только демо-данные, без auth (иначе Simple Browser / новая вкладка = белый редирект на login)
-Route::get('seo-reports/presets/{preset}/demo', 'SeoReportsController@presetDemo')
+Route::get('reports/presets/{preset}/demo', 'SeoReportsController@presetDemo')
     ->name('pages.seo-reports.preset-demo')
     ->where('preset', 'seo_only|seo_ads|complex');
+// Старый URL модуля → /reports (301)
+Route::get('seo-reports/{path?}', static function ($path = null) {
+    $target = '/reports';
+    if (is_string($path) && $path !== '') {
+        $target .= '/' . ltrim($path, '/');
+    }
+    $qs = request()->getQueryString();
+    if (is_string($qs) && $qs !== '') {
+        $target .= '?' . $qs;
+    }
+
+    return redirect($target, 301);
+})->where('path', '.*');
+// Старый URL модуля → /checklist (301)
+Route::get('seo-checklist/{path?}', static function ($path = null) {
+    $target = '/checklist';
+    if (is_string($path) && $path !== '') {
+        $target .= '/' . ltrim($path, '/');
+    }
+    $qs = request()->getQueryString();
+    if (is_string($qs) && $qs !== '') {
+        $target .= '?' . $qs;
+    }
+
+    return redirect($target, 301);
+})->where('path', '.*');
 Route::post('/balance-add/result', 'BalanceAddController@result')->name('balance.add.result');
 Route::get('/email/open/trigger/{token}.png', 'TriggerCampaignEmailOpenController@pixel')->name('email.trigger.open');
 Route::get('/personal-data/ru', 'AccessController@getRuPersonalData');
@@ -88,6 +114,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/yandex-metrika/bind', 'YandexMetrikaController@bind')->name('yandex-metrika.bind');
     Route::post('/yandex-metrika/unbind', 'YandexMetrikaController@unbind')->name('yandex-metrika.unbind');
     Route::post('/yandex-metrika/disconnect', 'YandexMetrikaController@disconnect')->name('yandex-metrika.disconnect');
+
+    Route::get('/yandex-webmaster/connect', 'YandexWebmasterController@connect')->name('yandex-webmaster.connect');
+    Route::get('/yandex-webmaster/callback', 'YandexWebmasterController@callback')->name('yandex-webmaster.callback');
+    Route::get('/yandex-webmaster/status', 'YandexWebmasterController@status')->name('yandex-webmaster.status');
+    Route::get('/yandex-webmaster/hosts', 'YandexWebmasterController@hosts')->name('yandex-webmaster.hosts');
+    Route::get('/yandex-webmaster/binding', 'YandexWebmasterController@binding')->name('yandex-webmaster.binding');
+    Route::post('/yandex-webmaster/bind', 'YandexWebmasterController@bind')->name('yandex-webmaster.bind');
+    Route::post('/yandex-webmaster/unbind', 'YandexWebmasterController@unbind')->name('yandex-webmaster.unbind');
+    Route::post('/yandex-webmaster/disconnect', 'YandexWebmasterController@disconnect')->name('yandex-webmaster.disconnect');
 
     Route::resource('main-projects', 'MainProjectsController');
     Route::get('/main-projects/statistics/{project}', 'MainProjectsController@statistics')->name('main-projects.statistics');
@@ -271,88 +306,89 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('site-audit/crawl/{id}/note', 'SiteAuditController@saveFindingNote')->name('pages.site-audit.note')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/note/clear', 'SiteAuditController@clearFindingNote')->name('pages.site-audit.note.clear')->middleware('permission:Site audit');
 
-    Route::get('seo-reports', 'SeoReportsController@index')->name('pages.seo-reports')->middleware('permission:SEO Reports');
-    Route::get('seo-reports/templates', 'SeoReportsController@templates')->name('pages.seo-reports.templates')->middleware('permission:SEO Reports');
-    Route::post('seo-reports/templates', 'SeoReportsController@storeTemplate')->name('pages.seo-reports.templates.store')->middleware('permission:SEO Reports');
-    Route::get('seo-reports/templates/{id}/edit', 'SeoReportsController@editTemplate')->name('pages.seo-reports.templates.edit')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
-    Route::get('seo-reports/templates/{id}/demo', 'SeoReportsController@templateDemo')->name('pages.seo-reports.templates.demo')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
-    Route::post('seo-reports/templates/{id}', 'SeoReportsController@updateTemplate')->name('pages.seo-reports.templates.update')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
-    Route::post('seo-reports/templates/{id}/duplicate', 'SeoReportsController@duplicateTemplate')->name('pages.seo-reports.templates.duplicate')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
-    Route::post('seo-reports/templates/{id}/delete', 'SeoReportsController@destroyTemplate')->name('pages.seo-reports.templates.destroy')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
-    Route::post('seo-reports', 'SeoReportsController@store')->name('pages.seo-reports.store')->middleware('permission:SEO Reports');
-    Route::post('seo-reports/batch-generate', 'SeoReportsController@batchGenerate')->name('pages.seo-reports.batch')->middleware('permission:SEO Reports');
-    Route::post('seo-reports/demo', 'SeoReportsController@createDemo')->name('pages.seo-reports.demo')->middleware('permission:SEO Reports');
-    Route::get('seo-reports/{id}', 'SeoReportsController@show')->name('pages.seo-reports.show')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
-    Route::get('seo-reports/{id}/settings', 'SeoReportsController@settings')->name('pages.seo-reports.settings')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
-    Route::post('seo-reports/{id}/settings', 'SeoReportsController@updateSettings')->name('pages.seo-reports.settings.update')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
-    Route::post('seo-reports/{id}/share', 'SeoReportsController@share')->name('pages.seo-reports.share')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
-    Route::post('seo-reports/{id}/unshare', 'SeoReportsController@unshare')->name('pages.seo-reports.unshare')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
-    Route::post('seo-reports/{id}/reports', 'SeoReportsController@storeReport')->name('pages.seo-reports.reports.store')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
-    Route::get('seo-reports/{id}/reports/{reportId}', 'SeoReportsController@showReport')->name('pages.seo-reports.report')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
-    Route::get('seo-reports/{id}/reports/{reportId}/status', 'SeoReportsController@reportStatus')->name('pages.seo-reports.report.status')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
-    Route::get('seo-reports/{id}/reports/{reportId}/pdf', 'SeoReportsController@pdf')->name('pages.seo-reports.report.pdf')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
-    Route::get('seo-reports/{id}/reports/{reportId}/docx', 'SeoReportsController@docx')->name('pages.seo-reports.report.docx')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
-    Route::get('seo-reports/{id}/reports/{reportId}/pack', 'SeoReportsController@downloadPack')->name('pages.seo-reports.report.pack')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
-    Route::post('seo-reports/{id}/reports/{reportId}/email', 'SeoReportsController@sendEmail')->name('pages.seo-reports.report.email')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
-    Route::post('seo-reports/{id}/reports/{reportId}/regenerate', 'SeoReportsController@regenerate')->name('pages.seo-reports.report.regenerate')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
-    Route::post('seo-reports/{id}/reports/{reportId}/publish', 'SeoReportsController@publish')->name('pages.seo-reports.report.publish')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
-    Route::post('seo-reports/{id}/reports/{reportId}/clone', 'SeoReportsController@cloneReport')->name('pages.seo-reports.report.clone')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
-    Route::get('seo-reports/{id}/reports/{reportId}/positions.csv', 'SeoReportsController@positionsCsv')->name('pages.seo-reports.report.positions-csv')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
-    Route::post('seo-reports/{id}/reports/{reportId}/texts', 'SeoReportsController@updateTexts')->name('pages.seo-reports.report.texts')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
-    Route::post('seo-reports/{id}/reports/{reportId}/share', 'SeoReportsController@updateShare')->name('pages.seo-reports.report.share')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
-    Route::get('seo-reports/{id}/compare', 'SeoReportsController@compare')->name('pages.seo-reports.compare')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
-    Route::post('seo-reports/{id}/archive', 'SeoReportsController@archive')->name('pages.seo-reports.archive')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
-    Route::post('seo-reports/{id}/restore', 'SeoReportsController@restore')->name('pages.seo-reports.restore')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::get('reports', 'SeoReportsController@index')->name('pages.seo-reports')->middleware('permission:SEO Reports');
+    Route::get('reports/templates', 'SeoReportsController@templates')->name('pages.seo-reports.templates')->middleware('permission:SEO Reports');
+    Route::post('reports/templates', 'SeoReportsController@storeTemplate')->name('pages.seo-reports.templates.store')->middleware('permission:SEO Reports');
+    Route::get('reports/templates/{id}/edit', 'SeoReportsController@editTemplate')->name('pages.seo-reports.templates.edit')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::get('reports/templates/{id}/demo', 'SeoReportsController@templateDemo')->name('pages.seo-reports.templates.demo')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('reports/templates/{id}', 'SeoReportsController@updateTemplate')->name('pages.seo-reports.templates.update')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('reports/templates/{id}/duplicate', 'SeoReportsController@duplicateTemplate')->name('pages.seo-reports.templates.duplicate')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('reports/templates/{id}/delete', 'SeoReportsController@destroyTemplate')->name('pages.seo-reports.templates.destroy')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('reports', 'SeoReportsController@store')->name('pages.seo-reports.store')->middleware('permission:SEO Reports');
+    Route::post('reports/batch-generate', 'SeoReportsController@batchGenerate')->name('pages.seo-reports.batch')->middleware('permission:SEO Reports');
+    Route::post('reports/demo', 'SeoReportsController@createDemo')->name('pages.seo-reports.demo')->middleware('permission:SEO Reports');
+    Route::get('reports/{id}', 'SeoReportsController@show')->name('pages.seo-reports.show')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::get('reports/{id}/settings', 'SeoReportsController@settings')->name('pages.seo-reports.settings')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('reports/{id}/settings', 'SeoReportsController@updateSettings')->name('pages.seo-reports.settings.update')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('reports/{id}/share', 'SeoReportsController@share')->name('pages.seo-reports.share')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('reports/{id}/unshare', 'SeoReportsController@unshare')->name('pages.seo-reports.unshare')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('reports/{id}/assign-team', 'SeoReportsController@assignTeam')->name('pages.seo-reports.assign-team')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('reports/{id}/reports', 'SeoReportsController@storeReport')->name('pages.seo-reports.reports.store')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::get('reports/{id}/reports/{reportId}', 'SeoReportsController@showReport')->name('pages.seo-reports.report')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::get('reports/{id}/reports/{reportId}/status', 'SeoReportsController@reportStatus')->name('pages.seo-reports.report.status')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::get('reports/{id}/reports/{reportId}/pdf', 'SeoReportsController@pdf')->name('pages.seo-reports.report.pdf')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::get('reports/{id}/reports/{reportId}/docx', 'SeoReportsController@docx')->name('pages.seo-reports.report.docx')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::get('reports/{id}/reports/{reportId}/pack', 'SeoReportsController@downloadPack')->name('pages.seo-reports.report.pack')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::post('reports/{id}/reports/{reportId}/email', 'SeoReportsController@sendEmail')->name('pages.seo-reports.report.email')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::post('reports/{id}/reports/{reportId}/regenerate', 'SeoReportsController@regenerate')->name('pages.seo-reports.report.regenerate')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::post('reports/{id}/reports/{reportId}/publish', 'SeoReportsController@publish')->name('pages.seo-reports.report.publish')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::post('reports/{id}/reports/{reportId}/clone', 'SeoReportsController@cloneReport')->name('pages.seo-reports.report.clone')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::get('reports/{id}/reports/{reportId}/positions.csv', 'SeoReportsController@positionsCsv')->name('pages.seo-reports.report.positions-csv')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::post('reports/{id}/reports/{reportId}/texts', 'SeoReportsController@updateTexts')->name('pages.seo-reports.report.texts')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::post('reports/{id}/reports/{reportId}/share', 'SeoReportsController@updateShare')->name('pages.seo-reports.report.share')->middleware('permission:SEO Reports')->where(['id' => '[0-9]+', 'reportId' => '[0-9]+']);
+    Route::get('reports/{id}/compare', 'SeoReportsController@compare')->name('pages.seo-reports.compare')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('reports/{id}/archive', 'SeoReportsController@archive')->name('pages.seo-reports.archive')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
+    Route::post('reports/{id}/restore', 'SeoReportsController@restore')->name('pages.seo-reports.restore')->middleware('permission:SEO Reports')->where('id', '[0-9]+');
 
-    Route::get('seo-checklist', 'SeoChecklistController@index')->name('pages.seo-checklist')->middleware('permission:SEO Checklist');
-    Route::post('seo-checklist', 'SeoChecklistController@store')->name('pages.seo-checklist.store')->middleware('permission:SEO Checklist');
-    Route::get('seo-checklist/my-tasks', 'SeoChecklistController@myTasks')->name('pages.seo-checklist.my-tasks')->middleware('permission:SEO Checklist');
-    Route::get('seo-checklist/review', 'SeoChecklistController@reviewQueue')->name('pages.seo-checklist.review')->middleware('permission:SEO Checklist');
-    Route::get('seo-checklist/chronicle', 'SeoChecklistController@chronicle')->name('pages.seo-checklist.chronicle')->middleware('permission:SEO Checklist');
-    Route::post('seo-checklist/chronicle/read', 'SeoChecklistController@markChronicleNotesRead')->name('pages.seo-checklist.chronicle.read')->middleware('permission:SEO Checklist');
-    Route::post('seo-checklist/module-title', 'SeoChecklistController@updateModuleTitle')->name('pages.seo-checklist.module-title')->middleware('permission:SEO Checklist');
-    Route::get('seo-checklist/time', 'SeoChecklistController@timesheet')->name('pages.seo-checklist.timesheet')->middleware('permission:SEO Checklist');
-    Route::get('seo-checklist/time/export', 'SeoChecklistController@timesheetExport')->name('pages.seo-checklist.timesheet.export')->middleware('permission:SEO Checklist');
-    Route::get('seo-checklist/team', 'SeoChecklistController@team')->name('pages.seo-checklist.team')->middleware('permission:SEO Checklist');
-    Route::post('seo-checklist/teams', 'SeoChecklistController@storeTeam')->name('pages.seo-checklist.teams.store')->middleware('permission:SEO Checklist');
-    Route::post('seo-checklist/teams/{teamId}', 'SeoChecklistController@updateTeamMeta')->name('pages.seo-checklist.teams.update')->middleware('permission:SEO Checklist')->where('teamId', '[0-9]+');
-    Route::post('seo-checklist/teams/{teamId}/delete', 'SeoChecklistController@destroyTeam')->name('pages.seo-checklist.teams.delete')->middleware('permission:SEO Checklist')->where('teamId', '[0-9]+');
-    Route::post('seo-checklist/teams/{teamId}/members', 'SeoChecklistController@storeTeamMember')->name('pages.seo-checklist.teams.members.store')->middleware('permission:SEO Checklist')->where('teamId', '[0-9]+');
-    Route::post('seo-checklist/teams/{teamId}/members/{memberId}', 'SeoChecklistController@updateTeamMember')->name('pages.seo-checklist.teams.members.update')->middleware('permission:SEO Checklist')->where(['teamId' => '[0-9]+', 'memberId' => '[0-9]+']);
-    Route::post('seo-checklist/teams/{teamId}/members/{memberId}/delete', 'SeoChecklistController@destroyTeamMember')->name('pages.seo-checklist.teams.members.delete')->middleware('permission:SEO Checklist')->where(['teamId' => '[0-9]+', 'memberId' => '[0-9]+']);
-    Route::post('seo-checklist/{id}/assign-team', 'SeoChecklistController@assignProjectTeam')->name('pages.seo-checklist.assign-team')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
-    Route::get('seo-checklist/templates', 'SeoChecklistController@templates')->name('pages.seo-checklist.templates')->middleware('permission:SEO Checklist');
-    Route::post('seo-checklist/timer/stop', 'SeoChecklistController@stopActiveTimer')->name('pages.seo-checklist.timer.stop-active')->middleware('permission:SEO Checklist');
-    Route::post('seo-checklist/templates', 'SeoChecklistController@storeTemplate')->name('pages.seo-checklist.templates.store')->middleware('permission:SEO Checklist');
-    Route::post('seo-checklist/templates/{templateId}/duplicate', 'SeoChecklistController@duplicateTemplate')->name('pages.seo-checklist.templates.duplicate')->middleware('permission:SEO Checklist')->where('templateId', '[0-9]+');
-    Route::get('seo-checklist/templates/{templateId}', 'SeoChecklistController@editTemplate')->name('pages.seo-checklist.templates.edit')->middleware('permission:SEO Checklist')->where('templateId', '[0-9]+');
-    Route::post('seo-checklist/templates/{templateId}', 'SeoChecklistController@updateTemplate')->name('pages.seo-checklist.templates.update')->middleware('permission:SEO Checklist')->where('templateId', '[0-9]+');
-    Route::post('seo-checklist/templates/{templateId}/delete', 'SeoChecklistController@destroyTemplate')->name('pages.seo-checklist.templates.delete')->middleware('permission:SEO Checklist')->where('templateId', '[0-9]+');
-    Route::post('seo-checklist/templates/{templateId}/stages', 'SeoChecklistController@storeTemplateStage')->name('pages.seo-checklist.templates.stage.store')->middleware('permission:SEO Checklist')->where('templateId', '[0-9]+');
-    Route::post('seo-checklist/templates/{templateId}/stages/skeleton', 'SeoChecklistController@applyTemplateSkeleton')->name('pages.seo-checklist.templates.stage.skeleton')->middleware('permission:SEO Checklist')->where('templateId', '[0-9]+');
-    Route::post('seo-checklist/templates/{templateId}/stages/{stageKey}', 'SeoChecklistController@updateTemplateStage')->name('pages.seo-checklist.templates.stage.update')->middleware('permission:SEO Checklist')->where(['templateId' => '[0-9]+', 'stageKey' => '[A-Za-z0-9_\\-]+']);
-    Route::post('seo-checklist/templates/{templateId}/stages/{stageKey}/move', 'SeoChecklistController@moveTemplateStage')->name('pages.seo-checklist.templates.stage.move')->middleware('permission:SEO Checklist')->where(['templateId' => '[0-9]+', 'stageKey' => '[A-Za-z0-9_\\-]+']);
-    Route::post('seo-checklist/templates/{templateId}/stages/{stageKey}/delete', 'SeoChecklistController@destroyTemplateStage')->name('pages.seo-checklist.templates.stage.delete')->middleware('permission:SEO Checklist')->where(['templateId' => '[0-9]+', 'stageKey' => '[A-Za-z0-9_\\-]+']);
-    Route::post('seo-checklist/templates/{templateId}/tasks', 'SeoChecklistController@storeTemplateTask')->name('pages.seo-checklist.templates.task.store')->middleware('permission:SEO Checklist')->where('templateId', '[0-9]+');
-    Route::post('seo-checklist/templates/{templateId}/tasks/{taskId}', 'SeoChecklistController@updateTemplateTask')->name('pages.seo-checklist.templates.task.update')->middleware('permission:SEO Checklist')->where(['templateId' => '[0-9]+', 'taskId' => '[0-9]+']);
-    Route::post('seo-checklist/templates/{templateId}/tasks/{taskId}/move', 'SeoChecklistController@moveTemplateTask')->name('pages.seo-checklist.templates.task.move')->middleware('permission:SEO Checklist')->where(['templateId' => '[0-9]+', 'taskId' => '[0-9]+']);
-    Route::post('seo-checklist/templates/{templateId}/tasks/{taskId}/subtasks', 'SeoChecklistController@storeTemplateSubtask')->name('pages.seo-checklist.templates.task.subtasks')->middleware('permission:SEO Checklist')->where(['templateId' => '[0-9]+', 'taskId' => '[0-9]+']);
-    Route::post('seo-checklist/templates/{templateId}/tasks/{taskId}/delete', 'SeoChecklistController@destroyTemplateTask')->name('pages.seo-checklist.templates.task.delete')->middleware('permission:SEO Checklist')->where(['templateId' => '[0-9]+', 'taskId' => '[0-9]+']);
-    Route::get('seo-checklist/{id}', 'SeoChecklistController@show')->name('pages.seo-checklist.show')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
-    Route::get('seo-checklist/{id}/pdf', 'SeoChecklistController@pdf')->name('pages.seo-checklist.pdf')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
-    Route::post('seo-checklist/{id}/team', 'SeoChecklistController@updateTeam')->name('pages.seo-checklist.team.update')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
-    Route::post('seo-checklist/{id}/archive', 'SeoChecklistController@archive')->name('pages.seo-checklist.archive')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
-    Route::post('seo-checklist/{id}/restore', 'SeoChecklistController@restore')->name('pages.seo-checklist.restore')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
-    Route::post('seo-checklist/{id}/delete', 'SeoChecklistController@destroy')->name('pages.seo-checklist.delete')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
-    Route::post('seo-checklist/{id}/items', 'SeoChecklistController@storeItem')->name('pages.seo-checklist.items.store')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
-    Route::post('seo-checklist/{id}/items/{itemId}', 'SeoChecklistController@updateItem')->name('pages.seo-checklist.item.update')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
-    Route::post('seo-checklist/{id}/items/{itemId}/delete', 'SeoChecklistController@destroyItem')->name('pages.seo-checklist.item.delete')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
-    Route::post('seo-checklist/{id}/items/{itemId}/status', 'SeoChecklistController@updateItemStatus')->name('pages.seo-checklist.item.status')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
-    Route::post('seo-checklist/{id}/items/{itemId}/notes', 'SeoChecklistController@addNote')->name('pages.seo-checklist.item.notes')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
-    Route::post('seo-checklist/{id}/items/{itemId}/timer/start', 'SeoChecklistController@startItemTimer')->name('pages.seo-checklist.item.timer.start')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
-    Route::post('seo-checklist/{id}/items/{itemId}/timer/stop', 'SeoChecklistController@stopItemTimer')->name('pages.seo-checklist.item.timer.stop')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
-    Route::get('seo-checklist/{id}/items/{itemId}/time', 'SeoChecklistController@itemTimeBreakdown')->name('pages.seo-checklist.item.time')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
-    Route::post('seo-checklist/{id}/items/{itemId}/subtasks', 'SeoChecklistController@addSubtask')->name('pages.seo-checklist.item.subtasks')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
+    Route::get('checklist', 'SeoChecklistController@index')->name('pages.seo-checklist')->middleware('permission:SEO Checklist');
+    Route::post('checklist', 'SeoChecklistController@store')->name('pages.seo-checklist.store')->middleware('permission:SEO Checklist');
+    Route::get('checklist/my-tasks', 'SeoChecklistController@myTasks')->name('pages.seo-checklist.my-tasks')->middleware('permission:SEO Checklist');
+    Route::get('checklist/review', 'SeoChecklistController@reviewQueue')->name('pages.seo-checklist.review')->middleware('permission:SEO Checklist');
+    Route::get('checklist/chronicle', 'SeoChecklistController@chronicle')->name('pages.seo-checklist.chronicle')->middleware('permission:SEO Checklist');
+    Route::post('checklist/chronicle/read', 'SeoChecklistController@markChronicleNotesRead')->name('pages.seo-checklist.chronicle.read')->middleware('permission:SEO Checklist');
+    Route::post('checklist/module-title', 'SeoChecklistController@updateModuleTitle')->name('pages.seo-checklist.module-title')->middleware('permission:SEO Checklist');
+    Route::get('checklist/time', 'SeoChecklistController@timesheet')->name('pages.seo-checklist.timesheet')->middleware('permission:SEO Checklist');
+    Route::get('checklist/time/export', 'SeoChecklistController@timesheetExport')->name('pages.seo-checklist.timesheet.export')->middleware('permission:SEO Checklist');
+    Route::get('checklist/team', 'SeoChecklistController@team')->name('pages.seo-checklist.team')->middleware('permission:SEO Checklist');
+    Route::post('checklist/teams', 'SeoChecklistController@storeTeam')->name('pages.seo-checklist.teams.store')->middleware('permission:SEO Checklist');
+    Route::post('checklist/teams/{teamId}', 'SeoChecklistController@updateTeamMeta')->name('pages.seo-checklist.teams.update')->middleware('permission:SEO Checklist')->where('teamId', '[0-9]+');
+    Route::post('checklist/teams/{teamId}/delete', 'SeoChecklistController@destroyTeam')->name('pages.seo-checklist.teams.delete')->middleware('permission:SEO Checklist')->where('teamId', '[0-9]+');
+    Route::post('checklist/teams/{teamId}/members', 'SeoChecklistController@storeTeamMember')->name('pages.seo-checklist.teams.members.store')->middleware('permission:SEO Checklist')->where('teamId', '[0-9]+');
+    Route::post('checklist/teams/{teamId}/members/{memberId}', 'SeoChecklistController@updateTeamMember')->name('pages.seo-checklist.teams.members.update')->middleware('permission:SEO Checklist')->where(['teamId' => '[0-9]+', 'memberId' => '[0-9]+']);
+    Route::post('checklist/teams/{teamId}/members/{memberId}/delete', 'SeoChecklistController@destroyTeamMember')->name('pages.seo-checklist.teams.members.delete')->middleware('permission:SEO Checklist')->where(['teamId' => '[0-9]+', 'memberId' => '[0-9]+']);
+    Route::post('checklist/{id}/assign-team', 'SeoChecklistController@assignProjectTeam')->name('pages.seo-checklist.assign-team')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
+    Route::get('checklist/templates', 'SeoChecklistController@templates')->name('pages.seo-checklist.templates')->middleware('permission:SEO Checklist');
+    Route::post('checklist/timer/stop', 'SeoChecklistController@stopActiveTimer')->name('pages.seo-checklist.timer.stop-active')->middleware('permission:SEO Checklist');
+    Route::post('checklist/templates', 'SeoChecklistController@storeTemplate')->name('pages.seo-checklist.templates.store')->middleware('permission:SEO Checklist');
+    Route::post('checklist/templates/{templateId}/duplicate', 'SeoChecklistController@duplicateTemplate')->name('pages.seo-checklist.templates.duplicate')->middleware('permission:SEO Checklist')->where('templateId', '[0-9]+');
+    Route::get('checklist/templates/{templateId}', 'SeoChecklistController@editTemplate')->name('pages.seo-checklist.templates.edit')->middleware('permission:SEO Checklist')->where('templateId', '[0-9]+');
+    Route::post('checklist/templates/{templateId}', 'SeoChecklistController@updateTemplate')->name('pages.seo-checklist.templates.update')->middleware('permission:SEO Checklist')->where('templateId', '[0-9]+');
+    Route::post('checklist/templates/{templateId}/delete', 'SeoChecklistController@destroyTemplate')->name('pages.seo-checklist.templates.delete')->middleware('permission:SEO Checklist')->where('templateId', '[0-9]+');
+    Route::post('checklist/templates/{templateId}/stages', 'SeoChecklistController@storeTemplateStage')->name('pages.seo-checklist.templates.stage.store')->middleware('permission:SEO Checklist')->where('templateId', '[0-9]+');
+    Route::post('checklist/templates/{templateId}/stages/skeleton', 'SeoChecklistController@applyTemplateSkeleton')->name('pages.seo-checklist.templates.stage.skeleton')->middleware('permission:SEO Checklist')->where('templateId', '[0-9]+');
+    Route::post('checklist/templates/{templateId}/stages/{stageKey}', 'SeoChecklistController@updateTemplateStage')->name('pages.seo-checklist.templates.stage.update')->middleware('permission:SEO Checklist')->where(['templateId' => '[0-9]+', 'stageKey' => '[A-Za-z0-9_\\-]+']);
+    Route::post('checklist/templates/{templateId}/stages/{stageKey}/move', 'SeoChecklistController@moveTemplateStage')->name('pages.seo-checklist.templates.stage.move')->middleware('permission:SEO Checklist')->where(['templateId' => '[0-9]+', 'stageKey' => '[A-Za-z0-9_\\-]+']);
+    Route::post('checklist/templates/{templateId}/stages/{stageKey}/delete', 'SeoChecklistController@destroyTemplateStage')->name('pages.seo-checklist.templates.stage.delete')->middleware('permission:SEO Checklist')->where(['templateId' => '[0-9]+', 'stageKey' => '[A-Za-z0-9_\\-]+']);
+    Route::post('checklist/templates/{templateId}/tasks', 'SeoChecklistController@storeTemplateTask')->name('pages.seo-checklist.templates.task.store')->middleware('permission:SEO Checklist')->where('templateId', '[0-9]+');
+    Route::post('checklist/templates/{templateId}/tasks/{taskId}', 'SeoChecklistController@updateTemplateTask')->name('pages.seo-checklist.templates.task.update')->middleware('permission:SEO Checklist')->where(['templateId' => '[0-9]+', 'taskId' => '[0-9]+']);
+    Route::post('checklist/templates/{templateId}/tasks/{taskId}/move', 'SeoChecklistController@moveTemplateTask')->name('pages.seo-checklist.templates.task.move')->middleware('permission:SEO Checklist')->where(['templateId' => '[0-9]+', 'taskId' => '[0-9]+']);
+    Route::post('checklist/templates/{templateId}/tasks/{taskId}/subtasks', 'SeoChecklistController@storeTemplateSubtask')->name('pages.seo-checklist.templates.task.subtasks')->middleware('permission:SEO Checklist')->where(['templateId' => '[0-9]+', 'taskId' => '[0-9]+']);
+    Route::post('checklist/templates/{templateId}/tasks/{taskId}/delete', 'SeoChecklistController@destroyTemplateTask')->name('pages.seo-checklist.templates.task.delete')->middleware('permission:SEO Checklist')->where(['templateId' => '[0-9]+', 'taskId' => '[0-9]+']);
+    Route::get('checklist/{id}', 'SeoChecklistController@show')->name('pages.seo-checklist.show')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
+    Route::get('checklist/{id}/pdf', 'SeoChecklistController@pdf')->name('pages.seo-checklist.pdf')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
+    Route::post('checklist/{id}/team', 'SeoChecklistController@updateTeam')->name('pages.seo-checklist.team.update')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
+    Route::post('checklist/{id}/archive', 'SeoChecklistController@archive')->name('pages.seo-checklist.archive')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
+    Route::post('checklist/{id}/restore', 'SeoChecklistController@restore')->name('pages.seo-checklist.restore')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
+    Route::post('checklist/{id}/delete', 'SeoChecklistController@destroy')->name('pages.seo-checklist.delete')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
+    Route::post('checklist/{id}/items', 'SeoChecklistController@storeItem')->name('pages.seo-checklist.items.store')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
+    Route::post('checklist/{id}/items/{itemId}', 'SeoChecklistController@updateItem')->name('pages.seo-checklist.item.update')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
+    Route::post('checklist/{id}/items/{itemId}/delete', 'SeoChecklistController@destroyItem')->name('pages.seo-checklist.item.delete')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
+    Route::post('checklist/{id}/items/{itemId}/status', 'SeoChecklistController@updateItemStatus')->name('pages.seo-checklist.item.status')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
+    Route::post('checklist/{id}/items/{itemId}/notes', 'SeoChecklistController@addNote')->name('pages.seo-checklist.item.notes')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
+    Route::post('checklist/{id}/items/{itemId}/timer/start', 'SeoChecklistController@startItemTimer')->name('pages.seo-checklist.item.timer.start')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
+    Route::post('checklist/{id}/items/{itemId}/timer/stop', 'SeoChecklistController@stopItemTimer')->name('pages.seo-checklist.item.timer.stop')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
+    Route::get('checklist/{id}/items/{itemId}/time', 'SeoChecklistController@itemTimeBreakdown')->name('pages.seo-checklist.item.time')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
+    Route::post('checklist/{id}/items/{itemId}/subtasks', 'SeoChecklistController@addSubtask')->name('pages.seo-checklist.item.subtasks')->middleware('permission:SEO Checklist')->where(['id' => '[0-9]+', 'itemId' => '[0-9]+']);
 
     Route::get('search-suggestions', 'SearchSuggestionsController@index')->name('pages.search-suggestions')->middleware('permission:Search suggestions');
     Route::post('search-suggestions/collect', 'SearchSuggestionsController@collect')->name('pages.search-suggestions.collect')->middleware('permission:Search suggestions');

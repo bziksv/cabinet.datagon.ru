@@ -929,6 +929,27 @@
                     });
                 })();
 
+                // Подсказки «как будет в отчёте» у показателей — клик/тап закрепляет
+                document.querySelectorAll('[data-sr-metric-tip]').forEach(function (tip) {
+                    var btn = tip.querySelector('.cabinet-sr-metric-tip__btn');
+                    if (!btn) return;
+                    btn.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var open = tip.classList.contains('is-open');
+                        document.querySelectorAll('[data-sr-metric-tip].is-open').forEach(function (el) {
+                            el.classList.remove('is-open');
+                        });
+                        if (!open) tip.classList.add('is-open');
+                    });
+                });
+                document.addEventListener('click', function (e) {
+                    if (e.target && e.target.closest && e.target.closest('[data-sr-metric-tip]')) return;
+                    document.querySelectorAll('[data-sr-metric-tip].is-open').forEach(function (el) {
+                        el.classList.remove('is-open');
+                    });
+                });
+
                 syncUi();
             })();
         </script>

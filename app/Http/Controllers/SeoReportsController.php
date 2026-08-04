@@ -16,11 +16,13 @@ use App\SeoReports\SeoReportSectionRegistry;
 use App\SeoReports\SeoReportTemplate;
 use App\User;
 use Illuminate\Support\Str;
+use App\Services\SeoChecklist\SeoChecklistService;
 use App\Services\SeoReports\SeoReportExportService;
 use App\Services\SeoReports\SeoReportExternalAdsCollector;
 use App\Services\SeoReports\SeoReportPresetDemoFactory;
 use App\Services\SeoReports\SeoReportTemplateService;
 use App\Services\YandexMetrika\YandexMetrikaService;
+use App\Services\YandexWebmaster\YandexWebmasterService;
 use App\Support\HomeUserSites;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -43,10 +45,17 @@ class SeoReportsController extends Controller
     /** @var YandexMetrikaService */
     private $metrika;
 
-    public function __construct(SeoReportExportService $export, YandexMetrikaService $metrika)
-    {
+    /** @var YandexWebmasterService */
+    private $webmaster;
+
+    public function __construct(
+        SeoReportExportService $export,
+        YandexMetrikaService $metrika,
+        YandexWebmasterService $webmaster
+    ) {
         $this->export = $export;
         $this->metrika = $metrika;
+        $this->webmaster = $webmaster;
     }
 
     /**
@@ -80,7 +89,19 @@ class SeoReportsController extends Controller
                 ->orderByDesc('updated_at')
                 ->get();
 
-        $projects = $owned->concat($shared)->unique('id')->values();
+        $teamProjects = collect();
+        $teamIds = SeoReportProject::teamIdsForMember($userId);
+        if ($teamIds !== [] && SeoReportProject::teamColumnReady()) {
+            $teamProjects = SeoReportProject::query()
+                ->whereIn('team_id', $teamIds)
+                ->where('status', 'active')
+                ->where('user_id', '!=', $userId)
+                ->withCount('reports')
+                ->orderByDesc('updated_at')
+                ->get();
+        }
+
+        $projects = $owned->concat($shared)->concat($teamProjects)->unique('id')->values();
 
         $archived = SeoReportProject::query()
             ->where('user_id', $userId)
@@ -169,6 +190,7 @@ class SeoReportsController extends Controller
             'missingReports' => $missingReports,
             'missingMonthLabel' => $missingMonth->format('Y-m'),
             'sharedProjectIds' => $shared->pluck('id')->all(),
+            'teamProjectIds' => $teamProjects->pluck('id')->all(),
             'presetCards' => SeoReportSectionRegistry::presetCards(),
             'reportTemplates' => $reportTemplates,
         ]);
@@ -404,6 +426,9 @@ class SeoReportsController extends Controller
         $reports = SeoReport::query()
             ->where('project_id', $project->id)
             ->orderByDesc('period_to')
+            // Актуальная версия (без archived_from) выше архивных копий с большим id
+            ->orderByRaw('CASE WHEN archived_from_report_id IS NULL THEN 0 ELSE 1 END')
+            ->orderByDesc('generated_at')
             ->orderByDesc('id')
             ->limit(50)
             ->get();
@@ -428,7 +453,21 @@ class SeoReportsController extends Controller
                 'source_status' => $sourceStatus,
                 'client_visible' => SeoReportSectionRegistry::visibleForClient($enabled, $sourceStatus),
                 'mvp' => !empty($meta['mvp']),
+                'connect' => $this->sourceConnectAction($project, (string) $meta['source'], $isOwner),
             ];
+        }
+
+        $checklistTeams = collect();
+        $assignedTeam = null;
+        if ($isOwner && SeoReportProject::teamColumnReady()) {
+            $checklistTeams = app(SeoChecklistService::class)->teamsForUser($userId);
+            if ((int) $project->team_id > 0) {
+                $assignedTeam = $project->relationLoaded('team')
+                    ? $project->team
+                    : $project->team()->with('members.user')->first();
+            }
+        } elseif ((int) $project->team_id > 0) {
+            $assignedTeam = $project->team()->with('members.user')->first();
         }
 
         return view('pages.seo-reports-show', [
@@ -442,6 +481,9 @@ class SeoReportsController extends Controller
             'sharedUsers' => ($isOwner && \Illuminate\Support\Facades\Schema::hasTable('seo_report_project_user'))
                 ? $project->sharedUsers()->orderBy('email')->get()
                 : collect(),
+            'checklistTeams' => $checklistTeams,
+            'assignedTeam' => $assignedTeam,
+            'teamAccessReady' => SeoReportProject::teamColumnReady(),
         ]);
     }
 
@@ -465,6 +507,12 @@ class SeoReportsController extends Controller
             }
         }
 
+        // Подтянуть Метрику / мониторинг / Вебмастер с главной, если ещё не сохранены в проекте.
+        SeoReportBindings::applyAutoBindings($project);
+        if ($project->isDirty()) {
+            $project->save();
+        }
+
         $settings = is_array($project->settings_json) ? $project->settings_json : [];
         $goals = [];
         if ($project->metrika_counter_id && $this->metrika->isConnected($userId)) {
@@ -483,6 +531,9 @@ class SeoReportsController extends Controller
             'templates' => $templateList,
             'attachedTemplate' => $project->resolvedTemplate(),
             'metrikaBindings' => SeoReportBindings::metrikaBindingsForUser($userId),
+            'webmasterBindings' => SeoReportBindings::webmasterBindingsForUser($userId),
+            'webmasterConfigured' => $this->webmaster->isConfigured(),
+            'webmasterConnected' => $this->webmaster->isConnected($userId),
             'monitoringOptions' => SeoReportBindings::monitoringOptionsForUser($userId),
             'metrikaGoals' => $goals,
             'selectedGoalIds' => isset($settings['metrika_goal_ids']) && is_array($settings['metrika_goal_ids'])
@@ -509,18 +560,13 @@ class SeoReportsController extends Controller
         $settings['metrika_goal_ids'] = is_array($goalIds)
             ? array_values(array_filter(array_map('intval', $goalIds)))
             : [];
-        $settings['gsc_property'] = trim((string) $request->input('gsc_property', '')) ?: null;
+        // GSC пока в разработке: не принимаем ввод, сохраняем уже записанное значение.
         $settings['webmaster_host'] = trim((string) $request->input('webmaster_host', '')) ?: null;
         $settings['auto_email'] = $request->boolean('auto_email');
         $settings['auto_email_to'] = trim((string) $request->input('auto_email_to', '')) ?: null;
         $settings['auto_email_message'] = trim((string) $request->input('auto_email_message', '')) ?: null;
         $settings['auto_email_cc_manager'] = $request->boolean('auto_email_cc_manager');
-        $settings['vk_ads_token'] = trim((string) $request->input('vk_ads_token', '')) ?: null;
-        $settings['vk_ads_account'] = trim((string) $request->input('vk_ads_account', '')) ?: null;
-        $settings['meta_ads_token'] = trim((string) $request->input('meta_ads_token', '')) ?: null;
-        $settings['meta_ads_account'] = trim((string) $request->input('meta_ads_account', '')) ?: null;
-        $settings['vk_smm_token'] = trim((string) $request->input('vk_smm_token', '')) ?: null;
-        $settings['vk_smm_group_id'] = trim((string) $request->input('vk_smm_group_id', '')) ?: null;
+        // VK Ads / SMM пока в разработке: не принимаем ввод, сохраняем уже записанные значения.
         $mirrors = preg_split('/[\s,;]+/', (string) $request->input('mirror_domains', '')) ?: [];
         $settings['mirror_domains'] = array_values(array_filter(array_map(static function ($d) {
             $d = HomeUserSites::normalizeDomain((string) $d);
@@ -1356,8 +1402,7 @@ class SeoReportsController extends Controller
         $toggles = $project->resolvedSectionToggles();
         foreach (['direct' => __('Yandex Direct is not connected — open settings after OAuth is available'),
             'google_ads' => __('Google Ads is not connected — cabinet OAuth will be added later'),
-            'vk_ads' => __('VK Ads is not connected'),
-            'meta_ads' => __('Meta Ads is not connected')] as $key => $msg) {
+            'vk_ads' => __('VK Ads is not connected')] as $key => $msg) {
             if (!empty($toggles[$key])) {
                 $warnings[] = $msg;
             }
@@ -1433,8 +1478,8 @@ class SeoReportsController extends Controller
                     ['label' => 'TOP-30', 'value' => 120, 'diff' => '+11'],
                 ],
                 'groups' => [
-                    ['id' => 1, 'name' => 'Коммерция', 'words' => 80],
-                    ['id' => 2, 'name' => 'Инфо', 'words' => 40],
+                    ['id' => 1, 'name' => 'Коммерция', 'words' => 80, 'top3' => 12, 'top10' => 28, 'top30' => 55, 'top100' => 72],
+                    ['id' => 2, 'name' => 'Инфо', 'words' => 40, 'top3' => 6, 'top10' => 14, 'top30' => 26, 'top100' => 35],
                 ],
                 'competitors' => [
                     'count' => 2,
@@ -1573,6 +1618,43 @@ class SeoReportsController extends Controller
             ->with('success', __('Access revoked'));
     }
 
+    public function assignTeam(Request $request, int $id): RedirectResponse
+    {
+        $project = $this->findOwnedProject($id);
+        if (!$project) {
+            return redirect()->route('pages.seo-reports')->with('error', __('Project not found'));
+        }
+        if (!SeoReportProject::teamColumnReady()) {
+            return redirect()
+                ->route('pages.seo-reports.show', ['id' => $project->id])
+                ->with('error', __('Teams are not available'));
+        }
+
+        $teamId = (int) $request->input('team_id', 0);
+        if ($teamId < 1) {
+            $project->team_id = null;
+            $project->save();
+
+            return redirect()
+                ->route('pages.seo-reports.show', ['id' => $project->id])
+                ->with('success', __('Team detached from report project'));
+        }
+
+        $team = app(SeoChecklistService::class)->findOwnedTeam((int) Auth::id(), $teamId);
+        if (!$team) {
+            return redirect()
+                ->route('pages.seo-reports.show', ['id' => $project->id])
+                ->with('error', __('Team not found'));
+        }
+
+        $project->team_id = $team->id;
+        $project->save();
+
+        return redirect()
+            ->route('pages.seo-reports.show', ['id' => $project->id])
+            ->with('success', __('Team assigned to report project'));
+    }
+
     /**
      * @param array<int, string> $exclude
      * @return array<int, string>
@@ -1612,8 +1694,20 @@ class SeoReportsController extends Controller
             if (is_array($import) && (!empty($import['queries']) || !empty($import['pages']) || !empty($import['kpis']))) {
                 return SeoReportSectionRegistry::SOURCE_STATUS_OK;
             }
+            $property = $source === 'gsc'
+                ? trim((string) ($settings['gsc_property'] ?? ''))
+                : trim((string) ($settings['webmaster_host'] ?? ''));
+            if ($property === '' && $source === 'webmaster') {
+                $property = (string) (SeoReportBindings::resolveWebmasterHost(
+                    (int) $project->user_id,
+                    (string) $project->domain
+                ) ?: '');
+            }
+            if ($property !== '') {
+                return SeoReportSectionRegistry::SOURCE_STATUS_OK;
+            }
         }
-        if (in_array($source, ['vk_ads', 'meta_ads', 'vk_smm'], true)) {
+        if (in_array($source, ['vk_ads', 'vk_smm'], true)) {
             $settings = method_exists($project, 'reportSettings') ? $project->reportSettings() : (is_array($project->settings_json) ? $project->settings_json : []);
             $import = $settings[$source . '_import'] ?? null;
             if (is_array($import) && (
@@ -1633,6 +1727,94 @@ class SeoReportsController extends Controller
         }
 
         return SeoReportSectionRegistry::SOURCE_STATUS_NOT_CONNECTED;
+    }
+
+    /**
+     * Куда вести пользователя, чтобы подключить источник.
+     *
+     * @return array{kind:string,label:string,url?:string,hint?:string}|null
+     */
+    private function sourceConnectAction(SeoReportProject $project, string $source, bool $canManage): ?array
+    {
+        $settingsUrl = static function (int $step) use ($project): string {
+            return route('pages.seo-reports.settings', ['id' => $project->id]) . '?step=' . $step;
+        };
+
+        if (in_array($source, ['manual', 'computed'], true)) {
+            return null;
+        }
+
+        // Ещё не готовые интеграции — не притворяемся, что «не подключено» можно починить сейчас.
+        if (in_array($source, ['gsc', 'direct', 'google_ads', 'vk_ads', 'vk_smm', 'calls'], true)) {
+            return [
+                'kind' => 'dev',
+                'label' => __('In development'),
+                'hint' => __('Connection will be available later'),
+            ];
+        }
+
+        if (!$canManage) {
+            return null;
+        }
+
+        if ($source === 'metrika') {
+            return [
+                'kind' => 'link',
+                'label' => $project->metrika_counter_id ? __('Change') : __('Connect'),
+                'url' => $settingsUrl(3),
+            ];
+        }
+        if ($source === 'monitoring') {
+            return [
+                'kind' => 'link',
+                'label' => $project->monitoring_project_id ? __('Change') : __('Connect'),
+                'url' => $settingsUrl(3),
+            ];
+        }
+        if ($source === 'webmaster') {
+            $settings = is_array($project->settings_json) ? $project->settings_json : [];
+            $has = trim((string) ($settings['webmaster_host'] ?? '')) !== '';
+
+            return [
+                'kind' => 'link',
+                'label' => $has ? __('Change') : __('Connect'),
+                'url' => $settingsUrl(4),
+            ];
+        }
+        if ($source === 'site_audit') {
+            return [
+                'kind' => 'link',
+                'label' => __('Open module'),
+                'url' => route('pages.site-audit'),
+            ];
+        }
+        if ($source === 'seo_checklist') {
+            return [
+                'kind' => 'link',
+                'label' => __('Open module'),
+                'url' => route('pages.seo-checklist'),
+            ];
+        }
+        if ($source === 'relevance') {
+            return [
+                'kind' => 'link',
+                'label' => __('Open module'),
+                'url' => route('relevance-analysis'),
+            ];
+        }
+        if ($source === 'site_monitoring') {
+            return [
+                'kind' => 'link',
+                'label' => __('Open module'),
+                'url' => route('site.monitoring'),
+            ];
+        }
+
+        return [
+            'kind' => 'link',
+            'label' => __('Settings'),
+            'url' => $settingsUrl(3),
+        ];
     }
 
     /**

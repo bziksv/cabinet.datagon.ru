@@ -12,39 +12,71 @@
         $hasTemplate = (int) ($project->template_id ?? 0) > 0;
         $hasMetrika = (int) ($project->metrika_counter_id ?? 0) > 0;
         $hasMonitoring = (int) ($project->monitoring_project_id ?? 0) > 0;
-        $hasGsc = trim((string) ($settings['gsc_property'] ?? '')) !== '';
         $hasWm = trim((string) ($settings['webmaster_host'] ?? '')) !== '';
-        $hasAds = trim((string) ($settings['vk_ads_token'] ?? '')) !== ''
-            || trim((string) ($settings['meta_ads_token'] ?? '')) !== ''
-            || trim((string) ($settings['vk_smm_token'] ?? '')) !== '';
         $hasEmail = !empty($settings['auto_email']) || trim((string) ($settings['auto_email_to'] ?? '')) !== '';
 
         $stepKinds = [
             1 => trim((string) ($project->title ?? '')) !== '' ? 'done' : 'needed',
             2 => $hasTemplate ? 'done' : 'needed',
             3 => ($hasMetrika || $hasMonitoring) ? 'done' : 'optional',
-            4 => ($hasGsc || $hasWm) ? 'done' : 'optional',
-            5 => $hasAds ? 'done' : 'optional',
+            // GSC пока в разработке — статус шага только по Я.Вебмастеру
+            4 => $hasWm ? 'done' : 'optional',
+            // Реклама / SMM / звонки — пока в разработке
+            5 => 'dev',
             6 => $hasEmail ? 'done' : 'optional',
         ];
         $stepLabels = [
             'done' => __('Step done'),
             'needed' => __('Step needed'),
             'optional' => __('Step optional'),
+            'dev' => __('In development'),
         ];
         $openStep = 1;
-        foreach ([1, 2, 3, 4, 5, 6] as $n) {
-            if (($stepKinds[$n] ?? '') === 'needed') {
-                $openStep = $n;
-                break;
+        $forcedStep = (int) request()->query('step', 0);
+        if ($forcedStep >= 1 && $forcedStep <= 6) {
+            $openStep = $forcedStep;
+        } else {
+            foreach ([1, 2, 3, 4, 5, 6] as $n) {
+                if (($stepKinds[$n] ?? '') === 'needed') {
+                    $openStep = $n;
+                    break;
+                }
             }
         }
+        $devModules = [
+            [
+                'title' => 'Google Search Console',
+                'hint' => __('GSC property in development hint'),
+                'step' => 4,
+            ],
+            [
+                'title' => 'Яндекс.Директ',
+                'hint' => __('Yandex Direct in development hint'),
+            ],
+            [
+                'title' => 'Google Ads',
+                'hint' => __('Google Ads in development hint'),
+            ],
+            [
+                'title' => 'VK Реклама',
+                'hint' => __('VK Ads in development hint'),
+            ],
+            [
+                'title' => 'VK / SMM',
+                'hint' => __('VK SMM in development hint'),
+            ],
+            [
+                'title' => 'Звонки',
+                'hint' => __('Calls in development hint'),
+            ],
+        ];
     @endphp
 
     <div class="cabinet-sr-page">
         @include('pages.partials.seo-reports-nav', [
             'srTab' => 'settings',
             'srContextProject' => $project,
+            'srCanEditSettings' => true,
         ])
 
         @if(session('success'))
@@ -194,16 +226,57 @@
                 </summary>
                 <div class="cabinet-sr-step__body">
                     <div class="mb-2">
-                        <label class="form-label">Google Search Console property</label>
-                        <input type="text" class="form-control form-control-sm" name="gsc_property"
-                               value="{{ old('gsc_property', $settings['gsc_property'] ?? '') }}"
-                               placeholder="sc-domain:example.com">
+                        <label class="form-label">
+                            Google Search Console property
+                            <span class="badge bg-secondary ms-1">{{ __('In development') }}</span>
+                        </label>
+                        <input type="text" class="form-control form-control-sm" disabled
+                               value="{{ $settings['gsc_property'] ?? '' }}"
+                               placeholder="sc-domain:example.com"
+                               aria-disabled="true">
+                        <div class="form-text">{{ __('GSC property in development hint') }}</div>
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-3"
+                         data-sr-webmaster
+                         data-domain="{{ $project->domain }}"
+                         data-webmaster-configured="{{ !empty($webmasterConfigured) ? '1' : '0' }}"
+                         data-webmaster-connected="{{ !empty($webmasterConnected) ? '1' : '0' }}"
+                         data-webmaster-connect-url="{{ route('yandex-webmaster.connect') }}"
+                         data-webmaster-binding-url="{{ route('yandex-webmaster.binding') }}"
+                         data-webmaster-hosts-url="{{ route('yandex-webmaster.hosts') }}"
+                         data-webmaster-bind-url="{{ route('yandex-webmaster.bind') }}"
+                         data-webmaster-unbind-url="{{ route('yandex-webmaster.unbind') }}"
+                         data-webmaster-return="{{ route('pages.seo-reports.settings', ['id' => $project->id]) }}">
                         <label class="form-label">{{ __('Yandex Webmaster host') }}</label>
-                        <input type="text" class="form-control form-control-sm" name="webmaster_host"
-                               value="{{ old('webmaster_host', $settings['webmaster_host'] ?? '') }}"
-                               placeholder="https:example.com:443">
+                        @php
+                            $selectedWm = old('webmaster_host', $settings['webmaster_host'] ?? '');
+                            $wmBindings = $webmasterBindings ?? collect();
+                            $selectedInList = $wmBindings->contains(static function ($b) use ($selectedWm) {
+                                return (string) $b->host_id === (string) $selectedWm;
+                            });
+                        @endphp
+                        <div class="d-flex flex-wrap gap-2 align-items-start mb-1">
+                            <div class="flex-grow-1" style="min-width: 12rem;">
+                                <select class="form-select form-select-sm" name="webmaster_host" data-sr-select2 data-sr-webmaster-select>
+                                    <option value="">{{ __('Not connected') }}</option>
+                                    @if($selectedWm !== '' && !$selectedInList)
+                                        <option value="{{ $selectedWm }}" selected>{{ $selectedWm }}</option>
+                                    @endif
+                                    @foreach($wmBindings as $binding)
+                                        <option value="{{ $binding->host_id }}"
+                                            @if((string) $selectedWm === (string) $binding->host_id) selected @endif>
+                                            {{ $binding->domain }}
+                                            @if($binding->host_url) · {{ $binding->host_url }}@endif
+                                            · {{ $binding->host_id }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" data-sr-webmaster-open>
+                                {{ __('Connect or change Webmaster') }}
+                            </button>
+                        </div>
+                        <div class="form-text">{{ __('Webmaster host connect from settings hint') }}</div>
                     </div>
                     <button type="button" class="btn btn-outline-primary btn-sm" data-sr-step-next="5">{{ __('Next step') }}</button>
                 </div>
@@ -213,39 +286,36 @@
                 <summary class="cabinet-sr-step__summary">
                     <span class="cabinet-sr-step__num">5</span>
                     <span class="cabinet-sr-step__text">
-                        <span class="cabinet-sr-step__title">{{ __('VK / Meta ads & community') }}</span>
-                        <span class="cabinet-sr-step__hint">{{ __('VK Meta API token hint') }}</span>
+                        <span class="cabinet-sr-step__title">
+                            {{ __('Ads, SMM and calls') }}
+                            <span class="badge bg-secondary ms-1">{{ __('In development') }}</span>
+                        </span>
+                        <span class="cabinet-sr-step__hint">{{ __('Settings step ads sources hint') }}</span>
                     </span>
                     <span class="cabinet-sr-step__status is-{{ $stepKinds[5] }}">{{ $stepLabels[$stepKinds[5]] }}</span>
                 </summary>
                 <div class="cabinet-sr-step__body">
-                    <div class="cabinet-sr-step__grid mb-3">
-                        <div>
-                            <label class="form-label">{{ __('VK Ads token') }}</label>
-                            <input type="text" class="form-control form-control-sm mb-2" name="vk_ads_token"
-                                   value="{{ old('vk_ads_token', $settings['vk_ads_token'] ?? '') }}" autocomplete="off">
-                            <label class="form-label">{{ __('VK Ads account') }}</label>
-                            <input type="text" class="form-control form-control-sm" name="vk_ads_account"
-                                   value="{{ old('vk_ads_account', $settings['vk_ads_account'] ?? '') }}">
-                        </div>
-                        <div>
-                            <label class="form-label">{{ __('Meta Ads token') }}</label>
-                            <input type="text" class="form-control form-control-sm mb-2" name="meta_ads_token"
-                                   value="{{ old('meta_ads_token', $settings['meta_ads_token'] ?? '') }}" autocomplete="off">
-                            <label class="form-label">{{ __('Meta Ads account') }}</label>
-                            <input type="text" class="form-control form-control-sm" name="meta_ads_account"
-                                   value="{{ old('meta_ads_account', $settings['meta_ads_account'] ?? '') }}">
-                        </div>
-                        <div>
-                            <label class="form-label">{{ __('VK community token') }}</label>
-                            <input type="text" class="form-control form-control-sm mb-2" name="vk_smm_token"
-                                   value="{{ old('vk_smm_token', $settings['vk_smm_token'] ?? '') }}" autocomplete="off">
-                            <label class="form-label">{{ __('VK community group ID') }}</label>
-                            <input type="text" class="form-control form-control-sm" name="vk_smm_group_id"
-                                   value="{{ old('vk_smm_group_id', $settings['vk_smm_group_id'] ?? '') }}"
-                                   placeholder="123456789">
-                        </div>
-                    </div>
+                    <p class="form-text mb-3">{{ __('Settings step ads sources body') }}</p>
+                    <ul class="cabinet-sr-dev-modules mb-3">
+                        @foreach($devModules as $mod)
+                            <li class="cabinet-sr-dev-modules__item">
+                                <div class="cabinet-sr-dev-modules__main">
+                                    <strong class="cabinet-sr-dev-modules__title">{{ $mod['title'] }}</strong>
+                                    <span class="cabinet-sr-dev-modules__badge">{{ __('In development') }}</span>
+                                    <span class="cabinet-sr-dev-modules__hint">{{ $mod['hint'] }}</span>
+                                </div>
+                                @if(!empty($mod['step']))
+                                    <button type="button"
+                                            class="btn btn-link btn-sm p-0"
+                                            data-sr-step-next="{{ $mod['step'] }}">
+                                        {{ __('Open step') }} {{ $mod['step'] }}
+                                    </button>
+                                @else
+                                    <span class="cabinet-sr-dev-modules__soon">{{ __('Soon') }}</span>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
                     <button type="button" class="btn btn-outline-primary btn-sm" data-sr-step-next="6">{{ __('Next step') }}</button>
                 </div>
             </details>
@@ -291,6 +361,47 @@
         </form>
     </div>
 
+    <div class="modal fade" id="cabinet-sr-webmaster-modal" tabindex="-1" aria-labelledby="cabinet-sr-webmaster-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="cabinet-sr-webmaster-modal-title">{{ __('Yandex Webmaster') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-secondary mb-2">
+                        {{ __('Choose Webmaster host for domain') }}:
+                        <strong data-webmaster-domain-label>—</strong>
+                    </p>
+                    <div data-webmaster-current class="alert alert-light border py-2 px-3 small d-none mb-3"></div>
+                    <div data-webmaster-loading class="text-secondary small py-3 d-none">{{ __('Loading Webmaster hosts') }}…</div>
+                    <div data-webmaster-error class="alert alert-danger py-2 px-3 small d-none"></div>
+                    <div data-webmaster-auth class="text-center py-3 d-none">
+                        <p class="mb-3">{{ __('Connect Yandex Webmaster to pick a host') }}</p>
+                        <a href="#" class="btn btn-primary" data-webmaster-auth-link>
+                            <i class="bi bi-box-arrow-in-right me-1" aria-hidden="true"></i>
+                            {{ __('Authorize Yandex Webmaster') }}
+                        </a>
+                    </div>
+                    <div data-webmaster-search-wrap class="mb-2 d-none">
+                        <input type="search"
+                               class="form-control form-control-sm"
+                               data-webmaster-search
+                               placeholder="{{ __('Search by site or host ID') }}"
+                               autocomplete="off">
+                    </div>
+                    <div class="list-group list-group-flush border rounded" data-webmaster-list style="max-height: 22rem; overflow: auto;"></div>
+                </div>
+                <div class="modal-footer justify-content-between">
+                    <button type="button" class="btn btn-outline-danger btn-sm d-none" data-webmaster-unbind>
+                        {{ __('Unbind Webmaster host') }}
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     @slot('js')
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script>
@@ -326,7 +437,6 @@
                     }
                 }
 
-                // Аккордеон: при открытии шага остальные сворачиваются
                 steps.forEach(function (el) {
                     el.addEventListener('toggle', function () {
                         if (!el.open) return;
@@ -342,6 +452,276 @@
                     e.preventDefault();
                     openStep(btn.getAttribute('data-sr-step-next'));
                 });
+
+                (function initWebmasterPicker() {
+                    var box = document.querySelector('[data-sr-webmaster]');
+                    var modalEl = document.getElementById('cabinet-sr-webmaster-modal');
+                    if (!box || !modalEl) return;
+
+                    var csrfEl = document.querySelector('meta[name="csrf-token"]');
+                    var csrfToken = csrfEl ? csrfEl.getAttribute('content') : '';
+                    var currentDomain = box.getAttribute('data-domain') || '';
+                    var allHosts = [];
+                    var selectedHostId = '';
+                    var listEl = modalEl.querySelector('[data-webmaster-list]');
+                    var loadingEl = modalEl.querySelector('[data-webmaster-loading]');
+                    var errorEl = modalEl.querySelector('[data-webmaster-error]');
+                    var authEl = modalEl.querySelector('[data-webmaster-auth]');
+                    var authLink = modalEl.querySelector('[data-webmaster-auth-link]');
+                    var domainLabel = modalEl.querySelector('[data-webmaster-domain-label]');
+                    var currentEl = modalEl.querySelector('[data-webmaster-current]');
+                    var unbindBtn = modalEl.querySelector('[data-webmaster-unbind]');
+                    var searchWrap = modalEl.querySelector('[data-webmaster-search-wrap]');
+                    var searchInput = modalEl.querySelector('[data-webmaster-search]');
+
+                    function showModal() {
+                        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                            return;
+                        }
+                        if (typeof $ !== 'undefined' && $.fn.modal) {
+                            $(modalEl).modal('show');
+                        }
+                    }
+
+                    function connectUrl(domain) {
+                        var base = box.getAttribute('data-webmaster-connect-url') || '';
+                        var ret = box.getAttribute('data-webmaster-return') || location.href;
+                        return base + (base.indexOf('?') === -1 ? '?' : '&') +
+                            'domain=' + encodeURIComponent(domain || '') +
+                            '&return=' + encodeURIComponent(ret);
+                    }
+
+                    function setError(msg) {
+                        if (!errorEl) return;
+                        errorEl.textContent = msg || '';
+                        errorEl.classList.toggle('d-none', !msg);
+                    }
+
+                    function setLoading(on) {
+                        if (loadingEl) loadingEl.classList.toggle('d-none', !on);
+                    }
+
+                    function setSearchVisible(on) {
+                        if (searchWrap) searchWrap.classList.toggle('d-none', !on);
+                        if (!on && searchInput) searchInput.value = '';
+                    }
+
+                    function filterHosts(hosts, query) {
+                        var q = String(query || '').trim().toLowerCase();
+                        if (!q) return hosts.slice();
+                        return hosts.filter(function (h) {
+                            var url = String(h.unicode_url || h.url || '').toLowerCase();
+                            var id = String(h.id || '').toLowerCase();
+                            var domain = String(h.domain || '').toLowerCase();
+                            return url.indexOf(q) !== -1 || id.indexOf(q) !== -1 || domain.indexOf(q) !== -1;
+                        });
+                    }
+
+                    function renderHosts(hosts, selectedId) {
+                        if (!listEl) return;
+                        listEl.innerHTML = '';
+                        if (!hosts.length) {
+                            listEl.innerHTML = '<div class="list-group-item text-secondary small">' +
+                                (allHosts.length
+                                    ? @json(__('No hosts match the search'))
+                                    : @json(__('No Webmaster hosts found'))) + '</div>';
+                            return;
+                        }
+                        hosts.forEach(function (h) {
+                            var btn = document.createElement('button');
+                            btn.type = 'button';
+                            btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-2';
+                            btn.setAttribute('data-webmaster-host-id', String(h.id));
+                            if (selectedId && String(selectedId) === String(h.id)) {
+                                btn.classList.add('active');
+                            }
+                            var title = String(h.unicode_url || h.url || h.id || '').replace(/</g, '&lt;');
+                            var meta = String(h.id || '').replace(/</g, '&lt;');
+                            if (h.verified) {
+                                meta += ' · ' + @json(__('Webmaster host verified'));
+                            }
+                            btn.innerHTML =
+                                '<span class="text-start">' +
+                                '<strong>' + title + '</strong>' +
+                                '<br><span class="small opacity-75">' + meta + '</span></span>' +
+                                '<span class="flex-shrink-0 align-self-center">' +
+                                (selectedId && String(selectedId) === String(h.id)
+                                    ? '<span class="badge text-bg-light text-dark border">' + @json(__('Selected')) + '</span>'
+                                    : '') +
+                                '</span>';
+                            btn.addEventListener('click', function () {
+                                bindHost(h.id);
+                            });
+                            listEl.appendChild(btn);
+                        });
+                    }
+
+                    function applyHostFilter() {
+                        renderHosts(
+                            filterHosts(allHosts, searchInput ? searchInput.value : ''),
+                            selectedHostId
+                        );
+                    }
+
+                    function openForDomain(domain) {
+                        currentDomain = domain || box.getAttribute('data-domain') || '';
+                        allHosts = [];
+                        selectedHostId = '';
+                        if (domainLabel) domainLabel.textContent = currentDomain || '—';
+                        if (authEl) authEl.classList.add('d-none');
+                        if (listEl) listEl.innerHTML = '';
+                        setSearchVisible(false);
+                        if (currentEl) {
+                            currentEl.classList.add('d-none');
+                            currentEl.textContent = '';
+                        }
+                        if (unbindBtn) unbindBtn.classList.add('d-none');
+                        setError('');
+                        setLoading(true);
+                        if (authLink) authLink.href = connectUrl(currentDomain);
+                        openStep(4);
+                        showModal();
+
+                        if (box.getAttribute('data-webmaster-configured') !== '1') {
+                            setLoading(false);
+                            setError(@json(__('Yandex Webmaster is not configured')));
+                            return;
+                        }
+
+                        var bindingUrl = box.getAttribute('data-webmaster-binding-url') +
+                            '?domain=' + encodeURIComponent(currentDomain);
+                        fetch(bindingUrl, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                            .then(function (r) { return r.json(); })
+                            .then(function (info) {
+                                if (!info || !info.ok) {
+                                    throw new Error('binding');
+                                }
+                                if (!info.configured) {
+                                    setLoading(false);
+                                    setError(@json(__('Yandex Webmaster is not configured')));
+                                    return null;
+                                }
+                                if (!info.connected) {
+                                    setLoading(false);
+                                    if (authEl) authEl.classList.remove('d-none');
+                                    return null;
+                                }
+                                if (info.binding && currentEl) {
+                                    currentEl.textContent = @json(__('Current Webmaster host')) + ': ' +
+                                        (info.binding.host_url || info.binding.host_id);
+                                    currentEl.classList.remove('d-none');
+                                    if (unbindBtn) unbindBtn.classList.remove('d-none');
+                                }
+                                return fetch(box.getAttribute('data-webmaster-hosts-url'), {
+                                    headers: { 'Accept': 'application/json' },
+                                    credentials: 'same-origin',
+                                }).then(function (r) {
+                                    return r.json().then(function (data) {
+                                        return { status: r.status, data: data, selected: info.binding && info.binding.host_id };
+                                    });
+                                });
+                            })
+                            .then(function (result) {
+                                setLoading(false);
+                                if (!result) return;
+                                if (result.status === 401 || (result.data && result.data.need_auth)) {
+                                    if (authEl) authEl.classList.remove('d-none');
+                                    return;
+                                }
+                                if (!result.data || !result.data.ok) {
+                                    setError((result.data && result.data.message) || @json(__('Could not load Webmaster hosts')));
+                                    return;
+                                }
+                                allHosts = result.data.hosts || [];
+                                selectedHostId = result.selected || '';
+                                setSearchVisible(allHosts.length > 0);
+                                applyHostFilter();
+                            })
+                            .catch(function () {
+                                setLoading(false);
+                                setError(@json(__('Could not load Webmaster hosts')));
+                            });
+                    }
+
+                    function bindHost(hostId) {
+                        setError('');
+                        setLoading(true);
+                        fetch(box.getAttribute('data-webmaster-bind-url'), {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ domain: currentDomain, host_id: hostId }),
+                        })
+                            .then(function (r) { return r.json(); })
+                            .then(function (data) {
+                                if (!data || !data.ok) {
+                                    throw new Error((data && data.message) || 'bind');
+                                }
+                                window.location.href = box.getAttribute('data-webmaster-return') || location.pathname;
+                            })
+                            .catch(function () {
+                                setLoading(false);
+                                setError(@json(__('Could not bind Webmaster host')));
+                            });
+                    }
+
+                    if (unbindBtn) {
+                        unbindBtn.addEventListener('click', function () {
+                            if (!currentDomain) return;
+                            setLoading(true);
+                            fetch(box.getAttribute('data-webmaster-unbind-url'), {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': csrfToken,
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                },
+                                credentials: 'same-origin',
+                                body: JSON.stringify({ domain: currentDomain }),
+                            })
+                                .then(function (r) { return r.json(); })
+                                .then(function (data) {
+                                    if (!data || !data.ok) throw new Error('unbind');
+                                    window.location.href = box.getAttribute('data-webmaster-return') || location.pathname;
+                                })
+                                .catch(function () {
+                                    setLoading(false);
+                                    setError(@json(__('Could not unbind Webmaster host')));
+                                });
+                        });
+                    }
+
+                    if (searchInput) {
+                        searchInput.addEventListener('input', applyHostFilter);
+                    }
+
+                    var openBtn = box.querySelector('[data-sr-webmaster-open]');
+                    if (openBtn) {
+                        openBtn.addEventListener('click', function () {
+                            openForDomain(box.getAttribute('data-domain') || '');
+                        });
+                    }
+
+                    try {
+                        var params = new URLSearchParams(window.location.search);
+                        if (params.get('webmaster_picker') === '1') {
+                            openForDomain(params.get('webmaster_domain') || box.getAttribute('data-domain') || '');
+                            if (window.history && window.history.replaceState) {
+                                params.delete('webmaster_picker');
+                                params.delete('webmaster_domain');
+                                var q = params.toString();
+                                window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : '') + window.location.hash);
+                            }
+                        }
+                    } catch (e) {}
+                })();
             })();
         </script>
     @endslot

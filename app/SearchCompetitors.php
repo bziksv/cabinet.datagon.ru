@@ -327,7 +327,7 @@ class SearchCompetitors extends Model
             return new Exception('competitors error: no regions');
         }
 
-        $this->updateProgressPercent(1, __('Processing the XML service response'));
+        $this->updateProgressPercent(1, __('Data processing'));
 
         $globalStepIndex = 0;
         $phrasesList = array_values(array_filter(array_map('trim', $this->phrases)));
@@ -368,7 +368,7 @@ class SearchCompetitors extends Model
                             'xml',
                             0.05
                         ),
-                        __('Processing the XML service response')
+                        __('Data processing')
                     );
 
                     $providerTick = 0;
@@ -384,7 +384,7 @@ class SearchCompetitors extends Model
                                 'xml',
                                 $part
                             ),
-                            __('Processing the XML service response')
+                            __('Data processing')
                         );
                     });
 
@@ -410,7 +410,7 @@ class SearchCompetitors extends Model
                             'xml',
                             1.0
                         ),
-                        __('Processing the XML service response')
+                        __('Data processing')
                     );
                 }
 

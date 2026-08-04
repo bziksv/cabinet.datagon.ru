@@ -900,6 +900,9 @@ class SeoChecklistService
     public function deleteTeam(SeoChecklistTeam $team): array
     {
         $inUse = SeoChecklistProject::query()->where('team_id', $team->id)->exists();
+        if (!$inUse && Schema::hasTable('seo_report_projects') && Schema::hasColumn('seo_report_projects', 'team_id')) {
+            $inUse = \App\SeoReports\SeoReportProject::query()->where('team_id', $team->id)->exists();
+        }
         if ($inUse) {
             return ['ok' => false, 'message' => __('Team is used by projects')];
         }

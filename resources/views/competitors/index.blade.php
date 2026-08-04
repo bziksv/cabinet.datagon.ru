@@ -144,7 +144,7 @@
                          aria-valuemin="0"
                          aria-valuemax="100">0%</div>
                 </div>
-                <div id="stage" class="text-muted small mt-2">{{ __('Processing the XML service response') }}</div>
+                <div id="stage" class="text-muted small mt-2">{{ __('Data processing') }}</div>
             </div>
 
             @include('competitors.partials.admin-debug-log', ['admin' => $admin ?? false])
@@ -1304,7 +1304,7 @@
                 $('#cabinet-ca-progress-percent').text(percent + '%');
 
                 if (percent < 30) {
-                    $('#stage').html("{{ __('Processing the XML service response') }}");
+                    $('#stage').html("{{ __('Data processing') }}");
                 } else if (percent <= 90) {
                     $('#stage').html("{{ __('Parse') }}");
                 } else {
@@ -1313,7 +1313,7 @@
             }
 
             function getXMLMessage() {
-                return "{{ __('Processing the XML service response') }}"
+                return "{{ __('Data processing') }}"
             }
 
             function stringGoToPage() {

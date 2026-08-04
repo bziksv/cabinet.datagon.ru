@@ -84,13 +84,14 @@
 
             if (sitesSection) {
                 var sitesMode = 'active';
-                var metrikaFilterOff = false;
+                var moduleFilter = null;
+                var metrikaFilter = null;
+                var webmasterFilter = null;
                 var sitesPage = 1;
                 var sitesSortKey = 'domain';
                 var sitesSortDir = 'asc';
                 var modeButtons = sitesSection.querySelectorAll('[data-sites-mode]');
                 var sitesInput = document.getElementById('cabinet-home-sites-search');
-                var metrikaFilterBtn = sitesSection.querySelector('[data-sites-filter-metrika="off"]');
                 var pagerEl = sitesSection.querySelector('[data-sites-pager]');
                 var pagerInfoEl = pagerEl ? pagerEl.querySelector('[data-sites-pager-info]') : null;
                 var pagerLabelEl = pagerEl ? pagerEl.querySelector('[data-sites-pager-label]') : null;
@@ -183,8 +184,31 @@
                     rows.forEach(function (row) {
                         var domain = (row.getAttribute('data-cabinet-site-domain') || '').toLowerCase();
                         var matchQ = q === '' || domain.indexOf(q) !== -1;
-                        var matchMetrika = !metrikaFilterOff || row.getAttribute('data-metrika-synced') !== '1';
-                        var match = matchQ && matchMetrika;
+                        var modulesCount = parseInt(row.getAttribute('data-sort-modules') || '0', 10) || 0;
+                        var modulesTotal = parseInt(row.getAttribute('data-modules-total') || '0', 10) || 0;
+                        var matchModule = true;
+                        if (moduleFilter === 'on') {
+                            // Есть зелёный кружок — сайт хотя бы в одном модуле
+                            matchModule = modulesCount > 0;
+                        } else if (moduleFilter === 'off') {
+                            // Есть красный кружок — хотя бы в одном модуле отсутствует
+                            matchModule = modulesTotal > 0 && modulesCount < modulesTotal;
+                        }
+                        var metrikaSynced = row.getAttribute('data-metrika-synced') === '1';
+                        var matchMetrika = true;
+                        if (metrikaFilter === 'on') {
+                            matchMetrika = metrikaSynced;
+                        } else if (metrikaFilter === 'off') {
+                            matchMetrika = !metrikaSynced;
+                        }
+                        var webmasterSynced = row.getAttribute('data-webmaster-synced') === '1';
+                        var matchWebmaster = true;
+                        if (webmasterFilter === 'on') {
+                            matchWebmaster = webmasterSynced;
+                        } else if (webmasterFilter === 'off') {
+                            matchWebmaster = !webmasterSynced;
+                        }
+                        var match = matchQ && matchModule && matchMetrika && matchWebmaster;
                         row.setAttribute('data-sites-match', match ? '1' : '0');
                         row.classList.add('is-hidden');
                         if (match) {
@@ -216,7 +240,7 @@
                         }
                     });
 
-                    var filtered = q !== '' || metrikaFilterOff;
+                    var filtered = q !== '' || moduleFilter || metrikaFilter || webmasterFilter;
                     var empty = document.getElementById('cabinet-home-sites-filter-empty');
                     var wrap = panel.querySelector('.cabinet-home-sites-table-wrap');
                     var panelEmpty = panel.querySelector('.cabinet-home-sites-empty');
@@ -296,14 +320,36 @@
                     });
                 });
 
-                if (metrikaFilterBtn) {
-                    metrikaFilterBtn.addEventListener('click', function () {
-                        metrikaFilterOff = !metrikaFilterOff;
-                        metrikaFilterBtn.classList.toggle('is-active', metrikaFilterOff);
-                        metrikaFilterBtn.setAttribute('aria-pressed', metrikaFilterOff ? 'true' : 'false');
-                        applySitesFilter(true);
+                function syncLegendFilterButtons() {
+                    [
+                        ['data-sites-filter-module', moduleFilter],
+                        ['data-sites-filter-metrika', metrikaFilter],
+                        ['data-sites-filter-webmaster', webmasterFilter]
+                    ].forEach(function (pair) {
+                        var attr = pair[0];
+                        var value = pair[1];
+                        sitesSection.querySelectorAll('[' + attr + ']').forEach(function (btn) {
+                            var active = value !== null && btn.getAttribute(attr) === value;
+                            btn.classList.toggle('is-active', active);
+                            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+                        });
                     });
                 }
+
+                function bindLegendFilter(attr, getValue, setValue) {
+                    sitesSection.querySelectorAll('[' + attr + ']').forEach(function (btn) {
+                        btn.addEventListener('click', function () {
+                            var next = btn.getAttribute(attr);
+                            setValue(getValue() === next ? null : next);
+                            syncLegendFilterButtons();
+                            applySitesFilter(true);
+                        });
+                    });
+                }
+
+                bindLegendFilter('data-sites-filter-module', function () { return moduleFilter; }, function (v) { moduleFilter = v; });
+                bindLegendFilter('data-sites-filter-metrika', function () { return metrikaFilter; }, function (v) { metrikaFilter = v; });
+                bindLegendFilter('data-sites-filter-webmaster', function () { return webmasterFilter; }, function (v) { webmasterFilter = v; });
 
                 if (pagerPrevBtn) {
                     pagerPrevBtn.addEventListener('click', function () {
@@ -1027,6 +1073,315 @@
                         if (window.history && window.history.replaceState) {
                             params.delete('metrika_picker');
                             params.delete('metrika_domain');
+                            var q = params.toString();
+                            window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : '') + window.location.hash);
+                        }
+                    }
+                } catch (e) {}
+            })();
+
+            // Яндекс.Вебмастер: клик по кружку → OAuth / выбор хоста
+            (function initWebmasterPicker() {
+                var root = document.getElementById('cabinet-home-sites');
+                var modalEl = document.getElementById('cabinet-webmaster-modal');
+                if (!root || !modalEl) {
+                    return;
+                }
+                var csrfEl = document.querySelector('meta[name="csrf-token"]');
+                var csrfToken = csrfEl ? csrfEl.getAttribute('content') : '';
+                var currentDomain = '';
+                var allHosts = [];
+                var selectedHostId = '';
+                var listEl = modalEl.querySelector('[data-webmaster-list]');
+                var loadingEl = modalEl.querySelector('[data-webmaster-loading]');
+                var errorEl = modalEl.querySelector('[data-webmaster-error]');
+                var authEl = modalEl.querySelector('[data-webmaster-auth]');
+                var authLink = modalEl.querySelector('[data-webmaster-auth-link]');
+                var domainLabel = modalEl.querySelector('[data-webmaster-domain-label]');
+                var currentEl = modalEl.querySelector('[data-webmaster-current]');
+                var unbindBtn = modalEl.querySelector('[data-webmaster-unbind]');
+                var searchWrap = modalEl.querySelector('[data-webmaster-search-wrap]');
+                var searchInput = modalEl.querySelector('[data-webmaster-search]');
+
+                function showModal() {
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                        return;
+                    }
+                    if (typeof $ !== 'undefined' && $.fn.modal) {
+                        $(modalEl).modal('show');
+                    }
+                }
+
+                function connectUrl(domain) {
+                    var base = root.getAttribute('data-webmaster-connect-url') || '';
+                    var ret = root.getAttribute('data-webmaster-return') || location.href;
+                    return base + (base.indexOf('?') === -1 ? '?' : '&') +
+                        'domain=' + encodeURIComponent(domain || '') +
+                        '&return=' + encodeURIComponent(ret);
+                }
+
+                function setError(msg) {
+                    if (!errorEl) return;
+                    errorEl.textContent = msg || '';
+                    errorEl.classList.toggle('d-none', !msg);
+                }
+
+                function setLoading(on) {
+                    if (loadingEl) loadingEl.classList.toggle('d-none', !on);
+                }
+
+                function setSearchVisible(on) {
+                    if (searchWrap) searchWrap.classList.toggle('d-none', !on);
+                    if (!on && searchInput) searchInput.value = '';
+                }
+
+                function filterHosts(hosts, query) {
+                    var q = String(query || '').trim().toLowerCase();
+                    if (!q) return hosts.slice();
+                    return hosts.filter(function (h) {
+                        var url = String(h.unicode_url || h.url || '').toLowerCase();
+                        var id = String(h.id || '').toLowerCase();
+                        var domain = String(h.domain || '').toLowerCase();
+                        return url.indexOf(q) !== -1 || id.indexOf(q) !== -1 || domain.indexOf(q) !== -1;
+                    });
+                }
+
+                function renderHosts(hosts, selectedId) {
+                    if (!listEl) return;
+                    listEl.innerHTML = '';
+                    if (!hosts.length) {
+                        listEl.innerHTML = '<div class="list-group-item text-secondary small">' +
+                            (allHosts.length
+                                ? @json(__('No hosts match the search'))
+                                : @json(__('No Webmaster hosts found'))) + '</div>';
+                        return;
+                    }
+                    hosts.forEach(function (h) {
+                        var btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-2';
+                        btn.setAttribute('data-webmaster-host-id', String(h.id));
+                        if (selectedId && String(selectedId) === String(h.id)) {
+                            btn.classList.add('active');
+                        }
+                        var title = String(h.unicode_url || h.url || h.id || '').replace(/</g, '&lt;');
+                        var meta = String(h.id || '').replace(/</g, '&lt;');
+                        if (h.verified) {
+                            meta += ' · ' + @json(__('Webmaster host verified'));
+                        }
+                        btn.innerHTML =
+                            '<span class="text-start">' +
+                            '<strong>' + title + '</strong>' +
+                            '<br><span class="small opacity-75">' + meta + '</span></span>' +
+                            '<span class="cabinet-metrika-counter-status flex-shrink-0 align-self-center">' +
+                            (selectedId && String(selectedId) === String(h.id)
+                                ? '<span class="badge text-bg-light text-dark border">' + @json(__('Selected')) + '</span>'
+                                : '') +
+                            '</span>';
+                        btn.addEventListener('click', function () {
+                            bindHost(h.id, btn);
+                        });
+                        listEl.appendChild(btn);
+                    });
+                }
+
+                function applyHostFilter() {
+                    renderHosts(
+                        filterHosts(allHosts, searchInput ? searchInput.value : ''),
+                        selectedHostId
+                    );
+                }
+
+                function setBindingBusy(busy, activeBtn) {
+                    if (searchInput) {
+                        searchInput.disabled = !!busy;
+                    }
+                    if (unbindBtn) {
+                        unbindBtn.disabled = !!busy;
+                    }
+                    if (!listEl) return;
+                    listEl.querySelectorAll('button[data-webmaster-host-id]').forEach(function (btn) {
+                        var isActive = busy && activeBtn && btn === activeBtn;
+                        btn.disabled = !!busy && !isActive;
+                        btn.classList.toggle('cabinet-metrika-counter--dimmed', !!busy && !isActive);
+                        btn.setAttribute('aria-busy', isActive ? 'true' : 'false');
+                        if (!busy) {
+                            btn.classList.remove('cabinet-metrika-counter--binding', 'cabinet-metrika-counter--dimmed');
+                            btn.removeAttribute('aria-busy');
+                            var status = btn.querySelector('.cabinet-metrika-counter-status');
+                            if (status && status.getAttribute('data-binding') === '1') {
+                                status.removeAttribute('data-binding');
+                                status.innerHTML = String(btn.getAttribute('data-webmaster-host-id')) === String(selectedHostId)
+                                    ? '<span class="badge text-bg-light text-dark border">' + @json(__('Selected')) + '</span>'
+                                    : '';
+                            }
+                        }
+                    });
+                    if (busy && activeBtn) {
+                        activeBtn.classList.add('cabinet-metrika-counter--binding');
+                        activeBtn.classList.remove('active');
+                        var statusEl = activeBtn.querySelector('.cabinet-metrika-counter-status');
+                        if (statusEl) {
+                            statusEl.setAttribute('data-binding', '1');
+                            statusEl.innerHTML =
+                                '<span class="cabinet-metrika-binding-label">' +
+                                '<span class="cabinet-metrika-spinner" aria-hidden="true"></span>' +
+                                @json(__('Linking Webmaster host')) +
+                                '…</span>';
+                        }
+                    }
+                    if (typeof window.__cabinetHomeSitesFloatUpdate === 'function') {
+                        window.__cabinetHomeSitesFloatUpdate();
+                    }
+                }
+
+                function openForDomain(domain) {
+                    currentDomain = domain || '';
+                    allHosts = [];
+                    selectedHostId = '';
+                    if (domainLabel) domainLabel.textContent = currentDomain || '—';
+                    if (authEl) authEl.classList.add('d-none');
+                    if (listEl) listEl.innerHTML = '';
+                    setSearchVisible(false);
+                    if (currentEl) {
+                        currentEl.classList.add('d-none');
+                        currentEl.textContent = '';
+                    }
+                    if (unbindBtn) unbindBtn.classList.add('d-none');
+                    setError('');
+                    setLoading(true);
+                    if (authLink) authLink.href = connectUrl(currentDomain);
+                    showModal();
+
+                    var bindingUrl = root.getAttribute('data-webmaster-binding-url') +
+                        '?domain=' + encodeURIComponent(currentDomain);
+                    fetch(bindingUrl, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+                        .then(function (r) { return r.json(); })
+                        .then(function (info) {
+                            if (!info || !info.ok) {
+                                throw new Error('binding');
+                            }
+                            if (!info.configured) {
+                                setLoading(false);
+                                setError(@json(__('Yandex Webmaster is not configured')));
+                                return null;
+                            }
+                            if (!info.connected) {
+                                setLoading(false);
+                                if (authEl) authEl.classList.remove('d-none');
+                                return null;
+                            }
+                            if (info.binding && currentEl) {
+                                currentEl.textContent = @json(__('Current Webmaster host')) + ': ' +
+                                    (info.binding.host_url || info.binding.host_id);
+                                currentEl.classList.remove('d-none');
+                                if (unbindBtn) unbindBtn.classList.remove('d-none');
+                            }
+                            return fetch(root.getAttribute('data-webmaster-hosts-url'), {
+                                headers: { 'Accept': 'application/json' },
+                                credentials: 'same-origin',
+                            }).then(function (r) {
+                                return r.json().then(function (data) {
+                                    return { status: r.status, data: data, selected: info.binding && info.binding.host_id };
+                                });
+                            });
+                        })
+                        .then(function (result) {
+                            setLoading(false);
+                            if (!result) return;
+                            if (result.status === 401 || (result.data && result.data.need_auth)) {
+                                if (authEl) authEl.classList.remove('d-none');
+                                return;
+                            }
+                            if (!result.data || !result.data.ok) {
+                                setError((result.data && result.data.message) || @json(__('Could not load Webmaster hosts')));
+                                return;
+                            }
+                            allHosts = result.data.hosts || [];
+                            selectedHostId = result.selected || '';
+                            setSearchVisible(allHosts.length > 0);
+                            applyHostFilter();
+                        })
+                        .catch(function () {
+                            setLoading(false);
+                            setError(@json(__('Could not load Webmaster hosts')));
+                        });
+                }
+
+                function bindHost(hostId, btn) {
+                    setError('');
+                    setBindingBusy(true, btn || null);
+                    fetch(root.getAttribute('data-webmaster-bind-url'), {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ domain: currentDomain, host_id: hostId }),
+                    })
+                        .then(function (r) { return r.json(); })
+                        .then(function (data) {
+                            if (!data || !data.ok) {
+                                throw new Error((data && data.message) || 'bind');
+                            }
+                            window.location.reload();
+                        })
+                        .catch(function () {
+                            setBindingBusy(false);
+                            setError(@json(__('Could not bind Webmaster host')));
+                        });
+                }
+
+                if (unbindBtn) {
+                    unbindBtn.addEventListener('click', function () {
+                        if (!currentDomain) return;
+                        setLoading(true);
+                        fetch(root.getAttribute('data-webmaster-unbind-url'), {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest',
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ domain: currentDomain }),
+                        })
+                            .then(function (r) { return r.json(); })
+                            .then(function (data) {
+                                if (!data || !data.ok) throw new Error('unbind');
+                                window.location.reload();
+                            })
+                            .catch(function () {
+                                setLoading(false);
+                                setError(@json(__('Could not unbind Webmaster host')));
+                            });
+                    });
+                }
+
+                if (searchInput) {
+                    searchInput.addEventListener('input', applyHostFilter);
+                }
+
+                root.addEventListener('click', function (event) {
+                    var btn = event.target.closest('[data-cabinet-webmaster-dot]');
+                    if (!btn) return;
+                    event.preventDefault();
+                    openForDomain(btn.getAttribute('data-domain') || '');
+                });
+
+                try {
+                    var params = new URLSearchParams(window.location.search);
+                    if (params.get('webmaster_picker') === '1') {
+                        var d = params.get('webmaster_domain') || '';
+                        openForDomain(d);
+                        if (window.history && window.history.replaceState) {
+                            params.delete('webmaster_picker');
+                            params.delete('webmaster_domain');
                             var q = params.toString();
                             window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : '') + window.location.hash);
                         }

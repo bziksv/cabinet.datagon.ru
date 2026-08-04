@@ -11,6 +11,31 @@ define('LARAVEL_START', microtime(true));
 
 /*
 |--------------------------------------------------------------------------
+| Static DB outage page (no Laravel / no MySQL)
+|--------------------------------------------------------------------------
+|
+| Prod: nginx also checks this flag. Local / PHP-FPM: catch here before boot.
+|
+*/
+$outageFlag = __DIR__ . '/../storage/app/outage/ENABLED';
+if (is_file($outageFlag)) {
+    http_response_code(503);
+    header('Content-Type: text/html; charset=UTF-8');
+    header('Retry-After: 300');
+    header('Cache-Control: no-store');
+    $outageHtml = __DIR__ . '/outage.html';
+    if (is_readable($outageHtml)) {
+        readfile($outageHtml);
+    } else {
+        echo '<!DOCTYPE html><html lang="ru"><meta charset="utf-8"><title>Технические работы</title>'
+            . '<body style="font-family:sans-serif;padding:2rem"><h1>Кабинет временно недоступен</h1>'
+            . '<p><a href="mailto:info@titlo.ru">info@titlo.ru</a></p></body></html>';
+    }
+    exit;
+}
+
+/*
+|--------------------------------------------------------------------------
 | Register The Auto Loader
 |--------------------------------------------------------------------------
 |

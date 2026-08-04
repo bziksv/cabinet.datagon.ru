@@ -2,6 +2,7 @@
 
 namespace App\Exceptions;
 
+use App\Support\OutagePage;
 use Exception;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
@@ -50,6 +51,15 @@ class Handler extends ExceptionHandler
      */
     public function render($request, Exception $exception)
     {
+        if (OutagePage::isDatabaseUnavailable($exception)) {
+            // Локально нет nginx — ставим флаг, чтобы следующие запросы не ждали таймаут БД.
+            if (!OutagePage::isEnabled()) {
+                OutagePage::enable($exception->getMessage());
+            }
+
+            return OutagePage::response();
+        }
+
         return parent::render($request, $exception);
     }
 }

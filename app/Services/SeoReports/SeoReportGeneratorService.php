@@ -32,18 +32,23 @@ class SeoReportGeneratorService
     /** @var SeoReportExternalAdsCollector */
     private $externalAds;
 
+    /** @var SeoReportWebmasterCollector */
+    private $webmasterCollector;
+
     public function __construct(
         YandexMetrikaService $metrika,
         SeoReportPositionsCollector $positionsCollector,
         SeoReportInsightsBuilder $insights,
         SeoReportTitloModulesCollector $titloModules,
-        SeoReportExternalAdsCollector $externalAds
+        SeoReportExternalAdsCollector $externalAds,
+        SeoReportWebmasterCollector $webmasterCollector
     ) {
         $this->metrika = $metrika;
         $this->positionsCollector = $positionsCollector;
         $this->insights = $insights;
         $this->titloModules = $titloModules;
         $this->externalAds = $externalAds;
+        $this->webmasterCollector = $webmasterCollector;
     }
 
     /**
@@ -80,6 +85,8 @@ class SeoReportGeneratorService
                 'titlo_relevance' => null,
                 'titlo_uptime' => null,
                 'work_facts' => [],
+                'work_done' => null,
+                'work_plan' => null,
                 'scorecard' => [],
                 'insights' => [],
                 'progress' => [],
@@ -239,7 +246,7 @@ class SeoReportGeneratorService
                     continue;
                 }
 
-                if (in_array($key, ['vk_ads', 'meta_ads', 'vk_smm'], true)) {
+                if (in_array($key, ['vk_ads', 'vk_smm'], true)) {
                     $sourcesTried++;
                     $ext = $this->externalAds->collect($key, $project, $report);
                     $snapshot['progress'][$key] = $ext['progress'];
@@ -297,21 +304,17 @@ class SeoReportGeneratorService
                     continue;
                 }
 
-                if ($source === 'gsc' || $source === 'webmaster') {
+                if ($source === 'gsc') {
                     $settings = $project->reportSettings();
                     $importKey = $source . '_import';
                     $import = is_array($settings[$importKey] ?? null) ? $settings[$importKey] : null;
-                    $hasProperty = $source === 'gsc'
-                        ? trim((string) ($settings['gsc_property'] ?? '')) !== ''
-                        : trim((string) ($settings['webmaster_host'] ?? '')) !== '';
+                    $hasProperty = trim((string) ($settings['gsc_property'] ?? '')) !== '';
                     if ($import && (!empty($import['queries']) || !empty($import['pages']) || !empty($import['kpis']))) {
                         $sourcesTried++;
                         $sourcesOk++;
                         $snapshot[$key] = [
                             'source' => 'import',
-                            'property' => $source === 'gsc'
-                                ? ($settings['gsc_property'] ?? null)
-                                : ($settings['webmaster_host'] ?? null),
+                            'property' => $settings['gsc_property'] ?? null,
                             'imported_at' => $import['imported_at'] ?? null,
                             'kpis' => $import['kpis'] ?? [],
                             'queries' => $import['queries'] ?? [],
@@ -329,13 +332,31 @@ class SeoReportGeneratorService
                         $sectionStates[$key] = [
                             'enabled' => true,
                             'source_status' => SeoReportSectionRegistry::SOURCE_STATUS_NOT_CONNECTED,
-                            'message' => $source === 'gsc'
-                                ? ($hasProperty
-                                    ? __('Connect Google Search Console OAuth')
-                                    : __('Google Search Console is not connected'))
-                                : ($hasProperty
-                                    ? __('Connect Yandex Webmaster OAuth')
-                                    : __('Yandex Webmaster is not connected')),
+                            'message' => $hasProperty
+                                ? __('Connect Google Search Console OAuth')
+                                : __('Google Search Console is not connected'),
+                        ];
+                    }
+                    continue;
+                }
+
+                if ($source === 'webmaster') {
+                    $sourcesTried++;
+                    $wm = $this->webmasterCollector->collect($project, $report);
+                    $snapshot['progress']['webmaster'] = $wm['progress'];
+                    if (!empty($wm['ok']) && is_array($wm['data'] ?? null)) {
+                        $sourcesOk++;
+                        $snapshot[$key] = $wm['data'];
+                        $sectionStates[$key] = [
+                            'enabled' => true,
+                            'source_status' => $wm['status'],
+                            'message' => $wm['message'] ?? null,
+                        ];
+                    } else {
+                        $sectionStates[$key] = [
+                            'enabled' => true,
+                            'source_status' => $wm['status'] ?? SeoReportSectionRegistry::SOURCE_STATUS_NOT_CONNECTED,
+                            'message' => $wm['message'] ?? __('Yandex Webmaster is not connected'),
                         ];
                     }
                     continue;
@@ -429,10 +450,31 @@ class SeoReportGeneratorService
                 }
             }
 
-            if (trim((string) $report->work_done_text) === '' && !empty($snapshot['work_facts'])) {
-                $report->work_done_text = implode("\n", array_map(static function ($f) {
-                    return '• ' . $f;
-                }, $snapshot['work_facts']));
+            // «Выполненные работы» / «План работ»: задачи из SEO-чеклиста + ручной текст менеджера (в UI отдельно).
+            if (!empty($toggles['work_done']) || !empty($toggles['work_plan'])) {
+                $workFromChecklist = $this->titloModules->collectWorkFromChecklist(
+                    (int) $project->user_id,
+                    (string) $project->domain,
+                    $report->period_from,
+                    $report->period_to
+                );
+                if (!empty($workFromChecklist['ok']) && is_array($workFromChecklist['data'] ?? null)) {
+                    $wd = $workFromChecklist['data'];
+                    $meta = [
+                        'checklist_project_id' => (int) ($wd['project_id'] ?? 0),
+                        'open_url' => (string) ($wd['open_url'] ?? ''),
+                    ];
+                    if (!empty($toggles['work_done'])) {
+                        $snapshot['work_done'] = $meta + [
+                            'from_checklist' => is_array($wd['closed'] ?? null) ? $wd['closed'] : [],
+                        ];
+                    }
+                    if (!empty($toggles['work_plan'])) {
+                        $snapshot['work_plan'] = $meta + [
+                            'from_checklist' => is_array($wd['plan'] ?? null) ? $wd['plan'] : [],
+                        ];
+                    }
+                }
             }
 
             $comments = is_array($report->comments_json) ? $report->comments_json : [];
@@ -1465,7 +1507,6 @@ class SeoReportGeneratorService
             'direct' => __('Yandex Direct is not connected — open settings after OAuth is available'),
             'google_ads' => __('Google Ads is not connected — cabinet OAuth will be added later'),
             'vk_ads' => __('VK Ads is not connected'),
-            'meta_ads' => __('Meta Ads is not connected'),
             'vk_smm' => __('VK community is not connected'),
             'calls' => __('Call tracking is not connected'),
         ];

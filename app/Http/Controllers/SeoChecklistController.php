@@ -107,6 +107,10 @@ class SeoChecklistController extends Controller
 
         return view('pages.seo-checklist-my-tasks', [
             'plan' => $plan,
+            'filterProjects' => $this->service->accessibleProjectsQuery($userId)
+                ->where('status', 'active')
+                ->orderBy('domain')
+                ->get(['id', 'domain', 'title']),
             'roleLabels' => $this->roleLabels(),
             'statusLabels' => $this->statusLabels(),
             'projectsCount' => $projectsCount,

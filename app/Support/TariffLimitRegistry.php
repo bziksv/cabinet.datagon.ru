@@ -152,7 +152,7 @@ class TariffLimitRegistry
             ],
             [
                 'code' => 'SeoReportProjects',
-                'module' => __('SEO Reports'),
+                'module' => __('Reports'),
                 'hint' => __('Number of active SEO report projects. Add values in tariff settings to enforce.'),
                 'enforcement' => self::ENFORCEMENT_STRICT,
             ],

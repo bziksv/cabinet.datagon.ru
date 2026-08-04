@@ -546,17 +546,43 @@
     </div>
 @endif
 
-@if($report->work_done_text)
+@php
+    $workDoneItems = is_array($snapshot['work_done']['from_checklist'] ?? null) ? $snapshot['work_done']['from_checklist'] : [];
+    $workPlanItems = is_array($snapshot['work_plan']['from_checklist'] ?? null) ? $snapshot['work_plan']['from_checklist'] : [];
+@endphp
+@if($workDoneItems !== [] || $report->work_done_text)
     <div class="section">
         <h2>Выполненные работы</h2>
-        <div class="prose">{{ $report->work_done_text }}</div>
+        @if($workDoneItems !== [])
+            <div class="meta">Из SEO-чеклиста</div>
+            <ul>
+                @foreach($workDoneItems as $item)
+                    <li>{{ $item['title'] ?? '—' }}@if(!empty($item['done_at'])) — {{ \Carbon\Carbon::parse($item['done_at'])->format('d.m.Y') }}@endif</li>
+                @endforeach
+            </ul>
+        @endif
+        @if($report->work_done_text)
+            @if($workDoneItems !== [])<div class="meta">Комментарий менеджера</div>@endif
+            <div class="prose">{{ $report->work_done_text }}</div>
+        @endif
     </div>
 @endif
 
-@if($report->work_plan_text)
+@if($workPlanItems !== [] || $report->work_plan_text)
     <div class="section">
         <h2>План работ</h2>
-        <div class="prose">{{ $report->work_plan_text }}</div>
+        @if($workPlanItems !== [])
+            <div class="meta">Из SEO-чеклиста</div>
+            <ul>
+                @foreach($workPlanItems as $item)
+                    <li>{{ $item['title'] ?? '—' }}@if(!empty($item['due_at'])) — {{ \Carbon\Carbon::parse($item['due_at'])->format('d.m.Y') }}@endif</li>
+                @endforeach
+            </ul>
+        @endif
+        @if($report->work_plan_text)
+            @if($workPlanItems !== [])<div class="meta">Комментарий менеджера</div>@endif
+            <div class="prose">{{ $report->work_plan_text }}</div>
+        @endif
     </div>
 @endif
 

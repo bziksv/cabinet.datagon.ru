@@ -102,15 +102,18 @@
                        autocomplete="off">
                 <div class="cabinet-sr-builder__metrics-list">
                     @foreach($sectionMetrics as $metric)
-                        <label class="cabinet-sr-builder__metric" data-sr-metric data-label="{{ $metric['label'] }}">
-                            <input type="hidden" name="metric_toggles[{{ $key }}][{{ $metric['key'] }}]" value="0">
-                            <input type="checkbox"
-                                   name="metric_toggles[{{ $key }}][{{ $metric['key'] }}]"
-                                   value="1"
-                                   data-sr-metric-cb
-                                @if(!empty($metricToggles[$key][$metric['key']])) checked @endif>
-                            <span>{{ $metric['label'] }}</span>
-                        </label>
+                        <div class="cabinet-sr-builder__metric" data-sr-metric data-label="{{ $metric['label'] }}">
+                            <label class="cabinet-sr-builder__metric-main">
+                                <input type="hidden" name="metric_toggles[{{ $key }}][{{ $metric['key'] }}]" value="0">
+                                <input type="checkbox"
+                                       name="metric_toggles[{{ $key }}][{{ $metric['key'] }}]"
+                                       value="1"
+                                       data-sr-metric-cb
+                                    @if(!empty($metricToggles[$key][$metric['key']])) checked @endif>
+                                <span>{{ $metric['label'] }}</span>
+                            </label>
+                            @include('pages.partials.seo-reports-metric-look-tip', ['metric' => $metric])
+                        </div>
                     @endforeach
                 </div>
                 <p class="cabinet-sr-builder__metrics-empty" data-sr-metrics-empty hidden>{{ __('No metrics match') }}</p>

@@ -75,6 +75,7 @@
 
         return $fmtNum($value);
     };
+    $trafficHeroShown = false;
 @endphp
 
 <div class="cabinet-sr-report {{ count($toc) > 1 ? 'cabinet-sr-report--with-toc' : '' }}"
@@ -168,42 +169,86 @@
     </section>
 
     @if(!empty($scorecard))
-        <section class="cabinet-sr-scorecard" id="sr-scorecard">
-            @foreach($scorecard as $card)
-                @php
-                    $cardKey = (string) ($card['key'] ?? '');
-                    $cardKpi = is_array($traffic['kpis'][$cardKey] ?? null) ? $traffic['kpis'][$cardKey] : null;
-                    $cardPrev = $cardKpi['prev'] ?? null;
-                    $cardCur = $cardKpi['value'] ?? null;
-                @endphp
-                <div class="cabinet-sr-kpi">
-                    <div class="cabinet-sr-kpi__label">
-                        <span class="cabinet-sr-tip" title="{{ __('Metric tip: :name', ['name' => $card['label']]) }}">{{ $card['label'] }}</span>
-                    </div>
-                    <div class="cabinet-sr-kpi__value">{{ $card['value'] }}</div>
-                    @include('pages.partials.seo-reports-kpi-compare', [
-                        'curValue' => $cardCur,
-                        'prevValue' => $cardPrev,
-                        'prevDisplay' => $cardPrev !== null && $cardKey !== ''
-                            ? $fmtKpiMetric($cardKey, $cardPrev)
-                            : null,
-                        'deltaDisplay' => !empty($card['delta']) ? $card['delta'] : null,
-                        'deltaClass' => $card['delta_class'] ?? '',
-                    ])
-                    @if($cardKey === 'visits' && !empty($traffic['series_users']))
-                        <div class="cabinet-sr-spark cabinet-sr-spark--mini" aria-hidden="true">
-                            @php
-                                $vals = array_values($traffic['series_users']);
-                                $max = max(1, max($vals ?: [1]));
-                            @endphp
-                            @foreach(array_slice($vals, -14) as $v)
-                                <span style="height: {{ max(4, (int) round(28 * $v / $max)) }}px"></span>
-                            @endforeach
+        @php
+            $scoreHasTrafficCompare = false;
+            foreach (['users', 'visits', 'pageviews'] as $tk) {
+                if (($traffic['kpis'][$tk]['prev'] ?? null) !== null) {
+                    $scoreHasTrafficCompare = true;
+                    break;
+                }
+            }
+            $scoreExtra = collect($scorecard)->filter(static function ($card) {
+                return !in_array((string) ($card['key'] ?? ''), ['visits', 'users', 'pageviews'], true);
+            })->values();
+        @endphp
+        @if($scoreHasTrafficCompare && is_array($traffic))
+            @include('pages.partials.seo-reports-traffic-hero')
+            @php $trafficHeroShown = true; @endphp
+            @if($scoreExtra->isNotEmpty())
+                <section class="cabinet-sr-scorecard cabinet-sr-scorecard--extra" id="sr-scorecard">
+                    @foreach($scoreExtra as $card)
+                        @php
+                            $cardKey = (string) ($card['key'] ?? '');
+                            $cardKpi = is_array($traffic['kpis'][$cardKey] ?? null) ? $traffic['kpis'][$cardKey] : null;
+                            $cardPrev = $cardKpi['prev'] ?? null;
+                            $cardCur = $cardKpi['value'] ?? null;
+                        @endphp
+                        <div class="cabinet-sr-kpi">
+                            <div class="cabinet-sr-kpi__label">
+                                <span class="cabinet-sr-tip" title="{{ __('Metric tip: :name', ['name' => $card['label']]) }}">{{ $card['label'] }}</span>
+                            </div>
+                            @include('pages.partials.seo-reports-kpi-compare', [
+                                'curValue' => $cardCur !== null ? $cardCur : null,
+                                'prevValue' => $cardPrev,
+                                'curDisplay' => $card['value'] ?? '—',
+                                'prevDisplay' => $cardPrev !== null && $cardKey !== ''
+                                    ? $fmtKpiMetric($cardKey, $cardPrev)
+                                    : null,
+                                'deltaDisplay' => !empty($card['delta']) ? $card['delta'] : null,
+                                'deltaClass' => $card['delta_class'] ?? '',
+                            ])
                         </div>
-                    @endif
-                </div>
-            @endforeach
-        </section>
+                    @endforeach
+                </section>
+            @endif
+        @else
+            <section class="cabinet-sr-scorecard" id="sr-scorecard">
+                @foreach($scorecard as $card)
+                    @php
+                        $cardKey = (string) ($card['key'] ?? '');
+                        $cardKpi = is_array($traffic['kpis'][$cardKey] ?? null) ? $traffic['kpis'][$cardKey] : null;
+                        $cardPrev = $cardKpi['prev'] ?? null;
+                        $cardCur = $cardKpi['value'] ?? null;
+                    @endphp
+                    <div class="cabinet-sr-kpi">
+                        <div class="cabinet-sr-kpi__label">
+                            <span class="cabinet-sr-tip" title="{{ __('Metric tip: :name', ['name' => $card['label']]) }}">{{ $card['label'] }}</span>
+                        </div>
+                        @include('pages.partials.seo-reports-kpi-compare', [
+                            'curValue' => $cardCur !== null ? $cardCur : null,
+                            'prevValue' => $cardPrev,
+                            'curDisplay' => $card['value'] ?? '—',
+                            'prevDisplay' => $cardPrev !== null && $cardKey !== ''
+                                ? $fmtKpiMetric($cardKey, $cardPrev)
+                                : null,
+                            'deltaDisplay' => !empty($card['delta']) ? $card['delta'] : null,
+                            'deltaClass' => $card['delta_class'] ?? '',
+                        ])
+                        @if($cardKey === 'visits' && !empty($traffic['series_users']))
+                            <div class="cabinet-sr-spark cabinet-sr-spark--mini" aria-hidden="true">
+                                @php
+                                    $vals = array_values($traffic['series_users']);
+                                    $max = max(1, max($vals ?: [1]));
+                                @endphp
+                                @foreach(array_slice($vals, -14) as $v)
+                                    <span style="height: {{ max(4, (int) round(28 * $v / $max)) }}px"></span>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </section>
+        @endif
     @endif
 
     @if(!empty($kpiGoalsEval))
@@ -261,7 +306,15 @@
             if ($confirmedOnly && $isPublic && in_array($key, ['summary', 'work_done', 'work_plan'], true)) {
                 $textField = $key === 'summary' ? $report->summary_text
                     : ($key === 'work_done' ? $report->work_done_text : $report->work_plan_text);
-                if (trim((string) $textField) === '' && empty($insights) && empty($snapshot['recommendations'])) {
+                $checklistItems = is_array($snapshot[$key]['from_checklist'] ?? null)
+                    ? $snapshot[$key]['from_checklist']
+                    : [];
+                $hasChecklist = $checklistItems !== [];
+                if ($key === 'summary') {
+                    if (trim((string) $textField) === '' && empty($insights) && empty($snapshot['recommendations'])) {
+                        continue;
+                    }
+                } elseif (trim((string) $textField) === '' && !$hasChecklist) {
                     continue;
                 }
             }
@@ -294,12 +347,16 @@
                     <p class="small text-secondary mb-0">{{ __('Placeholder: manual content will appear here') }}</p>
                 @endif
             @elseif($key === 'traffic' && is_array($traffic))
-                @if(!empty($traffic['scope_label']) && ($traffic['mode'] ?? 'all') !== 'all')
+                @php
+                    $trafficMode = (string) ($traffic['mode'] ?? 'all');
+                    $isSearchOnlyTraffic = $trafficMode === 'search_only';
+                @endphp
+                @if(!empty($traffic['scope_label']) && $trafficMode !== 'all')
                     <p class="cabinet-sr-traffic-scope-note">
                         {{ __('Traffic KPI scope') }}:
                         <strong>{{ $traffic['scope_label'] }}</strong>
                     </p>
-                @elseif(($traffic['mode'] ?? 'all') === 'search_only')
+                @elseif($isSearchOnlyTraffic)
                     <p class="cabinet-sr-traffic-scope-note">
                         {{ __('Traffic KPI scope') }}:
                         <strong>{{ __('Traffic mode search only') }}</strong>
@@ -316,45 +373,79 @@
                             break;
                         }
                     }
+                    $trafficVolumeKeys = ['users', 'visits', 'pageviews'];
+                    $trafficQualityKeys = ['page_depth', 'avg_visit_duration', 'bounce_rate'];
                 @endphp
                 @if($trafficHasCompare)
-                    <div class="cabinet-sr-compare-legend cabinet-sr-compare-only">
-                        <span class="is-prev">{{ __('Previous period') }}</span>
-                        <span class="is-cur">{{ __('Report period') }}</span>
+                    @if(empty($trafficHeroShown))
+                        @include('pages.partials.seo-reports-traffic-hero')
+                        @php $trafficHeroShown = true; @endphp
+                    @endif
+                    {{-- Остальные KPI (если вдруг не вошли в hero) --}}
+                    <div class="cabinet-sr-kpi-grid mt-3">
+                        @foreach($kpiLabels as $metric => $label)
+                            @continue(!$metricOn('traffic', $metric))
+                            @continue(in_array($metric, array_merge($trafficVolumeKeys, $trafficQualityKeys), true))
+                            @php
+                                $kpi = $traffic['kpis'][$metric] ?? null;
+                                $value = $kpi['value'] ?? null;
+                                $prev = $kpi['prev'] ?? null;
+                                $delta = $kpi['delta_pct'] ?? null;
+                                $display = $fmtKpiMetric($metric, $value);
+                                $deltaClass = '';
+                                if ($delta !== null) {
+                                    $deltaClass = $delta > 0 ? 'is-up' : ($delta < 0 ? 'is-down' : '');
+                                }
+                            @endphp
+                            <div class="cabinet-sr-kpi">
+                                <div class="cabinet-sr-kpi__label">{{ $label }}</div>
+                                @include('pages.partials.seo-reports-kpi-compare', [
+                                    'curValue' => $value,
+                                    'prevValue' => $prev,
+                                    'curDisplay' => $display,
+                                    'prevDisplay' => $prev !== null ? $fmtKpiMetric($metric, $prev) : null,
+                                    'deltaDisplay' => $delta !== null
+                                        ? (($delta > 0 ? '+' : '') . $fmtNum($delta, 1) . '%')
+                                        : null,
+                                    'deltaClass' => $deltaClass,
+                                ])
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="cabinet-sr-kpi-grid">
+                        @foreach($kpiLabels as $metric => $label)
+                            @continue(!$metricOn('traffic', $metric))
+                            @php
+                                $kpi = $traffic['kpis'][$metric] ?? null;
+                                $value = $kpi['value'] ?? null;
+                                $prev = $kpi['prev'] ?? null;
+                                $delta = $kpi['delta_pct'] ?? null;
+                                $display = $fmtKpiMetric($metric, $value);
+                                $deltaClass = '';
+                                if ($delta !== null) {
+                                    $deltaClass = $delta > 0 ? 'is-up' : ($delta < 0 ? 'is-down' : '');
+                                    if ($metric === 'bounce_rate') {
+                                        $deltaClass = $delta < 0 ? 'is-up' : ($delta > 0 ? 'is-down' : '');
+                                    }
+                                }
+                            @endphp
+                            <div class="cabinet-sr-kpi">
+                                <div class="cabinet-sr-kpi__label">{{ $label }}</div>
+                                @include('pages.partials.seo-reports-kpi-compare', [
+                                    'curValue' => $value,
+                                    'prevValue' => $prev,
+                                    'curDisplay' => $display,
+                                    'prevDisplay' => $prev !== null ? $fmtKpiMetric($metric, $prev) : null,
+                                    'deltaDisplay' => $delta !== null
+                                        ? (($delta > 0 ? '+' : '') . $fmtNum($delta, 1) . '%')
+                                        : null,
+                                    'deltaClass' => $deltaClass,
+                                ])
+                            </div>
+                        @endforeach
                     </div>
                 @endif
-                <div class="cabinet-sr-kpi-grid">
-                    @foreach($kpiLabels as $metric => $label)
-                        @continue(!$metricOn('traffic', $metric))
-                        @php
-                            $kpi = $traffic['kpis'][$metric] ?? null;
-                            $value = $kpi['value'] ?? null;
-                            $prev = $kpi['prev'] ?? null;
-                            $delta = $kpi['delta_pct'] ?? null;
-                            $display = $fmtKpiMetric($metric, $value);
-                            $deltaClass = '';
-                            if ($delta !== null) {
-                                $deltaClass = $delta > 0 ? 'is-up' : ($delta < 0 ? 'is-down' : '');
-                                if ($metric === 'bounce_rate') {
-                                    $deltaClass = $delta < 0 ? 'is-up' : ($delta > 0 ? 'is-down' : '');
-                                }
-                            }
-                        @endphp
-                        <div class="cabinet-sr-kpi">
-                            <div class="cabinet-sr-kpi__label">{{ $label }}</div>
-                            <div class="cabinet-sr-kpi__value">{{ $display }}</div>
-                            @include('pages.partials.seo-reports-kpi-compare', [
-                                'curValue' => $value,
-                                'prevValue' => $prev,
-                                'prevDisplay' => $prev !== null ? $fmtKpiMetric($metric, $prev) : null,
-                                'deltaDisplay' => $delta !== null
-                                    ? (($delta > 0 ? '+' : '') . $fmtNum($delta, 1) . '%')
-                                    : null,
-                                'deltaClass' => $deltaClass,
-                            ])
-                        </div>
-                    @endforeach
-                </div>
 
                 @php
                     $trafficComment = $comments['traffic'] ?? ($traffic['auto_comment'] ?? null);
@@ -364,19 +455,11 @@
                 @endif
 
                 @if(!empty($traffic['series_users']) && $metricOn('traffic', 'series_users'))
-                    <div class="cabinet-sr-spark mt-3">
-                        @php
-                            $seriesUsers = $traffic['series_users'];
-                            $vals = array_values($seriesUsers);
-                            $dates = array_keys($seriesUsers);
-                            $max = max(1, max($vals ?: [1]));
-                        @endphp
-                        @foreach($vals as $idx => $v)
-                            <span title="{{ $dates[$idx] ?? '' }}: {{ $fmtNum($v) }}"
-                                  style="height: {{ max(8, (int) round(48 * $v / $max)) }}px"></span>
-                        @endforeach
-                    </div>
-                    <p class="small text-secondary mb-0 mt-1">{{ __('Users by day') }}</p>
+                    @include('pages.partials.seo-reports-day-chart', [
+                        'series' => $traffic['series_users'],
+                        'title' => __('Users by day'),
+                        'unitLabel' => __('Users'),
+                    ])
                 @endif
 
                 @if(!empty($traffic['channels']) && $metricOn('traffic', 'channels'))
@@ -406,18 +489,21 @@
                         </table>
                     </div>
                     @if(!empty($traffic['channels']))
-                        <div class="cabinet-sr-bars mt-2">
-                            @php $maxCh = max(1, max(array_column($traffic['channels'], 'visits') ?: [1])); @endphp
-                            @foreach(array_slice($traffic['channels'], 0, 6) as $row)
-                                <div class="cabinet-sr-bars__row">
-                                    <span>{{ $metrikaLabel($row['name'] ?? '', $row['id'] ?? null) }}</span>
-                                    <div class="cabinet-sr-bars__track">
-                                        <i style="width: {{ max(4, (int) round(100 * ($row['visits'] ?? 0) / $maxCh)) }}%"></i>
-                                        <b>{{ $fmtNum($row['visits'] ?? 0) }}</b>
+                        @php $channelCount = count($traffic['channels']); @endphp
+                        @if($channelCount > 1)
+                            <div class="cabinet-sr-bars mt-2">
+                                @php $maxCh = max(1, max(array_column($traffic['channels'], 'visits') ?: [1])); @endphp
+                                @foreach(array_slice($traffic['channels'], 0, 6) as $row)
+                                    <div class="cabinet-sr-bars__row">
+                                        <span>{{ $metrikaLabel($row['name'] ?? '', $row['id'] ?? null) }}</span>
+                                        <div class="cabinet-sr-bars__track">
+                                            <i style="width: {{ max(4, (int) round(100 * ($row['visits'] ?? 0) / $maxCh)) }}%"></i>
+                                            <b>{{ $fmtNum($row['visits'] ?? 0) }}</b>
+                                        </div>
                                     </div>
-                                </div>
-                            @endforeach
-                        </div>
+                                @endforeach
+                            </div>
+                        @endif
                     @endif
                 @endif
 
@@ -472,66 +558,84 @@
 
                 @php $search = $traffic['search'] ?? null; @endphp
                 @if(is_array($search) && $metricOn('traffic', 'search'))
-                    <h3 class="h6 mt-3">{{ __('Search traffic') }}</h3>
-                    <div class="cabinet-sr-kpi-grid">
-                        @foreach(['visits' => __('Visits'), 'users' => __('Users'), 'bounce_rate' => __('Bounce rate'), 'page_depth' => __('Page depth')] as $metric => $label)
-                            @php
-                                $kpi = $search['kpis'][$metric] ?? null;
-                                $value = $kpi['value'] ?? null;
-                                $prev = $kpi['prev'] ?? null;
-                                $delta = $kpi['delta_pct'] ?? null;
-                                $display = $fmtKpiMetric($metric, $value);
-                                $deltaClass = '';
-                                if ($delta !== null) {
-                                    $deltaClass = $delta > 0 ? 'is-up' : ($delta < 0 ? 'is-down' : '');
-                                    if ($metric === 'bounce_rate') {
-                                        $deltaClass = $delta < 0 ? 'is-up' : ($delta > 0 ? 'is-down' : '');
+                    <h3 class="h6 mt-3">
+                        {{ $isSearchOnlyTraffic ? __('Search engines share') : __('Search traffic') }}
+                    </h3>
+                    {{-- При режиме «только поиск» KPI/график по дням дублируют блок выше — показываем доли ПС --}}
+                    @if(!$isSearchOnlyTraffic)
+                        <div class="cabinet-sr-kpi-grid">
+                            @foreach(['visits' => __('Visits'), 'users' => __('Users'), 'bounce_rate' => __('Bounce rate'), 'page_depth' => __('Page depth')] as $metric => $label)
+                                @php
+                                    $kpi = $search['kpis'][$metric] ?? null;
+                                    $value = $kpi['value'] ?? null;
+                                    $prev = $kpi['prev'] ?? null;
+                                    $delta = $kpi['delta_pct'] ?? null;
+                                    $display = $fmtKpiMetric($metric, $value);
+                                    $deltaClass = '';
+                                    if ($delta !== null) {
+                                        $deltaClass = $delta > 0 ? 'is-up' : ($delta < 0 ? 'is-down' : '');
+                                        if ($metric === 'bounce_rate') {
+                                            $deltaClass = $delta < 0 ? 'is-up' : ($delta > 0 ? 'is-down' : '');
+                                        }
                                     }
-                                }
-                            @endphp
-                            <div class="cabinet-sr-kpi">
-                                <div class="cabinet-sr-kpi__label">{{ $label }}</div>
-                                <div class="cabinet-sr-kpi__value">{{ $display }}</div>
-                                @include('pages.partials.seo-reports-kpi-compare', [
-                                    'curValue' => $value,
-                                    'prevValue' => $prev,
-                                    'prevDisplay' => $prev !== null ? $fmtKpiMetric($metric, $prev) : null,
-                                    'deltaDisplay' => $delta !== null
-                                        ? (($delta > 0 ? '+' : '') . $fmtNum($delta, 1) . '%')
-                                        : null,
-                                    'deltaClass' => $deltaClass,
-                                ])
-                            </div>
-                        @endforeach
-                    </div>
-                    @if(!empty($search['series_visits']))
-                        <div class="cabinet-sr-spark mt-2" aria-hidden="true">
-                            @php
-                                $vals = array_values($search['series_visits']);
-                                $max = max(1, max($vals ?: [1]));
-                            @endphp
-                            @foreach($vals as $v)
-                                <span style="height: {{ max(8, (int) round(48 * $v / $max)) }}px"></span>
+                                @endphp
+                                <div class="cabinet-sr-kpi">
+                                    <div class="cabinet-sr-kpi__label">{{ $label }}</div>
+                                    <div class="cabinet-sr-kpi__value">{{ $display }}</div>
+                                    @include('pages.partials.seo-reports-kpi-compare', [
+                                        'curValue' => $value,
+                                        'prevValue' => $prev,
+                                        'prevDisplay' => $prev !== null ? $fmtKpiMetric($metric, $prev) : null,
+                                        'deltaDisplay' => $delta !== null
+                                            ? (($delta > 0 ? '+' : '') . $fmtNum($delta, 1) . '%')
+                                            : null,
+                                        'deltaClass' => $deltaClass,
+                                    ])
+                                </div>
                             @endforeach
                         </div>
-                        <p class="small text-secondary mb-0 mt-1">{{ __('Search visits by day') }}</p>
+                        @if(!empty($search['series_visits']))
+                            @include('pages.partials.seo-reports-day-chart', [
+                                'series' => $search['series_visits'],
+                                'title' => __('Search visits by day'),
+                                'unitLabel' => __('Visits'),
+                            ])
+                        @endif
                     @endif
                     @if(!empty($search['engines']))
+                        @php
+                            $engineSlices = [];
+                            foreach ($search['engines'] as $row) {
+                                $engineSlices[] = [
+                                    'label' => (string) ($row['name'] ?? '—'),
+                                    'value' => (float) ($row['visits'] ?? 0),
+                                ];
+                            }
+                            $engineTotal = max(1, (int) array_sum(array_column($search['engines'], 'visits')));
+                        @endphp
+                        @include('pages.partials.seo-reports-donut-chart', [
+                            'slices' => $engineSlices,
+                            'title' => __('Search engines share'),
+                            'unitLabel' => __('Visits'),
+                        ])
                         <div class="table-responsive mt-2">
                             <table class="cabinet-sr-data-table">
                                 <thead>
                                 <tr>
                                     <th>{{ __('Search engine') }}</th>
                                     <th>{{ __('Visits') }}</th>
+                                    <th>{{ __('Traffic share') }}</th>
                                     <th>{{ __('Bounce rate') }}</th>
                                     <th>{{ __('Compare') }}</th>
                                 </tr>
                                 </thead>
                                 <tbody>
                                 @foreach($search['engines'] as $row)
+                                    @php $ev = (int) ($row['visits'] ?? 0); @endphp
                                     <tr>
                                         <td>{{ $row['name'] }}</td>
-                                        <td>{{ $fmtNum($row['visits'] ?? 0) }}</td>
+                                        <td>{{ $fmtNum($ev) }}</td>
+                                        <td>{{ $fmtNum(100 * $ev / $engineTotal, 1) }}%</td>
                                         <td>{{ $fmtNum($row['bounce_rate'] ?? 0, 1) }}%</td>
                                         <td>
                                             @if(isset($row['visits_delta_pct']) && $row['visits_delta_pct'] !== null)
@@ -552,12 +656,28 @@
 
                 @if(!empty($traffic['devices']) && $metricOn('traffic', 'devices'))
                     <h3 class="h6 mt-3">{{ __('Devices') }}</h3>
-                    <div class="table-responsive">
+                    @php
+                        $deviceSlices = [];
+                        foreach (array_slice($traffic['devices'], 0, 8) as $row) {
+                            $deviceSlices[] = [
+                                'label' => $metrikaLabel($row['name'] ?? '', $row['id'] ?? null),
+                                'value' => (float) ($row['visits'] ?? 0),
+                            ];
+                        }
+                        $devTotal = max(1, (int) array_sum(array_column($traffic['devices'], 'visits')));
+                    @endphp
+                    @include('pages.partials.seo-reports-donut-chart', [
+                        'slices' => $deviceSlices,
+                        'title' => __('Devices share'),
+                        'unitLabel' => __('Visits'),
+                    ])
+                    <div class="table-responsive mt-2">
                         <table class="cabinet-sr-data-table">
                             <thead>
                             <tr>
                                 <th>{{ __('Device') }}</th>
                                 <th>{{ __('Visits') }}</th>
+                                <th>{{ __('Traffic share') }}</th>
                                 <th>{{ __('Bounce rate') }}</th>
                                 <th>{{ __('Page depth') }}</th>
                                 <th>{{ __('Avg. visit duration') }}</th>
@@ -565,9 +685,11 @@
                             </thead>
                             <tbody>
                             @foreach($traffic['devices'] as $row)
+                                @php $devVisits = (int) ($row['visits'] ?? 0); @endphp
                                 <tr>
                                     <td>{{ $metrikaLabel($row['name'] ?? '', $row['id'] ?? null) }}</td>
-                                    <td>{{ $fmtNum($row['visits'] ?? 0) }}</td>
+                                    <td>{{ $fmtNum($devVisits) }}</td>
+                                    <td>{{ $fmtNum(100 * $devVisits / $devTotal, 1) }}%</td>
                                     <td>{{ $fmtNum($row['bounce_rate'] ?? 0, 1) }}%</td>
                                     <td>{{ $fmtNum($row['page_depth'] ?? 0, 2) }}</td>
                                     <td>{{ $fmtDur($row['avg_visit_duration'] ?? 0) }}</td>
@@ -575,18 +697,6 @@
                             @endforeach
                             </tbody>
                         </table>
-                    </div>
-                    <div class="cabinet-sr-bars mt-2">
-                        @php $maxDev = max(1, max(array_column($traffic['devices'], 'visits') ?: [1])); @endphp
-                        @foreach(array_slice($traffic['devices'], 0, 6) as $row)
-                            <div class="cabinet-sr-bars__row">
-                                <span>{{ $metrikaLabel($row['name'] ?? '', $row['id'] ?? null) }}</span>
-                                <div class="cabinet-sr-bars__track">
-                                    <i style="width: {{ max(4, (int) round(100 * ($row['visits'] ?? 0) / $maxDev)) }}%"></i>
-                                    <b>{{ $fmtNum($row['visits'] ?? 0) }}</b>
-                                </div>
-                            </div>
-                        @endforeach
                     </div>
                 @endif
 
@@ -917,13 +1027,34 @@
                             <tr>
                                 <th>{{ __('Group') }}</th>
                                 <th>{{ __('Queries') }}</th>
+                                <th>TOP-3</th>
+                                <th>TOP-10</th>
+                                <th>TOP-30</th>
+                                <th>TOP-100</th>
                             </tr>
                             </thead>
                             <tbody>
                             @foreach($positions['groups'] as $g)
+                                @php $gw = max(1, (int) ($g['words'] ?? 0)); @endphp
                                 <tr>
                                     <td>{{ $g['name'] ?? '—' }}</td>
                                     <td>{{ $fmtNum($g['words'] ?? 0) }}</td>
+                                    <td>
+                                        {{ $fmtNum($g['top3'] ?? 0) }}
+                                        <span class="text-secondary small">({{ $fmtNum(100 * ((int) ($g['top3'] ?? 0)) / $gw, 0) }}%)</span>
+                                    </td>
+                                    <td>
+                                        {{ $fmtNum($g['top10'] ?? 0) }}
+                                        <span class="text-secondary small">({{ $fmtNum(100 * ((int) ($g['top10'] ?? 0)) / $gw, 0) }}%)</span>
+                                    </td>
+                                    <td>
+                                        {{ $fmtNum($g['top30'] ?? 0) }}
+                                        <span class="text-secondary small">({{ $fmtNum(100 * ((int) ($g['top30'] ?? 0)) / $gw, 0) }}%)</span>
+                                    </td>
+                                    <td>
+                                        {{ $fmtNum($g['top100'] ?? 0) }}
+                                        <span class="text-secondary small">({{ $fmtNum(100 * ((int) ($g['top100'] ?? 0)) / $gw, 0) }}%)</span>
+                                    </td>
                                 </tr>
                             @endforeach
                             </tbody>
@@ -1258,18 +1389,11 @@
                     </div>
                 @endif
                 @if(!empty($direct['series_visits']) && $metricOn('direct', 'series_visits'))
-                    <div class="cabinet-sr-spark mt-3">
-                        @php
-                            $vals = array_values($direct['series_visits']);
-                            $dates = array_keys($direct['series_visits']);
-                            $max = max(1, max($vals ?: [1]));
-                        @endphp
-                        @foreach($vals as $idx => $v)
-                            <span title="{{ $dates[$idx] ?? '' }}: {{ $fmtNum($v) }}"
-                                  style="height: {{ max(8, (int) round(48 * $v / $max)) }}px"></span>
-                        @endforeach
-                    </div>
-                    <p class="small text-secondary mb-0 mt-1">{{ __('Ad visits by day') }}</p>
+                    @include('pages.partials.seo-reports-day-chart', [
+                        'series' => $direct['series_visits'],
+                        'title' => __('Ad visits by day'),
+                        'unitLabel' => __('Visits'),
+                    ])
                 @endif
                 @if(!empty($direct['engines']) && $metricOn('direct', 'engines'))
                     <h3 class="h6 mt-3">{{ __('Ad engines') }}</h3>
@@ -1470,6 +1594,93 @@
                         </table>
                     </div>
                 @endif
+                @if($key === 'webmaster' && !empty($sc['diagnostics']) && $metricOn('webmaster', 'diagnostics'))
+                    <h3 class="h6 mt-3">{{ __('Webmaster diagnostics errors') }}</h3>
+                    <div class="table-responsive">
+                        <table class="cabinet-sr-data-table">
+                            <thead>
+                            <tr>
+                                <th>{{ __('Severity') }}</th>
+                                <th>{{ __('Problem') }}</th>
+                                <th>{{ __('Updated') }}</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach($sc['diagnostics'] as $problem)
+                                <tr>
+                                    <td>
+                                        <span class="cabinet-sr-badge @if(($problem['severity'] ?? '') === 'FATAL') cabinet-sr-badge--warn @elseif(($problem['severity'] ?? '') === 'CRITICAL') cabinet-sr-badge--warn @else cabinet-sr-badge--manual @endif">
+                                            {{ $problem['severity'] ?? '—' }}
+                                        </span>
+                                    </td>
+                                    <td>{{ $problem['label'] ?? ($problem['code'] ?? '—') }}</td>
+                                    <td class="cabinet-sr-table__muted">
+                                        @if(!empty($problem['last_state_update']))
+                                            {{ \Illuminate\Support\Str::limit(str_replace('T', ' ', (string) $problem['last_state_update']), 19, '') }}
+                                        @else
+                                            —
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+                @if($key === 'webmaster' && !empty($sc['meta_duplicates']) && $metricOn('webmaster', 'meta_duplicates'))
+                    <h3 class="h6 mt-3">{{ __('Webmaster meta duplicates') }}</h3>
+                    <ul class="cabinet-sr-plain-list">
+                        @foreach($sc['meta_duplicates'] as $problem)
+                            <li>
+                                <strong>{{ $problem['label'] ?? ($problem['code'] ?? '—') }}</strong>
+                                <span class="text-secondary">· {{ $problem['severity'] ?? '' }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+                @if($key === 'webmaster' && $metricOn('webmaster', 'filtered_pages') && is_array($sc['filtered_pages'] ?? null))
+                    @php $fp = $sc['filtered_pages']; @endphp
+                    @if(!empty($fp['summary']))
+                        <h3 class="h6 mt-3">{{ __('Webmaster filtered pages') }}</h3>
+                        <div class="cabinet-sr-kpi-grid">
+                            @foreach(array_slice($fp['summary'], 0, 8) as $row)
+                                <div class="cabinet-sr-kpi @if(($row['status'] ?? '') === 'LOW_QUALITY') is-warn @endif">
+                                    <div class="cabinet-sr-kpi__label">{{ $row['label'] ?? ($row['status'] ?? '—') }}</div>
+                                    <div class="cabinet-sr-kpi__value">{{ $fmtNum($row['count'] ?? 0) }}</div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                    @if(!empty($fp['low_quality']))
+                        <h3 class="h6 mt-3">{{ __('Low-quality / low-value pages') }}</h3>
+                        <div class="table-responsive">
+                            <table class="cabinet-sr-data-table">
+                                <thead>
+                                <tr>
+                                    <th>{{ __('URL') }}</th>
+                                    <th>{{ __('Title') }}</th>
+                                    <th>{{ __('Date') }}</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                @foreach(array_slice($fp['low_quality'], 0, 30) as $row)
+                                    <tr>
+                                        <td class="cabinet-sr-url">{{ $row['url'] ?? '—' }}</td>
+                                        <td>{{ $row['title'] ?? '—' }}</td>
+                                        <td class="cabinet-sr-table__muted">
+                                            @if(!empty($row['event_date']))
+                                                {{ \Illuminate\Support\Str::limit(str_replace('T', ' ', (string) $row['event_date']), 16, '') }}
+                                            @else
+                                                —
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                @endif
             @elseif($key === 'google_ads' && is_array($snapshot['google_ads'] ?? null))
                 @php $gads = $snapshot['google_ads']; @endphp
                 @if(!empty($gads['note']))
@@ -1554,7 +1765,7 @@
                         </table>
                     </div>
                 @endif
-            @elseif(in_array($key, ['vk_ads', 'meta_ads'], true) && is_array($snapshot[$key] ?? null))
+            @elseif($key === 'vk_ads' && is_array($snapshot[$key] ?? null))
                 @php $ads = $snapshot[$key]; $ak = $ads['kpis'] ?? []; @endphp
                 @if(!empty($ads['note']))
                     <p class="small text-secondary">{{ $ads['note'] }}</p>
@@ -1743,7 +1954,7 @@
                         </table>
                     </div>
                 @endif
-            @elseif(in_array($key, ['gsc', 'webmaster', 'direct', 'google_ads', 'vk_ads', 'meta_ads', 'vk_smm', 'calls'], true))
+            @elseif(in_array($key, ['gsc', 'webmaster', 'direct', 'google_ads', 'vk_ads', 'vk_smm', 'calls'], true))
                 <p class="small text-secondary mb-0">
                     {{ $section['message'] ?? __('Not connected') }}
                     @if(!$isPublic)
@@ -1754,16 +1965,65 @@
                     <p class="cabinet-sr-comment mt-2">{{ $comments[$key] }}</p>
                 @endif
             @elseif($key === 'work_done')
+                @php
+                    $workDoneSnap = is_array($snapshot['work_done'] ?? null) ? $snapshot['work_done'] : [];
+                    $workDoneItems = is_array($workDoneSnap['from_checklist'] ?? null) ? $workDoneSnap['from_checklist'] : [];
+                @endphp
+                @if($workDoneItems !== [])
+                    <h3 class="h6">{{ __('From SEO checklist') }}</h3>
+                    <ul class="cabinet-sr-bullets">
+                        @foreach($workDoneItems as $item)
+                            <li>
+                                {{ $item['title'] ?? '—' }}
+                                @if(!empty($item['done_at']))
+                                    <span class="text-secondary small">· {{ \Carbon\Carbon::parse($item['done_at'])->format('d.m.Y') }}</span>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
                 @if($report->work_done_text)
+                    @if($workDoneItems !== [])
+                        <h3 class="h6 mt-3">{{ __('Manager notes') }}</h3>
+                    @endif
                     <div class="cabinet-sr-prose">{!! nl2br(e($report->work_done_text)) !!}</div>
-                @else
+                @elseif($workDoneItems === [])
                     <p class="small text-secondary mb-0">{{ __('Placeholder: manual content will appear here') }}</p>
                 @endif
+                @if(!empty($workDoneSnap['open_url']) && !$isPublic)
+                    <p class="small mt-2 mb-0"><a href="{{ $workDoneSnap['open_url'] }}">{{ __('Open source project') }}</a></p>
+                @endif
             @elseif($key === 'work_plan')
+                @php
+                    $workPlanSnap = is_array($snapshot['work_plan'] ?? null) ? $snapshot['work_plan'] : [];
+                    $workPlanItems = is_array($workPlanSnap['from_checklist'] ?? null) ? $workPlanSnap['from_checklist'] : [];
+                @endphp
+                @if($workPlanItems !== [])
+                    <h3 class="h6">{{ __('From SEO checklist') }}</h3>
+                    <ul class="cabinet-sr-bullets">
+                        @foreach($workPlanItems as $item)
+                            <li>
+                                {{ $item['title'] ?? '—' }}
+                                @if(!empty($item['due_at']))
+                                    <span class="text-secondary small {{ !empty($item['overdue']) ? 'text-danger' : '' }}">
+                                        · {{ \Carbon\Carbon::parse($item['due_at'])->format('d.m.Y') }}
+                                        @if(!empty($item['overdue'])) — {{ __('Overdue') }}@endif
+                                    </span>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
                 @if($report->work_plan_text)
+                    @if($workPlanItems !== [])
+                        <h3 class="h6 mt-3">{{ __('Manager notes') }}</h3>
+                    @endif
                     <div class="cabinet-sr-prose">{!! nl2br(e($report->work_plan_text)) !!}</div>
-                @else
+                @elseif($workPlanItems === [])
                     <p class="small text-secondary mb-0">{{ __('Placeholder: manual content will appear here') }}</p>
+                @endif
+                @if(!empty($workPlanSnap['open_url']) && !$isPublic)
+                    <p class="small mt-2 mb-0"><a href="{{ $workPlanSnap['open_url'] }}">{{ __('Open source project') }}</a></p>
                 @endif
             @elseif($key === 'insights')
                 @php $recs = is_array($snapshot['recommendations'] ?? null) ? $snapshot['recommendations'] : []; @endphp

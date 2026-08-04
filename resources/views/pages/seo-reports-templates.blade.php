@@ -1,6 +1,6 @@
 @component('component.card', [
-    'title' => __('SEO Reports'),
-    'documentTitle' => __('Templates') . ' · ' . __('SEO Reports'),
+    'title' => __('Reports'),
+    'documentTitle' => __('Templates') . ' · ' . __('Reports'),
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('css/cabinet-seo-reports.css') }}?v={{ @filemtime(public_path('css/cabinet-seo-reports.css')) ?: time() }}">

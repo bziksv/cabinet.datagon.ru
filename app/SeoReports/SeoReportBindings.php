@@ -5,6 +5,7 @@ namespace App\SeoReports;
 use App\MonitoringProject;
 use App\Support\HomeUserSites;
 use App\YandexMetrikaDomainCounter;
+use App\YandexWebmasterDomainHost;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 
@@ -27,6 +28,28 @@ class SeoReportBindings
             ->value('counter_id');
 
         return $counterId > 0 ? $counterId : null;
+    }
+
+    /**
+     * host_id Яндекс.Вебмастера (например https:kawe.su:443) из привязки на главной.
+     */
+    public static function resolveWebmasterHost(int $userId, string $domain): ?string
+    {
+        if ($userId < 1 || !YandexWebmasterDomainHost::tableReady()) {
+            return null;
+        }
+
+        $domain = HomeUserSites::normalizeDomain($domain);
+        if ($domain === '') {
+            return null;
+        }
+
+        $hostId = trim((string) YandexWebmasterDomainHost::query()
+            ->where('user_id', $userId)
+            ->where('domain', $domain)
+            ->value('host_id'));
+
+        return $hostId !== '' ? $hostId : null;
     }
 
     public static function resolveMonitoringProjectId(int $userId, string $domain): ?int
@@ -102,6 +125,14 @@ class SeoReportBindings
         return YandexMetrikaDomainCounter::forUser($userId);
     }
 
+    /**
+     * @return Collection<int, YandexWebmasterDomainHost>
+     */
+    public static function webmasterBindingsForUser(int $userId): Collection
+    {
+        return YandexWebmasterDomainHost::forUser($userId);
+    }
+
     public static function applyAutoBindings(SeoReportProject $project): void
     {
         $userId = (int) $project->user_id;
@@ -120,5 +151,70 @@ class SeoReportBindings
                 $project->monitoring_project_id = $monitoringId;
             }
         }
+
+        $settings = is_array($project->settings_json) ? $project->settings_json : [];
+        $currentHost = trim((string) ($settings['webmaster_host'] ?? ''));
+        if ($currentHost === '') {
+            $hostId = self::resolveWebmasterHost($userId, $domain);
+            if ($hostId) {
+                $settings['webmaster_host'] = $hostId;
+                $project->settings_json = $settings;
+            }
+        }
+    }
+
+    /**
+     * После привязки на главной / в настройках — проставить host_id в SEO-проектах с тем же доменом.
+     */
+    public static function syncWebmasterHostToProjects(int $userId, string $domain, string $hostId): void
+    {
+        $domain = HomeUserSites::normalizeDomain($domain);
+        $hostId = trim($hostId);
+        if ($userId < 1 || $domain === '' || $hostId === '') {
+            return;
+        }
+
+        SeoReportProject::query()
+            ->where('user_id', $userId)
+            ->where('domain', $domain)
+            ->orderBy('id')
+            ->limit(100)
+            ->get()
+            ->each(static function (SeoReportProject $project) use ($hostId) {
+                $settings = is_array($project->settings_json) ? $project->settings_json : [];
+                if (trim((string) ($settings['webmaster_host'] ?? '')) === $hostId) {
+                    return;
+                }
+                $settings['webmaster_host'] = $hostId;
+                $project->settings_json = $settings;
+                $project->save();
+            });
+    }
+
+    /**
+     * После отвязки на главной / в настройках — очистить host у SEO-проектов домена.
+     */
+    public static function clearWebmasterHostFromProjects(int $userId, string $domain): void
+    {
+        $domain = HomeUserSites::normalizeDomain($domain);
+        if ($userId < 1 || $domain === '') {
+            return;
+        }
+
+        SeoReportProject::query()
+            ->where('user_id', $userId)
+            ->where('domain', $domain)
+            ->orderBy('id')
+            ->limit(100)
+            ->get()
+            ->each(static function (SeoReportProject $project) {
+                $settings = is_array($project->settings_json) ? $project->settings_json : [];
+                if (trim((string) ($settings['webmaster_host'] ?? '')) === '') {
+                    return;
+                }
+                $settings['webmaster_host'] = null;
+                $project->settings_json = $settings;
+                $project->save();
+            });
     }
 }

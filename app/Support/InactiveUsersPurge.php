@@ -51,6 +51,14 @@ class InactiveUsersPurge
         'text_uniqueness_histories',
         'text_uniqueness_usages',
         'users_jobs',
+        // Чек-лист / отчёты: простые user_id-таблицы (иерархию чистит deleteSeo*ForUser)
+        'seo_checklist_user_preferences',
+        'seo_checklist_note_reads',
+        'seo_checklist_item_notes',
+        'seo_checklist_item_time_logs',
+        'seo_checklist_activity_logs',
+        'seo_checklist_team_members',
+        'seo_report_project_user',
     ];
 
     public function __construct()
@@ -157,6 +165,8 @@ class InactiveUsersPurge
         DB::transaction(function () use ($user, $userId) {
             $this->deleteMonitoringSearchenginesForCreator($userId);
             $this->deleteSiteAuditForUser($userId);
+            $this->deleteSeoChecklistForUser($userId);
+            $this->deleteSeoReportsForUser($userId);
             $this->deleteOrphanUserIdRows($userId);
 
             $user->roles()->detach();
@@ -378,6 +388,121 @@ class InactiveUsersPurge
             DB::table('site_audit_finding_notes')->where('user_id', $userId)->delete();
         }
         DB::table('site_audit_projects')->where('user_id', $userId)->delete();
+    }
+
+    /**
+     * Чек-лист: проекты пользователя целиком + шаблоны/команды + следы участия в чужих.
+     */
+    private function deleteSeoChecklistForUser(int $userId): void
+    {
+        if (Schema::hasTable('seo_checklist_projects')) {
+            $projectIds = DB::table('seo_checklist_projects')->where('user_id', $userId)->pluck('id');
+            if ($projectIds->isNotEmpty()) {
+                $itemIds = Schema::hasTable('seo_checklist_items')
+                    ? DB::table('seo_checklist_items')->whereIn('project_id', $projectIds)->pluck('id')
+                    : collect();
+
+                if ($itemIds->isNotEmpty()) {
+                    if (Schema::hasTable('seo_checklist_item_notes')) {
+                        $noteIds = DB::table('seo_checklist_item_notes')->whereIn('item_id', $itemIds)->pluck('id');
+                        if ($noteIds->isNotEmpty() && Schema::hasTable('seo_checklist_note_reads')) {
+                            DB::table('seo_checklist_note_reads')->whereIn('note_id', $noteIds)->delete();
+                        }
+                        DB::table('seo_checklist_item_notes')->whereIn('item_id', $itemIds)->delete();
+                    }
+                    if (Schema::hasTable('seo_checklist_item_time_logs')) {
+                        DB::table('seo_checklist_item_time_logs')->whereIn('item_id', $itemIds)->delete();
+                    }
+                    if (Schema::hasTable('seo_checklist_activity_logs')) {
+                        DB::table('seo_checklist_activity_logs')->whereIn('item_id', $itemIds)->delete();
+                    }
+                    DB::table('seo_checklist_items')->whereIn('id', $itemIds)->delete();
+                }
+
+                if (Schema::hasTable('seo_checklist_activity_logs')) {
+                    DB::table('seo_checklist_activity_logs')->whereIn('project_id', $projectIds)->delete();
+                }
+                DB::table('seo_checklist_projects')->whereIn('id', $projectIds)->delete();
+            }
+
+            // В чужих проектах — только снять ссылки на пользователя
+            DB::table('seo_checklist_projects')->where('pm_user_id', $userId)->update(['pm_user_id' => null]);
+            DB::table('seo_checklist_projects')->where('owner_user_id', $userId)->update(['owner_user_id' => null]);
+        }
+
+        if (Schema::hasTable('seo_checklist_items')) {
+            DB::table('seo_checklist_items')->where('assignee_user_id', $userId)->update(['assignee_user_id' => null]);
+            if (Schema::hasColumn('seo_checklist_items', 'done_by')) {
+                DB::table('seo_checklist_items')->where('done_by', $userId)->update(['done_by' => null]);
+            }
+        }
+
+        if (Schema::hasTable('seo_checklist_teams')) {
+            $teamIds = DB::table('seo_checklist_teams')->where('user_id', $userId)->pluck('id');
+            if ($teamIds->isNotEmpty()) {
+                if (Schema::hasTable('seo_checklist_team_members')) {
+                    DB::table('seo_checklist_team_members')->whereIn('team_id', $teamIds)->delete();
+                }
+                DB::table('seo_checklist_teams')->whereIn('id', $teamIds)->delete();
+            }
+        }
+
+        if (Schema::hasTable('seo_checklist_team_members')) {
+            DB::table('seo_checklist_team_members')->where('user_id', $userId)->delete();
+        }
+
+        if (Schema::hasTable('seo_checklist_templates')) {
+            $templateIds = DB::table('seo_checklist_templates')
+                ->where('user_id', $userId)
+                ->pluck('id');
+            if ($templateIds->isNotEmpty()) {
+                if (Schema::hasTable('seo_checklist_template_tasks')) {
+                    DB::table('seo_checklist_template_tasks')->whereIn('template_id', $templateIds)->delete();
+                }
+                DB::table('seo_checklist_templates')->whereIn('id', $templateIds)->delete();
+            }
+        }
+
+        foreach ([
+            'seo_checklist_user_preferences',
+            'seo_checklist_note_reads',
+            'seo_checklist_item_notes',
+            'seo_checklist_item_time_logs',
+            'seo_checklist_activity_logs',
+        ] as $table) {
+            if (Schema::hasTable($table) && Schema::hasColumn($table, 'user_id')) {
+                DB::table($table)->where('user_id', $userId)->delete();
+            }
+        }
+    }
+
+    /**
+     * SEO-отчёты: проекты пользователя, шаблоны, шаринг.
+     */
+    private function deleteSeoReportsForUser(int $userId): void
+    {
+        if (Schema::hasTable('seo_report_projects')) {
+            $projectIds = DB::table('seo_report_projects')->where('user_id', $userId)->pluck('id');
+            if ($projectIds->isNotEmpty()) {
+                if (Schema::hasTable('seo_reports')) {
+                    DB::table('seo_reports')->whereIn('project_id', $projectIds)->delete();
+                }
+                if (Schema::hasTable('seo_report_project_user')) {
+                    DB::table('seo_report_project_user')->whereIn('seo_report_project_id', $projectIds)->delete();
+                }
+                DB::table('seo_report_projects')->whereIn('id', $projectIds)->delete();
+            }
+        }
+
+        if (Schema::hasTable('seo_reports')) {
+            DB::table('seo_reports')->where('user_id', $userId)->delete();
+        }
+        if (Schema::hasTable('seo_report_project_user')) {
+            DB::table('seo_report_project_user')->where('user_id', $userId)->delete();
+        }
+        if (Schema::hasTable('seo_report_templates')) {
+            DB::table('seo_report_templates')->where('user_id', $userId)->delete();
+        }
     }
 
     private function deleteOrphanUserIdRows(int $userId): void

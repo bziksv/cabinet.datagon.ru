@@ -11,6 +11,7 @@ use App\HomeUserArchivedSite;
 use App\IndexCheckHistory;
 use App\HomeUserSitesPreference;
 use App\YandexMetrikaDomainCounter;
+use App\YandexWebmasterDomainHost;
 use App\MonitoringProject;
 use App\ProjectRelevanceHistory;
 use App\SiteAuditProject;
@@ -69,6 +70,14 @@ class HomeUserSites
                 'supports_sync' => true,
             ],
             [
+                'key' => 'yandex-webmaster',
+                'title' => __('Yandex Webmaster'),
+                'short' => __('Webmaster short'),
+                'create_url' => '#webmaster',
+                'kind' => 'integration',
+                'supports_sync' => true,
+            ],
+            [
                 'key' => 'site-audit',
                 'title' => __('Site audit'),
                 'short' => __('Audit short'),
@@ -78,20 +87,20 @@ class HomeUserSites
                 'supports_sync' => true,
             ],
             [
-                'key' => 'seo-checklist',
+                'key' => 'checklist',
                 'title' => \App\SeoChecklist\SeoChecklistUserPreference::moduleTitleFor(
                     Auth::check() ? (int) Auth::id() : null
                 ),
                 'short' => __('Checklist short'),
-                'create_url' => url('/seo-checklist'),
+                'create_url' => url('/checklist'),
                 'kind' => 'module',
                 'supports_sync' => false,
             ],
             [
-                'key' => 'seo-reports',
-                'title' => __('SEO Reports'),
+                'key' => 'reports',
+                'title' => __('Reports'),
                 'short' => __('SEO reports short'),
-                'create_url' => url('/seo-reports'),
+                'create_url' => url('/reports'),
                 'kind' => 'module',
                 'supports_sync' => false,
             ],
@@ -228,8 +237,8 @@ class HomeUserSites
             self::collectDomainRecords($userId, $add);
             self::collectIndexCheck($userId, $add);
             self::collectEsenin($userId, $add);
-            // Пока заглушка: привязки счётчиков Метрики ещё нет.
             self::collectYandexMetrika($userId, $add);
+            self::collectYandexWebmaster($userId, $add);
         } catch (Throwable $e) {
             report($e);
         }
@@ -374,6 +383,9 @@ class HomeUserSites
                     'counter_id' => $present && isset($info['counter_id'])
                         ? (int) $info['counter_id']
                         : null,
+                    'host_id' => $present && isset($info['host_id'])
+                        ? (string) $info['host_id']
+                        : null,
                 ];
             }
             $site['matrix'] = $matrix;
@@ -465,7 +477,6 @@ class HomeUserSites
 
     /**
      * Привязки доменов к счётчикам Яндекс.Метрики.
-     * Заготовка под будущую синхронизацию (пока всегда пусто).
      *
      * @param callable(string,string,string,mixed,string):void $add
      */
@@ -487,6 +498,33 @@ class HomeUserSites
                 $row->updated_at ?: $row->created_at,
                 $label,
                 ['counter_id' => (int) $row->counter_id]
+            );
+        });
+    }
+
+    /**
+     * Привязки доменов к хостам Яндекс.Вебмастера.
+     *
+     * @param callable(string,string,string,mixed,string):void $add
+     */
+    private static function collectYandexWebmaster(int $userId, callable $add): void
+    {
+        if ($userId < 1 || !YandexWebmasterDomainHost::tableReady()) {
+            return;
+        }
+
+        YandexWebmasterDomainHost::forUser($userId)->each(static function ($row) use ($add) {
+            $label = trim((string) $row->host_url);
+            if ($label === '') {
+                $label = (string) $row->host_id;
+            }
+            $add(
+                (string) $row->domain,
+                'yandex-webmaster',
+                '#webmaster',
+                $row->updated_at ?: $row->created_at,
+                $label,
+                ['host_id' => (string) $row->host_id]
             );
         });
     }
@@ -525,8 +563,8 @@ class HomeUserSites
                 $label = ((int) $row->progress_done) . '/' . ((int) $row->progress_total);
                 $add(
                     (string) $row->domain,
-                    'seo-checklist',
-                    url('/seo-checklist/' . (int) $row->id),
+                    "checklist",
+                    url('/checklist/' . (int) $row->id),
                     $row->last_activity_at ?: $row->updated_at,
                     $label
                 );
@@ -542,9 +580,23 @@ class HomeUserSites
             return;
         }
 
+        $teamIds = SeoReportProject::teamIdsForMember($userId);
+
         SeoReportProject::query()
-            ->where('user_id', $userId)
             ->where('status', 'active')
+            ->where(static function ($q) use ($userId, $teamIds) {
+                $q->where('user_id', $userId);
+                if ($teamIds !== [] && SeoReportProject::teamColumnReady()) {
+                    $q->orWhereIn('team_id', $teamIds);
+                }
+                if (Schema::hasTable('seo_report_project_user')) {
+                    $q->orWhereIn('id', function ($sub) use ($userId) {
+                        $sub->select('seo_report_project_id')
+                            ->from('seo_report_project_user')
+                            ->where('user_id', $userId);
+                    });
+                }
+            })
             ->withCount('reports')
             ->orderByDesc('updated_at')
             ->limit(self::PER_SOURCE_LIMIT)
@@ -553,8 +605,8 @@ class HomeUserSites
                 $label = (string) ((int) $row->reports_count);
                 $add(
                     (string) $row->domain,
-                    'seo-reports',
-                    url('/seo-reports/' . (int) $row->id),
+                    'reports',
+                    url('/reports/' . (int) $row->id),
                     $row->updated_at,
                     $label
                 );

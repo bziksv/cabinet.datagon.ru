@@ -133,6 +133,8 @@ class SeoReportTitloModulesCollector
             ->where('due_at', '<', Carbon::now())
             ->count();
 
+        $work = $this->workListsForChecklistProject($project, $from, $to);
+
         return [
             'ok' => true,
             'status' => 'ok',
@@ -143,9 +145,109 @@ class SeoReportTitloModulesCollector
                 'progress_total' => (int) ($project->progress_total ?? 0),
                 'closed_in_period' => $closedInPeriod,
                 'overdue' => $overdue,
+                'closed_items' => $work['closed'],
+                'plan_items' => $work['plan'],
                 'open_url' => route('pages.seo-checklist.show', ['id' => $project->id]),
             ],
         ];
+    }
+
+    /**
+     * Задачи чеклиста для блоков «Выполненные работы» / «План работ».
+     *
+     * @return array{ok:bool,status:string,message?:string,data?:array{project_id:int,open_url:string,closed:list<array>,plan:list<array>}}
+     */
+    public function collectWorkFromChecklist(int $userId, string $domain, ?Carbon $from, ?Carbon $to): array
+    {
+        $domain = HomeUserSites::normalizeDomain($domain);
+        try {
+            $project = SeoChecklistProject::query()
+                ->where('user_id', $userId)
+                ->where('domain', $domain)
+                ->orderByDesc('id')
+                ->first();
+        } catch (Throwable $e) {
+            return $this->fail('error', __('Could not load Titlo module data'));
+        }
+
+        if (!$project) {
+            return $this->fail('not_connected', __('SEO Checklist is not connected'));
+        }
+
+        $work = $this->workListsForChecklistProject($project, $from, $to);
+
+        return [
+            'ok' => true,
+            'status' => 'ok',
+            'progress' => 'ok',
+            'data' => [
+                'project_id' => (int) $project->id,
+                'open_url' => route('pages.seo-checklist.show', ['id' => $project->id]),
+                'closed' => $work['closed'],
+                'plan' => $work['plan'],
+            ],
+        ];
+    }
+
+    /**
+     * @return array{closed:list<array{id:int,title:string,status:string,done_at:?string}>,plan:list<array{id:int,title:string,status:string,due_at:?string,overdue:bool}>}
+     */
+    private function workListsForChecklistProject(SeoChecklistProject $project, ?Carbon $from, ?Carbon $to): array
+    {
+        $closedQuery = $project->items()
+            ->whereNull('parent_id')
+            ->whereIn('status', SeoChecklistItem::CLOSED_STATUSES)
+            ->whereNotNull('done_at');
+        if ($from) {
+            $closedQuery->where('done_at', '>=', $from->copy()->startOfDay());
+        }
+        if ($to) {
+            $closedQuery->where('done_at', '<=', $to->copy()->endOfDay());
+        }
+        $closed = $closedQuery
+            ->orderByDesc('done_at')
+            ->limit(40)
+            ->get(['id', 'title', 'status', 'done_at'])
+            ->map(static function (SeoChecklistItem $item) {
+                return [
+                    'id' => (int) $item->id,
+                    'title' => (string) $item->title,
+                    'status' => (string) $item->status,
+                    'done_at' => $item->done_at ? $item->done_at->format('Y-m-d') : null,
+                ];
+            })
+            ->values()
+            ->all();
+
+        $horizonEnd = ($to ? $to->copy() : Carbon::now())->addDays(21)->endOfDay();
+        $now = Carbon::now();
+        $plan = $project->items()
+            ->whereNull('parent_id')
+            ->whereIn('status', SeoChecklistItem::OPEN_STATUSES)
+            ->where(function ($q) use ($horizonEnd) {
+                $q->where(function ($q2) use ($horizonEnd) {
+                    $q2->whereNotNull('due_at')->where('due_at', '<=', $horizonEnd);
+                })->orWhereIn('status', ['doing', 'rework', 'clarify', 'review']);
+            })
+            ->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('due_at')
+            ->orderBy('id')
+            ->limit(30)
+            ->get(['id', 'title', 'status', 'due_at'])
+            ->map(static function (SeoChecklistItem $item) use ($now) {
+                $due = $item->due_at;
+                return [
+                    'id' => (int) $item->id,
+                    'title' => (string) $item->title,
+                    'status' => (string) $item->status,
+                    'due_at' => $due ? $due->format('Y-m-d') : null,
+                    'overdue' => $due ? $due->lt($now) : false,
+                ];
+            })
+            ->values()
+            ->all();
+
+        return ['closed' => $closed, 'plan' => $plan];
     }
 
     /**

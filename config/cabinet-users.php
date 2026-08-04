@@ -2,7 +2,7 @@
 
 /** Админ: /users */
 return [
-    'version' => '1.2.8s',
+    'version' => '1.2.9s',
 
     /** Неактивность владельца (дней) для отчёта «зависшие расписания мониторинга». */
     'stale_monitoring_inactive_days' => (int) env('CABINET_USERS_STALE_MONITORING_DAYS', 90),
@@ -87,6 +87,55 @@ return [
             'table' => 'project_tracking',
             'column' => 'user_id',
             'avg_row_bytes' => 350,
+        ],
+        [
+            'key' => 'site_audit_projects',
+            'label' => 'Аудит сайта: проекты',
+            'table' => 'site_audit_projects',
+            'column' => 'user_id',
+            'avg_row_bytes' => 400,
+        ],
+        [
+            'key' => 'seo_checklist_projects',
+            'label' => 'Чек-лист: проекты',
+            'table' => 'seo_checklist_projects',
+            'column' => 'user_id',
+            'avg_row_bytes' => 420,
+        ],
+        [
+            'key' => 'seo_checklist_items',
+            'label' => 'Чек-лист: задачи',
+            'table' => 'seo_checklist_items',
+            'column' => 'assignee_user_id',
+            'avg_row_bytes' => 280,
+        ],
+        [
+            'key' => 'seo_checklist_time',
+            'label' => 'Чек-лист: таймлог',
+            'table' => 'seo_checklist_item_time_logs',
+            'column' => 'user_id',
+            'avg_row_bytes' => 160,
+        ],
+        [
+            'key' => 'seo_report_projects',
+            'label' => 'Отчёты: проекты',
+            'table' => 'seo_report_projects',
+            'column' => 'user_id',
+            'avg_row_bytes' => 640,
+        ],
+        [
+            'key' => 'seo_reports',
+            'label' => 'Отчёты: снимки',
+            'table' => 'seo_reports',
+            'column' => 'user_id',
+            'avg_row_bytes' => 16384,
+        ],
+        [
+            'key' => 'seo_report_templates',
+            'label' => 'Отчёты: шаблоны',
+            'table' => 'seo_report_templates',
+            'column' => 'user_id',
+            'avg_row_bytes' => 2048,
         ],
     ],
 ];

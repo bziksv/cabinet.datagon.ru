@@ -2,6 +2,8 @@
 
 namespace App\SeoReports;
 
+use App\SeoChecklist\SeoChecklistTeam;
+use App\SeoChecklist\SeoChecklistTeamMember;
 use App\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,6 +16,9 @@ class SeoReportProject extends Model
 {
     public const SHARE_ROLE_READ = 'read';
     public const SHARE_ROLE_EDIT = 'edit';
+
+    /** Checklist team roles that can edit SEO reports. */
+    public const TEAM_EDIT_ROLES = ['owner', 'pm', 'auditor'];
 
     /** Keys that live on the report template (shared across projects). */
     public const TEMPLATE_SETTING_KEYS = [
@@ -42,6 +47,7 @@ class SeoReportProject extends Model
 
     protected $fillable = [
         'user_id',
+        'team_id',
         'template_id',
         'domain',
         'title',
@@ -68,11 +74,17 @@ class SeoReportProject extends Model
         'metrika_counter_id' => 'integer',
         'monitoring_project_id' => 'integer',
         'template_id' => 'integer',
+        'team_id' => 'integer',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(SeoChecklistTeam::class, 'team_id');
     }
 
     public function reportTemplate(): BelongsTo
@@ -92,6 +104,41 @@ class SeoReportProject extends Model
             ->withTimestamps();
     }
 
+    public static function teamColumnReady(): bool
+    {
+        try {
+            return Schema::hasTable('seo_report_projects')
+                && Schema::hasColumn('seo_report_projects', 'team_id');
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Team IDs where the user is a member (SEO Checklist teams).
+     *
+     * @return array<int, int>
+     */
+    public static function teamIdsForMember(int $userId): array
+    {
+        if ($userId < 1 || !Schema::hasTable('seo_checklist_team_members')) {
+            return [];
+        }
+
+        return SeoChecklistTeamMember::query()
+            ->where('user_id', $userId)
+            ->pluck('team_id')
+            ->map(static function ($id) {
+                return (int) $id;
+            })
+            ->filter(static function ($id) {
+                return $id > 0;
+            })
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function isOwnedBy(int $userId): bool
     {
         return (int) $this->user_id === $userId;
@@ -102,6 +149,11 @@ class SeoReportProject extends Model
         if ($this->isOwnedBy($userId)) {
             return true;
         }
+
+        if ($this->teamMemberRoleFor($userId) !== null) {
+            return true;
+        }
+
         if (!Schema::hasTable('seo_report_project_user')) {
             return false;
         }
@@ -114,6 +166,14 @@ class SeoReportProject extends Model
         if ($this->isOwnedBy($userId)) {
             return 'owner';
         }
+
+        $teamRole = $this->teamMemberRoleFor($userId);
+        if ($teamRole !== null) {
+            return in_array($teamRole, self::TEAM_EDIT_ROLES, true)
+                ? self::SHARE_ROLE_EDIT
+                : self::SHARE_ROLE_READ;
+        }
+
         if (!Schema::hasTable('seo_report_project_user')) {
             return null;
         }
@@ -127,6 +187,23 @@ class SeoReportProject extends Model
         $role = $this->shareRoleFor($userId);
 
         return in_array($role, ['owner', self::SHARE_ROLE_EDIT], true);
+    }
+
+    public function teamMemberRoleFor(int $userId): ?string
+    {
+        if ($userId < 1 || !self::teamColumnReady() || !(int) $this->team_id) {
+            return null;
+        }
+        if (!Schema::hasTable('seo_checklist_team_members')) {
+            return null;
+        }
+
+        $role = SeoChecklistTeamMember::query()
+            ->where('team_id', (int) $this->team_id)
+            ->where('user_id', $userId)
+            ->value('role');
+
+        return $role !== null ? (string) $role : null;
     }
 
     /**

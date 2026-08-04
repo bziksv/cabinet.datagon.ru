@@ -819,8 +819,9 @@ $(document).off('click.cabinetCaMetaCollapse', '[data-cabinet-ca-toggle="meta-co
     });
 
 function getBtnGroup(url, messages) {
+    const popperCfg = escapeHtml(JSON.stringify({ strategy: 'fixed' }));
     return '<div class="btn-group">' +
-        '   <button type="button" data-bs-toggle="dropdown" aria-expanded="false" class="btn btn-tool dropdown-toggle p-0">' +
+        '   <button type="button" data-bs-toggle="dropdown" data-bs-popper-config="' + popperCfg + '" aria-expanded="false" class="btn btn-tool dropdown-toggle p-0">' +
         '   <i class="fas fa-external-link-alt"></i>' +
         '   </button>' +
         '       <div role="menu" class="dropdown-menu dropdown-menu-end">' +

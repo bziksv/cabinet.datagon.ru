@@ -80,9 +80,80 @@ class SeoReportPositionsCollector
     }
 
     /**
-     * @return list<array{id:int,name:string,words:int}>
+     * Группы запросов + распределение по TOP (лучшая позиция запроса на последнем съёме).
+     *
+     * @return list<array{id:int,name:string,words:int,top3:int,top10:int,top30:int,top100:int}>
      */
     private function groupsSummary(int $projectId): array
+    {
+        try {
+            $latestDay = DB::table('monitoring_positions as mp')
+                ->join('monitoring_keywords as mk', 'mk.id', '=', 'mp.monitoring_keyword_id')
+                ->where('mk.monitoring_project_id', $projectId)
+                ->max(DB::raw('DATE(mp.created_at)'));
+
+            if (!$latestDay) {
+                return $this->groupsSummaryWordsOnly($projectId);
+            }
+
+            // Последняя позиция по каждой паре запрос×ПС за день съёма
+            $latestIds = DB::table('monitoring_positions as mp')
+                ->join('monitoring_keywords as mk', 'mk.id', '=', 'mp.monitoring_keyword_id')
+                ->where('mk.monitoring_project_id', $projectId)
+                ->whereDate('mp.created_at', $latestDay)
+                ->selectRaw('mp.monitoring_keyword_id, mp.monitoring_searchengine_id, MAX(mp.id) as id')
+                ->groupBy('mp.monitoring_keyword_id', 'mp.monitoring_searchengine_id');
+
+            // Лучшая (минимальная) позиция запроса среди ПС
+            $bestByKeyword = DB::query()
+                ->fromSub($latestIds, 'x')
+                ->join('monitoring_positions as p', 'p.id', '=', 'x.id')
+                ->where('p.position', '>', 0)
+                ->selectRaw('x.monitoring_keyword_id, MIN(p.position) as best_pos')
+                ->groupBy('x.monitoring_keyword_id');
+
+            $rows = DB::table('monitoring_keywords as mk')
+                ->leftJoin('monitoring_groups as g', 'g.id', '=', 'mk.monitoring_group_id')
+                ->leftJoinSub($bestByKeyword, 'bp', 'bp.monitoring_keyword_id', '=', 'mk.id')
+                ->where('mk.monitoring_project_id', $projectId)
+                ->groupBy('mk.monitoring_group_id', 'g.name')
+                ->orderByDesc(DB::raw('COUNT(*)'))
+                ->limit(20)
+                ->get([
+                    DB::raw('mk.monitoring_group_id as id'),
+                    DB::raw("COALESCE(g.name, 'Без группы') as name"),
+                    DB::raw('COUNT(*) as words'),
+                    DB::raw('SUM(CASE WHEN bp.best_pos IS NOT NULL AND bp.best_pos <= 3 THEN 1 ELSE 0 END) as top3'),
+                    DB::raw('SUM(CASE WHEN bp.best_pos IS NOT NULL AND bp.best_pos <= 10 THEN 1 ELSE 0 END) as top10'),
+                    DB::raw('SUM(CASE WHEN bp.best_pos IS NOT NULL AND bp.best_pos <= 30 THEN 1 ELSE 0 END) as top30'),
+                    DB::raw('SUM(CASE WHEN bp.best_pos IS NOT NULL AND bp.best_pos <= 100 THEN 1 ELSE 0 END) as top100'),
+                ]);
+        } catch (Throwable $e) {
+            return $this->groupsSummaryWordsOnly($projectId);
+        }
+
+        $out = [];
+        foreach ($rows as $row) {
+            $out[] = [
+                'id' => (int) ($row->id ?? 0),
+                'name' => (string) ($row->name ?? '—'),
+                'words' => (int) ($row->words ?? 0),
+                'top3' => (int) ($row->top3 ?? 0),
+                'top10' => (int) ($row->top10 ?? 0),
+                'top30' => (int) ($row->top30 ?? 0),
+                'top100' => (int) ($row->top100 ?? 0),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Fallback: только число запросов в группе (если позиций ещё нет).
+     *
+     * @return list<array{id:int,name:string,words:int,top3:int,top10:int,top30:int,top100:int}>
+     */
+    private function groupsSummaryWordsOnly(int $projectId): array
     {
         try {
             $rows = DB::table('monitoring_keywords as mk')
@@ -106,6 +177,10 @@ class SeoReportPositionsCollector
                 'id' => (int) ($row->id ?? 0),
                 'name' => (string) ($row->name ?? '—'),
                 'words' => (int) ($row->words ?? 0),
+                'top3' => 0,
+                'top10' => 0,
+                'top30' => 0,
+                'top100' => 0,
             ];
         }
 

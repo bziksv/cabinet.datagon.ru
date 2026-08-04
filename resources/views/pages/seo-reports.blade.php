@@ -1,6 +1,6 @@
 @component('component.card', [
-    'title' => __('SEO Reports'),
-    'documentTitle' => __('SEO Reports'),
+    'title' => __('Reports'),
+    'documentTitle' => __('Reports'),
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
@@ -66,43 +66,86 @@
                 @endif
             </div>
         @else
-            <div class="cabinet-sr-toolbar">
+            <div class="cabinet-sr-toolbar cabinet-sr-toolbar--projects">
                 <input type="search"
                        class="form-control form-control-sm"
                        placeholder="{{ __('Search projects') }}…"
                        data-sr-project-search
                        autocomplete="off">
-            </div>
-            <form method="post" action="{{ route('pages.seo-reports.batch') }}" class="mb-3" id="cabinetSrBatchForm">
-                @csrf
-                <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                <form method="post" action="{{ route('pages.seo-reports.batch') }}" class="cabinet-sr-batch" id="cabinetSrBatchForm">
+                    @csrf
                     <button type="submit" class="btn btn-outline-primary btn-sm">{{ __('Batch generate previous month') }}</button>
                     <label class="cabinet-sr-toggle-row mb-0">
                         <input type="checkbox" name="force" value="1">
                         <span class="small">{{ __('Force regenerate existing') }}</span>
                     </label>
-                </div>
-            </form>
-            <div class="cabinet-sr-grid" data-sr-project-grid>
+                </form>
+            </div>
+            <div class="cabinet-sr-project-list" data-sr-project-grid>
                 @foreach($projects as $project)
-                    <div class="cabinet-sr-card cabinet-sr-card--batch"
-                         data-sr-project-card
-                         data-domain="{{ $project->domain }}">
-                        <label class="cabinet-sr-toggle-row mb-2">
-                            <input type="checkbox" form="cabinetSrBatchForm" name="project_ids[]" value="{{ $project->id }}">
-                            <span class="small">{{ __('Select') }}</span>
-                        </label>
-                        <a href="{{ route('pages.seo-reports.show', ['id' => $project->id]) }}">
-                            <p class="cabinet-sr-card__domain">{{ $project->domain }}</p>
-                            <p class="cabinet-sr-card__meta">
-                                {{ $project->title ?: __('SEO report project') }}
-                                · {{ trans_choice(':count reports', (int) $project->reports_count, ['count' => (int) $project->reports_count]) }}
-                                @if(!empty($sharedProjectIds) && in_array($project->id, $sharedProjectIds, true))
-                                    · {{ __('Shared') }}
-                                @endif
-                            </p>
-                        </a>
-                    </div>
+                    @php
+                        $isShared = !empty($sharedProjectIds) && in_array($project->id, $sharedProjectIds, true);
+                        $isTeam = !empty($teamProjectIds) && in_array($project->id, $teamProjectIds, true);
+                        $isOwner = (int) $project->user_id === (int) Auth::id();
+                        $projSettings = is_array($project->settings_json) ? $project->settings_json : [];
+                        $hasMetrika = (int) ($project->metrika_counter_id ?? 0) > 0;
+                        $hasMonitoring = (int) ($project->monitoring_project_id ?? 0) > 0;
+                        $hasWm = trim((string) ($projSettings['webmaster_host'] ?? '')) !== '';
+                        $reportsCount = (int) $project->reports_count;
+                        $title = trim((string) ($project->title ?? ''));
+                    @endphp
+                    <article class="cabinet-sr-project"
+                             data-sr-project-card
+                             data-domain="{{ $project->domain }}"
+                             data-title="{{ $title }}">
+                        <div class="cabinet-sr-project__top">
+                            <label class="cabinet-sr-project__select" title="{{ __('Select for batch') }}">
+                                <input type="checkbox" form="cabinetSrBatchForm" name="project_ids[]" value="{{ $project->id }}">
+                                <span class="visually-hidden">{{ __('Select') }}</span>
+                            </label>
+                            <div class="cabinet-sr-project__identity">
+                                <h2 class="cabinet-sr-project__domain">{{ $project->domain }}</h2>
+                                <p class="cabinet-sr-project__title">
+                                    {{ $title !== '' ? $title : __('SEO report project') }}
+                                    @if($isShared)
+                                        <span class="cabinet-sr-project__tag">{{ __('Shared') }}</span>
+                                    @elseif($isTeam)
+                                        <span class="cabinet-sr-project__tag">{{ __('Team') }}</span>
+                                    @endif
+                                </p>
+                            </div>
+                            <div class="cabinet-sr-project__reports" title="{{ __('Reports') }}">
+                                <strong>{{ $reportsCount }}</strong>
+                                <span>{{ __('Reports') }}</span>
+                            </div>
+                        </div>
+                        <ul class="cabinet-sr-project__sources" aria-label="{{ __('Connections health') }}">
+                            <li class="is-{{ $hasMetrika ? 'on' : 'off' }}">
+                                <i class="bi bi-{{ $hasMetrika ? 'check-circle-fill' : 'circle' }}" aria-hidden="true"></i>
+                                {{ __('Metrika') }}
+                            </li>
+                            <li class="is-{{ $hasMonitoring ? 'on' : 'off' }}">
+                                <i class="bi bi-{{ $hasMonitoring ? 'check-circle-fill' : 'circle' }}" aria-hidden="true"></i>
+                                {{ __('Monitoring') }}
+                            </li>
+                            <li class="is-{{ $hasWm ? 'on' : 'off' }}">
+                                <i class="bi bi-{{ $hasWm ? 'check-circle-fill' : 'circle' }}" aria-hidden="true"></i>
+                                {{ __('Webmaster') }}
+                            </li>
+                        </ul>
+                        <div class="cabinet-sr-project__actions">
+                            <a class="btn btn-primary btn-sm"
+                               href="{{ route('pages.seo-reports.show', ['id' => $project->id]) }}">
+                                {{ __('Open project') }}
+                            </a>
+                            @if($isOwner)
+                                <a class="btn btn-outline-secondary btn-sm"
+                                   href="{{ route('pages.seo-reports.settings', ['id' => $project->id]) }}">
+                                    {{ __('Settings') }}
+                                </a>
+                            @endif
+                        </div>
+                    </article>
                 @endforeach
             </div>
         @endif
@@ -264,7 +307,9 @@
                         var q = (input.value || '').toLowerCase().trim();
                         grid.querySelectorAll('[data-sr-project-card]').forEach(function (card) {
                             var domain = (card.getAttribute('data-domain') || '').toLowerCase();
-                            card.style.display = (!q || domain.indexOf(q) !== -1) ? '' : 'none';
+                            var title = (card.getAttribute('data-title') || '').toLowerCase();
+                            var match = !q || domain.indexOf(q) !== -1 || title.indexOf(q) !== -1;
+                            card.style.display = match ? '' : 'none';
                         });
                     });
                 }

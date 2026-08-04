@@ -4,15 +4,16 @@
     $srProjectsTabActive = in_array($srTab, ['projects', 'project', 'settings', 'report', 'compare'], true);
     $srTemplatesTabActive = $srTab === 'templates';
     $srProjectsCount = $srProjectsCount ?? null;
+    $srCanEditSettings = $srCanEditSettings ?? false;
 @endphp
 <div class="cabinet-sr-nav-shell">
     @include('pages.partials.module-beta-banner', [
-        'moduleName' => __('SEO Reports'),
+        'moduleName' => __('Reports'),
     ])
-    <nav class="cabinet-sr-tabs" aria-label="{{ __('SEO Reports') }}">
+    <nav class="cabinet-sr-tabs" aria-label="{{ __('Reports') }}">
         <a href="{{ route('pages.seo-reports') }}"
-           class="cabinet-sr-tabs__item @if($srProjectsTabActive) is-active @endif"
-           @if($srProjectsTabActive) aria-current="page" @endif>
+           class="cabinet-sr-tabs__item @if($srProjectsTabActive && !$srContextProject) is-active @endif"
+           @if($srProjectsTabActive && !$srContextProject) aria-current="page" @endif>
             {{ __('Projects') }}
             @if($srProjectsCount !== null)
                 <span class="cabinet-sr-tabs__count">{{ (int) $srProjectsCount }}</span>
@@ -27,24 +28,31 @@
 
     @if($srContextProject)
         <div class="cabinet-sr-context" aria-label="{{ __('Project') }}">
-            <div class="cabinet-sr-context__crumb">
-                <a href="{{ route('pages.seo-reports') }}">{{ __('Projects') }}</a>
-                <span class="cabinet-sr-context__sep" aria-hidden="true">/</span>
-                @if(in_array($srTab, ['settings', 'report', 'compare'], true))
-                    <a href="{{ route('pages.seo-reports.show', ['id' => $srContextProject->id]) }}">{{ $srContextProject->domain }}</a>
+            <div class="cabinet-sr-context__main">
+                <div class="cabinet-sr-context__crumb">
+                    <a href="{{ route('pages.seo-reports') }}">{{ __('Projects') }}</a>
                     <span class="cabinet-sr-context__sep" aria-hidden="true">/</span>
-                    <span class="cabinet-sr-context__current">
-                        @if($srTab === 'settings')
-                            {{ __('Settings') }}
-                        @elseif($srTab === 'compare')
-                            {{ __('Compare') }}
-                        @else
-                            {{ __('Report') }}
-                        @endif
-                    </span>
-                @else
                     <span class="cabinet-sr-context__current">{{ $srContextProject->domain }}</span>
-                @endif
+                </div>
+                <nav class="cabinet-sr-subnav" aria-label="{{ $srContextProject->domain }}">
+                    <a href="{{ route('pages.seo-reports.show', ['id' => $srContextProject->id]) }}"
+                       class="cabinet-sr-subnav__item @if($srTab === 'project' || $srTab === 'report') is-active @endif">
+                        <i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i>
+                        {{ __('Overview') }}
+                    </a>
+                    @if($srCanEditSettings)
+                        <a href="{{ route('pages.seo-reports.settings', ['id' => $srContextProject->id]) }}"
+                           class="cabinet-sr-subnav__item @if($srTab === 'settings') is-active @endif">
+                            <i class="bi bi-gear" aria-hidden="true"></i>
+                            {{ __('Settings') }}
+                        </a>
+                    @endif
+                    <a href="{{ route('pages.seo-reports.compare', ['id' => $srContextProject->id]) }}"
+                       class="cabinet-sr-subnav__item @if($srTab === 'compare') is-active @endif">
+                        <i class="bi bi-columns-gap" aria-hidden="true"></i>
+                        {{ __('Compare') }}
+                    </a>
+                </nav>
             </div>
             <a href="{{ route('pages.seo-reports') }}" class="cabinet-sr-context__back">
                 ← {{ __('All SEO report projects') }}

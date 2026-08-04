@@ -185,7 +185,7 @@ class SeoReportPresetDemoFactory
      */
     private function presetForToggles(array $toggles): string
     {
-        $ads = ['direct', 'google_ads', 'vk_ads', 'meta_ads', 'vk_smm', 'ecommerce', 'calls'];
+        $ads = ['direct', 'google_ads', 'vk_ads', 'vk_smm', 'ecommerce', 'calls'];
         $hasAds = false;
         foreach ($ads as $key) {
             if (!empty($toggles[$key])) {
@@ -434,8 +434,8 @@ class SeoReportPresetDemoFactory
                     ],
                 ],
                 'groups' => [
-                    ['id' => 1, 'name' => 'Коммерция', 'words' => 80, 'top10' => 28],
-                    ['id' => 2, 'name' => 'Инфо', 'words' => 40, 'top10' => 14],
+                    ['id' => 1, 'name' => 'Коммерция', 'words' => 80, 'top3' => 12, 'top10' => 28, 'top30' => 55, 'top100' => 72],
+                    ['id' => 2, 'name' => 'Инфо', 'words' => 40, 'top3' => 6, 'top10' => 14, 'top30' => 26, 'top100' => 35],
                 ],
                 'competitors' => [
                     'count' => 2,
@@ -495,6 +495,26 @@ class SeoReportPresetDemoFactory
                 'pages' => [
                     ['name' => '/', 'clicks' => 1100, 'impressions' => 20000],
                 ],
+                'diagnostics' => [
+                    ['code' => 'URL_ALERT_4XX', 'label' => 'Страницы отвечают 4xx', 'severity' => 'CRITICAL', 'state' => 'PRESENT', 'last_state_update' => now()->subDays(2)->toIso8601String()],
+                    ['code' => 'NO_SITEMAPS', 'label' => 'Нет Sitemap', 'severity' => 'POSSIBLE_PROBLEM', 'state' => 'PRESENT', 'last_state_update' => now()->subDays(5)->toIso8601String()],
+                ],
+                'meta_duplicates' => [
+                    ['code' => 'DUPLICATE_CONTENT_ATTRS', 'label' => 'Одинаковые title и Description', 'severity' => 'POSSIBLE_PROBLEM', 'state' => 'PRESENT'],
+                    ['code' => 'DOCUMENTS_MISSING_DESCRIPTION', 'label' => 'Нет Description на многих страницах', 'severity' => 'POSSIBLE_PROBLEM', 'state' => 'PRESENT'],
+                ],
+                'filtered_pages' => [
+                    'summary' => [
+                        ['status' => 'LOW_QUALITY', 'label' => 'Малополезная / низкокачественная', 'count' => 18],
+                        ['status' => 'DUPLICATE', 'label' => 'Дубль', 'count' => 7],
+                        ['status' => 'NO_INDEX', 'label' => 'noindex', 'count' => 3],
+                    ],
+                    'low_quality' => [
+                        ['url' => 'https://example.com/tag/old', 'title' => 'Старый тег', 'status' => 'LOW_QUALITY', 'status_label' => 'Малополезная / низкокачественная', 'event_date' => now()->subDays(3)->toIso8601String()],
+                        ['url' => 'https://example.com/print/item', 'title' => 'Версия для печати', 'status' => 'LOW_QUALITY', 'status_label' => 'Малополезная / низкокачественная', 'event_date' => now()->subDays(8)->toIso8601String()],
+                    ],
+                    'samples' => [],
+                ],
             ],
             'insights' => [
                 'Визиты за период: 12 480 (+8,3% к прошлому периоду)',
@@ -538,6 +558,20 @@ class SeoReportPresetDemoFactory
                 'closed_in_period' => 12,
                 'overdue' => 2,
                 'note' => 'Демо SEO-чеклист',
+            ],
+            'work_done' => [
+                'checklist_project_id' => 1,
+                'from_checklist' => [
+                    ['id' => 1, 'title' => 'Оптимизация title/description на посадочных', 'status' => 'done', 'done_at' => now()->subDays(10)->toDateString()],
+                    ['id' => 2, 'title' => 'Расширение семантики TOP-20', 'status' => 'done', 'done_at' => now()->subDays(6)->toDateString()],
+                ],
+            ],
+            'work_plan' => [
+                'checklist_project_id' => 1,
+                'from_checklist' => [
+                    ['id' => 3, 'title' => 'Усилить быстрые победы (позиции 8–20)', 'status' => 'todo', 'due_at' => now()->addDays(5)->toDateString(), 'overdue' => false],
+                    ['id' => 4, 'title' => 'Пересобрать коммерческие посадочные', 'status' => 'doing', 'due_at' => now()->addDays(12)->toDateString(), 'overdue' => false],
+                ],
             ],
             'titlo_relevance' => [
                 'project_id' => 1,
@@ -643,26 +677,6 @@ class SeoReportPresetDemoFactory
                     ['name' => 'м 25–34', 'clicks' => 740, 'impressions' => 28000],
                 ],
             ];
-            $snap['meta_ads'] = [
-                'source' => 'demo',
-                'note' => 'Демо Meta Ads',
-                'kpis' => [
-                    'reach' => 18000,
-                    'impressions' => 52000,
-                    'clicks' => 900,
-                    'ctr' => 1.73,
-                    'cpc' => 22.0,
-                    'cpm' => 380,
-                    'spend' => 19800,
-                ],
-                'campaigns' => [
-                    ['name' => 'Awareness', 'impressions' => 52000, 'clicks' => 900, 'ctr' => 1.73, 'spend' => 19800],
-                ],
-                'ads' => [
-                    ['name' => 'Carousel 1', 'impressions' => 52000, 'clicks' => 900, 'ctr' => 1.73],
-                ],
-                'demography' => [],
-            ];
             $snap['vk_smm'] = [
                 'source' => 'demo',
                 'note' => 'Демо сообщества VK',
@@ -731,7 +745,6 @@ class SeoReportPresetDemoFactory
             ];
             $snap['traffic']['ecommerce'] = $snap['ecommerce'];
             $snap['progress']['vk_ads'] = 'ok';
-            $snap['progress']['meta_ads'] = 'ok';
             $snap['progress']['vk_smm'] = 'ok';
             $snap['progress']['ecommerce'] = 'ok';
             $snap['progress']['calls'] = 'ok';

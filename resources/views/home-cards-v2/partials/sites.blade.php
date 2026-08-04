@@ -43,7 +43,14 @@
          data-metrika-binding-url="{{ route('yandex-metrika.binding') }}"
          data-metrika-bind-url="{{ route('yandex-metrika.bind') }}"
          data-metrika-unbind-url="{{ route('yandex-metrika.unbind') }}"
-         data-metrika-return="{{ url()->current() }}">
+         data-metrika-return="{{ url()->current() }}"
+         data-webmaster-connect-url="{{ route('yandex-webmaster.connect') }}"
+         data-webmaster-status-url="{{ route('yandex-webmaster.status') }}"
+         data-webmaster-hosts-url="{{ route('yandex-webmaster.hosts') }}"
+         data-webmaster-binding-url="{{ route('yandex-webmaster.binding') }}"
+         data-webmaster-bind-url="{{ route('yandex-webmaster.bind') }}"
+         data-webmaster-unbind-url="{{ route('yandex-webmaster.unbind') }}"
+         data-webmaster-return="{{ url()->current() }}">
     <div class="cabinet-home-sites__head">
         <button type="button"
                 class="cabinet-home-sites__toggle"
@@ -83,25 +90,53 @@
                     </div>
                 @endif
                 <div class="cabinet-home-sites-legend small text-secondary">
-                    <span class="cabinet-home-sites-legend__item">
+                    <button type="button"
+                            class="cabinet-home-sites-legend__item cabinet-home-sites-legend__filter"
+                            data-sites-filter-module="on"
+                            aria-pressed="false"
+                            title="{{ __('Show sites with module presence') }}">
                         <span class="cabinet-home-sites-dot cabinet-home-sites-dot--on" aria-hidden="true"></span>
-                        {{ __('Site in module') }}
-                    </span>
-                    <span class="cabinet-home-sites-legend__item">
+                        {{ __('Site in module short') }}
+                    </button>
+                    <button type="button"
+                            class="cabinet-home-sites-legend__item cabinet-home-sites-legend__filter"
+                            data-sites-filter-module="off"
+                            aria-pressed="false"
+                            title="{{ __('Show sites with module gaps') }}">
                         <span class="cabinet-home-sites-dot cabinet-home-sites-dot--off" aria-hidden="true"></span>
-                        {{ __('Site not in module') }}
-                    </span>
-                    <span class="cabinet-home-sites-legend__item">
+                        {{ __('Site not in module short') }}
+                    </button>
+                    <button type="button"
+                            class="cabinet-home-sites-legend__item cabinet-home-sites-legend__filter"
+                            data-sites-filter-metrika="on"
+                            aria-pressed="false"
+                            title="{{ __('Show sites with Metrika') }}">
                         <span class="cabinet-home-sites-dot cabinet-home-sites-dot--sync-on" aria-hidden="true"></span>
-                        {{ __('Metrika synced') }}
-                    </span>
+                        {{ __('Metrika synced short') }}
+                    </button>
                     <button type="button"
                             class="cabinet-home-sites-legend__item cabinet-home-sites-legend__filter"
                             data-sites-filter-metrika="off"
                             aria-pressed="false"
                             title="{{ __('Show sites without Metrika') }}">
                         <span class="cabinet-home-sites-dot cabinet-home-sites-dot--sync-off" aria-hidden="true"></span>
-                        {{ __('Metrika not synced') }}
+                        {{ __('Metrika not synced short') }}
+                    </button>
+                    <button type="button"
+                            class="cabinet-home-sites-legend__item cabinet-home-sites-legend__filter"
+                            data-sites-filter-webmaster="on"
+                            aria-pressed="false"
+                            title="{{ __('Show sites with Webmaster') }}">
+                        <span class="cabinet-home-sites-dot cabinet-home-sites-dot--sync-on" aria-hidden="true"></span>
+                        {{ __('Webmaster synced short') }}
+                    </button>
+                    <button type="button"
+                            class="cabinet-home-sites-legend__item cabinet-home-sites-legend__filter"
+                            data-sites-filter-webmaster="off"
+                            aria-pressed="false"
+                            title="{{ __('Show sites without Webmaster') }}">
+                        <span class="cabinet-home-sites-dot cabinet-home-sites-dot--sync-off" aria-hidden="true"></span>
+                        {{ __('Webmaster not synced short') }}
                     </button>
                 </div>
                 <div class="cabinet-home-sites-toolbar__controls">
@@ -263,6 +298,7 @@
                                     @foreach($panel['rows'] as $site)
                                         @php
                                             $metrikaSynced = false;
+                                            $webmasterSynced = false;
                                             $modSort = [];
                                             foreach (($site['matrix'] ?? []) as $matrixCell) {
                                                 $mk = (string) ($matrixCell['key'] ?? '');
@@ -277,6 +313,9 @@
                                                 if ($mk === 'yandex-metrika') {
                                                     $metrikaSynced = !empty($matrixCell['synced']);
                                                 }
+                                                if ($mk === 'yandex-webmaster') {
+                                                    $webmasterSynced = !empty($matrixCell['synced']);
+                                                }
                                             }
                                             $visits = $site['visits'] ?? null;
                                             $vToday = is_array($visits) && array_key_exists('today', $visits) ? $visits['today'] : null;
@@ -289,6 +328,7 @@
                                         <tr data-cabinet-site-domain="{{ $site['domain'] }}"
                                             data-cabinet-site-mode="{{ $panel['mode'] }}"
                                             data-metrika-synced="{{ $metrikaSynced ? '1' : '0' }}"
+                                            data-webmaster-synced="{{ $webmasterSynced ? '1' : '0' }}"
                                             data-sort-domain="{{ $site['domain'] }}"
                                             data-sort-visits_today="{{ $vToday === null ? '' : $vToday }}"
                                             data-sort-visits_yesterday="{{ $vYesterday === null ? '' : $vYesterday }}"
@@ -297,7 +337,8 @@
                                             data-sort-visits_sum30="{{ $vSum30 === null ? '' : $vSum30 }}"
                                             data-sort-visits_avg30="{{ $vAvg30 === null ? '' : $vAvg30 }}"
                                             @foreach($modSort as $modKey => $modVal) data-sort-mod-{{ $modKey }}="{{ $modVal }}" @endforeach
-                                            data-sort-modules="{{ (int) ($site['modules_count'] ?? 0) }}">
+                                            data-sort-modules="{{ (int) ($site['modules_count'] ?? 0) }}"
+                                            data-modules-total="{{ (int) ($site['modules_total'] ?? $modulesTotal) }}">
                                             <td class="cabinet-home-sites-domain">
                                                 <a href="https://{{ $site['domain'] }}"
                                                    class="cabinet-home-sites-domain__host"
@@ -338,9 +379,15 @@
                                                         $dotClass = !empty($cell['synced'])
                                                             ? 'cabinet-home-sites-dot--sync-on'
                                                             : 'cabinet-home-sites-dot--sync-off';
-                                                        $statusText = !empty($cell['synced'])
-                                                            ? __('Metrika synced')
-                                                            : __('Metrika not synced');
+                                                        if (($cell['key'] ?? '') === 'yandex-webmaster') {
+                                                            $statusText = !empty($cell['synced'])
+                                                                ? __('Webmaster synced')
+                                                                : __('Webmaster not synced');
+                                                        } else {
+                                                            $statusText = !empty($cell['synced'])
+                                                                ? __('Metrika synced')
+                                                                : __('Metrika not synced');
+                                                        }
                                                     } else {
                                                         $dotClass = !empty($cell['present'])
                                                             ? 'cabinet-home-sites-dot--on'
@@ -363,6 +410,16 @@
                                                                 data-cabinet-metrika-dot
                                                                 data-domain="{{ $site['domain'] }}"
                                                                 data-counter-id="{{ (int) ($cell['counter_id'] ?? 0) }}"
+                                                                data-synced="{{ !empty($cell['synced']) ? '1' : '0' }}"
+                                                                title="{{ $cell['title'] }} — {{ $statusText }}{{ $cell['label'] !== '' ? (': '.$cell['label']) : '' }}">
+                                                            <span class="visually-hidden">{{ $cell['short'] }}</span>
+                                                        </button>
+                                                    @elseif(($cell['key'] ?? '') === 'yandex-webmaster')
+                                                        <button type="button"
+                                                                class="cabinet-home-sites-dot {{ $dotClass }}"
+                                                                data-cabinet-webmaster-dot
+                                                                data-domain="{{ $site['domain'] }}"
+                                                                data-host-id="{{ $cell['host_id'] ?? '' }}"
                                                                 data-synced="{{ !empty($cell['synced']) ? '1' : '0' }}"
                                                                 title="{{ $cell['title'] }} — {{ $statusText }}{{ $cell['label'] !== '' ? (': '.$cell['label']) : '' }}">
                                                             <span class="visually-hidden">{{ $cell['short'] }}</span>
@@ -507,6 +564,47 @@
                 <div class="modal-footer justify-content-between">
                     <button type="button" class="btn btn-outline-danger btn-sm d-none" data-metrika-unbind>
                         {{ __('Unbind counter') }}
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="cabinet-webmaster-modal" tabindex="-1" aria-labelledby="cabinet-webmaster-modal-title" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="cabinet-webmaster-modal-title">{{ __('Yandex Webmaster') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-secondary mb-2">
+                        {{ __('Choose Webmaster host for domain') }}:
+                        <strong data-webmaster-domain-label>—</strong>
+                    </p>
+                    <div data-webmaster-current class="alert alert-light border py-2 px-3 small d-none mb-3"></div>
+                    <div data-webmaster-loading class="text-secondary small py-3 d-none">{{ __('Loading Webmaster hosts') }}…</div>
+                    <div data-webmaster-error class="alert alert-danger py-2 px-3 small d-none"></div>
+                    <div data-webmaster-auth class="text-center py-3 d-none">
+                        <p class="mb-3">{{ __('Connect Yandex Webmaster to pick a host') }}</p>
+                        <a href="#" class="btn btn-primary" data-webmaster-auth-link>
+                            <i class="bi bi-box-arrow-in-right me-1" aria-hidden="true"></i>
+                            {{ __('Authorize Yandex Webmaster') }}
+                        </a>
+                    </div>
+                    <div data-webmaster-search-wrap class="mb-2 d-none">
+                        <input type="search"
+                               class="form-control form-control-sm"
+                               data-webmaster-search
+                               placeholder="{{ __('Search by site or host ID') }}"
+                               autocomplete="off">
+                    </div>
+                    <div class="list-group list-group-flush border rounded" data-webmaster-list style="max-height: 22rem; overflow: auto;"></div>
+                </div>
+                <div class="modal-footer justify-content-between">
+                    <button type="button" class="btn btn-outline-danger btn-sm d-none" data-webmaster-unbind>
+                        {{ __('Unbind Webmaster host') }}
                     </button>
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ __('Close') }}</button>
                 </div>

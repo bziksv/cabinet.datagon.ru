@@ -48,6 +48,8 @@
             @endif
         </p>
     </div>
+    <script src="{{ asset('plugins/chart.js/3.9.1/chart.js') }}"></script>
+    <script src="{{ asset('js/cabinet-seo-reports-charts.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-reports-charts.js')) ?: time() }}"></script>
     <script>
         (function () {
             var reactUrl = @json(route('seo-reports.public.react', ['token' => $report->public_token]));

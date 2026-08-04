@@ -12,6 +12,7 @@
         @include('pages.partials.seo-reports-nav', [
             'srTab' => 'report',
             'srContextProject' => $project,
+            'srCanEditSettings' => !empty($isOwner),
         ])
 
         @if(session('success'))
@@ -343,6 +344,7 @@
                         @endforeach
                     </div>
                     <textarea class="form-control form-control-sm" name="work_done_text" rows="4" data-sr-text="work_done">{{ old('work_done_text', $report->work_done_text) }}</textarea>
+                    <div class="form-text">{{ __('Work done editor hint checklist') }}</div>
                 </div>
                 <div class="mb-2">
                     <label class="form-label small">{{ __('Work plan') }}</label>
@@ -352,6 +354,7 @@
                         @endforeach
                     </div>
                     <textarea class="form-control form-control-sm" name="work_plan_text" rows="4" data-sr-text="work_plan">{{ old('work_plan_text', $report->work_plan_text) }}</textarea>
+                    <div class="form-text">{{ __('Work plan editor hint checklist') }}</div>
                 </div>
                 <div class="mb-2">
                     <label class="form-label small">{{ __('Traffic comment') }}</label>
@@ -381,6 +384,8 @@
     </div>
 
     @slot('js')
+        <script src="{{ asset('plugins/chart.js/3.9.1/chart.js') }}"></script>
+        <script src="{{ asset('js/cabinet-seo-reports-charts.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-reports-charts.js')) ?: time() }}"></script>
         <script>
             (function () {
                 var page = document.querySelector('[data-sr-status-url]');

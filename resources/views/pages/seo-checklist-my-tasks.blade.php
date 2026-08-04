@@ -3,6 +3,8 @@
     'documentTitle' => cabinet_sc_document_title(__('My tasks')),
 ])
     @slot('css')
+        <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
+        <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('css/cabinet-seo-checklist.css') }}?v={{ @filemtime(public_path('css/cabinet-seo-checklist.css')) ?: time() }}">
     @endslot
 
@@ -10,9 +12,9 @@
          id="cabinetSeoChecklistPlan"
          data-sc-hub="my-tasks"
          data-csrf="{{ csrf_token() }}"
-         data-status-url-template="{{ url('/seo-checklist/__PROJECT__/items/__ID__/status') }}"
-         data-timer-start-url-template="{{ url('/seo-checklist/__PROJECT__/items/__ID__/timer/start') }}"
-         data-timer-stop-url-template="{{ url('/seo-checklist/__PROJECT__/items/__ID__/timer/stop') }}"
+         data-status-url-template="{{ url('/checklist/__PROJECT__/items/__ID__/status') }}"
+         data-timer-start-url-template="{{ url('/checklist/__PROJECT__/items/__ID__/timer/start') }}"
+         data-timer-stop-url-template="{{ url('/checklist/__PROJECT__/items/__ID__/timer/stop') }}"
          data-timer-stop-active-url="{{ route('pages.seo-checklist.timer.stop-active') }}"
          data-i18n-comment-required="{{ e(__('Comment required for this status')) }}"
          data-i18n-choose-status="{{ e(__('Choose task status')) }}"
@@ -49,6 +51,7 @@
                 }
             }
             $statusLabels = $statusLabels ?? [];
+            $filterProjects = $filterProjects ?? collect();
         @endphp
 
         @if(!$hasAny)
@@ -59,6 +62,45 @@
                 <a href="{{ route('pages.seo-checklist') }}" class="btn btn-primary btn-sm">{{ __('Open projects') }}</a>
             </div>
         @else
+            <div class="cabinet-sc-plan-filters" data-sc-plan-filters>
+                <div class="cabinet-sc-plan-filters__label">{{ __('Filters') }}</div>
+                <label class="cabinet-sc-plan-filters__project">
+                    <span class="visually-hidden">{{ __('Filter by project') }}</span>
+                    <select class="form-select form-select-sm"
+                            data-sc-plan-project
+                            data-placeholder="{{ __('All projects') }}">
+                        <option value=""></option>
+                        @foreach($filterProjects as $fp)
+                            <option value="{{ $fp->id }}">
+                                {{ $fp->domain }}@if(trim((string) ($fp->title ?? '')) !== '') · {{ $fp->title }}@endif
+                            </option>
+                        @endforeach
+                    </select>
+                </label>
+                <div class="cabinet-sc-filters" title="{{ __('Filters can be combined') }}">
+                    <button type="button" class="btn btn-sm btn-outline-secondary active" data-sc-plan-preset="all" aria-pressed="true">{{ __('All') }}</button>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-secondary"
+                            data-sc-plan-preset="overdue"
+                            data-tip="{{ __('Overdue filter hint') }}"
+                            title="{{ __('Overdue filter hint') }}"
+                            aria-pressed="false">{{ __('Overdue') }}</button>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-secondary"
+                            data-sc-plan-preset="due-soon"
+                            data-tip="{{ __('Due soon filter hint') }}"
+                            title="{{ __('Due soon filter hint') }}"
+                            aria-pressed="false">{{ __('Due soon') }}</button>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-secondary"
+                            data-sc-plan-preset="important"
+                            title="{{ __('Important task hint') }}"
+                            aria-pressed="false">{{ __('Important') }}</button>
+                </div>
+            </div>
+            <div class="cabinet-sc-plan-filter-empty d-none" data-sc-plan-filter-empty>
+                <p class="small text-secondary mb-0">{{ __('No tasks match filters') }}</p>
+            </div>
             <div class="cabinet-sc-plan">
                 @foreach($groups as $group)
                     @php $items = $group['items'] ?? collect(); @endphp
@@ -96,7 +138,25 @@
     @include('pages.partials.seo-checklist-status-modal')
 
     @slot('js')
+        <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-status-modal.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-status-modal.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-plan.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-plan.js')) ?: time() }}"></script>
+        <script>
+            (function () {
+                if (!window.jQuery || !jQuery.fn.select2) return;
+                var $el = jQuery('[data-sc-plan-project]');
+                if (!$el.length) return;
+                $el.select2({
+                    theme: 'bootstrap4',
+                    width: '100%',
+                    placeholder: $el.data('placeholder') || '',
+                    allowClear: true,
+                    language: {
+                        noResults: function () { return @json(__('Nothing found')); },
+                        searching: function () { return @json(__('Searching')); }
+                    }
+                });
+            })();
+        </script>
     @endslot
 @endcomponent

@@ -11,7 +11,9 @@ class CabinetModuleBeta
     private const LINK_MARKERS = [
         'site-audit',
         'seo-checklist',
+        'checklist',
         'seo-reports',
+        'reports',
     ];
 
     public static function isBetaLink(?string $link): bool

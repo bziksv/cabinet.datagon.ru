@@ -9,7 +9,7 @@ use GuzzleHttp\Client;
 use Throwable;
 
 /**
- * VK Ads / Meta Ads / VK SMM via API tokens (VK community live; ads API sync pending).
+ * VK Ads / VK SMM via API tokens (VK community live; ads API sync pending).
  * Legacy *_import payloads in settings are still read if present.
  */
 class SeoReportExternalAdsCollector
@@ -51,9 +51,6 @@ class SeoReportExternalAdsCollector
             'vk_ads' => $tokenHint
                 ? __('VK Ads API sync pending')
                 : __('VK Ads is not connected'),
-            'meta_ads' => $tokenHint
-                ? __('Meta Ads API sync pending')
-                : __('Meta Ads is not connected'),
             'vk_smm' => $tokenHint
                 ? __('VK community API check rights')
                 : __('VK community is not connected'),
@@ -340,9 +337,6 @@ class SeoReportExternalAdsCollector
     {
         if ($key === 'vk_ads') {
             return trim((string) ($settings['vk_ads_token'] ?? '')) !== '';
-        }
-        if ($key === 'meta_ads') {
-            return trim((string) ($settings['meta_ads_token'] ?? '')) !== '';
         }
         if ($key === 'vk_smm') {
             return trim((string) ($settings['vk_smm_token'] ?? '')) !== ''

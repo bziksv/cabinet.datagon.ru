@@ -1,5 +1,5 @@
 @component('mail::message')
-# {{ __('SEO Reports') }}
+# {{ __('Reports') }}
 
 {{ __('You have been given access to SEO report project') }}: **{{ $project->domain }}**
 

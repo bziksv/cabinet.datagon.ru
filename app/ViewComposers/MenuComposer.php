@@ -111,7 +111,7 @@ class MenuComposer
     {
         $titleKey = (string) ($item['title'] ?? '');
         $link = (string) ($item['link'] ?? '');
-        if ($titleKey === 'SEO Checklist' || strpos($link, 'seo-checklist') !== false) {
+        if ($titleKey === 'SEO Checklist' || strpos($link, 'seo-checklist') !== false || strpos($link, '/checklist') !== false) {
             return SeoChecklistUserPreference::moduleTitleFor((int) Auth::id());
         }
 

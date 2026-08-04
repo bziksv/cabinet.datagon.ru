@@ -16,7 +16,11 @@
     data-sc-plan-item
     data-id="{{ $item->id }}"
     data-project-id="{{ $item->project_id }}"
+    data-domain="{{ $project ? $project->domain : '' }}"
     data-status="{{ $item->status }}"
+    data-important="{{ $item->is_important ? '1' : '0' }}"
+    data-overdue="{{ $isOver ? '1' : '0' }}"
+    data-due-soon="{{ (method_exists($item, 'isDueSoon') && $item->isDueSoon()) ? '1' : '0' }}"
     data-can-approve="{{ $canApprove ? '1' : '0' }}"
     data-time-spent="{{ (int) $item->time_spent_seconds }}"
     data-timer-running="{{ $timerRunning ? '1' : '0' }}"
@@ -30,7 +34,20 @@
         </div>
         <div class="cabinet-sc-plan__controls">
             @if($item->is_important)
-                <span class="cabinet-sc-plan__flag" title="{{ __('Important') }}">!</span>
+                <span class="cabinet-sc-plan__flag"
+                      data-tip="{{ __('Important task hint') }}"
+                      title="{{ __('Important task hint') }}"
+                      aria-label="{{ __('Important task hint') }}"
+                      role="img"
+                      tabindex="0">!</span>
+            @endif
+            @if(trim((string) ($item->help ?? '')) !== '')
+                <span class="cabinet-sc-plan__help-tip"
+                      data-tip="{{ e($item->help) }}"
+                      title="{{ e($item->help) }}"
+                      aria-label="{{ __('Hint / help') }}"
+                      role="img"
+                      tabindex="0">?</span>
             @endif
             <span class="cabinet-sc-role cabinet-sc-role--{{ $item->role }}">{{ $roleLabel }}</span>
             @if($item->due_at)

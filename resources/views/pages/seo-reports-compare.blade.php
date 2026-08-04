@@ -10,6 +10,7 @@
         @include('pages.partials.seo-reports-nav', [
             'srTab' => 'compare',
             'srContextProject' => $project,
+            'srCanEditSettings' => $project->isOwnedBy((int) Auth::id()),
         ])
 
         <div class="cabinet-sr-hero">

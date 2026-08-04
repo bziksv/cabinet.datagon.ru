@@ -78,21 +78,55 @@ class SeoReportDocxBuilder
             $paras[] = $this->p('');
         }
 
-        if ($report->work_done_text) {
+        $workDoneItems = is_array($snapshot['work_done']['from_checklist'] ?? null)
+            ? $snapshot['work_done']['from_checklist'] : [];
+        if ($workDoneItems !== [] || $report->work_done_text) {
             $paras[] = $this->p('Выполненные работы', true, 22);
-            foreach (preg_split("/\r\n|\n|\r/", (string) $report->work_done_text) ?: [] as $line) {
-                if (trim($line) !== '') {
-                    $paras[] = $this->p($line);
+            if ($workDoneItems !== []) {
+                $paras[] = $this->p('Из SEO-чеклиста', true, 18);
+                foreach ($workDoneItems as $item) {
+                    $line = (string) ($item['title'] ?? '—');
+                    if (!empty($item['done_at'])) {
+                        $line .= ' — ' . $item['done_at'];
+                    }
+                    $paras[] = $this->p('• ' . $line);
+                }
+            }
+            if ($report->work_done_text) {
+                if ($workDoneItems !== []) {
+                    $paras[] = $this->p('Комментарий менеджера', true, 18);
+                }
+                foreach (preg_split("/\r\n|\n|\r/", (string) $report->work_done_text) ?: [] as $line) {
+                    if (trim($line) !== '') {
+                        $paras[] = $this->p($line);
+                    }
                 }
             }
             $paras[] = $this->p('');
         }
 
-        if ($report->work_plan_text) {
+        $workPlanItems = is_array($snapshot['work_plan']['from_checklist'] ?? null)
+            ? $snapshot['work_plan']['from_checklist'] : [];
+        if ($workPlanItems !== [] || $report->work_plan_text) {
             $paras[] = $this->p('План работ', true, 22);
-            foreach (preg_split("/\r\n|\n|\r/", (string) $report->work_plan_text) ?: [] as $line) {
-                if (trim($line) !== '') {
-                    $paras[] = $this->p($line);
+            if ($workPlanItems !== []) {
+                $paras[] = $this->p('Из SEO-чеклиста', true, 18);
+                foreach ($workPlanItems as $item) {
+                    $line = (string) ($item['title'] ?? '—');
+                    if (!empty($item['due_at'])) {
+                        $line .= ' — ' . $item['due_at'];
+                    }
+                    $paras[] = $this->p('• ' . $line);
+                }
+            }
+            if ($report->work_plan_text) {
+                if ($workPlanItems !== []) {
+                    $paras[] = $this->p('Комментарий менеджера', true, 18);
+                }
+                foreach (preg_split("/\r\n|\n|\r/", (string) $report->work_plan_text) ?: [] as $line) {
+                    if (trim($line) !== '') {
+                        $paras[] = $this->p($line);
+                    }
                 }
             }
         }

@@ -128,7 +128,7 @@ class HomeModuleItemCounts
             return SiteAuditProject::query()->where('user_id', $userId)->count();
         });
 
-        $add('seo-reports', 'projects', static function () use ($userId) {
+        $add('reports', 'projects', static function () use ($userId) {
             if (!Schema::hasTable('seo_report_projects')) {
                 return 0;
             }
@@ -200,6 +200,7 @@ class HomeModuleItemCounts
             'meta-tags' => true,
             'html-editor' => true,
             'site-audit' => true,
+            'reports' => true,
             'seo-reports' => true,
             'text-analyzer' => true,
             'esenin-text-check' => true,
@@ -210,6 +211,15 @@ class HomeModuleItemCounts
             'phrase-commerce' => true,
         ];
 
-        return isset($known[$segment]) ? $segment : null;
+        if (!isset($known[$segment])) {
+            return null;
+        }
+
+        // Старый slug меню → тот же счётчик, что у /reports
+        if ($segment === 'seo-reports') {
+            return 'reports';
+        }
+
+        return $segment;
     }
 }

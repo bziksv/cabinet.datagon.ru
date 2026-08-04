@@ -1,6 +1,6 @@
 @component('component.card', [
     'title' => $project->domain,
-    'documentTitle' => $project->domain . ' · ' . __('SEO Reports'),
+    'documentTitle' => $project->domain . ' · ' . __('Reports'),
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('css/cabinet-seo-reports.css') }}?v={{ @filemtime(public_path('css/cabinet-seo-reports.css')) ?: time() }}">
@@ -10,6 +10,7 @@
         @include('pages.partials.seo-reports-nav', [
             'srTab' => 'project',
             'srContextProject' => $project,
+            'srCanEditSettings' => !empty($isOwner),
         ])
 
         @if(session('success'))
@@ -27,15 +28,7 @@
                 </p>
             </div>
             <div class="cabinet-sr-actions">
-                <a class="btn btn-outline-secondary btn-sm"
-                   href="{{ route('pages.seo-reports.compare', ['id' => $project->id]) }}">
-                    {{ __('Compare') }}
-                </a>
                 @if(!empty($isOwner))
-                    <a class="btn btn-outline-secondary btn-sm"
-                       href="{{ route('pages.seo-reports.settings', ['id' => $project->id]) }}">
-                        {{ __('Settings') }}
-                    </a>
                     <form method="post" action="{{ route('pages.seo-reports.demo') }}" class="d-inline">
                         @csrf
                         <input type="hidden" name="project_id" value="{{ $project->id }}">
@@ -51,6 +44,22 @@
                     </button>
                 @elseif(!empty($shareRole))
                     <span class="cabinet-sr-badge cabinet-sr-badge--manual">{{ __('Read only') }}</span>
+                @endif
+                @if(empty($isOwner) && !empty($assignedTeam))
+                    <span class="cabinet-sr-badge cabinet-sr-badge--ok" title="{{ __('Checklist team') }}">
+                        {{ $assignedTeam->title }}
+                    </span>
+                @endif
+                @if(!empty($isOwner))
+                    <form method="post" action="{{ route('pages.seo-reports.archive', ['id' => $project->id]) }}" class="d-inline">
+                        @csrf
+                        <button type="submit"
+                                class="btn btn-outline-secondary btn-sm cabinet-sr-archive-btn"
+                                data-confirm="{{ __('Archive this project?') }}"
+                                onclick="return confirm(this.dataset.confirm);">
+                            {{ __('Archive') }}
+                        </button>
+                    </form>
                 @endif
             </div>
         </div>
@@ -69,21 +78,43 @@
         <div class="cabinet-sr-dq mb-3">
             <div class="cabinet-sr-dq__head">
                 <span class="fw-semibold">{{ __('Connections health') }}</span>
+                @if(!empty($isOwner))
+                    <a href="{{ route('pages.seo-reports.settings', ['id' => $project->id]) }}" class="cabinet-sr-dq__head-link">
+                        {{ __('Project settings') }} →
+                    </a>
+                @endif
             </div>
-            <ul class="cabinet-sr-dq__list">
+            <ul class="cabinet-sr-dq__connections">
                 @foreach($sections as $section)
                     @if(in_array($section['source'], ['manual', 'computed'], true))
                         @continue
                     @endif
-                    <li>
-                        <strong>{{ $section['title'] }}</strong>
-                        ·
-                        @if($section['source_status'] === 'ok')
-                            <span class="text-success">{{ __('Connected') }}</span>
-                        @elseif($section['source_status'] === 'manual')
-                            {{ __('Manual') }}
-                        @else
-                            <span class="text-warning">{{ __('Not connected') }}</span>
+                    @if(empty($section['enabled']))
+                        @continue
+                    @endif
+                    @php
+                        $status = $section['source_status'] ?? 'not_connected';
+                        $connect = $section['connect'] ?? null;
+                        $isOk = $status === 'ok';
+                        $isDev = is_array($connect) && ($connect['kind'] ?? '') === 'dev';
+                    @endphp
+                    <li class="cabinet-sr-dq__conn @if($isOk) is-ok @elseif($isDev) is-dev @else is-off @endif">
+                        <div class="cabinet-sr-dq__conn-main">
+                            <strong>{{ $section['title'] }}</strong>
+                            @if($isOk)
+                                <span class="cabinet-sr-dq__conn-status">{{ __('Connected') }}</span>
+                            @elseif($isDev)
+                                <span class="cabinet-sr-dq__conn-status">{{ __('In development') }}</span>
+                            @else
+                                <span class="cabinet-sr-dq__conn-status">{{ __('Not connected') }}</span>
+                            @endif
+                        </div>
+                        @if(is_array($connect) && ($connect['kind'] ?? '') === 'link' && !empty($connect['url']))
+                            <a class="cabinet-sr-dq__conn-action" href="{{ $connect['url'] }}">
+                                {{ $connect['label'] ?? __('Connect') }}
+                            </a>
+                        @elseif($isDev)
+                            <span class="cabinet-sr-dq__conn-muted" title="{{ $connect['hint'] ?? '' }}">{{ __('Soon') }}</span>
                         @endif
                     </li>
                 @endforeach
@@ -91,6 +122,47 @@
         </div>
 
         @if(!empty($isOwner))
+            <div class="cabinet-sr-dq mb-3">
+                <div class="cabinet-sr-dq__head">
+                    <span class="fw-semibold">{{ __('Checklist team') }}</span>
+                </div>
+                @if(empty($teamAccessReady))
+                    <p class="small text-secondary mb-0">{{ __('Teams are not available') }}</p>
+                @else
+                    <p class="small text-secondary mb-2">{{ __('SEO reports team assign hint') }}</p>
+                    <form method="post" action="{{ route('pages.seo-reports.assign-team', ['id' => $project->id]) }}" class="mb-2">
+                        @csrf
+                        <div class="d-flex flex-wrap gap-2 align-items-end">
+                            <div style="min-width:14rem">
+                                <label class="form-label small mb-1">{{ __('Team') }}</label>
+                                <select name="team_id" class="form-select form-select-sm">
+                                    <option value="0">{{ __('No team') }}</option>
+                                    @foreach(($checklistTeams ?? []) as $team)
+                                        <option value="{{ $team->id }}" @if((int) $project->team_id === (int) $team->id) selected @endif>
+                                            {{ $team->title }}
+                                            @if(isset($team->members_count))
+                                                · {{ (int) $team->members_count }}
+                                            @endif
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-outline-primary btn-sm">{{ __('Save') }}</button>
+                            <a class="btn btn-link btn-sm" href="{{ route('pages.seo-checklist.team') }}">{{ __('Manage teams') }}</a>
+                        </div>
+                    </form>
+                    @if(!empty($assignedTeam))
+                        <p class="small mb-0 text-secondary">
+                            {{ __('Assigned team') }}:
+                            <strong>{{ $assignedTeam->title }}</strong>
+                            @if($assignedTeam->relationLoaded('members') || $assignedTeam->members)
+                                · {{ $assignedTeam->members->count() }} {{ __('members') }}
+                            @endif
+                        </p>
+                    @endif
+                @endif
+            </div>
+
             <div class="cabinet-sr-dq mb-3">
                 <div class="cabinet-sr-dq__head">
                     <span class="fw-semibold">{{ __('Project sharing') }}</span>
@@ -129,9 +201,19 @@
             </div>
         @endif
 
-        <div class="row g-3">
-            <div class="col-lg-7">
-                <h2 class="h6 mb-2">{{ __('Reports') }}</h2>
+        <div class="cabinet-sr-board">
+            <section class="cabinet-sr-board__reports">
+                <div class="cabinet-sr-board__head">
+                    <h2 class="cabinet-sr-board__title">{{ __('Reports') }}</h2>
+                    @if(!empty($canEdit))
+                        <button type="button"
+                                class="btn btn-primary btn-sm"
+                                data-bs-toggle="modal"
+                                data-bs-target="#cabinetSrGenerateModal">
+                            {{ __('Generate report') }}
+                        </button>
+                    @endif
+                </div>
                 @if($reports->isEmpty())
                     <div class="cabinet-sr-empty py-4">
                         <p class="mb-2">{{ __('No reports yet') }}</p>
@@ -150,26 +232,43 @@
                             <thead>
                             <tr>
                                 <th>{{ __('Period') }}</th>
+                                <th>{{ __('Generated at') }}</th>
                                 <th>{{ __('Status') }}</th>
                                 <th></th>
                             </tr>
                             </thead>
                             <tbody>
                             @foreach($reports as $report)
-                                <tr>
+                                @php
+                                    $isArchive = !empty($report->archived_from_report_id);
+                                    $generatedAt = $report->generated_at ?: $report->updated_at ?: $report->created_at;
+                                @endphp
+                                <tr @if(!$isArchive) class="is-current" @endif>
                                     <td>
                                         {{ optional($report->period_from)->format('d.m.Y') }}
                                         —
                                         {{ optional($report->period_to)->format('d.m.Y') }}
-                                        @if(!empty($report->archived_from_report_id))
+                                        @if($isArchive)
                                             <span class="cabinet-sr-badge cabinet-sr-badge--warn">{{ __('Previous version') }}</span>
+                                        @else
+                                            <span class="cabinet-sr-badge cabinet-sr-badge--ok">{{ __('Current version') }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="cabinet-sr-table__muted">
+                                        @if($generatedAt)
+                                            <time datetime="{{ $generatedAt->toIso8601String() }}">
+                                                {{ $generatedAt->format('d.m.Y H:i') }}
+                                            </time>
+                                        @else
+                                            —
                                         @endif
                                     </td>
                                     <td>
                                         <span class="cabinet-sr-badge cabinet-sr-badge--manual">{{ $report->statusLabel() }}</span>
                                     </td>
                                     <td class="text-end">
-                                        <a href="{{ route('pages.seo-reports.report', ['id' => $project->id, 'reportId' => $report->id]) }}">
+                                        <a class="btn btn-outline-primary btn-sm"
+                                           href="{{ route('pages.seo-reports.report', ['id' => $project->id, 'reportId' => $report->id]) }}">
                                             {{ __('Open') }}
                                         </a>
                                     </td>
@@ -179,51 +278,102 @@
                         </table>
                     </div>
                 @endif
-            </div>
+            </section>
 
-            <div class="col-lg-5">
-                <h2 class="h6 mb-2">{{ __('Report sections') }}</h2>
-                <p class="small text-secondary mb-2">{{ __('SEO report sections manager hint') }}</p>
-                <div class="cabinet-sr-section-list">
-                    @foreach($sections as $section)
+            @php
+                $sectionEnabled = collect($sections)->where('enabled', true)->values();
+                $sectionOff = collect($sections)->where('enabled', false)->values();
+                $secOk = $sectionEnabled->where('source_status', 'ok')->count()
+                    + $sectionEnabled->where('source_status', 'manual')->count();
+                $secNeed = $sectionEnabled->filter(function ($s) {
+                    $connect = $s['connect'] ?? null;
+                    $isDev = is_array($connect) && ($connect['kind'] ?? '') === 'dev';
+                    return !$isDev && in_array($s['source_status'] ?? '', ['not_connected', 'error', 'empty'], true);
+                })->count();
+                $secDev = $sectionEnabled->filter(function ($s) {
+                    $connect = $s['connect'] ?? null;
+                    return is_array($connect) && ($connect['kind'] ?? '') === 'dev';
+                })->count();
+            @endphp
+            <section class="cabinet-sr-board__sections">
+                <div class="cabinet-sr-board__head">
+                    <div>
+                        <h2 class="cabinet-sr-board__title">{{ __('Report sections') }}</h2>
+                        <p class="cabinet-sr-board__hint mb-0">{{ __('SEO report sections manager hint') }}</p>
+                    </div>
+                    @if(!empty($project->template_id))
+                        <a class="btn btn-outline-secondary btn-sm"
+                           href="{{ route('pages.seo-reports.templates.edit', ['id' => $project->template_id]) }}">
+                            {{ __('Edit template') }}
+                        </a>
+                    @endif
+                </div>
+                <div class="cabinet-sr-section-summary">
+                    <span class="is-ok">{{ $secOk }} {{ __('ready') }}</span>
+                    @if($secNeed > 0)
+                        <span class="is-need">{{ $secNeed }} {{ __('need connection') }}</span>
+                    @endif
+                    @if($secDev > 0)
+                        <span class="is-dev">{{ $secDev }} {{ __('in development short') }}</span>
+                    @endif
+                    @if($sectionOff->count() > 0)
+                        <span class="is-off">{{ $sectionOff->count() }} {{ __('off') }}</span>
+                    @endif
+                </div>
+                <div class="cabinet-sr-section-grid">
+                    @foreach($sectionEnabled as $section)
                         @php
+                            $connect = $section['connect'] ?? null;
+                            $isDev = is_array($connect) && ($connect['kind'] ?? '') === 'dev';
                             $dead = in_array($section['source_status'], ['not_connected', 'error', 'empty'], true);
-                            $cls = !$section['enabled'] ? 'cabinet-sr-section--off' : ($dead ? 'cabinet-sr-section--dead' : '');
-                            $badgeCls = 'cabinet-sr-badge--off';
-                            $badgeText = __('Off');
-                            if ($section['enabled'] && $section['source_status'] === 'ok') {
-                                $badgeCls = 'cabinet-sr-badge--ok';
-                                $badgeText = __('Connected');
-                            } elseif ($section['enabled'] && $section['source_status'] === 'manual') {
-                                $badgeCls = 'cabinet-sr-badge--manual';
+                            $cls = $isDev ? 'is-dev' : ($dead ? 'is-dead' : 'is-ok');
+                            if ($section['source_status'] === 'manual') {
+                                $cls = 'is-manual';
+                            }
+                            $badgeText = __('Connected');
+                            if ($section['source_status'] === 'manual') {
                                 $badgeText = __('Manual');
-                            } elseif ($section['enabled'] && $dead) {
-                                $badgeCls = 'cabinet-sr-badge--warn';
+                            } elseif ($isDev) {
+                                $badgeText = __('In development');
+                            } elseif ($dead) {
                                 $badgeText = __('Not connected');
                             }
                         @endphp
-                        <div class="cabinet-sr-section {{ $cls }}">
-                            <p class="cabinet-sr-section__title">{{ $section['title'] }}</p>
-                            <span class="cabinet-sr-badge {{ $badgeCls }}">{{ $badgeText }}</span>
-                            @if($section['enabled'] && !$section['client_visible'])
-                                <span class="small text-secondary">{{ __('Hidden for client') }}</span>
-                            @endif
+                        <div class="cabinet-sr-section-chip {{ $cls }}">
+                            <div class="cabinet-sr-section-chip__main">
+                                <span class="cabinet-sr-section-chip__title">{{ $section['title'] }}</span>
+                                <span class="cabinet-sr-section-chip__badge">{{ $badgeText }}</span>
+                            </div>
+                            <div class="cabinet-sr-section-chip__meta">
+                                @if($section['enabled'] && !$section['client_visible'] && !$isDev)
+                                    <span class="cabinet-sr-section-chip__note">{{ __('Hidden for client') }}</span>
+                                @endif
+                                @if(is_array($connect) && ($connect['kind'] ?? '') === 'link' && !empty($connect['url']) && $dead)
+                                    <a href="{{ $connect['url'] }}">{{ $connect['label'] ?? __('Connect') }}</a>
+                                @elseif($isDev)
+                                    <span class="cabinet-sr-section-chip__note">{{ __('Soon') }}</span>
+                                @endif
+                            </div>
                         </div>
                     @endforeach
                 </div>
-            </div>
+                @if($sectionOff->isNotEmpty())
+                    <details class="cabinet-sr-section-off">
+                        <summary>{{ __('Disabled sections') }} ({{ $sectionOff->count() }})</summary>
+                        <div class="cabinet-sr-section-grid cabinet-sr-section-grid--off">
+                            @foreach($sectionOff as $section)
+                                <div class="cabinet-sr-section-chip is-off">
+                                    <div class="cabinet-sr-section-chip__main">
+                                        <span class="cabinet-sr-section-chip__title">{{ $section['title'] }}</span>
+                                        <span class="cabinet-sr-section-chip__badge">{{ __('Off') }}</span>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </details>
+                @endif
+            </section>
         </div>
-
-        @if(!empty($isOwner))
-            <form method="post" action="{{ route('pages.seo-reports.archive', ['id' => $project->id]) }}" class="mt-4">
-                @csrf
-                <button type="submit" class="btn btn-outline-secondary btn-sm"
-                        data-confirm="{{ __('Archive this project?') }}"
-                        onclick="return confirm(this.dataset.confirm);">
-                    {{ __('Archive') }}
-                </button>
-            </form>
-        @endif
     </div>
 
     @if(!empty($canEdit))

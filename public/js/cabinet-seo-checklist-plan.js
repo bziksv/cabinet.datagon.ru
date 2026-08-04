@@ -312,6 +312,131 @@
         });
     });
 
+    (function initPlanFilters() {
+        var projectSelect = root.querySelector('[data-sc-plan-project]');
+        var emptyEl = root.querySelector('[data-sc-plan-filter-empty]');
+        var presetBtns = Array.prototype.slice.call(root.querySelectorAll('[data-sc-plan-preset]'));
+        if (!projectSelect && !presetBtns.length) return;
+
+        var activePresets = [];
+
+        function readQuery() {
+            try {
+                var params = new URLSearchParams(window.location.search);
+                var project = params.get('project') || '';
+                var preset = params.get('preset') || '';
+                if (projectSelect && project) {
+                    projectSelect.value = project;
+                }
+                if (preset && preset !== 'all') {
+                    activePresets = preset.split(',').map(function (p) {
+                        return String(p || '').trim();
+                    }).filter(Boolean);
+                }
+            } catch (e) {}
+        }
+
+        function writeQuery() {
+            try {
+                if (!window.history || !window.history.replaceState) return;
+                var params = new URLSearchParams(window.location.search);
+                var project = projectSelect ? String(projectSelect.value || '') : '';
+                if (project) params.set('project', project);
+                else params.delete('project');
+                if (activePresets.length) params.set('preset', activePresets.join(','));
+                else params.delete('preset');
+                var q = params.toString();
+                window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : '') + window.location.hash);
+            } catch (e) {}
+        }
+
+        function syncPresetButtons() {
+            var hasFacet = activePresets.length > 0;
+            presetBtns.forEach(function (btn) {
+                var key = btn.getAttribute('data-sc-plan-preset');
+                var on = key === 'all' ? !hasFacet : activePresets.indexOf(key) !== -1;
+                btn.classList.toggle('active', on);
+                btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+        }
+
+        function applyFilters() {
+            var projectId = projectSelect ? String(projectSelect.value || '') : '';
+            var hasPreset = activePresets.length > 0;
+            var visibleTotal = 0;
+
+            syncPresetButtons();
+
+            root.querySelectorAll('[data-sc-plan-group]').forEach(function (group) {
+                var visibleInGroup = 0;
+                group.querySelectorAll('[data-sc-plan-item]').forEach(function (item) {
+                    var show = true;
+                    if (projectId && String(item.getAttribute('data-project-id') || '') !== projectId) {
+                        show = false;
+                    }
+                    if (show && hasPreset) {
+                        var important = item.getAttribute('data-important') === '1';
+                        var overdue = item.getAttribute('data-overdue') === '1';
+                        var dueSoon = item.getAttribute('data-due-soon') === '1';
+                        var dueFilters = [];
+                        if (activePresets.indexOf('overdue') !== -1) dueFilters.push('overdue');
+                        if (activePresets.indexOf('due-soon') !== -1) dueFilters.push('due-soon');
+                        if (activePresets.indexOf('important') !== -1 && !important) {
+                            show = false;
+                        }
+                        if (show && dueFilters.length) {
+                            var dueOk = false;
+                            if (dueFilters.indexOf('overdue') !== -1 && overdue) dueOk = true;
+                            if (dueFilters.indexOf('due-soon') !== -1 && (dueSoon || overdue)) dueOk = true;
+                            if (!dueOk) show = false;
+                        }
+                    }
+                    item.classList.toggle('is-filter-hidden', !show);
+                    item.hidden = !show;
+                    if (show) visibleInGroup += 1;
+                });
+                var countEl = group.querySelector('[data-sc-plan-count]');
+                if (countEl) countEl.textContent = String(visibleInGroup);
+                group.classList.toggle('is-filter-hidden', visibleInGroup === 0);
+                group.hidden = visibleInGroup === 0;
+                visibleTotal += visibleInGroup;
+            });
+
+            if (emptyEl) {
+                emptyEl.classList.toggle('is-filter-hidden', visibleTotal > 0);
+                emptyEl.hidden = visibleTotal > 0;
+            }
+            writeQuery();
+        }
+
+        function togglePreset(key) {
+            if (!key || key === 'all') {
+                activePresets = [];
+                applyFilters();
+                return;
+            }
+            var idx = activePresets.indexOf(key);
+            if (idx === -1) activePresets.push(key);
+            else activePresets.splice(idx, 1);
+            applyFilters();
+        }
+
+        readQuery();
+        if (projectSelect) {
+            if (window.jQuery) {
+                window.jQuery(projectSelect).on('change', applyFilters);
+            } else {
+                projectSelect.addEventListener('change', applyFilters);
+            }
+        }
+        presetBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                togglePreset(btn.getAttribute('data-sc-plan-preset'));
+            });
+        });
+        applyFilters();
+    })();
+
     window.setInterval(function () {
         root.querySelectorAll('[data-sc-plan-item][data-timer-running="1"]').forEach(function (itemEl) {
             var timeEl = itemEl.querySelector('[data-sc-time]');

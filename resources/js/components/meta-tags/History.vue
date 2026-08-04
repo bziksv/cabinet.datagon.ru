@@ -11,59 +11,70 @@
 
                 <div id="accordion">
 
-                    <div class="card" v-for="(item, index) in history" :key="item.url || item.title || index" v-show="!seenCard.length || seenCard[index] === 1">
-                        <div class="card-header card-header-accordion">
-                            <h4 class="card-title">
-                                <a class="d-block w-100 collapsed accordion-title" data-toggle="collapse" :href="'#collapse' + index" aria-expanded="false">
-                                    <i class="expandable-accordion-caret fas fa-caret-right fa-fw"></i> {{ item.title }}
+                    <div class="card border mb-2" v-for="(item, index) in history" :key="item.url || item.title || index" v-show="!seenCard.length || seenCard[index] === 1">
+                        <div class="card-header card-header-accordion py-2 d-flex align-items-start gap-2">
+                            <h4 class="card-title h6 mb-0 flex-grow-1">
+                                <a class="d-block accordion-title collapsed"
+                                   data-bs-toggle="collapse"
+                                   :href="'#collapseHistory' + index"
+                                   role="button"
+                                   aria-expanded="false">
+                                    <i class="bi bi-chevron-right cabinet-mt-caret me-1" aria-hidden="true"></i>{{ item.title }}
                                 </a>
                             </h4>
 
-                            <div class="card-tools">
-                                <div class="btn-group">
-                                    <button type="button" class="btn btn-tool dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
-                                        <i class="fas fa-external-link-alt"></i>
-                                    </button>
-
-                                    <div class="dropdown-menu dropdown-menu-right" role="menu" style="">
+                            <div class="dropdown">
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                                        data-bs-toggle="dropdown"
+                                        aria-expanded="false">
+                                    <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
                                         <a :href="item.url || item.title" target="_blank" rel="noopener" class="dropdown-item">
                                             <i class="bi bi-box-arrow-up-right me-2" aria-hidden="true"></i>
                                             {{ lang.go_to_site }}
                                         </a>
+                                    </li>
+                                    <li>
                                         <a href="#" class="dropdown-item" @click.prevent="openTextAnalyzer(item.url || item.title)">
                                             <i class="bi bi-pie-chart me-2" aria-hidden="true"></i>
                                             {{ lang.text_analysis }}
                                         </a>
-                                    </div>
-                                </div>
-
-                                <span v-for="error_badge in item.error.badge" v-if="error_badge.length" v-html="error_badge.join('')"></span>
+                                    </li>
+                                </ul>
                             </div>
+
+                            <span v-for="(error_badge, tag) in (item.error && item.error.badge) || {}"
+                                  :key="tag"
+                                  v-if="error_badge && error_badge.length"
+                                  v-html="error_badge.join('')"></span>
                         </div>
 
-                        <div :id="'collapse' + index" class="collapse" data-parent="#accordion" style="">
-                            <div class="card-body">
-                                <table class="table table-bordered">
-                                    <thead>
+                        <div :id="'collapseHistory' + index" class="collapse" data-bs-parent="#accordion">
+                            <div class="card-body pt-0">
+                                <table class="table table-sm table-bordered table-hover align-middle mb-0">
+                                    <thead class="table-light">
                                         <tr>
                                             <th style="width: 150px;">{{ lang.tag }}</th>
                                             <th>{{ lang.content }}</th>
-                                            <th style="width: 40px">{{ lang.count }}</th>
+                                            <th style="width: 4rem">{{ lang.count }}</th>
                                             <th style="width: 150px">{{ lang.main_problems }}</th>
                                         </tr>
                                     </thead>
 
                                     <tbody>
-                                        <tr v-for="(value, tag) in item.data">
-                                            <td><span class="badge badge-success">< {{ tag }} ></span></td>
+                                        <tr v-for="(value, tag) in item.data" :key="tag">
+                                            <td><span class="badge text-bg-success">&lt; {{ tag }} &gt;</span></td>
                                             <td>
-                                                <span v-if="isTagContentPresent(value)"><textarea class="form-control">{{ value.join( ', \r\n' ) }}</textarea></span>
-                                                <span v-else class="badge badge-danger">{{ tagMissingLabel }}</span>
+                                                <span v-if="isTagContentPresent(value)"><textarea class="form-control form-control-sm" readonly>{{ value.join( ', \r\n' ) }}</textarea></span>
+                                                <span v-else class="badge text-bg-danger">{{ tagMissingLabel }}</span>
                                             </td>
                                             <td>
-                                                <span class="badge bg-warning">{{ tagContentCount(value) }}</span>
+                                                <span class="badge text-bg-warning">{{ tagContentCount(value) }}</span>
                                             </td>
-                                            <td v-html="item.error.main[tag].join(' <br />')"></td>
+                                            <td v-html="problemHtml(item, tag)"></td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -129,6 +140,13 @@
             },
             tagContentCount(value) {
                 return Array.isArray(value) ? value.length : 0;
+            },
+            problemHtml(item, tag) {
+                const main = item && item.error && item.error.main && item.error.main[tag];
+                if (Array.isArray(main) && main.length) {
+                    return main.join(' <br />');
+                }
+                return '';
             },
             fetchChunk(offset, initial) {
                 if (initial) {

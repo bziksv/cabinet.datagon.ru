@@ -87,7 +87,12 @@ class MetaTags extends MetaTagsController
                 $history_links = count($history);
                 $history = collect($history)->toJson();
 
-                $history = MetaTagsHistory::create(['meta_tag_id' => $model->id, 'quantity' => $history_links, 'data' => $history]);
+                $history = MetaTagsHistory::create([
+                    'meta_tag_id' => $model->id,
+                    'quantity' => $history_links,
+                    'errors_count' => $this->countHistoryErrorsFromJson($history),
+                    'data' => $history,
+                ]);
 
                 $compare = [];
 

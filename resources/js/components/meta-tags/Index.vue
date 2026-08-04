@@ -379,8 +379,8 @@
                 url: '',
                 time: 500,
                 length: [
-                    {id: 'title', name: this.lang.title, input: {min: null, max: null}},
-                    {id: 'description', name: this.lang.description, input: {min: null, max: null}},
+                    {id: 'title', name: this.lang.title, input: {min: 70, max: 80}},
+                    {id: 'description', name: this.lang.description, input: {min: 180, max: 300}},
                     {id: 'keywords', name: this.lang.keywords, input: {min: null, max: null}},
                 ],
                 result: [],

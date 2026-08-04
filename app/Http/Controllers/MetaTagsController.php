@@ -550,6 +550,10 @@ class MetaTagsController extends Controller
         }
 
         $data = json_decode($history->data, true) ?? [];
+        if (! is_array($data)) {
+            $data = [];
+        }
+        $data = $this->refreshHistoryItemErrors($data);
 
         if (! $request->has('offset') && ! $request->has('limit')) {
             return response()->json($data);
@@ -711,10 +715,14 @@ class MetaTagsController extends Controller
 
         $strSmall = '';
         $errors = [];
+        $requiredTags = ['title', 'description', 'keywords', 'canonical', 'h1'];
 
-        if (is_array($val)) {
+        // Отсутствующий обязательный тег (false / null / []) раньше ошибочно шёл в «Без проблем».
+        if ((! is_array($val) || count($val) === 0) && in_array($tag, $requiredTags, true)) {
+            $errors[] = $this->templateErrors(__('Meta tags tag missing'), '');
+        } elseif (is_array($val)) {
 
-            if (count($val) > 1 && ($tag === 'title' || $tag === 'description' || $tag === 'keywords' || $tag === 'canonical' || $tag === 'h1')) {
+            if (count($val) > 1 && in_array($tag, $requiredTags, true)) {
 
                 if ($type === 'main')
                     $strSmall = __('Duplicate tag, Check the page and leave 1 tag');
@@ -748,12 +756,37 @@ class MetaTagsController extends Controller
         return $errors;
     }
 
+    /**
+     * Пересчёт error.main / error.badge по сохранённым data (для старых снимков без length).
+     *
+     * @param  array<int, array<string, mixed>>  $items
+     * @return array<int, array<string, mixed>>
+     */
+    protected function refreshHistoryItemErrors(array $items): array
+    {
+        foreach ($items as &$item) {
+            if (! is_array($item) || ! isset($item['data']) || ! is_array($item['data'])) {
+                continue;
+            }
+
+            $error = ['main' => [], 'badge' => []];
+            foreach ($item['data'] as $tag => $value) {
+                $error['main'][$tag] = $this->errorsMetaTags($tag, $value, 'main');
+                $error['badge'][$tag] = $this->errorsMetaTags($tag, $value, 'badge');
+            }
+            $item['error'] = $error;
+        }
+        unset($item);
+
+        return $items;
+    }
+
     protected function templateErrors($text, $smallText)
     {
         $str = '';
 
         if (strlen($text))
-            $str .= '<span class="badge badge-danger mr-1">' . $text . '</span>';
+            $str .= '<span class="badge text-bg-danger me-1">' . $text . '</span>';
 
         if (strlen($smallText))
             $str .= '<br/><small>' . $smallText . '</small>';

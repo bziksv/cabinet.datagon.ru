@@ -17,6 +17,12 @@ use Illuminate\Support\Facades\Log;
  */
 class SiteAuditCrawlEngine
 {
+    /** Как часто писать лёгкий прогресс в БД (без очереди URL). */
+    private const PROGRESS_DB_EVERY = 5;
+
+    /** Как часто сбрасывать очередь/seen на диск. */
+    private const ENGINE_FILE_EVERY = 15;
+
     public function run(SiteAuditCrawl $crawl, bool $asyncChunks = true): SiteAuditCrawl
     {
         if (! $this->hasEngineState($crawl)) {
@@ -113,9 +119,19 @@ class SiteAuditCrawlEngine
             $state = $this->loadEngineState($crawl);
             $queue = $state['queue'];
             $i = $state['index'];
+            $fetched = $state['fetched'];
             $seen = $state['seen'];
             $unchanged = $state['unchanged'];
             $expanded = $state['expanded'];
+            $robotsGroups = is_array($crawl->progress_json['robots']['groups'] ?? null)
+                ? $crawl->progress_json['robots']['groups']
+                : null;
+
+            // сразу снять огромный engine из MySQL (миграция со старых краулов)
+            if (isset($crawl->progress_json['engine'])) {
+                $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
+                $crawl->save();
+            }
 
             if ($crawl->status !== SiteAuditCrawl::STATUS_FETCHING) {
                 $crawl->status = SiteAuditCrawl::STATUS_FETCHING;
@@ -130,15 +146,15 @@ class SiteAuditCrawlEngine
                     break;
                 }
 
-                $crawl->refresh();
-                if ($crawl->isFinished()) {
-                    $this->persistEngineState($crawl, $queue, $i, $seen, $unchanged, $expanded);
+                if ($this->crawlStatusIsTerminal((int) $crawl->id)) {
+                    $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
 
                     return false;
                 }
 
                 $url = $queue[$i];
                 $i++;
+                $fetched++;
                 $processed++;
 
                 try {
@@ -156,64 +172,55 @@ class SiteAuditCrawlEngine
                     $unchanged++;
                 }
 
-                $crawl->refresh();
-                if ($crawl->isFinished()) {
-                    $this->persistEngineState($crawl, $queue, $i, $seen, $unchanged, $expanded);
+                if ($this->crawlStatusIsTerminal((int) $crawl->id)) {
+                    $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
 
                     return false;
                 }
 
                 if (! empty($out['internal_links'])) {
+                    $known = $fetched + (count($queue) - $i);
                     foreach ($out['internal_links'] as $link) {
                         if (isset($seen[$link])) {
                             continue;
                         }
-                        if (count($queue) >= $limit) {
+                        if ($known >= $limit) {
                             break;
                         }
                         if ($patterns && SiteAuditUrlFilter::isExcluded($link, $patterns)) {
                             continue;
                         }
-                        $groups = $crawl->progress_json['robots']['groups'] ?? null;
-                        if (is_array($groups) && ! (new SiteAuditRobotsTxt())->isPathAllowed($groups, $link)) {
+                        if (is_array($robotsGroups) && ! (new SiteAuditRobotsTxt())->isPathAllowed($robotsGroups, $link)) {
                             continue;
                         }
                         $seen[$link] = true;
                         $queue[] = $link;
                         $expanded++;
+                        $known++;
                     }
                 }
 
-                $crawl->pages_fetched = $i;
-                $crawl->pages_total = count($queue);
-                $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
-                $progress['fetched'] = $i;
-                $progress['total'] = count($queue);
-                $progress['pages_unchanged'] = $unchanged;
-                $progress['links_expanded'] = $expanded;
-                $crawl->progress_json = $progress;
-                $this->persistEngineState($crawl, $queue, $i, $seen, $unchanged, $expanded);
-                $crawl->save();
+                $pagesTotal = max(count($seen), $fetched + (count($queue) - $i));
+                if ($processed % self::PROGRESS_DB_EVERY === 0 || $processed === 1) {
+                    $this->touchProgress($crawl, $fetched, $pagesTotal, $unchanged, $expanded);
+                }
+                if ($processed % self::ENGINE_FILE_EVERY === 0) {
+                    $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
+                }
             }
 
             // закончили всю очередь
             if ($i >= count($queue)) {
+                $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
                 $this->finishFetch($crawl, $dispatchContinue);
 
                 return false;
             }
 
             // ещё есть URL — следующий тик
-            $this->persistEngineState($crawl, $queue, $i, $seen, $unchanged, $expanded);
-            $crawl->pages_fetched = $i;
-            $crawl->pages_total = count($queue);
-            $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
-            $progress['fetched'] = $i;
-            $progress['total'] = count($queue);
-            $progress['pages_unchanged'] = $unchanged;
-            $progress['links_expanded'] = $expanded;
-            $crawl->progress_json = $progress;
-            $crawl->save();
+            $pagesTotal = max(count($seen), $fetched + (count($queue) - $i));
+            $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
+            $this->touchProgress($crawl, $fetched, $pagesTotal, $unchanged, $expanded);
 
             if ($dispatchContinue) {
                 ContinueSiteAuditCrawlJob::dispatch($crawl->id);
@@ -357,7 +364,7 @@ class SiteAuditCrawlEngine
         $progress['total'] = count($queue);
         $progress['links_expanded'] = 0;
         $crawl->progress_json = $progress;
-        $this->persistEngineState($crawl, $queue, 0, $seen, 0, 0);
+        $this->persistEngineState($crawl, $queue, 0, 0, $seen, 0, 0);
         $crawl->save();
 
         if (! $queue) {
@@ -400,8 +407,59 @@ class SiteAuditCrawlEngine
         }
     }
 
+    private function crawlStatusIsTerminal(int $crawlId): bool
+    {
+        $status = \Illuminate\Support\Facades\DB::table('site_audit_crawls')
+            ->where('id', $crawlId)
+            ->value('status');
+
+        return in_array($status, [
+            SiteAuditCrawl::STATUS_DONE,
+            SiteAuditCrawl::STATUS_FAILED,
+            SiteAuditCrawl::STATUS_CANCELLED,
+        ], true);
+    }
+
+    /**
+     * Лёгкий апдейт счётчиков в БД — без очереди URL в progress_json.
+     */
+    private function touchProgress(
+        SiteAuditCrawl $crawl,
+        int $fetched,
+        int $pagesTotal,
+        int $unchanged,
+        int $expanded
+    ): void {
+        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+        unset($progress['engine']);
+        $progress['engine_storage'] = 'file';
+        $progress['fetched'] = $fetched;
+        $progress['total'] = $pagesTotal;
+        $progress['pages_unchanged'] = $unchanged;
+        $progress['links_expanded'] = $expanded;
+        $crawl->progress_json = $progress;
+        $crawl->pages_fetched = $fetched;
+        $crawl->pages_total = $pagesTotal;
+        $crawl->save();
+    }
+
+    private function engineStatePath(int $crawlId): string
+    {
+        $dir = storage_path('app/site-audit-engine');
+        if (! is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+
+        return $dir . '/crawl_' . $crawlId . '.json';
+    }
+
     private function hasEngineState(SiteAuditCrawl $crawl): bool
     {
+        $path = $this->engineStatePath((int) $crawl->id);
+        if (is_file($path) && filesize($path) > 2) {
+            return true;
+        }
+
         $engine = $crawl->progress_json['engine'] ?? null;
 
         return is_array($engine)
@@ -410,19 +468,40 @@ class SiteAuditCrawlEngine
     }
 
     /**
-     * @return array{queue: string[], index: int, seen: array<string,bool>, unchanged: int, expanded: int}
+     * @return array{queue: string[], index: int, fetched: int, seen: array<string,bool>, unchanged: int, expanded: int}
      */
     private function loadEngineState(SiteAuditCrawl $crawl): array
     {
-        $engine = is_array($crawl->progress_json['engine'] ?? null) ? $crawl->progress_json['engine'] : [];
+        $path = $this->engineStatePath((int) $crawl->id);
+        $engine = null;
+        if (is_file($path)) {
+            $decoded = json_decode((string) file_get_contents($path), true);
+            if (is_array($decoded)) {
+                $engine = $decoded;
+            }
+        }
+
+        // миграция со старого огромного progress_json.engine
+        if ($engine === null) {
+            $engine = is_array($crawl->progress_json['engine'] ?? null) ? $crawl->progress_json['engine'] : [];
+        }
+
         $queue = array_values(array_map('strval', is_array($engine['queue'] ?? null) ? $engine['queue'] : []));
         $index = max(0, (int) ($engine['index'] ?? 0));
+        $fetched = (int) ($engine['fetched'] ?? $index);
+        if ($index > 0 && $index <= count($queue)) {
+            // компактим «уже обойдённые» URL из старого формата
+            $queue = array_values(array_slice($queue, $index));
+            $index = 0;
+        } elseif ($index > count($queue)) {
+            $index = 0;
+        }
+
         $seenList = is_array($engine['seen'] ?? null) ? $engine['seen'] : [];
         $seen = [];
         foreach ($seenList as $u) {
             $seen[(string) $u] = true;
         }
-        // на всякий случай — всё из queue уже «seen»
         foreach ($queue as $u) {
             $seen[$u] = true;
         }
@@ -430,6 +509,7 @@ class SiteAuditCrawlEngine
         return [
             'queue' => $queue,
             'index' => $index,
+            'fetched' => max(0, $fetched),
             'seen' => $seen,
             'unchanged' => (int) ($engine['unchanged'] ?? 0),
             'expanded' => (int) ($engine['expanded'] ?? 0),
@@ -444,25 +524,52 @@ class SiteAuditCrawlEngine
         SiteAuditCrawl $crawl,
         array $queue,
         int $index,
+        int $fetched,
         array $seen,
         int $unchanged,
         int $expanded
     ): void {
-        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
-        $progress['engine'] = [
-            'queue' => array_values($queue),
-            'index' => $index,
+        $remaining = array_values(array_slice($queue, max(0, $index)));
+        $payload = [
+            'queue' => $remaining,
+            'index' => 0,
+            'fetched' => $fetched,
             'seen' => array_keys($seen),
             'unchanged' => $unchanged,
             'expanded' => $expanded,
         ];
+
+        $path = $this->engineStatePath((int) $crawl->id);
+        $tmp = $path . '.tmp';
+        file_put_contents($tmp, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        @rename($tmp, $path);
+
+        // убираем blob очереди из MySQL — иначе 6MB UPDATE на каждый тик
+        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+        unset($progress['engine']);
+        $progress['engine_storage'] = 'file';
+        $progress['fetched'] = $fetched;
+        $progress['total'] = max(count($seen), $fetched + count($remaining));
+        $progress['pages_unchanged'] = $unchanged;
+        $progress['links_expanded'] = $expanded;
         $crawl->progress_json = $progress;
+        $crawl->pages_fetched = $fetched;
+        $crawl->pages_total = (int) $progress['total'];
     }
 
     private function clearEngineState(SiteAuditCrawl $crawl): void
     {
+        $path = $this->engineStatePath((int) $crawl->id);
+        if (is_file($path)) {
+            @unlink($path);
+        }
+        $tmp = $path . '.tmp';
+        if (is_file($tmp)) {
+            @unlink($tmp);
+        }
+
         $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
-        unset($progress['engine']);
+        unset($progress['engine'], $progress['engine_storage']);
         $crawl->progress_json = $progress;
     }
 }

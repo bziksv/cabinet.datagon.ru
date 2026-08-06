@@ -284,6 +284,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('site-audit/project/{id}/schedule', 'SiteAuditController@saveSchedule')->name('pages.site-audit.schedule')->middleware('permission:Site audit');
     Route::get('site-audit/crawl/{id}', 'SiteAuditController@showCrawl')->name('pages.site-audit.crawl.show')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/repeat', 'SiteAuditController@repeatCrawl')->name('pages.site-audit.crawl.repeat')->middleware('permission:Site audit');
+    Route::post('site-audit/crawl/{id}/continue', 'SiteAuditController@continueCrawl')->name('pages.site-audit.crawl.continue')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/cancel', 'SiteAuditController@cancelCrawl')->name('pages.site-audit.crawl.cancel')->middleware('permission:Site audit');
     Route::delete('site-audit/crawl/{id}', 'SiteAuditController@destroyCrawl')->name('pages.site-audit.crawl.destroy')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/share', 'SiteAuditController@createShare')->name('pages.site-audit.share.create')->middleware('permission:Site audit');

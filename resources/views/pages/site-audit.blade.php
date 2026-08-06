@@ -317,8 +317,18 @@
                                             </form>
                                         @endif
                                         @if($finished)
+                                            @php
+                                                $canResume = (new \App\Services\SiteAudit\SiteAuditCrawlEngine())->canResume($c);
+                                            @endphp
+                                            @if($canResume)
+                                                <form method="POST" action="{{ route('pages.site-audit.crawl.continue', $c->id) }}" class="d-inline"
+                                                      onsubmit="return confirm('Продолжить краул #{{ $c->id }} с {{ (int) $c->pages_fetched }} URL? Уже скачанные страницы сохранятся.');">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-outline-primary">Продолжить</button>
+                                                </form>
+                                            @endif
                                             <form method="POST" action="{{ route('pages.site-audit.crawl.repeat', $c->id) }}" class="d-inline"
-                                                  onsubmit="return confirm('Повторить краул для {{ e(optional($c->project)->domain ?? 'проекта') }} с теми же настройками?');">
+                                                  onsubmit="return confirm('Повторить краул для {{ e(optional($c->project)->domain ?? 'проекта') }} с теми же настройками? Начнётся новый краул с нуля.');">
                                                 @csrf
                                                 @if(app()->environment('local'))
                                                     <input type="hidden" name="sync" value="" data-sa-repeat-sync>
@@ -451,12 +461,25 @@
                             if (!actions.querySelector('form[action*="/repeat"]')) {
                                 var domain = (row.querySelector('td.fw-medium') || {}).textContent || 'проекта';
                                 domain = String(domain).trim() || 'проекта';
+                                if (j.can_resume && !actions.querySelector('form[action*="/continue"]')) {
+                                    var cont = document.createElement('form');
+                                    cont.method = 'POST';
+                                    cont.action = '{{ url('site-audit/crawl') }}/' + j.id + '/continue';
+                                    cont.className = 'd-inline';
+                                    cont.onsubmit = function () {
+                                        return confirm('Продолжить краул #' + j.id + ' с ' + (j.pages_fetched || 0) + ' URL? Уже скачанные страницы сохранятся.');
+                                    };
+                                    cont.innerHTML =
+                                        '<input type="hidden" name="_token" value="' + token + '">' +
+                                        '<button type="submit" class="btn btn-sm btn-outline-primary">Продолжить</button>';
+                                    actions.appendChild(cont);
+                                }
                                 var repeat = document.createElement('form');
                                 repeat.method = 'POST';
                                 repeat.action = '{{ url('site-audit/crawl') }}/' + j.id + '/repeat';
                                 repeat.className = 'd-inline';
                                 repeat.onsubmit = function () {
-                                    return confirm('Повторить краул для ' + domain + ' с теми же настройками?');
+                                    return confirm('Повторить краул для ' + domain + ' с теми же настройками? Начнётся новый краул с нуля.');
                                 };
                                 var syncHidden = @json(app()->environment('local'))
                                     ? '<input type="hidden" name="sync" value="' + syncFlag() + '">'

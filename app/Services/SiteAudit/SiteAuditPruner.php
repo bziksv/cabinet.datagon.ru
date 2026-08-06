@@ -20,6 +20,7 @@ class SiteAuditPruner
         });
 
         SiteAuditUserAgentSession::clear((int) $crawl->id);
+        SiteAuditCrawlEngine::clearStoredState((int) $crawl->id);
     }
 
     /**

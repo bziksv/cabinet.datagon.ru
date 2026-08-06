@@ -42,8 +42,18 @@
             </form>
         @endif
         @if($crawl->isFinished())
+            @php
+                $canResumeCrawl = (new \App\Services\SiteAudit\SiteAuditCrawlEngine())->canResume($crawl);
+            @endphp
+            @if($canResumeCrawl)
+                <form method="POST" action="{{ route('pages.site-audit.crawl.continue', $crawl->id) }}" class="d-inline"
+                      onsubmit="return confirm('Продолжить краул #{{ $crawl->id }} с {{ (int) $crawl->pages_fetched }} URL? Уже скачанные страницы сохранятся.');">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-primary">Продолжить сканирование</button>
+                </form>
+            @endif
             <form method="POST" action="{{ route('pages.site-audit.crawl.repeat', $crawl->id) }}" class="d-inline"
-                  onsubmit="return confirm('Повторить краул для {{ e(optional($project)->domain ?? 'проекта') }} с теми же настройками?');">
+                  onsubmit="return confirm('Повторить краул для {{ e(optional($project)->domain ?? 'проекта') }} с теми же настройками? Начнётся новый краул с нуля.');">
                 @csrf
                 <button type="submit" class="btn btn-sm btn-outline-secondary">Повторить</button>
             </form>

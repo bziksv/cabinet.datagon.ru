@@ -937,6 +937,52 @@ class SiteAuditController extends Controller
     }
 
     /**
+     * Продолжить failed/cancelled краул с сохранённой очередью (тот же id).
+     */
+    public function continueCrawl(Request $request, int $id)
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            if ($request->expectsJson()) {
+                return response()->json(['error' => 'demo', 'message' => 'В демо недоступно'], 403);
+            }
+            abort(403);
+        }
+
+        $crawl = $this->ownedCrawl($id);
+        $engine = new \App\Services\SiteAudit\SiteAuditCrawlEngine();
+
+        try {
+            $crawl = $engine->resume($crawl);
+        } catch (\Throwable $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['error' => 'resume', 'message' => $e->getMessage()], 422);
+            }
+
+            return redirect()
+                ->route('pages.site-audit.crawl.show', $id)
+                ->with('status', $e->getMessage());
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'crawl_id' => $crawl->id,
+                'status' => $crawl->status,
+                'status_label' => $crawl->statusLabelRu(),
+                'finished' => $crawl->isFinished(),
+                'can_resume' => false,
+                'status_url' => route('pages.site-audit.crawl.status', $crawl->id),
+                'redirect' => route('pages.site-audit'),
+                'message' => 'Сканирование продолжено с сохранённого места.',
+            ]);
+        }
+
+        return redirect(
+            route('pages.site-audit') . '?highlight=' . $crawl->id . '#sa-history'
+        )->with('status', 'Краул #' . $crawl->id . ' продолжен с ' . (int) $crawl->pages_fetched . ' URL');
+    }
+
+    /**
      * Повторный краул проекта с настройками исходного (скорость, exclude, seed, лимит).
      */
     public function repeatCrawl(Request $request, int $id)
@@ -1040,6 +1086,7 @@ class SiteAuditController extends Controller
             'counts' => $counts,
             'error' => $crawl->error,
             'finished' => $crawl->isFinished(),
+            'can_resume' => (new \App\Services\SiteAudit\SiteAuditCrawlEngine())->canResume($crawl),
             'progress_pct' => $crawl->pages_total > 0
                 ? (int) round(100 * $crawl->pages_fetched / $crawl->pages_total)
                 : 0,

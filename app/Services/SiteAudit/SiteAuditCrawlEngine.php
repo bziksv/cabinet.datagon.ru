@@ -491,7 +491,7 @@ class SiteAuditCrawlEngine
         $crawl->progress_json = $progress;
     }
 
-    private function hasEngineState(SiteAuditCrawl $crawl): bool
+    public function hasEngineState(SiteAuditCrawl $crawl): bool
     {
         $path = $this->engineStatePath((int) $crawl->id);
         if (is_file($path) && filesize($path) > 2) {
@@ -503,6 +503,59 @@ class SiteAuditCrawlEngine
         return is_array($engine)
             && isset($engine['queue'], $engine['index'])
             && is_array($engine['queue']);
+    }
+
+    /**
+     * Можно ли продолжить после failed/cancelled с сохранённой очередью.
+     */
+    public function canResume(SiteAuditCrawl $crawl): bool
+    {
+        if (! in_array($crawl->status, [
+            SiteAuditCrawl::STATUS_FAILED,
+            SiteAuditCrawl::STATUS_CANCELLED,
+        ], true)) {
+            return false;
+        }
+        if (! $this->hasEngineState($crawl)) {
+            return false;
+        }
+
+        $state = $this->loadEngineState($crawl);
+
+        return count($state['queue']) > $state['index'];
+    }
+
+    /**
+     * Снять finished и снова поставить в очередь (тот же crawl_id, тот же прогресс).
+     */
+    public function resume(SiteAuditCrawl $crawl): SiteAuditCrawl
+    {
+        if (! $this->canResume($crawl)) {
+            throw new \RuntimeException('Нет сохранённого прогресса для продолжения — только полный повтор');
+        }
+
+        $crawl->status = SiteAuditCrawl::STATUS_QUEUED_WAIT;
+        $crawl->error = null;
+        $crawl->finished_at = null;
+        $crawl->save();
+
+        SiteAuditGlobalCap::tryDispatch($crawl);
+
+        return $crawl->fresh() ?: $crawl;
+    }
+
+    public static function clearStoredState(int $crawlId): void
+    {
+        $dir = storage_path('app/site-audit-engine');
+        foreach ([
+            $dir . '/crawl_' . $crawlId . '.json',
+            $dir . '/crawl_' . $crawlId . '.json.tmp',
+            $dir . '/crawl_' . $crawlId . '_sitemap_urls.b64',
+        ] as $path) {
+            if (is_file($path)) {
+                @unlink($path);
+            }
+        }
     }
 
     /**

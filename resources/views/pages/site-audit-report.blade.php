@@ -22,6 +22,11 @@
 
         @include('pages.partials.site-audit-beta-banner')
 
+        @include('pages.partials.site-audit-crawl-live', [
+            'crawl' => $crawl,
+            'reloadOnFinish' => true,
+        ])
+
         <div class="mb-2 text-secondary small d-flex flex-wrap align-items-center" style="gap:8px">
             <span>
                 {{ optional($project)->domain }} ·
@@ -98,12 +103,12 @@
 
         <div class="tab-content">
             <div class="tab-pane fade {{ $activeGroup === 'all' ? 'show active' : '' }}" id="sa-pane-all" role="tabpanel">
-                <div class="cabinet-sa-buckets mb-4">
+                <div class="cabinet-sa-buckets mb-4" id="sa-buckets">
                     @foreach($bucketLabels as $key => $label)
                         <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}"
                              title="@if($key === 'critical')Самые срочные ошибки — чинить первыми@elseif($key === 'other')Средняя срочность@elseif($key === 'warning')Желательно починить@elseПросто знать, не всегда срочно@endif. Клик — отфильтровать меню слева.">
                             <div class="cabinet-sa-bucket__label">{{ $label }}</div>
-                            <div class="cabinet-sa-bucket__value">{{ (int) (($bucketsAll ?? [])[$key] ?? 0) }}</div>
+                            <div class="cabinet-sa-bucket__value" data-bucket="{{ $key }}" data-sa-live-bucket="{{ $key }}">{{ (int) (($bucketsAll ?? [])[$key] ?? 0) }}</div>
                         </div>
                     @endforeach
                 </div>
@@ -185,5 +190,6 @@
 
     @slot('js')
         @include('pages.partials.site-audit-tree-nav-js')
+        @include('pages.partials.site-audit-crawl-live-js')
     @endslot
 @endcomponent

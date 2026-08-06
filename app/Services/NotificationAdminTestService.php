@@ -5,7 +5,8 @@ namespace App\Services;
 use App\Notifications\BrokenDomainNotification;
 use App\Notifications\BrokenLinkNotification;
 use App\Notifications\ClusterCompletedNotification;
-use App\Notifications\MonitoringLimitExhaustedNotification;
+use App\Notifications\SiteAuditCrawlCompletedNotification;
+use App\SiteAuditCrawl;
 use App\Notifications\RegisterPasswordEmail;
 use App\Notifications\RepairDomainNotification;
 use App\Notifications\sendNotificationAboutChangeDNS;
@@ -13,6 +14,7 @@ use App\Notifications\sendNotificationAboutExpirationRegistrationPeriod;
 use App\ClusterResults;
 use App\ProjectTracking;
 use App\Support\NotificationLocale;
+use App\Support\StaffTelegramNotifier;
 use App\TelegramBot;
 use App\User;
 use Carbon\Carbon;
@@ -33,6 +35,10 @@ class NotificationAdminTestService
         'meta-tags-changed',
         'cluster-done',
         'monitoring-limit-exhausted',
+        'support-ticket-created',
+        'support-ticket-message',
+        'ideas-created',
+        'site-audit-crawl-done',
     ];
 
     private const EMAIL_EVENTS = [
@@ -46,6 +52,7 @@ class NotificationAdminTestService
         'monitoring-limit-exhausted',
         'auth-verify-email',
         'cluster-done',
+        'site-audit-crawl-done',
     ];
 
     private const MODAL_EVENTS = [
@@ -189,6 +196,14 @@ class NotificationAdminTestService
                     );
                     break;
 
+                case 'site-audit-crawl-done':
+                    $sent = SiteAuditCrawlCompletedNotification::sendTelegram(
+                        $user,
+                        $this->mockSiteAuditCrawl($user),
+                        'admin_test'
+                    );
+                    break;
+
                 case 'monitoring-limit-exhausted':
                     $sent = (new TelegramBotService((int) $user->chat_id))->sendMsg(
                         $this->testPrefix($activeLocale) . __('Monitoring limit exhausted telegram notify'),
@@ -199,6 +214,12 @@ class NotificationAdminTestService
                             'source' => 'admin_test',
                         ]
                     );
+                    break;
+
+                case 'support-ticket-created':
+                case 'support-ticket-message':
+                case 'ideas-created':
+                    $sent = StaffTelegramNotifier::sendTestToUser($user, $eventId, 'admin_test');
                     break;
 
                 default:
@@ -285,6 +306,10 @@ class NotificationAdminTestService
                         $this->mockClusterResult(),
                         $this->mockClusterRequest()
                     ));
+                    break;
+
+                case 'site-audit-crawl-done':
+                    $user->notify(new SiteAuditCrawlCompletedNotification($this->mockSiteAuditCrawl($user)));
                     break;
 
                 default:
@@ -496,6 +521,30 @@ class NotificationAdminTestService
         $cluster->clustering_level = 'hard';
 
         return $cluster;
+    }
+
+    private function mockSiteAuditCrawl(User $user): SiteAuditCrawl
+    {
+        $project = new \App\SiteAuditProject();
+        $project->id = 0;
+        $project->user_id = $user->id;
+        $project->domain = 'demo-test.example.ru';
+
+        $crawl = new SiteAuditCrawl();
+        $crawl->id = 42;
+        $crawl->user_id = $user->id;
+        $crawl->project_id = 0;
+        $crawl->pages_fetched = 1208;
+        $crawl->pages_total = 1208;
+        $crawl->buckets_json = [
+            'critical' => 16,
+            'other' => 42,
+            'warning' => 128,
+            'info' => 512,
+        ];
+        $crawl->setRelation('project', $project);
+
+        return $crawl;
     }
 
     /**

@@ -3,12 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Support\SupportAccess;
+use App\Support\StaffTelegramNotifier;
 use App\SupportTicket;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class SupportTicketController extends Controller
@@ -75,6 +77,15 @@ class SupportTicketController extends Controller
             return $ticket;
         });
 
+        try {
+            StaffTelegramNotifier::notifyTicketCreated($ticket);
+        } catch (\Throwable $e) {
+            Log::warning('Staff telegram ticket created failed', [
+                'ticket_id' => $ticket->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         flash()->overlay(__('Ticket created'), __('Success'))->success();
 
         return redirect()->route('support.show', $ticket);
@@ -139,6 +150,21 @@ class SupportTicketController extends Controller
             $ticket->status = $asStaff ? SupportTicket::STATUS_ANSWERED : SupportTicket::STATUS_OPEN;
             $ticket->save();
         });
+
+        if (! $asStaff) {
+            try {
+                StaffTelegramNotifier::notifyTicketUserMessage(
+                    $ticket->fresh(),
+                    $data['body'],
+                    Auth::user()
+                );
+            } catch (\Throwable $e) {
+                Log::warning('Staff telegram ticket message failed', [
+                    'ticket_id' => $ticket->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         flash()->overlay(__('Message sent'), __('Success'))->success();
 

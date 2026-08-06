@@ -86,19 +86,15 @@
             @php
                 $stClass = $crawl->statusCssClass();
             @endphp
-            <span class="cabinet-sa-status cabinet-sa-status--{{ $stClass }}" id="sa-status-pill">{{ $crawl->statusLabelRu() }}</span>
+            @if($crawl->isFinished())
+                <span class="cabinet-sa-status cabinet-sa-status--{{ $stClass }}" id="sa-status-pill">{{ $crawl->statusLabelRu() }}</span>
+            @endif
         </div>
 
-        <div class="mb-4" id="sa-progress-wrap" @if($crawl->isFinished()) style="display:none" @endif>
-            <div class="d-flex justify-content-between small text-muted mb-1">
-                <span>Прогресс</span>
-                <span id="sa-progress-label">{{ $crawl->pages_fetched }} / {{ $crawl->pages_total }}</span>
-            </div>
-            <div class="cabinet-sa-progress">
-                <div class="cabinet-sa-progress__bar" id="sa-progress-bar"
-                     style="width: {{ $crawl->pages_total > 0 ? round(100 * $crawl->pages_fetched / $crawl->pages_total) : 0 }}%"></div>
-            </div>
-        </div>
+        @include('pages.partials.site-audit-crawl-live', [
+            'crawl' => $crawl,
+            'reloadOnFinish' => true,
+        ])
 
         @if($crawl->error)
             <div class="alert {{ $crawl->status === 'cancelled' ? 'alert-warning' : 'alert-danger' }}">{{ $crawl->error }}</div>
@@ -1053,49 +1049,7 @@
                     }
                 })();
 
-                var root = document.getElementById('sa-crawl-root');
-                if (!root || root.getAttribute('data-finished') === '1') return;
-
-                var url = root.getAttribute('data-status-url');
-                var bar = document.getElementById('sa-progress-bar');
-                var label = document.getElementById('sa-progress-label');
-                var pill = document.getElementById('sa-status-pill');
-                var wrap = document.getElementById('sa-progress-wrap');
-
-                function tick() {
-                    fetch(url, { headers: { 'Accept': 'application/json' } })
-                        .then(function (r) { return r.json(); })
-                        .then(function (j) {
-                            if (label) {
-                                var txt = j.pages_fetched + ' / ' + j.pages_total;
-                                if (j.pages_unchanged > 0) {
-                                    txt += ' · без изменений ' + j.pages_unchanged;
-                                }
-                                label.textContent = txt;
-                            }
-                            if (bar) bar.style.width = (j.progress_pct || 0) + '%';
-                            if (pill) {
-                                pill.textContent = j.status_label || j.status;
-                                pill.className = 'cabinet-sa-status cabinet-sa-status--' +
-                                    (j.status === 'done' ? 'done' : (j.status === 'failed' ? 'failed' : 'run'));
-                            }
-                            if (j.buckets) {
-                                Object.keys(j.buckets).forEach(function (k) {
-                                    var el = document.querySelector('#sa-buckets [data-bucket="' + k + '"]');
-                                    if (el) el.textContent = j.buckets[k];
-                                });
-                            }
-                            if (j.finished) {
-                                if (wrap) wrap.style.display = 'none';
-                                window.location.reload();
-                                return;
-                            }
-                            setTimeout(tick, 2000);
-                        })
-                        .catch(function () { setTimeout(tick, 4000); });
-                }
-
-                setTimeout(tick, 1500);
+                @include('pages.partials.site-audit-crawl-live-js')
             })();
         </script>
     @endslot

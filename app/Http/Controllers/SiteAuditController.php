@@ -112,13 +112,8 @@ class SiteAuditController extends Controller
         $crawl = $this->ownedCrawl($id, true, true);
         $crawl->load('project');
 
-        $counts = $crawl->counts_json ?: SiteAuditFinding::query()
-            ->where('crawl_id', $crawl->id)
-            ->selectRaw('code, count(*) as c')
-            ->groupBy('code')
-            ->pluck('c', 'code')
-            ->all();
-        $counts = (new SiteAuditIgnoreService())->applyToCounts((array) $counts, $crawl);
+        $counts = $this->countsForCrawlDisplay($crawl);
+        $counts = (new SiteAuditIgnoreService())->applyToCounts($counts, $crawl);
         $counts = (new SiteAuditFindingNoteService())->applyFixedToCounts($counts, $crawl);
 
         $tree = $this->buildReportTree($counts, 'tech');
@@ -400,7 +395,7 @@ class SiteAuditController extends Controller
             $filterParams['fixed'] = 1;
         }
 
-        $sideCounts = (array) ($crawl->counts_json ?: []);
+        $sideCounts = $this->countsForCrawlDisplay($crawl);
         $sideCounts = $ignoreSvc->applyToCounts($sideCounts, $crawl);
         $sideCounts = $noteSvc->applyFixedToCounts($sideCounts, $crawl);
 
@@ -1025,14 +1020,13 @@ class SiteAuditController extends Controller
     {
         $crawl = $this->ownedCrawl($id);
 
-        $counts = $crawl->counts_json ?: [];
-        if ($crawl->status === SiteAuditCrawl::STATUS_DONE && ! $counts) {
-            $counts = SiteAuditFinding::query()
-                ->where('crawl_id', $crawl->id)
-                ->selectRaw('code, count(*) as c')
-                ->groupBy('code')
-                ->pluck('c', 'code')
-                ->all();
+        $counts = $this->countsForCrawlDisplay($crawl);
+        $counts = (new SiteAuditIgnoreService())->applyToCounts($counts, $crawl);
+        $counts = (new SiteAuditFindingNoteService())->applyFixedToCounts($counts, $crawl);
+
+        $buckets = is_array($crawl->buckets_json) ? $crawl->buckets_json : [];
+        if ($buckets === [] || ! $crawl->isFinished()) {
+            $buckets = $this->bucketsFromTree($this->buildReportTree($counts, null));
         }
 
         return response()->json([
@@ -1042,7 +1036,7 @@ class SiteAuditController extends Controller
             'pages_fetched' => (int) $crawl->pages_fetched,
             'pages_total' => (int) $crawl->pages_total,
             'pages_unchanged' => (int) (($crawl->progress_json['pages_unchanged'] ?? 0)),
-            'buckets' => $crawl->buckets_json,
+            'buckets' => $buckets,
             'counts' => $counts,
             'error' => $crawl->error,
             'finished' => $crawl->isFinished(),
@@ -1506,6 +1500,27 @@ class SiteAuditController extends Controller
         }
 
         return $bySeverity;
+    }
+
+    /**
+     * Счётчики по кодам: после агрегации — counts_json, во время краула — live из findings.
+     * Иначе на отчётах нули, хотя строки findings уже есть.
+     *
+     * @return array<string,int>
+     */
+    private function countsForCrawlDisplay(SiteAuditCrawl $crawl): array
+    {
+        $stored = is_array($crawl->counts_json) ? $crawl->counts_json : [];
+        if ($crawl->isFinished() && $stored !== []) {
+            return $stored;
+        }
+
+        return SiteAuditFinding::query()
+            ->where('crawl_id', $crawl->id)
+            ->selectRaw('code, count(*) as c')
+            ->groupBy('code')
+            ->pluck('c', 'code')
+            ->all();
     }
 
     private function bucketsFromTree(array $tree): array

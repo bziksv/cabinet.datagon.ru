@@ -92,6 +92,9 @@ class SiteAuditFailedJobsCommand extends Command
         if (stripos($clip, 'DiscoverSiteAudit') !== false) {
             return 'DiscoverSiteAuditUrlsJob';
         }
+        if (stripos($clip, 'ContinueSiteAudit') !== false) {
+            return 'ContinueSiteAuditCrawlJob';
+        }
         if (stripos($clip, 'AggregateSiteAudit') !== false) {
             return 'AggregateSiteAuditCrawlJob';
         }

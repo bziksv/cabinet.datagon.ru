@@ -1,4 +1,4 @@
-@component('component.card', ['title' =>  __('Все слова') ])
+@component('component.card', ['title' =>  __('Main words') ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('plugins/keyword-generator/css/font-awesome-4.7.0/css/font-awesome.css') }}">
         <link rel="stylesheet" href="{{ asset('plugins/keyword-generator/css/style.css') }}">
@@ -43,7 +43,7 @@
     </div>
 
     <div class="pb-3 unigram">
-        <h2>{{ __('Top list of phrases (TLP)') }}</h2>
+        <h2>{{ __('Top list of main words') }}</h2>
         <table id="unigram" class="table table-bordered table-hover dataTable dtr-inline"
                style="width: 100% !important;">
             <thead>

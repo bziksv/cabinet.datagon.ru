@@ -1057,7 +1057,7 @@
                     copy: "{{ __('Copy') }}",
                     csv: "{{ __('CSV') }}",
                     excel: "{{ __('Excel') }}",
-                    childWords: "{{ __('Word forms') }}",
+                    childWords: "{{ __('Main words') }}",
                     missingWords: "{{ __('Missing words') }}",
                     success: "{{ __('Successfully') }}",
                     successCopied: "{{ __('Success copied') }}",

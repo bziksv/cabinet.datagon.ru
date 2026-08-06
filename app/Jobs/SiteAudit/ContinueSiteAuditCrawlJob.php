@@ -11,15 +11,15 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Старт краула: discovery + первый батч обхода; дальше — ContinueSiteAuditCrawlJob.
+ * Продолжение краула после батча (обход URL порциями, чтобы не упираться в timeout воркера).
  */
-class DiscoverSiteAuditUrlsJob implements ShouldQueue
+class ContinueSiteAuditCrawlJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $tries = 1;
+    public $tries = 3;
 
-    /** Discovery (sitemap) + первый батч; продолжение — отдельные Continue job */
+    /** Секунд: батч ~4 мин + запас на discover-хвост / сеть */
     public $timeout = 900;
 
     /** @var int */
@@ -37,11 +37,13 @@ class DiscoverSiteAuditUrlsJob implements ShouldQueue
         if (! $crawl || $crawl->isFinished()) {
             return;
         }
-        // Ещё ждёт глобальный слот — не стартуем discover
         if ($crawl->status === SiteAuditCrawl::STATUS_QUEUED_WAIT) {
             return;
         }
+        if ($crawl->status === SiteAuditCrawl::STATUS_AGGREGATING) {
+            return;
+        }
 
-        (new SiteAuditCrawlEngine())->run($crawl, true);
+        (new SiteAuditCrawlEngine())->processBatch($crawl, true);
     }
 }

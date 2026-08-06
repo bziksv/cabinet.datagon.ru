@@ -1791,10 +1791,13 @@ class SiteAuditAggregator
     {
         try {
             $user = \App\User::query()->find($crawl->user_id);
-            if (! $user || ! $user->email) {
+            if (! $user) {
                 return;
             }
-            $user->notify(new \App\Notifications\SiteAuditCrawlCompletedNotification($crawl));
+            if ($user->email) {
+                $user->notify(new \App\Notifications\SiteAuditCrawlCompletedNotification($crawl));
+            }
+            \App\Notifications\SiteAuditCrawlCompletedNotification::sendTelegram($user, $crawl);
         } catch (\Throwable $e) {
             Log::warning('SiteAudit notify failed: ' . $e->getMessage(), [
                 'crawl_id' => $crawl->id,

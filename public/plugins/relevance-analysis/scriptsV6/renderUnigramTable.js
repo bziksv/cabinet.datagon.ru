@@ -124,7 +124,7 @@ function renderUnigramTable(unigramTable, count, words, resultId = 0, searchPass
         unlock: (words && words.unlockWord) || 'Убрать слово из игнора',
         expand: (words && words.expandForms) || 'Развернуть словоформы',
         collapse: (words && words.collapseForms) || 'Свернуть',
-        childWords: (words && words.childWords) || 'Словоформы',
+        childWords: (words && words.childWords) || 'Главные слова',
         missingWords: (words && words.missingWords) || 'Упущенные слова',
     })
 
@@ -270,8 +270,8 @@ function initUnigramDataTable(count, words, resultId, searchPassages, onReady) {
         if (key === 1) {
             $(this).append(
                 "<a class='btn btn-secondary click_tracking' data-click='Child Words' href='/show-child-words/" + resultId + "' target='_blank'" +
-                (typeof window.relevanceActionTipAttr === 'function' ? window.relevanceActionTipAttr((words && words.childWords) || 'Словоформы') : '') + ">" +
-                (words.childWords || 'Словоформы') +
+                (typeof window.relevanceActionTipAttr === 'function' ? window.relevanceActionTipAttr((words && words.childWords) || 'Главные слова') : '') + ">" +
+                (words.childWords || 'Главные слова') +
                 "</a>"
             )
             if (resultId !== 0) {

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 /**
  * Глобальный backpressure: одновременно N краулов на весь сервер.
  * Остальные — queued_wait без Discover/Fetch jobs.
- * Cabinet default N=1; proxy2 — SITE_AUDIT_GLOBAL_MAX_ACTIVE.
+ * Cabinet default N=2 (как numprocs site_audit); proxy2 — SITE_AUDIT_GLOBAL_MAX_ACTIVE.
  */
 class SiteAuditGlobalCap
 {

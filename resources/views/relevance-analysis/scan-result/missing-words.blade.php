@@ -43,7 +43,7 @@
     </div>
 
     <div class="pb-3 unigram">
-        <h2>{{ __('Top list of phrases (TLP)') }}</h2>
+        <h2>{{ __('Top list of missing words') }}</h2>
         <table id="unigram" class="table table-bordered table-hover dataTable dtr-inline"
                style="width: 100% !important;">
             <thead>

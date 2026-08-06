@@ -11,6 +11,6 @@ class SiteAuditSyncRunner
 {
     public function run(SiteAuditCrawl $crawl): SiteAuditCrawl
     {
-        return (new SiteAuditCrawlEngine())->run($crawl);
+        return (new SiteAuditCrawlEngine())->run($crawl, false);
     }
 }

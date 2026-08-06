@@ -201,6 +201,14 @@ a.paginate_button.current {
     z-index: 30;
 }
 
+/* При наведении поднимаем колонку над соседними sticky-th (иначе тултип режется). */
+#unigram_wrapper .relevance-tlp-table-scroll thead tr.unigram-thead__titles th:hover,
+#unigram_wrapper .relevance-tlp-table-scroll thead tr.unigram-thead__titles th:focus-within,
+#phrases_wrapper .relevance-tlp-table-scroll thead tr.phrases-thead__titles th:hover,
+#phrases_wrapper .relevance-tlp-table-scroll thead tr.phrases-thead__titles th:focus-within {
+    z-index: 45;
+}
+
 #unigram_wrapper .relevance-tlp-table-scroll .relevance-tlp-col-tip,
 #phrases_wrapper .relevance-tlp-table-scroll .relevance-tlp-col-tip {
     left: 0;
@@ -892,7 +900,8 @@ th {
 
 #unigram_wrapper .dt-buttons,
 #phrases_wrapper .dt-buttons,
-#scanned-sites_wrapper .dt-buttons {
+#scanned-sites_wrapper .dt-buttons,
+#recommendations_wrapper .dt-buttons {
     margin-left: 20px;
     margin-bottom: 0.75rem;
     float: left;
@@ -905,9 +914,11 @@ th {
 #unigram_wrapper .dataTables_length,
 #phrases_wrapper .dataTables_length,
 #scanned-sites_wrapper .dataTables_length,
+#recommendations_wrapper .dataTables_length,
 #unigram_wrapper .dataTables_filter,
 #phrases_wrapper .dataTables_filter,
-#scanned-sites_wrapper .dataTables_filter {
+#scanned-sites_wrapper .dataTables_filter,
+#recommendations_wrapper .dataTables_filter {
     margin-bottom: 0.75rem;
 }
 
@@ -915,12 +926,15 @@ th {
 #unigram_wrapper .dt-buttons.btn-group > .btn,
 #phrases_wrapper .dt-buttons.btn-group > .btn,
 #scanned-sites_wrapper .dt-buttons.btn-group > .btn,
+#recommendations_wrapper .dt-buttons.btn-group > .btn,
 #unigram_wrapper .dt-buttons > .btn,
 #phrases_wrapper .dt-buttons > .btn,
 #scanned-sites_wrapper .dt-buttons > .btn,
+#recommendations_wrapper .dt-buttons > .btn,
 #unigram_wrapper .dt-buttons > a.btn,
 #phrases_wrapper .dt-buttons > a.btn,
 #scanned-sites_wrapper .dt-buttons > a.btn,
+#recommendations_wrapper .dt-buttons > a.btn,
 #scanned-sites_wrapper #copySites {
     margin: 0;
     border-radius: 0.375rem !important;
@@ -1842,7 +1856,16 @@ a.competitor-cloud:hover {
     font-size: 0.95rem;
 }
 
-/* Подсказки кнопок действий — как cabinet-pw / cabinet-sm */
+/* Подсказки кнопок действий / TLP — поверх sticky-th и overflow-скролла таблицы */
+.cabinet-ra-tooltip {
+    z-index: 2000000 !important;
+}
+
+.relevance-tlp-col-tip-host > .relevance-tlp-col-tip,
+.relevance-tlp-col-tip-host > .ui_tooltip {
+    display: none !important;
+}
+
 .cabinet-ra-tooltip .tooltip-inner {
     max-width: 16rem;
     padding: 0.4rem 0.65rem;

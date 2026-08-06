@@ -22,8 +22,11 @@ return [
     'body_temp_max_total_bytes' => (int) env('SITE_AUDIT_BODY_TEMP_MAX_BYTES', 200_000_000), // 200 MB
     'body_temp_max_files' => (int) env('SITE_AUDIT_BODY_TEMP_MAX_FILES', 200),
     'max_active_crawls_per_user' => 1,
-    // Глобально на сервер (cabinet=1; на proxy2 поднять SITE_AUDIT_GLOBAL_MAX_ACTIVE)
-    'global_max_active_crawls' => (int) env('SITE_AUDIT_GLOBAL_MAX_ACTIVE', 1),
+    // Глобально на сервер: по числу воркеров site_audit (сейчас 2). На proxy2 — SITE_AUDIT_GLOBAL_MAX_ACTIVE.
+    'global_max_active_crawls' => (int) env('SITE_AUDIT_GLOBAL_MAX_ACTIVE', 2),
+    // Порция обхода в одном job (страниц / секунд). Дальше — ContinueSiteAuditCrawlJob.
+    'batch_max_pages' => (int) env('SITE_AUDIT_BATCH_PAGES', 80),
+    'batch_max_seconds' => (int) env('SITE_AUDIT_BATCH_SECONDS', 240),
     // Активный краул без updated_at дольше N мин → failed (иначе держит слот навечно)
     'stale_active_minutes' => (int) env('SITE_AUDIT_STALE_ACTIVE_MINUTES', 120),
     // local/тесты: не резать по тарифу, пока UI/модуль сырые

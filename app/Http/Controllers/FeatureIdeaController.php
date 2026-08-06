@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\FeatureIdea;
 use App\FeatureIdeaVote;
 use App\Support\FeatureIdeaAccess;
+use App\Support\StaffTelegramNotifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 class FeatureIdeaController extends Controller
@@ -82,6 +84,15 @@ class FeatureIdeaController extends Controller
             'body' => $data['body'],
             'status' => FeatureIdea::STATUS_PENDING,
         ]);
+
+        try {
+            StaffTelegramNotifier::notifyIdeaCreated($idea);
+        } catch (\Throwable $e) {
+            Log::warning('Staff telegram idea created failed', [
+                'idea_id' => $idea->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         flash()->overlay(__('Your idea was sent for moderation. We will publish it after review.'), __('Thank you'))->success();
 

@@ -14,6 +14,9 @@ class SiteAuditPageProcessor
     /** @var SiteAuditHtmlParser */
     private $parser;
 
+    /** @var string|null ключ настроек, для которых уже создан $fetcher (keep-alive между URL) */
+    private $fetcherKey;
+
     public function __construct(?SiteAuditFetcher $fetcher = null, ?SiteAuditHtmlParser $parser = null)
     {
         $this->fetcher = $fetcher ?: new SiteAuditFetcher();
@@ -26,7 +29,15 @@ class SiteAuditPageProcessor
     public function process(int $crawlId, string $url, string $projectHost, array $crawlSettings = []): array
     {
         if ($crawlSettings) {
-            $this->fetcher = SiteAuditFetcher::fromCrawlSettings($crawlSettings, $crawlId);
+            // один Guzzle-клиент на весь батч — иначе каждый URL = новый TCP/TLS
+            $key = $crawlId . ':' . md5(json_encode([
+                $crawlSettings['rps'] ?? null,
+                $crawlSettings['crawl_speed'] ?? null,
+            ]));
+            if ($this->fetcherKey !== $key) {
+                $this->fetcher = SiteAuditFetcher::fromCrawlSettings($crawlSettings, $crawlId);
+                $this->fetcherKey = $key;
+            }
         }
 
         $rps = (float) ($crawlSettings['rps'] ?? config('site_audit.per_host_rps', 1));

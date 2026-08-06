@@ -27,6 +27,8 @@ class SiteAuditFetcher
             ],
             'verify' => true,
             'headers' => [],
+            // keep-alive между URL одного краула
+            'curl' => defined('CURLOPT_TCP_KEEPALIVE') ? [CURLOPT_TCP_KEEPALIVE => 1] : [],
         ]);
     }
 

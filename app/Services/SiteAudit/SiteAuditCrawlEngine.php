@@ -147,6 +147,7 @@ class SiteAuditCrawlEngine
             }
 
             $processor = new SiteAuditPageProcessor();
+            $robotsTxt = is_array($robotsGroups) ? new SiteAuditRobotsTxt() : null;
             $processed = 0;
 
             while ($i < count($queue)) {
@@ -154,10 +155,13 @@ class SiteAuditCrawlEngine
                     break;
                 }
 
-                if ($this->crawlStatusIsTerminal((int) $crawl->id)) {
-                    $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
+                // cancel/fail — редко; не долбим MySQL на каждом URL
+                if ($processed === 0 || $processed % 10 === 0) {
+                    if ($this->crawlStatusIsTerminal((int) $crawl->id)) {
+                        $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
 
-                    return false;
+                        return false;
+                    }
                 }
 
                 $url = $queue[$i];
@@ -180,12 +184,6 @@ class SiteAuditCrawlEngine
                     $unchanged++;
                 }
 
-                if ($this->crawlStatusIsTerminal((int) $crawl->id)) {
-                    $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
-
-                    return false;
-                }
-
                 if (! empty($out['internal_links'])) {
                     $known = $fetched + (count($queue) - $i);
                     foreach ($out['internal_links'] as $link) {
@@ -198,7 +196,7 @@ class SiteAuditCrawlEngine
                         if ($patterns && SiteAuditUrlFilter::isExcluded($link, $patterns)) {
                             continue;
                         }
-                        if (is_array($robotsGroups) && ! (new SiteAuditRobotsTxt())->isPathAllowed($robotsGroups, $link)) {
+                        if ($robotsTxt && ! $robotsTxt->isPathAllowed($robotsGroups, $link)) {
                             continue;
                         }
                         $seen[$link] = true;

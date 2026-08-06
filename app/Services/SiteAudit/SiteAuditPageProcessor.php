@@ -515,8 +515,25 @@ class SiteAuditPageProcessor
             ])
             ->delete();
 
-        foreach ($findings as $f) {
-            SiteAuditFinding::query()->create($f + ['crawl_id' => $crawlId]);
+        if ($findings !== []) {
+            $now = now();
+            $rows = [];
+            foreach ($findings as $f) {
+                $meta = $f['meta_json'] ?? null;
+                $rows[] = [
+                    'crawl_id' => $crawlId,
+                    'code' => $f['code'],
+                    'severity' => $f['severity'],
+                    'url' => $f['url'],
+                    'url_hash' => $f['url_hash'],
+                    'meta_json' => $meta === null ? null : json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
+            foreach (array_chunk($rows, 100) as $chunk) {
+                SiteAuditFinding::query()->insert($chunk);
+            }
         }
 
         return [
@@ -592,12 +609,20 @@ class SiteAuditPageProcessor
      */
     private function robotsGroupsForCrawl(int $crawlId): ?array
     {
-        $crawl = \App\SiteAuditCrawl::query()->find($crawlId);
-        if (! $crawl) {
-            return null;
+        static $cache = [];
+        if (array_key_exists($crawlId, $cache)) {
+            return $cache[$crawlId];
         }
-        $groups = $crawl->progress_json['robots']['groups'] ?? null;
 
-        return is_array($groups) ? $groups : null;
+        // не тянем весь progress_json (там urls_gz ~сотни KB)
+        $raw = \Illuminate\Support\Facades\DB::table('site_audit_crawls')
+            ->where('id', $crawlId)
+            ->value(\Illuminate\Support\Facades\DB::raw("JSON_EXTRACT(progress_json, '$.robots.groups')"));
+        if ($raw === null || $raw === '') {
+            return $cache[$crawlId] = null;
+        }
+        $groups = is_string($raw) ? json_decode($raw, true) : $raw;
+
+        return $cache[$crawlId] = is_array($groups) ? $groups : null;
     }
 }

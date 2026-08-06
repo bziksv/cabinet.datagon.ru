@@ -127,9 +127,17 @@ class SiteAuditCrawlEngine
                 ? $crawl->progress_json['robots']['groups']
                 : null;
 
-            // сразу снять огромный engine из MySQL (миграция со старых краулов)
+            // сразу снять огромный engine / urls_gz из MySQL (миграция mid-crawl)
+            $dirtyProgress = false;
             if (isset($crawl->progress_json['engine'])) {
                 $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
+                $dirtyProgress = true;
+            }
+            if (! empty($crawl->progress_json['sitemap']['urls_gz'])) {
+                $this->offloadSitemapUrlsGz($crawl);
+                $dirtyProgress = true;
+            }
+            if ($dirtyProgress) {
                 $crawl->save();
             }
 
@@ -365,6 +373,7 @@ class SiteAuditCrawlEngine
         $progress['links_expanded'] = 0;
         $crawl->progress_json = $progress;
         $this->persistEngineState($crawl, $queue, 0, 0, $seen, 0, 0);
+        $this->offloadSitemapUrlsGz($crawl);
         $crawl->save();
 
         if (! $queue) {
@@ -421,7 +430,7 @@ class SiteAuditCrawlEngine
     }
 
     /**
-     * Лёгкий апдейт счётчиков в БД — без очереди URL в progress_json.
+     * Лёгкий апдейт счётчиков в БД — без перезаписи всего progress_json (urls_gz и т.п.).
      */
     private function touchProgress(
         SiteAuditCrawl $crawl,
@@ -430,17 +439,25 @@ class SiteAuditCrawlEngine
         int $unchanged,
         int $expanded
     ): void {
-        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
-        unset($progress['engine']);
-        $progress['engine_storage'] = 'file';
-        $progress['fetched'] = $fetched;
-        $progress['total'] = $pagesTotal;
-        $progress['pages_unchanged'] = $unchanged;
-        $progress['links_expanded'] = $expanded;
-        $crawl->progress_json = $progress;
         $crawl->pages_fetched = $fetched;
         $crawl->pages_total = $pagesTotal;
-        $crawl->save();
+
+        \Illuminate\Support\Facades\DB::table('site_audit_crawls')
+            ->where('id', $crawl->id)
+            ->update([
+                'pages_fetched' => $fetched,
+                'pages_total' => $pagesTotal,
+                'updated_at' => now(),
+                'progress_json' => \Illuminate\Support\Facades\DB::raw(
+                    "JSON_SET(COALESCE(progress_json, '{}'),"
+                    . " '$.engine_storage', 'file',"
+                    . " '$.fetched', " . (int) $fetched . ","
+                    . " '$.total', " . (int) $pagesTotal . ","
+                    . " '$.pages_unchanged', " . (int) $unchanged . ","
+                    . " '$.links_expanded', " . (int) $expanded
+                    . ")"
+                ),
+            ]);
     }
 
     private function engineStatePath(int $crawlId): string
@@ -451,6 +468,29 @@ class SiteAuditCrawlEngine
         }
 
         return $dir . '/crawl_' . $crawlId . '.json';
+    }
+
+    /**
+     * urls_gz (~сотня KB–MB) не должен жить в progress_json во время fetch —
+     * иначе каждый save/refresh таскает его из MySQL.
+     */
+    private function offloadSitemapUrlsGz(SiteAuditCrawl $crawl): void
+    {
+        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+        $gz = $progress['sitemap']['urls_gz'] ?? null;
+        if (! is_string($gz) || $gz === '') {
+            return;
+        }
+
+        $dir = storage_path('app/site-audit-engine');
+        if (! is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+        $path = $dir . '/crawl_' . (int) $crawl->id . '_sitemap_urls.b64';
+        file_put_contents($path, $gz);
+        unset($progress['sitemap']['urls_gz']);
+        $progress['sitemap']['urls_gz_file'] = true;
+        $crawl->progress_json = $progress;
     }
 
     private function hasEngineState(SiteAuditCrawl $crawl): bool

@@ -88,6 +88,12 @@ class SiteAuditSitemapProbe
     public static function urlsFromProgress(SiteAuditCrawl $crawl): array
     {
         $gz = $crawl->progress_json['sitemap']['urls_gz'] ?? null;
+        if ((! is_string($gz) || $gz === '') && ! empty($crawl->progress_json['sitemap']['urls_gz_file'])) {
+            $path = storage_path('app/site-audit-engine/crawl_' . (int) $crawl->id . '_sitemap_urls.b64');
+            if (is_file($path)) {
+                $gz = (string) file_get_contents($path);
+            }
+        }
         if (! is_string($gz) || $gz === '') {
             return [];
         }

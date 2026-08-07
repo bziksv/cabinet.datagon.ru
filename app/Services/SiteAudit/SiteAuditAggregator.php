@@ -187,6 +187,10 @@ class SiteAuditAggregator
                     if ($status === null || (int) $status < 200 || (int) $status >= 400) {
                         continue;
                     }
+                    // Контент/мета после follow — у финала; редирект уже в «Редиректы».
+                    if ($this->pageHadRedirect($page)) {
+                        continue;
+                    }
 
                     $findings = [];
 
@@ -1843,7 +1847,11 @@ class SiteAuditAggregator
             ->whereNotNull('simhash')
             ->where('simhash', '!=', '')
             ->orderBy('id')
-            ->get(['id', 'url', 'url_hash', 'simhash', 'title']);
+            ->get(['id', 'url', 'url_hash', 'simhash', 'title', 'redirect_chain', 'final_url']);
+
+        $pages = $pages->filter(function ($page) {
+            return ! $this->pageHadRedirect($page);
+        })->values();
 
         $n = $pages->count();
         if ($n < 2) {
@@ -1901,21 +1909,30 @@ class SiteAuditAggregator
     {
         $severity = config('site_audit.findings.' . $code . '.severity', 'other');
 
-        $groups = SiteAuditPage::query()
+        $pages = SiteAuditPage::query()
             ->where('crawl_id', $crawlId)
             ->whereNotNull($hashColumn)
-            ->select($hashColumn, DB::raw('count(*) as c'))
-            ->groupBy($hashColumn)
-            ->having('c', '>', 1)
-            ->pluck('c', $hashColumn);
+            ->get(['url', 'url_hash', 'title', 'description', $hashColumn, 'redirect_chain', 'final_url']);
 
-        foreach ($groups as $hash => $count) {
-            $pages = SiteAuditPage::query()
-                ->where('crawl_id', $crawlId)
-                ->where($hashColumn, $hash)
-                ->get(['url', 'url_hash', 'title', 'description']);
+        $byHash = [];
+        foreach ($pages as $page) {
+            // Follow редиректа → тот же body/meta, что у финала. Не считаем «дублем» с каноном.
+            if ($this->pageHadRedirect($page)) {
+                continue;
+            }
+            $hash = (string) $page->{$hashColumn};
+            if ($hash === '') {
+                continue;
+            }
+            $byHash[$hash][] = $page;
+        }
 
-            foreach ($pages as $page) {
+        foreach ($byHash as $hash => $group) {
+            $count = count($group);
+            if ($count < 2) {
+                continue;
+            }
+            foreach ($group as $page) {
                 SiteAuditFinding::query()->create([
                     'crawl_id' => $crawlId,
                     'code' => $code,
@@ -1923,7 +1940,7 @@ class SiteAuditAggregator
                     'url' => $page->url,
                     'url_hash' => $page->url_hash,
                     'meta_json' => [
-                        'group_size' => (int) $count,
+                        'group_size' => $count,
                         'hash' => $hash,
                         'title' => $page->title,
                         'description' => $page->description,
@@ -1931,6 +1948,30 @@ class SiteAuditAggregator
                 ]);
             }
         }
+    }
+
+    /**
+     * URL, с которого краулер ушёл по Location (цепь или final ≠ start).
+     * У такой страницы title/description/content — уже от финала.
+     */
+    private function pageHadRedirect($page): bool
+    {
+        $chain = $page->redirect_chain ?? null;
+        if (is_string($chain)) {
+            $decoded = json_decode($chain, true);
+            $chain = is_array($decoded) ? $decoded : [];
+        }
+        if (is_array($chain) && $chain !== []) {
+            return true;
+        }
+
+        $final = trim((string) ($page->final_url ?? ''));
+        $url = trim((string) ($page->url ?? ''));
+        if ($final === '' || $url === '') {
+            return false;
+        }
+
+        return SiteAuditRedirectChain::normalize($final) !== SiteAuditRedirectChain::normalize($url);
     }
 
     /**

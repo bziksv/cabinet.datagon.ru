@@ -67,16 +67,27 @@ class SiteAuditController extends Controller
                 ->limit(50)
                 ->get();
 
-            $crawls = SiteAuditCrawl::query()
+            $historyDomain = trim((string) $request->input('domain', ''));
+
+            $crawlsQuery = SiteAuditCrawl::query()
                 ->where('user_id', $user->id)
                 ->with('project')
                 ->orderByDesc('id')
-                ->limit(30)
-                ->get([
+                ->select([
                     'id', 'project_id', 'user_id', 'status',
-                    'pages_total', 'pages_fetched', 'buckets_json', 'counts_json',
-                    'finished_at', 'created_at', 'error',
-                ]);
+                    'pages_total', 'pages_fetched', 'pages_limit', 'buckets_json', 'counts_json',
+                    'started_at', 'finished_at', 'created_at', 'error',
+                ])
+                ->selectRaw("JSON_EXTRACT(COALESCE(progress_json, '{}'), '$.settings') as settings_json_raw");
+
+            if ($historyDomain !== '') {
+                $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $historyDomain) . '%';
+                $crawlsQuery->whereHas('project', function ($q) use ($like) {
+                    $q->where('domain', 'like', $like);
+                });
+            }
+
+            $crawls = $crawlsQuery->limit($historyDomain !== '' ? 100 : 30)->get();
 
             $crawlSizes = SiteAuditCrawlStorage::payloadBytesByCrawlIds($crawls->pluck('id')->all());
 
@@ -87,20 +98,33 @@ class SiteAuditController extends Controller
         } else {
             $schedules = collect();
             $crawlSizes = [];
+            $historyDomain = '';
         }
 
         $canSchedule = $user && ! DemoCabinet::isCurrentUser() && SiteAuditSchedule::allowedForUser($user);
+
+        if ($user && ! DemoCabinet::isCurrentUser()) {
+            SiteAuditLimits::touchDowngradeState($user);
+        }
 
         return view('pages.site-audit', [
             'projects' => $projects,
             'crawls' => $crawls,
             'crawlSizes' => $crawlSizes,
+            'historyDomain' => $historyDomain ?? '',
             'schedules' => $schedules,
             'canSchedule' => $canSchedule,
             'scheduleFrequencies' => SiteAuditSchedule::frequencyLabels(),
+            'scheduleWeekdays' => SiteAuditSchedule::weekdayLabels(),
+            'schedulesLimit' => SiteAuditLimits::schedulesLimit(),
+            'schedulesUsed' => SiteAuditLimits::schedulesUsed(),
             'pagesLimit' => SiteAuditLimits::pagesPerCrawlLimit(),
+            'concurrencyLimit' => SiteAuditLimits::concurrencyLimit(),
+            'projectsLimit' => SiteAuditLimits::projectsLimit(),
+            'projectsUsed' => SiteAuditLimits::projectsUsed(),
             'crawlsLimit' => SiteAuditLimits::crawlsPerMonthLimit(),
             'crawlsUsed' => SiteAuditLimits::crawlsUsedThisMonth(),
+            'historyPurgeNotice' => SiteAuditLimits::historyPurgeNotice($user),
             'findingsCatalog' => config('site_audit.findings', []),
             'isLocal' => app()->environment('local'),
             'bucketLabels' => self::BUCKET_LABELS,
@@ -611,6 +635,8 @@ class SiteAuditController extends Controller
 
         $enabled = $request->boolean('enabled', false);
         $frequency = SiteAuditSchedule::normalizeFrequency($request->input('frequency', SiteAuditSchedule::FREQ_WEEKLY));
+        $weekday = SiteAuditSchedule::normalizeWeekday($request->input('weekday'));
+        $hour = SiteAuditSchedule::normalizeHour($request->input('hour', 4));
 
         if (! $enabled) {
             SiteAuditSchedule::query()
@@ -623,7 +649,28 @@ class SiteAuditController extends Controller
 
         if (! SiteAuditSchedule::allowedForUser($user)) {
             return redirect()->route('pages.site-audit')
-                ->with('error', 'Расписание аудита доступно только на платных тарифах');
+                ->with('error', 'Авторасписание недоступно на вашем тарифе (на Free — 0 слотов)');
+        }
+
+        $existing = SiteAuditSchedule::query()
+            ->where('user_id', $user->id)
+            ->where('project_id', $project->id)
+            ->where('enabled', true)
+            ->first();
+
+        if (! $existing && ! SiteAuditLimits::canEnableSchedule($user, $project->id)) {
+            $lim = SiteAuditLimits::schedulesLimit($user);
+
+            return redirect()->route('pages.site-audit')
+                ->with('error', "Лимит авторасписаний исчерпан ({$lim}). Отключите другое или увеличьте тариф.");
+        }
+
+        $concurrency = SiteAuditLimits::resolveConcurrency($user, $request->input('concurrency', 1));
+        $pagesLimit = SiteAuditLimits::resolvePagesLimit($user, $request->input('pages_limit'));
+        $speed = (string) $request->input('crawl_speed', 'normal');
+        $presets = config('site_audit.speed_presets', []);
+        if (! isset($presets[$speed])) {
+            $speed = 'normal';
         }
 
         $schedule = SiteAuditSchedule::query()->firstOrNew([
@@ -634,15 +681,22 @@ class SiteAuditController extends Controller
         $schedule->enabled = true;
         $schedule->frequency = $frequency;
         $schedule->settings_json = [
-            'crawl_speed' => 'normal',
-            'concurrency' => 1,
+            'crawl_speed' => $speed,
+            'concurrency' => $concurrency,
+            'pages_limit' => $pagesLimit,
+            'weekday' => $weekday,
+            'hour' => $hour,
             'save_html' => 'off',
         ];
-        // при смене частоты / первом включении — ближайший слот от сейчас
         $schedule->next_run_at = $schedule->computeNextRun(Carbon::now());
         $schedule->save();
 
-        return redirect()->route('pages.site-audit')->with('status', 'Расписание сохранено');
+        $when = $schedule->next_run_at
+            ? $schedule->next_run_at->format('d.m.Y H:i')
+            : '—';
+
+        return redirect()->route('pages.site-audit')
+            ->with('status', 'Расписание сохранено. Следующий запуск: ' . $when);
     }
 
     public function createShare(Request $request, int $id): JsonResponse
@@ -867,7 +921,7 @@ class SiteAuditController extends Controller
                     ], 422);
                 }
             }
-            $tariffPages = \App\Support\SiteAuditLimits::pagesPerCrawlLimit($user) ?? 500;
+            $tariffPages = \App\Support\SiteAuditLimits::pagesPerCrawlLimit($user);
             foreach ($groups as $host => $urls) {
                 $urls = array_values(array_slice($urls, 0, max(1, $tariffPages)));
                 $jobs[] = [
@@ -875,10 +929,13 @@ class SiteAuditController extends Controller
                     'settings' => [
                         'seed_urls' => $urls,
                         'pages_only' => true,
-                        'pages_limit' => max(count($urls), 1),
+                        'pages_limit' => SiteAuditLimits::resolvePagesLimit(
+                            $user,
+                            $request->input('pages_limit', count($urls))
+                        ),
                         'save_html' => 'off',
                         'crawl_speed' => (string) $request->input('crawl_speed', 'normal'),
-                        'concurrency' => (int) $request->input('concurrency', 1),
+                        'concurrency' => SiteAuditLimits::resolveConcurrency($user, $request->input('concurrency', 1)),
                         'exclude_patterns' => '',
                         'virtual_robots' => (string) $request->input('virtual_robots', ''),
                         'extra_hosts' => [],
@@ -892,17 +949,29 @@ class SiteAuditController extends Controller
                     'pages_only' => false,
                     'save_html' => 'off',
                     'crawl_speed' => (string) $request->input('crawl_speed', 'normal'),
-                    'concurrency' => (int) $request->input('concurrency', 1),
+                    'concurrency' => SiteAuditLimits::resolveConcurrency($user, $request->input('concurrency', 1)),
                     'exclude_patterns' => '',
                     'virtual_robots' => (string) $request->input('virtual_robots', ''),
                     'extra_hosts' => count($domains) === 1
                         ? \App\Services\SiteAudit\SiteAuditUrlNormalizer::parseExtraHosts($request->input('extra_hosts', ''))
                         : [],
                 ];
-                if (app()->environment('local') && $request->filled('pages_limit')) {
-                    $settings['pages_limit'] = max(1, (int) $request->input('pages_limit'));
+                if ($request->filled('pages_limit')) {
+                    // local: starter bypasses tariff — передаём как есть; prod — truncate до тарифа
+                    $settings['pages_limit'] = app()->environment('local')
+                        ? max(1, SiteAuditLimits::parseIntLoose($request->input('pages_limit')))
+                        : SiteAuditLimits::resolvePagesLimit($user, $request->input('pages_limit'));
                 }
                 $jobs[] = ['domain' => $domain, 'settings' => $settings];
+            }
+        }
+
+        if (app()->environment('local')) {
+            foreach ($jobs as $ji => $job) {
+                $jobs[$ji]['settings']['local_test'] = true;
+                if ($runSync) {
+                    $jobs[$ji]['settings']['sync'] = true;
+                }
             }
         }
 
@@ -918,9 +987,8 @@ class SiteAuditController extends Controller
                     false,
                     $index > 0
                 );
-                // pages_only / local: зафиксировать лимит под число URL (starter уже учёл тариф)
-                if (! empty($settings['pages_limit'])
-                    && ($pagesOnly || app()->environment('local') || (bool) config('site_audit.bypass_limits', false))) {
+                // starter уже выставил pages_limit; local — точное значение из формы (bypass тарифа)
+                if (app()->environment('local') && ! empty($settings['pages_limit'])) {
                     $crawl->pages_limit = (int) $settings['pages_limit'];
                     $crawl->save();
                 }
@@ -1165,6 +1233,9 @@ class SiteAuditController extends Controller
             'progress_pct' => $crawl->pages_total > 0
                 ? (int) round(100 * $crawl->pages_fetched / $crawl->pages_total)
                 : 0,
+            'started_at' => optional($crawl->started_at)->format('d.m.Y H:i'),
+            'finished_at' => optional($crawl->finished_at)->format('d.m.Y H:i'),
+            'eta_at' => $crawl->estimateFinishedAtFormatted(),
         ]);
     }
 

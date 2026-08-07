@@ -40,6 +40,8 @@ return [
     'description_max' => (int) env('SITE_AUDIT_DESC_MAX', 160),
     // сколько детальных краулов хранить на проект (старше — prune)
     'history_keep_per_project' => (int) env('SITE_AUDIT_HISTORY_KEEP', 200),
+    // После перехода с платного на Free — через N дней удаляем всю историю аудита
+    'free_history_keep_days' => (int) env('SITE_AUDIT_FREE_HISTORY_DAYS', 14),
     // Повторный краул: если content_hash+status совпали с прошлым done — пропускаем HEAD картинок/ассетов
     'incremental_by_content_hash' => (bool) env('SITE_AUDIT_INCREMENTAL', true),
     'robots_max_bytes' => (int) env('SITE_AUDIT_ROBOTS_MAX_BYTES', 512000),
@@ -47,6 +49,7 @@ return [
     'simhash_max_pairs' => (int) env('SITE_AUDIT_SIMHASH_MAX_PAIRS', 200),
     'share_ttl_days' => (int) env('SITE_AUDIT_SHARE_TTL_DAYS', 0), // 0 = бессрочно
     'broken_link_head_max' => (int) env('SITE_AUDIT_BROKEN_HEAD_MAX', 40),
+    'broken_link_max_findings' => (int) env('SITE_AUDIT_BROKEN_MAX_FINDINGS', 200),
     'broken_image_head_max' => (int) env('SITE_AUDIT_BROKEN_IMAGE_HEAD_MAX', 50),
     'heavy_image_bytes' => (int) env('SITE_AUDIT_HEAVY_IMAGE_BYTES', 500000),
     'html_critical_min' => (int) env('SITE_AUDIT_HTML_CRITICAL_MIN', 1),
@@ -727,7 +730,7 @@ return [
             'phase' => 'A',
             'severity' => 'critical',
             'title' => 'Битые внутренние ссылки',
-            'description' => 'Целевой URL отвечает 4xx/5xx или недоступен (по данным краула или HEAD-проверке).',
+            'description' => 'Целевой URL отвечает 4xx/5xx или недоступен. Одна строка на битый URL; страницы со ссылкой — в «Откуда ссылаются».',
         ],
         'page_has_bad_links' => [
             'phase' => 'C',

@@ -6,6 +6,7 @@ use App\SiteAuditCrawl;
 use App\SiteAuditCrawlStat;
 use App\SiteAuditFinding;
 use App\SiteAuditPage;
+use App\SiteAuditProject;
 use Illuminate\Support\Facades\DB;
 
 class SiteAuditPruner
@@ -57,6 +58,36 @@ class SiteAuditPruner
             }
             $this->deleteCrawl($crawl);
             $deleted++;
+        }
+
+        return $deleted;
+    }
+
+    /**
+     * Удалить все краулы пользователя (история аудита). Проекты тоже.
+     */
+    public function purgeUserHistory(int $userId): int
+    {
+        $deleted = 0;
+        $crawlIds = SiteAuditCrawl::query()->where('user_id', $userId)->pluck('id');
+        foreach ($crawlIds as $id) {
+            $crawl = SiteAuditCrawl::query()->find($id);
+            if (! $crawl) {
+                continue;
+            }
+            if (! $crawl->isFinished()) {
+                $crawl->status = SiteAuditCrawl::STATUS_CANCELLED;
+                $crawl->error = 'Остановлен: очистка истории после перехода на бесплатный тариф';
+                $crawl->finished_at = now();
+                $crawl->save();
+            }
+            $this->deleteCrawl($crawl);
+            $deleted++;
+        }
+
+        SiteAuditProject::query()->where('user_id', $userId)->delete();
+        if (class_exists(\App\SiteAuditSchedule::class)) {
+            \App\SiteAuditSchedule::query()->where('user_id', $userId)->delete();
         }
 
         return $deleted;

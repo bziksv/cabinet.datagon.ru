@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Services\SiteAudit\SiteAuditCrawlStarter;
 use App\SiteAuditSchedule;
+use App\Support\SiteAuditLimits;
 use App\User;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -48,11 +49,26 @@ class SiteAuditRunSchedulesCommand extends Command
             if (! SiteAuditSchedule::allowedForUser($user)) {
                 $schedule->enabled = false;
                 $schedule->save();
-                $this->warn('  disabled: not paid tariff');
+                $this->warn('  disabled: schedule limit 0 / free');
                 continue;
             }
 
-            // нормализуем legacy daily → weekly
+            $limit = SiteAuditLimits::schedulesLimit($user);
+            $enabledIds = SiteAuditSchedule::query()
+                ->where('user_id', $user->id)
+                ->where('enabled', true)
+                ->orderBy('id')
+                ->pluck('id');
+            if ($enabledIds->count() > $limit) {
+                $keep = $enabledIds->take($limit);
+                if (! $keep->contains($schedule->id)) {
+                    $schedule->enabled = false;
+                    $schedule->save();
+                    $this->warn('  disabled: over schedule tariff limit');
+                    continue;
+                }
+            }
+
             $freq = SiteAuditSchedule::normalizeFrequency($schedule->frequency);
             if ($schedule->frequency !== $freq) {
                 $schedule->frequency = $freq;

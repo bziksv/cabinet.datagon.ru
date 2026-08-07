@@ -1089,6 +1089,10 @@ class SiteAuditAggregator
         $pageSev = config('site_audit.findings.page_has_broken_links.severity', 'warning');
         $linkSev = config('site_audit.findings.broken_internal_link.severity', 'critical');
 
+        // Один битый URL → один finding (а не N копий по числу страниц со ссылкой).
+        // brokenUrl => ['status'=>?, 'source'=>?, 'from'=>[pageUrl...]]
+        $uniqueBroken = [];
+
         foreach ($pages as $page) {
             $outs = is_array($page->out_links_json) ? $page->out_links_json : [];
             if (! $outs) {
@@ -1178,27 +1182,49 @@ class SiteAuditAggregator
                 ],
             ]);
 
-            // отдельные finding по уникальным битым URL (cap)
-            $seenBroken = [];
-                foreach (array_slice($brokenSamples, 0, 5) as $sample) {
+            foreach ($brokenSamples as $sample) {
                 $bu = (string) ($sample['url'] ?? '');
-                if ($bu === '' || isset($seenBroken[$bu])) {
+                if ($bu === '') {
                     continue;
                 }
-                $seenBroken[$bu] = true;
-                SiteAuditFinding::query()->create([
-                    'crawl_id' => $crawl->id,
-                    'code' => 'broken_internal_link',
-                    'severity' => $linkSev,
-                    'url' => $bu,
-                    'url_hash' => SiteAuditUrlNormalizer::hash($bu),
-                    'meta_json' => [
-                        'from' => $page->url,
+                if (! isset($uniqueBroken[$bu])) {
+                    $uniqueBroken[$bu] = [
                         'status' => $sample['status'] ?? null,
                         'source' => $sample['source'] ?? null,
-                    ],
-                ]);
+                        'error' => $sample['error'] ?? null,
+                        'from' => [],
+                    ];
+                }
+                if (count($uniqueBroken[$bu]['from']) < 50
+                    && ! in_array($page->url, $uniqueBroken[$bu]['from'], true)) {
+                    $uniqueBroken[$bu]['from'][] = $page->url;
+                }
             }
+        }
+
+        $maxBrokenFindings = max(1, (int) config('site_audit.broken_link_max_findings', 200));
+        $emitted = 0;
+        foreach ($uniqueBroken as $bu => $info) {
+            if ($emitted >= $maxBrokenFindings) {
+                break;
+            }
+            $fromList = $info['from'];
+            SiteAuditFinding::query()->create([
+                'crawl_id' => $crawl->id,
+                'code' => 'broken_internal_link',
+                'severity' => $linkSev,
+                'url' => $bu,
+                'url_hash' => SiteAuditUrlNormalizer::hash($bu),
+                'meta_json' => [
+                    'from' => $fromList[0] ?? null,
+                    'referrers' => array_slice($fromList, 0, 12),
+                    'referrer_count' => count($fromList),
+                    'status' => $info['status'] ?? null,
+                    'source' => $info['source'] ?? null,
+                    'error' => $info['error'] ?? null,
+                ],
+            ]);
+            $emitted++;
         }
     }
 

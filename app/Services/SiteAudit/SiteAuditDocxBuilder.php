@@ -51,7 +51,7 @@ class SiteAuditDocxBuilder
         $paras[] = $this->p('Краул #' . $crawl->id . ' · ' . $crawl->statusLabelRu());
         $paras[] = $this->p(
             'URL: ' . (int) $crawl->pages_fetched . ' / ' . (int) $crawl->pages_total
-            . ' (лимит ' . (int) $crawl->pages_limit . ')'
+            . ' (лимит ' . number_format((int) $crawl->pages_limit, 0, '', ' ') . ')'
         );
         $paras[] = $this->p('');
         $paras[] = $this->p('Приоритеты', true, 22);

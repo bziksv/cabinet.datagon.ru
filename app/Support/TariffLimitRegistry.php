@@ -165,13 +165,31 @@ class TariffLimitRegistry
             [
                 'code' => 'SiteAudit',
                 'module' => 'Аудит сайта (страниц/краул)',
-                'hint' => 'Макс. URL за один краул. Free 500 / Optimal 5000 / Ultimate 20000 / Maximum 50000.',
+                'hint' => 'Макс. URL за один краул на домен. Free 100 / Optimal 1000 / Ultimate 10000 / Maximum 100000.',
                 'enforcement' => self::ENFORCEMENT_STRICT,
             ],
             [
                 'code' => 'SiteAuditCrawls',
                 'module' => 'Аудит сайта (краулов/мес)',
                 'hint' => 'Запусков аудита в месяц. Free 1 / Optimal 4 / Ultimate 8 / Maximum 12.',
+                'enforcement' => self::ENFORCEMENT_STRICT,
+            ],
+            [
+                'code' => 'SiteAuditConcurrency',
+                'module' => 'Аудит сайта (потоки)',
+                'hint' => 'Параллельных HTTP-запросов в крауле. Free 1 / Optimal 2 / Ultimate 4 / Maximum 8.',
+                'enforcement' => self::ENFORCEMENT_STRICT,
+            ],
+            [
+                'code' => 'SiteAuditProjects',
+                'module' => 'Аудит сайта (проектов)',
+                'hint' => 'Доменов/проектов в памяти. Free 1 / Optimal 20 / Ultimate 50 / Maximum 100.',
+                'enforcement' => self::ENFORCEMENT_STRICT,
+            ],
+            [
+                'code' => 'SiteAuditSchedules',
+                'module' => 'Аудит сайта (авторасписаний)',
+                'hint' => 'Проектов на автозапуске. Free 0 / Optimal 2 / Ultimate 5 / Maximum 10.',
                 'enforcement' => self::ENFORCEMENT_STRICT,
             ],
             [

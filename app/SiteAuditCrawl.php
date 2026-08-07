@@ -116,6 +116,49 @@ class SiteAuditCrawl extends Model
         return 'run';
     }
 
+    /**
+     * Оценка окончания по текущей скорости (started_at → pages_fetched).
+     * null если ещё рано считать или краул завершён.
+     */
+    public function estimateFinishedAt(): ?\Carbon\Carbon
+    {
+        if ($this->isFinished() || $this->finished_at) {
+            return null;
+        }
+
+        $fetched = (int) $this->pages_fetched;
+        $total = (int) $this->pages_total;
+        if ($fetched < 15 || $total <= $fetched) {
+            return null;
+        }
+
+        $start = $this->started_at ?: $this->created_at;
+        if (! $start) {
+            return null;
+        }
+
+        $elapsed = max(1, now()->getTimestamp() - $start->getTimestamp());
+        $rate = $fetched / $elapsed;
+        if ($rate < 0.01) {
+            return null;
+        }
+
+        $secondsLeft = (int) ceil(($total - $fetched) / $rate);
+        // защита от абсурда (больше ~14 суток)
+        if ($secondsLeft > 14 * 24 * 3600) {
+            return null;
+        }
+
+        return now()->addSeconds($secondsLeft);
+    }
+
+    public function estimateFinishedAtFormatted(): ?string
+    {
+        $at = $this->estimateFinishedAt();
+
+        return $at ? $at->format('d.m.Y H:i') : null;
+    }
+
     public function isShared(): bool
     {
         return $this->share_token && $this->share_enabled_at;

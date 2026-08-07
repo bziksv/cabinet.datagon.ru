@@ -325,7 +325,7 @@ class SiteAuditFindingPresenter
                     return 'не в очереди (robots / фильтр)';
                 }
                 if ($reason === 'pages_limit' || isset($meta['pages_limit'])) {
-                    return 'лимит краула: ' . (int) ($meta['pages_limit'] ?? 0);
+                    return 'лимит краула: ' . number_format((int) ($meta['pages_limit'] ?? 0), 0, '', ' ');
                 }
 
                 return 'не в крауле';
@@ -335,7 +335,7 @@ class SiteAuditFindingPresenter
 
             case 'landing_not_crawled':
                 return isset($meta['pages_limit'])
-                    ? ('посадочная · не в крауле · лимит ' . (int) $meta['pages_limit'])
+                    ? ('посадочная · не в крауле · лимит ' . number_format((int) $meta['pages_limit'], 0, '', ' '))
                     : 'посадочная · не в крауле';
 
             case 'landing_url_changed':
@@ -462,11 +462,14 @@ class SiteAuditFindingPresenter
 
             case 'broken_internal_link':
                 $bits = [];
-                if (! empty($meta['from'])) {
-                    $bits[] = 'с: ' . self::clip((string) $meta['from'], 50);
-                }
                 if (isset($meta['status'])) {
                     $bits[] = 'HTTP ' . (int) $meta['status'];
+                }
+                $refN = (int) ($meta['referrer_count'] ?? 0);
+                if ($refN > 1) {
+                    $bits[] = 'с ' . $refN . ' стр.';
+                } elseif (! empty($meta['from'])) {
+                    $bits[] = 'с: ' . self::clip((string) $meta['from'], 50);
                 }
 
                 return $bits ? implode(' · ', $bits) : 'битая ссылка';

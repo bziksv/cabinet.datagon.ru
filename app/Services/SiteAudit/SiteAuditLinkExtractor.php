@@ -26,6 +26,9 @@ class SiteAuditLinkExtractor
         $externalAssets = [];
         $badLinks = [];
 
+        // Ссылки в <!-- ... --> не живут в DOM для пользователя/бота — не считаем.
+        $html = $this->stripHtmlComments($html);
+
         $robots = [];
         if (preg_match_all('/<meta\b[^>]*\bname\s*=\s*["\']robots["\'][^>]*>/i', $html, $mt)) {
             foreach ($mt[0] as $tag) {
@@ -198,6 +201,40 @@ class SiteAuditLinkExtractor
             'img_srcs' => array_keys($imgSrcs),
             'asset_srcs' => array_keys($assetSrcs),
         ];
+    }
+
+    /**
+     * Убрать HTML-комментарии, не трогая содержимое script/style/textarea
+     * (там могут быть строки с «<!--»).
+     */
+    private function stripHtmlComments(string $html): string
+    {
+        if ($html === '' || strpos($html, '<!--') === false) {
+            return $html;
+        }
+
+        $slots = [];
+        $html = preg_replace_callback(
+            '/<(script|style|textarea)\b[^>]*>.*?<\/\1>/is',
+            static function ($m) use (&$slots) {
+                $key = "\x00SA_SLOT_" . count($slots) . "\x00";
+                $slots[$key] = $m[0];
+
+                return $key;
+            },
+            $html
+        );
+
+        $html = preg_replace('/<!--.*?-->/s', '', $html);
+        if (! is_string($html)) {
+            $html = '';
+        }
+
+        if ($slots) {
+            $html = strtr($html, $slots);
+        }
+
+        return $html;
     }
 
     /**

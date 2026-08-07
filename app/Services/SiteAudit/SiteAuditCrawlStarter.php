@@ -41,6 +41,21 @@ class SiteAuditCrawlStarter
         }
 
         $settings = SiteAuditCrawlOptions::normalize($settings);
+        if ($bypassLimits) {
+            $settings['concurrency'] = max(1, min(
+                (int) config('site_audit.max_concurrency', 8),
+                max(1, (int) ($settings['concurrency'] ?? 1))
+            ));
+        } else {
+            $settings['concurrency'] = SiteAuditLimits::resolveConcurrency($user, $settings['concurrency'] ?? 1);
+        }
+
+        if (! $bypassLimits && ! SiteAuditLimits::canCreateProject($user, $domain)) {
+            $lim = SiteAuditLimits::projectsLimit($user);
+            throw new RuntimeException(
+                "Лимит проектов аудита сайта исчерпан ({$lim}). Удалите старый проект или увеличьте тариф."
+            );
+        }
 
         $project = SiteAuditProject::query()->firstOrCreate(
             ['user_id' => $user->id, 'domain' => $domain],
@@ -55,11 +70,19 @@ class SiteAuditCrawlStarter
             $project->save();
         }
 
-        $pagesLimit = SiteAuditLimits::pagesPerCrawlLimit($user) ?? 500;
-        if ($force || app()->environment('local') || (bool) config('site_audit.bypass_limits', false)) {
-            if (! empty($settings['pages_limit'])) {
-                $pagesLimit = (int) $settings['pages_limit'];
-            }
+        $tariffMax = SiteAuditLimits::pagesPerCrawlLimit($user);
+        if ($bypassLimits && ! empty($settings['pages_limit'])) {
+            // local / force: можно задать свой лимит (в т.ч. выше тарифа для теста)
+            $pagesLimit = max(1, (int) $settings['pages_limit']);
+        } else {
+            $pagesLimit = SiteAuditLimits::resolvePagesLimit(
+                $user,
+                $settings['pages_limit'] ?? null
+            );
+        }
+        // страховка: на проде не выше тарифа
+        if (! $bypassLimits) {
+            $pagesLimit = min($pagesLimit, $tariffMax);
         }
 
         // Сначала в глобальную очередь ожидания; tryDispatch поднимет, если слот свободен.
@@ -81,6 +104,8 @@ class SiteAuditCrawlStarter
                     'strip_trailing_slash' => true,
                     'check_broken_links' => true,
                     'pages_only' => ! empty($settings['pages_only']),
+                    'local_test' => ! empty($settings['local_test']),
+                    'sync' => ! empty($settings['sync']),
                     'extra_hosts' => $settings['extra_hosts'] ?? [],
                 ],
             ],

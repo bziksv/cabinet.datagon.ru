@@ -635,6 +635,7 @@ class SiteAuditController extends Controller
         $schedule->frequency = $frequency;
         $schedule->settings_json = [
             'crawl_speed' => 'normal',
+            'concurrency' => 1,
             'save_html' => 'off',
         ];
         // при смене частоты / первом включении — ближайший слот от сейчас
@@ -803,9 +804,6 @@ class SiteAuditController extends Controller
         }
 
         $domains = $this->parseSiteAuditDomains($request->input('domain', ''));
-        if ($domains === []) {
-            return response()->json(['error' => 'domain', 'message' => 'Укажите хотя бы один домен (каждый с новой строки)'], 422);
-        }
 
         $seed = trim((string) $request->input('seed_urls', ''));
         $seedUrls = [];
@@ -818,23 +816,20 @@ class SiteAuditController extends Controller
             }
         }
 
-        $settings = [
-            'seed_urls' => $seedUrls,
-            'save_html' => 'off',
-            'crawl_speed' => (string) $request->input('crawl_speed', 'normal'),
-            'exclude_patterns' => '',
-            'virtual_robots' => (string) $request->input('virtual_robots', ''),
-            'unify_www' => true,
-            'force_https' => true,
-            'strip_trailing_slash' => true,
-            'check_broken_links' => true,
-            'extra_hosts' => count($domains) === 1
-                ? \App\Services\SiteAudit\SiteAuditUrlNormalizer::parseExtraHosts($request->input('extra_hosts', ''))
-                : [],
-        ];
+        $pagesOnly = in_array((string) $request->input('pages_only', ''), ['1', 'true', 'yes', 'on'], true)
+            || ($domains === [] && $seedUrls !== []);
 
-        if (app()->environment('local') && $request->filled('pages_limit')) {
-            $settings['pages_limit'] = max(1, (int) $request->input('pages_limit'));
+        if ($pagesOnly && $seedUrls === []) {
+            return response()->json([
+                'error' => 'seeds',
+                'message' => 'Режим «только страницы»: укажите URL (по одному на строку) в поле «Страницы / доп. URL»',
+            ], 422);
+        }
+        if (! $pagesOnly && $domains === []) {
+            return response()->json([
+                'error' => 'domain',
+                'message' => 'Укажите домен(ы) или включите «только эти страницы» и перечислите URL',
+            ], 422);
         }
 
         $runSync = app()->environment('local')
@@ -845,7 +840,75 @@ class SiteAuditController extends Controller
         $started = [];
         $errors = [];
 
-        foreach ($domains as $index => $domain) {
+        /** @var array<int, array{domain:string,settings:array}> $jobs */
+        $jobs = [];
+
+        if ($pagesOnly) {
+            $groups = \App\Services\SiteAudit\SiteAuditSeedGroups::groupByHost($seedUrls);
+            if ($groups === []) {
+                return response()->json([
+                    'error' => 'seeds',
+                    'message' => 'Не удалось разобрать URL. Нужны полные адреса вида https://site.ru/page',
+                ], 422);
+            }
+            // если в «Доменах» что-то указано — ограничиваем группы этими хостами
+            if ($domains !== []) {
+                $allowed = [];
+                foreach ($domains as $d) {
+                    $allowed[preg_replace('/^www\./', '', strtolower($d))] = true;
+                }
+                $groups = array_filter($groups, function ($urls, $host) use ($allowed) {
+                    return isset($allowed[$host]);
+                }, ARRAY_FILTER_USE_BOTH);
+                if ($groups === []) {
+                    return response()->json([
+                        'error' => 'seeds',
+                        'message' => 'URL не совпадают с указанными доменами',
+                    ], 422);
+                }
+            }
+            $tariffPages = \App\Support\SiteAuditLimits::pagesPerCrawlLimit($user) ?? 500;
+            foreach ($groups as $host => $urls) {
+                $urls = array_values(array_slice($urls, 0, max(1, $tariffPages)));
+                $jobs[] = [
+                    'domain' => $host,
+                    'settings' => [
+                        'seed_urls' => $urls,
+                        'pages_only' => true,
+                        'pages_limit' => max(count($urls), 1),
+                        'save_html' => 'off',
+                        'crawl_speed' => (string) $request->input('crawl_speed', 'normal'),
+                        'concurrency' => (int) $request->input('concurrency', 1),
+                        'exclude_patterns' => '',
+                        'virtual_robots' => (string) $request->input('virtual_robots', ''),
+                        'extra_hosts' => [],
+                    ],
+                ];
+            }
+        } else {
+            foreach ($domains as $domain) {
+                $settings = [
+                    'seed_urls' => $seedUrls,
+                    'pages_only' => false,
+                    'save_html' => 'off',
+                    'crawl_speed' => (string) $request->input('crawl_speed', 'normal'),
+                    'concurrency' => (int) $request->input('concurrency', 1),
+                    'exclude_patterns' => '',
+                    'virtual_robots' => (string) $request->input('virtual_robots', ''),
+                    'extra_hosts' => count($domains) === 1
+                        ? \App\Services\SiteAudit\SiteAuditUrlNormalizer::parseExtraHosts($request->input('extra_hosts', ''))
+                        : [],
+                ];
+                if (app()->environment('local') && $request->filled('pages_limit')) {
+                    $settings['pages_limit'] = max(1, (int) $request->input('pages_limit'));
+                }
+                $jobs[] = ['domain' => $domain, 'settings' => $settings];
+            }
+        }
+
+        foreach ($jobs as $index => $job) {
+            $domain = $job['domain'];
+            $settings = $job['settings'];
             try {
                 $crawl = $starter->start(
                     $user,
@@ -853,9 +916,11 @@ class SiteAuditController extends Controller
                     $settings,
                     ! $runSync,
                     false,
-                    $index > 0 // пакет: не блокировать 2-й+ из‑за «уже идёт краул»
+                    $index > 0
                 );
-                if (! empty($settings['pages_limit'])) {
+                // pages_only / local: зафиксировать лимит под число URL (starter уже учёл тариф)
+                if (! empty($settings['pages_limit'])
+                    && ($pagesOnly || app()->environment('local') || (bool) config('site_audit.bypass_limits', false))) {
                     $crawl->pages_limit = (int) $settings['pages_limit'];
                     $crawl->save();
                 }
@@ -866,10 +931,10 @@ class SiteAuditController extends Controller
                     'crawl_id' => $crawl->id,
                     'domain' => $domain,
                     'status' => $crawl->status,
+                    'pages_only' => ! empty($settings['pages_only']),
                 ];
             } catch (\Throwable $e) {
                 $errors[] = $domain . ': ' . $e->getMessage();
-                // Лимит месяца — дальше смысла нет; «уже идёт» на первом домене — тоже стоп.
                 if ($index === 0 || strpos($e->getMessage(), 'лимит') !== false) {
                     break;
                 }
@@ -885,11 +950,21 @@ class SiteAuditController extends Controller
 
         $first = $started[0];
         $n = count($started);
-        $msg = $runSync
-            ? ($n === 1 ? 'Краул выполнен. Смотрите историю ниже.' : "Выполнено краулов: {$n}. Смотрите историю ниже.")
-            : ($n === 1
-                ? 'Краул запущен. Прогресс — в истории краулов.'
-                : "Запущено краулов: {$n}. Прогресс — в истории краулов.");
+        if ($pagesOnly) {
+            $msg = $runSync
+                ? ($n === 1
+                    ? 'Проверка страниц выполнена. Смотрите историю ниже.'
+                    : "Проверка страниц: {$n} проект(а) по доменам. Смотрите историю ниже.")
+                : ($n === 1
+                    ? 'Запущена проверка только указанных страниц.'
+                    : "Запущено {$n} краула(ов) только по страницам (разные домены → разные проекты).");
+        } else {
+            $msg = $runSync
+                ? ($n === 1 ? 'Краул выполнен. Смотрите историю ниже.' : "Выполнено краулов: {$n}. Смотрите историю ниже.")
+                : ($n === 1
+                    ? 'Краул запущен. Прогресс — в истории краулов.'
+                    : "Запущено краулов: {$n}. Прогресс — в истории краулов.");
+        }
         if ($errors !== []) {
             $msg .= ' Не запущено: ' . implode('; ', $errors);
         }

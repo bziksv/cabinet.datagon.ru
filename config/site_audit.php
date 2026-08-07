@@ -24,6 +24,8 @@ return [
     'max_active_crawls_per_user' => 1,
     // Глобально на сервер: по числу воркеров site_audit (сейчас 2). На proxy2 — SITE_AUDIT_GLOBAL_MAX_ACTIVE.
     'global_max_active_crawls' => (int) env('SITE_AUDIT_GLOBAL_MAX_ACTIVE', 2),
+    // Параллельные HTTP-запросы внутри одного краула (потоки). 1 = как раньше.
+    'max_concurrency' => (int) env('SITE_AUDIT_MAX_CONCURRENCY', 8),
     // Порция обхода в одном job (страниц / секунд). Дальше — ContinueSiteAuditCrawlJob.
     'batch_max_pages' => (int) env('SITE_AUDIT_BATCH_PAGES', 80),
     'batch_max_seconds' => (int) env('SITE_AUDIT_BATCH_SECONDS', 240),

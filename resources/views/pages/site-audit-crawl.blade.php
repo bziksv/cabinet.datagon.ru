@@ -80,7 +80,8 @@
                     · лимит {{ $crawl->pages_limit }} URL
                     @php $s = $crawl->progress_json['settings'] ?? []; @endphp
                     @if(!empty($s))
-                        · скорость {{ $s['crawl_speed'] ?? '—' }} ({{ $s['rps'] ?? '—' }} URL/с)
+                        · скорость {{ $s['crawl_speed'] ?? '—' }} ({{ $s['rps'] ?? '—' }} URL/с на поток)
+                        · потоки {{ (int) ($s['concurrency'] ?? 1) }}
                     @endif
                     @if($crawl->started_at) · старт {{ $crawl->started_at }} @endif
                     @if($crawl->finished_at) · конец {{ $crawl->finished_at }} @endif

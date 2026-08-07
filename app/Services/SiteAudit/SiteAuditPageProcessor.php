@@ -28,17 +28,7 @@ class SiteAuditPageProcessor
      */
     public function process(int $crawlId, string $url, string $projectHost, array $crawlSettings = []): array
     {
-        if ($crawlSettings) {
-            // один Guzzle-клиент на весь батч — иначе каждый URL = новый TCP/TLS
-            $key = $crawlId . ':' . md5(json_encode([
-                $crawlSettings['rps'] ?? null,
-                $crawlSettings['crawl_speed'] ?? null,
-            ]));
-            if ($this->fetcherKey !== $key) {
-                $this->fetcher = SiteAuditFetcher::fromCrawlSettings($crawlSettings, $crawlId);
-                $this->fetcherKey = $key;
-            }
-        }
+        $this->ensureFetcher($crawlId, $crawlSettings);
 
         $rps = (float) ($crawlSettings['rps'] ?? config('site_audit.per_host_rps', 1));
         SiteAuditHostThrottle::wait($projectHost, $rps);
@@ -51,6 +41,96 @@ class SiteAuditPageProcessor
             return $this->processFetched($crawlId, $url, $urlHash, $result, $crawlSettings, $projectHost);
         } finally {
             SiteAuditBodyTemp::release($bodyPath);
+        }
+    }
+
+    /**
+     * Обработать уже скачанный ответ (для параллельного fetch).
+     *
+     * @param array<string, mixed> $result
+     * @param array<string, mixed> $crawlSettings
+     * @return array{internal_links:string[],content_unchanged?:bool}
+     */
+    public function processFetchedResult(
+        int $crawlId,
+        string $url,
+        array $result,
+        string $projectHost,
+        array $crawlSettings = []
+    ): array {
+        $this->ensureFetcher($crawlId, $crawlSettings);
+        $urlHash = SiteAuditUrlNormalizer::hash($url);
+        $bodyPath = isset($result['body_path']) ? (string) $result['body_path'] : null;
+
+        try {
+            return $this->processFetched($crawlId, $url, $urlHash, $result, $crawlSettings, $projectHost);
+        } finally {
+            SiteAuditBodyTemp::release($bodyPath);
+        }
+    }
+
+    /**
+     * Параллельный fetch + последовательный parse.
+     *
+     * @param string[] $urls
+     * @return array<int, array{internal_links:string[],content_unchanged?:bool}>
+     */
+    public function processMany(int $crawlId, array $urls, string $projectHost, array $crawlSettings = []): array
+    {
+        $urls = array_values($urls);
+        if ($urls === []) {
+            return [];
+        }
+
+        $this->ensureFetcher($crawlId, $crawlSettings);
+        $rps = (float) ($crawlSettings['rps'] ?? config('site_audit.per_host_rps', 1));
+        $concurrency = max(1, (int) ($crawlSettings['concurrency'] ?? 1));
+        $hostRps = max(0.1, $rps * $concurrency);
+
+        $fetched = $this->fetcher->fetchMany($urls, $concurrency, function () use ($projectHost, $hostRps) {
+            SiteAuditHostThrottle::wait($projectHost, $hostRps);
+        });
+
+        $outs = [];
+        foreach ($urls as $i => $url) {
+            $result = $fetched[$i] ?? [
+                'ok' => false,
+                'status_code' => null,
+                'final_url' => $url,
+                'redirect_chain' => [],
+                'body' => null,
+                'body_path' => null,
+                'size_bytes' => 0,
+                'content_type' => null,
+                'x_robots' => null,
+                'sec_headers' => [],
+                'error' => 'missing fetch result',
+                'user_agent' => null,
+                'ua_rotated' => false,
+            ];
+            try {
+                $outs[] = $this->processFetchedResult($crawlId, $url, $result, $projectHost, $crawlSettings);
+            } catch (\Throwable $e) {
+                $outs[] = ['internal_links' => [], 'content_unchanged' => false];
+            }
+        }
+
+        return $outs;
+    }
+
+    private function ensureFetcher(int $crawlId, array $crawlSettings): void
+    {
+        if (! $crawlSettings) {
+            return;
+        }
+        $key = $crawlId . ':' . md5(json_encode([
+            $crawlSettings['rps'] ?? null,
+            $crawlSettings['crawl_speed'] ?? null,
+            $crawlSettings['concurrency'] ?? null,
+        ]));
+        if ($this->fetcherKey !== $key) {
+            $this->fetcher = SiteAuditFetcher::fromCrawlSettings($crawlSettings, $crawlId);
+            $this->fetcherKey = $key;
         }
     }
 

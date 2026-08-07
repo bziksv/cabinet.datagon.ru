@@ -15,9 +15,14 @@ class SiteAuditCrawlOptions
         $rps = isset($input['rps']) ? (float) $input['rps'] : (float) ($presets[$speed] ?? 1.0);
         $rps = max(0.1, min(20.0, $rps));
 
+        $maxConcurrency = max(1, (int) config('site_audit.max_concurrency', 8));
+        $concurrency = isset($input['concurrency']) ? (int) $input['concurrency'] : 1;
+        $concurrency = max(1, min($maxConcurrency, $concurrency));
+
         return array_merge($input, [
             'crawl_speed' => $speed,
             'rps' => $rps,
+            'concurrency' => $concurrency,
             'save_html' => $input['save_html'] ?? 'off',
             'exclude_patterns' => SiteAuditUrlFilter::parsePatterns($input['exclude_patterns'] ?? []),
             'virtual_robots' => self::normalizeVirtualRobots($input['virtual_robots'] ?? ''),
@@ -27,6 +32,8 @@ class SiteAuditCrawlOptions
             'strip_trailing_slash' => true,
             // Битые ссылки всегда проверяем (не опция UI).
             'check_broken_links' => true,
+            // Только seed-URL: без sitemap и без дообхода по ссылкам.
+            'pages_only' => ! empty($input['pages_only']),
         ]);
     }
 

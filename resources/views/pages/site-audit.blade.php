@@ -22,7 +22,8 @@
                 <div>
                     <p class="mb-1 fw-semibold text-body">Технический аудит сайта</p>
                     <p class="mb-0 small text-secondary">
-                        Sitemap + robots.txt → проверка страниц → сводка по приоритетам.
+                        Полный краул: sitemap + robots.txt → страницы → сводка.
+                        Или только выбранные URL — без sitemap и без дообхода по ссылкам; разные сайты → отдельные проекты.
                         @if($isLocal)
                             <span class="badge text-bg-secondary">local · лимиты тарифа отключены</span>
                         @endif
@@ -58,10 +59,17 @@
 
                         <div class="mb-3 cabinet-sa-field">
                             <label class="form-label fw-medium" for="sa-seeds">
-                                Доп. URL <span class="text-secondary fw-normal">(опционально)</span>
-                                @include('pages.partials.site-audit-tip', ['tip' => "Страницы, которые обязательно нужно проверить, даже если их нет в sitemap.\nПо одному URL на строку. Полезно для посадочных, новых разделов, страниц за логикой меню."])
+                                Страницы / доп. URL <span class="text-secondary fw-normal">(опционально)</span>
+                                @include('pages.partials.site-audit-tip', ['tip' => "По одному URL на строку, лучше с https://.\nБез галочки ниже — это доп. семена: сайт обходится как обычно (sitemap + ссылки), эти URL точно попадут в очередь.\nС галочкой «только эти страницы» — сканируются исключительно перечисленные URL: без sitemap, без главной «насильно» и без дообхода по ссылкам.\nURL с разных доменов автоматически разбиваются на отдельные проекты/краулы.\nМожно не заполнять «Домены», если галочка включена — домен возьмём из URL."])
                             </label>
-                            <textarea class="form-control" id="sa-seeds" rows="3" placeholder="https://example.com/page"></textarea>
+                            <textarea class="form-control" id="sa-seeds" rows="3" placeholder="https://example.com/page&#10;https://other.ru/about"></textarea>
+                            <div class="form-check mt-2 mb-0">
+                                <input type="checkbox" class="form-check-input" id="sa-pages-only">
+                                <label class="form-check-label" for="sa-pages-only">
+                                    Сканировать только эти страницы
+                                    <span class="text-secondary">(без sitemap и дообхода; разные сайты → разные проекты)</span>
+                                </label>
+                            </div>
                         </div>
 
                         <div class="mb-3 cabinet-sa-field">
@@ -75,14 +83,29 @@
 
                         <div class="mb-3 cabinet-sa-field">
                             <label class="form-label fw-medium" for="sa-speed">
-                                Скорость снятия
-                                @include('pages.partials.site-audit-tip', ['tip' => "Сколько запросов в секунду к одному домену.\nМедленнее — мягче к антиботу и меньше риск блокировок.\nТурбо — только для своих/тестовых сайтов: можно получить 403/429."])
+                                Скорость на поток
+                                @include('pages.partials.site-audit-tip', ['tip' => "Лимит стартов запросов в секунду на один поток.\nИтоговая скорость ≈ потоки × скорость на поток, но не выше, чем позволяет размер страниц сайта.\nМедленнее — мягче к антиботу.\nТурбо — только для своих/тестовых сайтов: можно получить 403/429."])
                             </label>
                             <select class="form-select" id="sa-speed">
-                                <option value="slow">Медленно (~1 URL/с) — мягче к антиботу</option>
-                                <option value="normal" selected>Обычная (~5 URL/с)</option>
-                                <option value="fast">Быстрая (~10 URL/с)</option>
-                                <option value="turbo">Турбо (~15 URL/с) — только свои сайты</option>
+                                <option value="slow">Медленно (~1 URL/с на поток)</option>
+                                <option value="normal" selected>Обычная (~5 URL/с на поток)</option>
+                                <option value="fast">Быстрая (~10 URL/с на поток)</option>
+                                <option value="turbo">Турбо (~15 URL/с на поток) — только свои сайты</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3 cabinet-sa-field">
+                            <label class="form-label fw-medium" for="sa-concurrency">
+                                Потоки (параллельные запросы)
+                                @include('pages.partials.site-audit-tip', ['tip' => "Сколько HTTP-запросов к сайту одновременно.\n1 — как раньше (последовательно).\nНа тяжёлых сайтах (большие HTML) 4–8 потоков ускоряют краул в разы.\nСлишком много потоков → риск 429/бана у антибота."])
+                            </label>
+                            <select class="form-select" id="sa-concurrency">
+                                @php $maxConc = max(1, (int) config('site_audit.max_concurrency', 8)); @endphp
+                                @for($n = 1; $n <= $maxConc; $n++)
+                                    <option value="{{ $n }}" @if($n === 1) selected @endif>
+                                        {{ $n }} {{ $n === 1 ? 'поток' : ($n < 5 ? 'потока' : 'потоков') }}
+                                    </option>
+                                @endfor
                             </select>
                         </div>
 
@@ -240,7 +263,12 @@
                                 data-status-url="{{ route('pages.site-audit.crawl.status', $c->id) }}"
                                 class="{{ $finished ? '' : 'cabinet-sa-row--active' }}">
                                 <td class="text-secondary">#{{ $c->id }}</td>
-                                <td class="fw-medium">{{ optional($c->project)->domain ?? '—' }}</td>
+                                <td class="fw-medium">
+                                    {{ optional($c->project)->domain ?? '—' }}
+                                    @if(!empty(($c->progress_json['settings']['pages_only'] ?? $c->progress_json['pages_only'] ?? false)))
+                                        <span class="badge text-bg-light border ms-1" title="Только указанные страницы">страницы</span>
+                                    @endif
+                                </td>
                                 <td>
                                     <span class="cabinet-sa-status cabinet-sa-status--{{ $stClass }}" data-sa-status>
                                         {{ $c->statusLabelRu() }}
@@ -542,12 +570,15 @@
                     startBtn.addEventListener('click', function () {
                         startBtn.disabled = true;
                         msg.textContent = 'Запуск…';
+                        var pagesOnlyEl = document.getElementById('sa-pages-only');
                         var body = {
                             domain: document.getElementById('sa-domain').value,
                             seed_urls: document.getElementById('sa-seeds').value,
+                            pages_only: pagesOnlyEl && pagesOnlyEl.checked ? '1' : '0',
                             extra_hosts: (document.getElementById('sa-extra-hosts') || {}).value || '',
                             virtual_robots: document.getElementById('sa-robots').value,
                             crawl_speed: document.getElementById('sa-speed').value,
+                            concurrency: (document.getElementById('sa-concurrency') || {}).value || '1',
                             unify_www: true,
                             force_https: true,
                             strip_trailing_slash: true,

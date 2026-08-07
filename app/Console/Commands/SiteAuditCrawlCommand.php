@@ -17,6 +17,7 @@ class SiteAuditCrawlCommand extends Command
         {--user= : user_id}
         {--limit=50 : Обрезка pages_limit для теста}
         {--speed=normal : slow|normal|fast|turbo}
+        {--concurrency=1 : Параллельные HTTP-запросы (1–8)}
         {--sync : Выполнить в этом процессе без очереди}
         {--force : Игнорировать лимиты тарифа (только для локальных прогонов)}';
 
@@ -47,6 +48,7 @@ class SiteAuditCrawlCommand extends Command
             'save_html' => 'off',
             'pages_limit' => $limit,
             'crawl_speed' => (string) $this->option('speed'),
+            'concurrency' => max(1, (int) $this->option('concurrency')),
         ], ! $sync, $force || app()->environment('local'));
 
         $crawl->pages_limit = $limit;

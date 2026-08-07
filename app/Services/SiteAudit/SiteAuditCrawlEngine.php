@@ -149,6 +149,8 @@ class SiteAuditCrawlEngine
             $processor = new SiteAuditPageProcessor();
             $robotsTxt = is_array($robotsGroups) ? new SiteAuditRobotsTxt() : null;
             $processed = 0;
+            $maxConcurrency = max(1, (int) config('site_audit.max_concurrency', 8));
+            $concurrency = max(1, min($maxConcurrency, (int) ($settings['concurrency'] ?? 1)));
 
             while ($i < count($queue)) {
                 if ($processed >= $maxPages || (microtime(true) - $startedAt) >= $maxSeconds) {
@@ -164,54 +166,67 @@ class SiteAuditCrawlEngine
                     }
                 }
 
-                $url = $queue[$i];
-                $i++;
-                $fetched++;
-                $processed++;
+                $remainingBudget = $maxPages - $processed;
+                $waveSize = min($concurrency, $remainingBudget, count($queue) - $i);
+                if ($waveSize < 1) {
+                    break;
+                }
+
+                $wave = [];
+                for ($w = 0; $w < $waveSize; $w++) {
+                    $wave[] = $queue[$i];
+                    $i++;
+                }
 
                 try {
-                    $out = $processor->process($crawl->id, $url, $host, $settings);
+                    $outs = $processor->processMany($crawl->id, $wave, $host, $settings);
                 } catch (\Throwable $e) {
-                    Log::warning('SiteAudit page process failed', [
+                    Log::warning('SiteAudit wave process failed', [
                         'crawl_id' => $crawl->id,
-                        'url' => $url,
+                        'urls' => count($wave),
                         'error' => $e->getMessage(),
                     ]);
-                    $out = ['internal_links' => [], 'content_unchanged' => false];
+                    $outs = array_fill(0, count($wave), ['internal_links' => [], 'content_unchanged' => false]);
                 }
 
-                if (! empty($out['content_unchanged'])) {
-                    $unchanged++;
-                }
+                foreach ($wave as $wi => $url) {
+                    $fetched++;
+                    $processed++;
+                    $out = $outs[$wi] ?? ['internal_links' => [], 'content_unchanged' => false];
 
-                if (! empty($out['internal_links'])) {
-                    $known = $fetched + (count($queue) - $i);
-                    foreach ($out['internal_links'] as $link) {
-                        if (isset($seen[$link])) {
-                            continue;
-                        }
-                        if ($known >= $limit) {
-                            break;
-                        }
-                        if ($patterns && SiteAuditUrlFilter::isExcluded($link, $patterns)) {
-                            continue;
-                        }
-                        if ($robotsTxt && ! $robotsTxt->isPathAllowed($robotsGroups, $link)) {
-                            continue;
-                        }
-                        $seen[$link] = true;
-                        $queue[] = $link;
-                        $expanded++;
-                        $known++;
+                    if (! empty($out['content_unchanged'])) {
+                        $unchanged++;
                     }
-                }
 
-                $pagesTotal = max(count($seen), $fetched + (count($queue) - $i));
-                if ($processed % self::PROGRESS_DB_EVERY === 0 || $processed === 1) {
-                    $this->touchProgress($crawl, $fetched, $pagesTotal, $unchanged, $expanded);
-                }
-                if ($processed % self::ENGINE_FILE_EVERY === 0) {
-                    $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
+                    if (! empty($out['internal_links']) && empty($settings['pages_only'])) {
+                        $known = $fetched + (count($queue) - $i);
+                        foreach ($out['internal_links'] as $link) {
+                            if (isset($seen[$link])) {
+                                continue;
+                            }
+                            if ($known >= $limit) {
+                                break;
+                            }
+                            if ($patterns && SiteAuditUrlFilter::isExcluded($link, $patterns)) {
+                                continue;
+                            }
+                            if ($robotsTxt && ! $robotsTxt->isPathAllowed($robotsGroups, $link)) {
+                                continue;
+                            }
+                            $seen[$link] = true;
+                            $queue[] = $link;
+                            $expanded++;
+                            $known++;
+                        }
+                    }
+
+                    $pagesTotal = max(count($seen), $fetched + (count($queue) - $i));
+                    if ($processed % self::PROGRESS_DB_EVERY === 0 || $processed === 1) {
+                        $this->touchProgress($crawl, $fetched, $pagesTotal, $unchanged, $expanded);
+                    }
+                    if ($processed % self::ENGINE_FILE_EVERY === 0) {
+                        $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
+                    }
                 }
             }
 
@@ -280,6 +295,7 @@ class SiteAuditCrawlEngine
         );
 
         $urlOpts = SiteAuditUrlNormalizer::optionsFromSettings($settings, $project->domain);
+        $pagesOnly = ! empty($settings['pages_only']);
 
         $seed = [];
         $manual = $project->setting('seed_urls', []);
@@ -293,40 +309,66 @@ class SiteAuditCrawlEngine
         }
 
         $home = SiteAuditUrlNormalizer::normalize('https://' . $project->domain . '/', $project->domain, $urlOpts);
-        if ($home) {
-            $seed[$home] = true;
-        }
 
-        $extraHosts = SiteAuditUrlNormalizer::parseExtraHosts($settings['extra_hosts'] ?? []);
-        foreach ($extraHosts as $extraHost) {
-            $extraHome = SiteAuditUrlNormalizer::normalize('https://' . $extraHost . '/', $extraHost, $urlOpts);
-            if ($extraHome) {
-                $seed[$extraHome] = true;
-            }
-        }
-        if ($extraHosts !== []) {
-            $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
-            $progress['extra_hosts'] = $extraHosts;
-            $crawl->progress_json = $progress;
-            $crawl->save();
-        }
-
-        try {
-            $discovered = (new SiteAuditSitemapProbe())->run($crawl, $project->domain, $limit);
-            $crawl->refresh();
-            foreach ($discovered['seed_urls'] as $u) {
-                $norm = SiteAuditUrlNormalizer::normalize($u, $project->domain, $urlOpts) ?: $u;
-                $seed[$norm] = true;
-            }
-        } catch (\Throwable $e) {
-            if (! $seed) {
+        if ($pagesOnly) {
+            // только явные URL: без главной «насильно», без sitemap, без дообхода
+            if ($seed === []) {
                 $crawl->status = SiteAuditCrawl::STATUS_FAILED;
-                $crawl->error = 'Discovery failed: ' . $e->getMessage();
+                $crawl->error = 'Режим «только страницы»: укажите хотя бы один URL';
                 $crawl->finished_at = now();
                 $crawl->save();
                 SiteAuditGlobalCap::promoteWaiting();
 
                 return $crawl;
+            }
+            $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+            $progress['pages_only'] = true;
+            $progress['sitemap'] = [
+                'found' => false,
+                'url_count' => 0,
+                'seed_count' => count($seed),
+                'sources' => [],
+                'errors' => [],
+                'skipped' => 'pages_only',
+            ];
+            $crawl->progress_json = $progress;
+            $crawl->save();
+        } else {
+            if ($home) {
+                $seed[$home] = true;
+            }
+
+            $extraHosts = SiteAuditUrlNormalizer::parseExtraHosts($settings['extra_hosts'] ?? []);
+            foreach ($extraHosts as $extraHost) {
+                $extraHome = SiteAuditUrlNormalizer::normalize('https://' . $extraHost . '/', $extraHost, $urlOpts);
+                if ($extraHome) {
+                    $seed[$extraHome] = true;
+                }
+            }
+            if ($extraHosts !== []) {
+                $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+                $progress['extra_hosts'] = $extraHosts;
+                $crawl->progress_json = $progress;
+                $crawl->save();
+            }
+
+            try {
+                $discovered = (new SiteAuditSitemapProbe())->run($crawl, $project->domain, $limit);
+                $crawl->refresh();
+                foreach ($discovered['seed_urls'] as $u) {
+                    $norm = SiteAuditUrlNormalizer::normalize($u, $project->domain, $urlOpts) ?: $u;
+                    $seed[$norm] = true;
+                }
+            } catch (\Throwable $e) {
+                if (! $seed) {
+                    $crawl->status = SiteAuditCrawl::STATUS_FAILED;
+                    $crawl->error = 'Discovery failed: ' . $e->getMessage();
+                    $crawl->finished_at = now();
+                    $crawl->save();
+                    SiteAuditGlobalCap::promoteWaiting();
+
+                    return $crawl;
+                }
             }
         }
 

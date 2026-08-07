@@ -87,7 +87,10 @@ class SiteAuditController extends Controller
                 });
             }
 
-            $crawls = $crawlsQuery->limit($historyDomain !== '' ? 100 : 30)->get();
+            $crawls = $crawlsQuery
+                ->paginate(20)
+                ->appends($request->only('domain'))
+                ->fragment('sa-history');
 
             $crawlSizes = SiteAuditCrawlStorage::payloadBytesByCrawlIds($crawls->pluck('id')->all());
 
@@ -99,6 +102,7 @@ class SiteAuditController extends Controller
             $schedules = collect();
             $crawlSizes = [];
             $historyDomain = '';
+            $crawls = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20);
         }
 
         $canSchedule = $user && ! DemoCabinet::isCurrentUser() && SiteAuditSchedule::allowedForUser($user);

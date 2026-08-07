@@ -347,7 +347,9 @@
                     </form>
                 </div>
                 @if(!empty($historyDomain))
-                    <div class="small text-secondary mt-1">Найдено: {{ $crawls->count() }} по «{{ $historyDomain }}»</div>
+                    <div class="small text-secondary mt-1">
+                        Найдено: {{ method_exists($crawls, 'total') ? $crawls->total() : $crawls->count() }} по «{{ $historyDomain }}»
+                    </div>
                 @endif
                 <div class="small text-secondary mt-1 mb-0">
                     После окончания платного тарифа история аудита хранится ещё 14 дней, затем удаляется автоматически.
@@ -561,11 +563,26 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr data-sa-empty><td colspan="10" class="text-secondary px-3 py-4 text-center">История пуста</td></tr>
+                            <tr data-sa-empty><td colspan="13" class="text-secondary px-3 py-4 text-center">История пуста</td></tr>
                         @endforelse
                         </tbody>
                     </table>
                 </div>
+                @if(method_exists($crawls, 'hasPages') && $crawls->hasPages())
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 py-2 border-top">
+                        <div class="small text-secondary">
+                            {{ $crawls->firstItem() }}–{{ $crawls->lastItem() }}
+                            из {{ number_format($crawls->total(), 0, '', ' ') }}
+                        </div>
+                        <nav title="Страницы истории краулов">
+                            {{ $crawls->links('pagination::bootstrap-4') }}
+                        </nav>
+                    </div>
+                @elseif(method_exists($crawls, 'total') && $crawls->total() > 0)
+                    <div class="small text-secondary px-3 py-2 border-top">
+                        Всего {{ number_format($crawls->total(), 0, '', ' ') }}
+                    </div>
+                @endif
             </div>
         </section>
     </div>

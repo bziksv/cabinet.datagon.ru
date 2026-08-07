@@ -82,8 +82,6 @@
                     @if(!empty($s))
                         · скорость {{ $s['crawl_speed'] ?? '—' }} ({{ $s['rps'] ?? '—' }} URL/с на поток)
                         · потоки {{ (int) ($s['concurrency'] ?? 1) }}
-                        @if(!empty($s['local_test'])) · <span class="badge text-bg-secondary">local</span> @endif
-                        @if(!empty($s['sync'])) · <span class="badge text-bg-light border">sync</span> @endif
                     @endif
                     @if($crawl->started_at) · старт {{ $crawl->started_at->format('d.m.Y H:i') }} @endif
                     @if($crawl->finished_at) · конец {{ $crawl->finished_at->format('d.m.Y H:i') }} @endif

@@ -131,7 +131,6 @@ class SiteAuditController extends Controller
             'crawlsUsed' => SiteAuditLimits::crawlsUsedThisMonth(),
             'historyPurgeNotice' => SiteAuditLimits::historyPurgeNotice($user),
             'findingsCatalog' => config('site_audit.findings', []),
-            'isLocal' => app()->environment('local'),
             'bucketLabels' => self::BUCKET_LABELS,
         ]);
     }
@@ -195,7 +194,6 @@ class SiteAuditController extends Controller
             'treeAll' => $treeAll,
             'counts' => $counts,
             'findingsCatalog' => config('site_audit.findings', []),
-            'isLocal' => app()->environment('local'),
             'history' => $history,
             'historyRows' => $historyRows,
             'archiveCrawls' => $archiveCrawls,
@@ -895,9 +893,6 @@ class SiteAuditController extends Controller
             ], 422);
         }
 
-        $runSync = app()->environment('local')
-            && in_array((string) $request->input('sync', ''), ['1', 'true', 'yes', 'on'], true);
-
         $starter = new SiteAuditCrawlStarter();
         $user = Auth::user();
         $started = [];
@@ -966,21 +961,9 @@ class SiteAuditController extends Controller
                         : [],
                 ];
                 if ($request->filled('pages_limit')) {
-                    // local: starter bypasses tariff — передаём как есть; prod — truncate до тарифа
-                    $settings['pages_limit'] = app()->environment('local')
-                        ? max(1, SiteAuditLimits::parseIntLoose($request->input('pages_limit')))
-                        : SiteAuditLimits::resolvePagesLimit($user, $request->input('pages_limit'));
+                    $settings['pages_limit'] = SiteAuditLimits::resolvePagesLimit($user, $request->input('pages_limit'));
                 }
                 $jobs[] = ['domain' => $domain, 'settings' => $settings];
-            }
-        }
-
-        if (app()->environment('local')) {
-            foreach ($jobs as $ji => $job) {
-                $jobs[$ji]['settings']['local_test'] = true;
-                if ($runSync) {
-                    $jobs[$ji]['settings']['sync'] = true;
-                }
             }
         }
 
@@ -992,18 +975,10 @@ class SiteAuditController extends Controller
                     $user,
                     $domain,
                     $settings,
-                    ! $runSync,
+                    true,
                     false,
                     $index > 0
                 );
-                // starter уже выставил pages_limit; local — точное значение из формы (bypass тарифа)
-                if (app()->environment('local') && ! empty($settings['pages_limit'])) {
-                    $crawl->pages_limit = (int) $settings['pages_limit'];
-                    $crawl->save();
-                }
-                if ($runSync) {
-                    $crawl = (new \App\Services\SiteAudit\SiteAuditSyncRunner())->run($crawl);
-                }
                 $started[] = [
                     'crawl_id' => $crawl->id,
                     'domain' => $domain,
@@ -1028,19 +1003,13 @@ class SiteAuditController extends Controller
         $first = $started[0];
         $n = count($started);
         if ($pagesOnly) {
-            $msg = $runSync
-                ? ($n === 1
-                    ? 'Проверка страниц выполнена. Смотрите историю ниже.'
-                    : "Проверка страниц: {$n} проект(а) по доменам. Смотрите историю ниже.")
-                : ($n === 1
-                    ? 'Запущена проверка только указанных страниц.'
-                    : "Запущено {$n} краула(ов) только по страницам (разные домены → разные проекты).");
+            $msg = $n === 1
+                ? 'Запущена проверка только указанных страниц.'
+                : "Запущено {$n} краула(ов) только по страницам (разные домены → разные проекты).";
         } else {
-            $msg = $runSync
-                ? ($n === 1 ? 'Краул выполнен. Смотрите историю ниже.' : "Выполнено краулов: {$n}. Смотрите историю ниже.")
-                : ($n === 1
-                    ? 'Краул запущен. Прогресс — в истории краулов.'
-                    : "Запущено краулов: {$n}. Прогресс — в истории краулов.");
+            $msg = $n === 1
+                ? 'Краул запущен. Прогресс — в истории краулов.'
+                : "Запущено краулов: {$n}. Прогресс — в истории краулов.";
         }
         if ($errors !== []) {
             $msg .= ' Не запущено: ' . implode('; ', $errors);
@@ -1167,22 +1136,16 @@ class SiteAuditController extends Controller
             $settings['save_html'] = $source->save_html;
         }
 
-        $runSync = app()->environment('local')
-            && in_array((string) $request->input('sync', ''), ['1', 'true', 'yes', 'on'], true);
-
         try {
             $crawl = (new SiteAuditCrawlStarter())->start(
                 Auth::user(),
                 $project->domain,
                 $settings,
-                ! $runSync
+                true
             );
             if (! empty($settings['pages_limit'])) {
-                $crawl->pages_limit = (int) $settings['pages_limit'];
+                $crawl->pages_limit = SiteAuditLimits::resolvePagesLimit(Auth::user(), $settings['pages_limit']);
                 $crawl->save();
-            }
-            if ($runSync) {
-                $crawl = (new \App\Services\SiteAudit\SiteAuditSyncRunner())->run($crawl);
             }
         } catch (\Throwable $e) {
             if ($request->expectsJson()) {
@@ -1203,9 +1166,7 @@ class SiteAuditController extends Controller
                 'finished' => $crawl->isFinished(),
                 'status_url' => route('pages.site-audit.crawl.status', $crawl->id),
                 'redirect' => route('pages.site-audit'),
-                'message' => $runSync
-                    ? 'Повтор выполнен. Смотрите историю ниже.'
-                    : 'Повтор запущен. Прогресс — в истории краулов.',
+                'message' => 'Повтор запущен. Прогресс — в истории краулов.',
             ]);
         }
 

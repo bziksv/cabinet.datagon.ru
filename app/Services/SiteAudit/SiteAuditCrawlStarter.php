@@ -23,7 +23,6 @@ class SiteAuditCrawlStarter
         bool $skipActiveCheck = false
     ): SiteAuditCrawl {
         $bypassLimits = $force
-            || app()->environment('local')
             || (bool) config('site_audit.bypass_limits', false);
 
         if (! $bypassLimits && ! SiteAuditLimits::canStartCrawl($user)) {
@@ -104,8 +103,6 @@ class SiteAuditCrawlStarter
                     'strip_trailing_slash' => true,
                     'check_broken_links' => true,
                     'pages_only' => ! empty($settings['pages_only']),
-                    'local_test' => ! empty($settings['local_test']),
-                    'sync' => ! empty($settings['sync']),
                     'extra_hosts' => $settings['extra_hosts'] ?? [],
                 ],
             ],

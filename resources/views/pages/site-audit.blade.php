@@ -25,9 +25,6 @@
                         Обходим сайт по sitemap и ссылкам, смотрим robots, собираем ошибки в отчёт.
                         Можно кинуть список URL — тогда только их, без дальнейшего обхода.
                         Несколько доменов — отдельные проекты.
-                        @if($isLocal)
-                            <span class="badge text-bg-secondary">local · без лимитов тарифа</span>
-                        @endif
                     </p>
                     <button type="button" class="btn btn-sm btn-outline-primary cabinet-sa-tour-start" id="sa-tour-start">
                         <i class="bi bi-lightbulb me-1" aria-hidden="true"></i>Как пользоваться…
@@ -126,29 +123,13 @@
                                    inputmode="numeric" autocomplete="off"
                                    value="{{ number_format((int) ($pagesLimit ?? 100), 0, '', ' ') }}"
                                    data-min="1"
-                                   data-max="{{ !empty($isLocal) ? 700000 : (int) ($pagesLimit ?? 100) }}">
+                                   data-max="{{ (int) ($pagesLimit ?? 100) }}">
                             <div class="form-text">
                                 Макс. по тарифу: {{ number_format((int) ($pagesLimit ?? 100), 0, '', ' ') }}
                                 · проектов {{ (int) ($projectsUsed ?? 0) }}/{{ (int) ($projectsLimit ?? 1) }}
                             </div>
                         </div>
                         </div>
-
-                        @if($isLocal)
-                            <div class="cabinet-sa-opt-group cabinet-sa-opt-group--local mb-3">
-                                <div class="cabinet-sa-opt-group__head">
-                                    <span class="fw-semibold">Local / тест</span>
-                                    @include('pages.partials.site-audit-tip', ['tip' => "Только в local. Лимит URL выше можно задать больше тарифа; sync — без очереди."])
-                                </div>
-                                <div class="cabinet-sa-opt-row mb-0 mt-2">
-                                    <div class="form-check form-switch mb-0">
-                                        <input type="checkbox" class="form-check-input" id="sa-sync" role="switch">
-                                        <label class="form-check-label" for="sa-sync">Синхронно (без queue)</label>
-                                    </div>
-                                    @include('pages.partials.site-audit-tip', ['tip' => "Выкл. — краул в очереди site_audit.\nВкл. — ждёт до конца в одном запросе."])
-                                </div>
-                            </div>
-                        @endif
 
                         <div class="d-flex flex-wrap align-items-center gap-2">
                             <button type="button" class="btn btn-primary" id="sa-start">
@@ -409,8 +390,6 @@
                                 $speed = (string) ($s['crawl_speed'] ?? '—');
                                 $rps = isset($s['rps']) ? (float) $s['rps'] : null;
                                 $pagesOnly = ! empty($s['pages_only']);
-                                $localTest = ! empty($s['local_test']);
-                                $syncRun = ! empty($s['sync']);
                                 $limitShow = (int) ($c->pages_limit ?: ($s['pages_limit'] ?? 0));
                             @endphp
                             <tr data-crawl-id="{{ $c->id }}"
@@ -498,12 +477,6 @@
                                         @if($limitShow > 0)
                                             лимит {{ number_format($limitShow, 0, '', ' ') }}
                                         @endif
-                                        @if($localTest)
-                                            <span class="badge text-bg-secondary ms-1" title="Запуск из local">local</span>
-                                        @endif
-                                        @if($syncRun)
-                                            <span class="badge text-bg-light border ms-1" title="Синхронно без очереди">sync</span>
-                                        @endif
                                     </div>
                                 </td>
                                 <td class="text-nowrap" data-sa-size>
@@ -548,9 +521,6 @@
                                             <form method="POST" action="{{ route('pages.site-audit.crawl.repeat', $c->id) }}" class="d-inline"
                                                   onsubmit="return confirm('Повторить краул для {{ e(optional($c->project)->domain ?? 'проекта') }} с теми же настройками? Начнётся новый краул с нуля.');">
                                                 @csrf
-                                                @if(app()->environment('local'))
-                                                    <input type="hidden" name="sync" value="" data-sa-repeat-sync>
-                                                @endif
                                                 <button type="submit" class="btn btn-sm btn-outline-secondary">Повторить</button>
                                             </form>
                                             <form method="POST" action="{{ route('pages.site-audit.crawl.destroy', $c->id) }}" class="d-inline"
@@ -632,19 +602,6 @@
                     form.addEventListener('submit', function () {
                         var lim = form.querySelector('.sa-num-space[name="pages_limit"]');
                         if (lim) lim.value = String(saParseIntSpaces(lim.value) || 1);
-                    });
-                });
-
-                function syncFlag() {
-                    var syncEl = document.getElementById('sa-sync');
-                    return (syncEl && syncEl.checked) ? '1' : '0';
-                }
-
-                document.querySelectorAll('[data-sa-repeat-sync]').forEach(function (inp) {
-                    var form = inp.closest('form');
-                    if (!form) return;
-                    form.addEventListener('submit', function () {
-                        inp.value = syncFlag();
                     });
                 });
 
@@ -769,12 +726,8 @@
                                 repeat.onsubmit = function () {
                                     return confirm('Повторить краул для ' + domain + ' с теми же настройками? Начнётся новый краул с нуля.');
                                 };
-                                var syncHidden = @json(app()->environment('local'))
-                                    ? '<input type="hidden" name="sync" value="' + syncFlag() + '">'
-                                    : '';
                                 repeat.innerHTML =
                                     '<input type="hidden" name="_token" value="' + token + '">' +
-                                    syncHidden +
                                     '<button type="submit" class="btn btn-sm btn-outline-secondary">Повторить</button>';
                                 actions.appendChild(repeat);
 
@@ -878,8 +831,6 @@
                         };
                         var limitEl = document.getElementById('sa-limit');
                         if (limitEl && limitEl.value) body.pages_limit = String(saParseIntSpaces(limitEl.value) || '');
-                        var syncEl = document.getElementById('sa-sync');
-                        if (syncEl) body.sync = syncEl.checked ? '1' : '0';
 
                         fetch('{{ route('pages.site-audit.start') }}', {
                             method: 'POST',

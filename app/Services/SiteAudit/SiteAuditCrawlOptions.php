@@ -34,8 +34,6 @@ class SiteAuditCrawlOptions
             'check_broken_links' => true,
             // Только seed-URL: без sitemap и без дообхода по ссылкам.
             'pages_only' => ! empty($input['pages_only']),
-            'local_test' => ! empty($input['local_test']),
-            'sync' => ! empty($input['sync']),
         ]);
     }
 

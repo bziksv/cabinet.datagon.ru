@@ -558,6 +558,13 @@ class SiteAuditCrawlEngine
         ], true)) {
             return false;
         }
+
+        // Лёгкий флаг в progress_json (история не грузит 5MB queue на каждый ряд).
+        $meta = $this->engineResumeMeta($crawl);
+        if ($meta !== null) {
+            return (int) ($meta['remaining'] ?? 0) > 0;
+        }
+
         if (! $this->hasEngineState($crawl)) {
             return false;
         }
@@ -565,6 +572,31 @@ class SiteAuditCrawlEngine
         $state = $this->loadEngineState($crawl);
 
         return count($state['queue']) > $state['index'];
+    }
+
+    /**
+     * @return array{remaining?:int,fetched?:int}|null
+     */
+    private function engineResumeMeta(SiteAuditCrawl $crawl): ?array
+    {
+        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : null;
+        if ($progress === null && isset($crawl->engine_resume_raw)) {
+            $raw = $crawl->engine_resume_raw;
+            if (is_string($raw)) {
+                $decoded = json_decode($raw, true);
+
+                return is_array($decoded) ? $decoded : null;
+            }
+            if (is_array($raw)) {
+                return $raw;
+            }
+        }
+        if (! is_array($progress)) {
+            return null;
+        }
+        $meta = $progress['engine_resume'] ?? null;
+
+        return is_array($meta) ? $meta : null;
     }
 
     /**
@@ -681,6 +713,10 @@ class SiteAuditCrawlEngine
         $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
         unset($progress['engine']);
         $progress['engine_storage'] = 'file';
+        $progress['engine_resume'] = [
+            'remaining' => count($remaining),
+            'fetched' => $fetched,
+        ];
         $progress['fetched'] = $fetched;
         $progress['total'] = max(count($seen), $fetched + count($remaining));
         $progress['pages_unchanged'] = $unchanged;
@@ -702,7 +738,7 @@ class SiteAuditCrawlEngine
         }
 
         $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
-        unset($progress['engine'], $progress['engine_storage']);
+        unset($progress['engine'], $progress['engine_storage'], $progress['engine_resume']);
         $crawl->progress_json = $progress;
     }
 }

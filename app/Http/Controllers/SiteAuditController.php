@@ -78,7 +78,8 @@ class SiteAuditController extends Controller
                     'pages_total', 'pages_fetched', 'pages_limit', 'buckets_json', 'counts_json',
                     'started_at', 'finished_at', 'created_at', 'error',
                 ])
-                ->selectRaw("JSON_EXTRACT(COALESCE(progress_json, '{}'), '$.settings') as settings_json_raw");
+                ->selectRaw("JSON_EXTRACT(COALESCE(progress_json, '{}'), '$.settings') as settings_json_raw")
+                ->selectRaw("JSON_EXTRACT(COALESCE(progress_json, '{}'), '$.engine_resume') as engine_resume_raw");
 
             if ($historyDomain !== '') {
                 $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $historyDomain) . '%';
@@ -525,7 +526,7 @@ class SiteAuditController extends Controller
             }
 
             return redirect()
-                ->route('pages.site-audit.crawl.show', $crawl->id)
+                ->back(302, [], route('pages.site-audit') . '#sa-history')
                 ->with('status', 'Краул уже завершён');
         }
 
@@ -543,11 +544,15 @@ class SiteAuditController extends Controller
                 'status' => $crawl->status,
                 'status_label' => $crawl->statusLabelRu(),
                 'finished' => true,
+                'can_resume' => (new \App\Services\SiteAudit\SiteAuditCrawlEngine())->canResume($crawl),
+                'pages_fetched' => (int) $crawl->pages_fetched,
+                'pages_total' => (int) $crawl->pages_total,
+                'id' => (int) $crawl->id,
             ]);
         }
 
         return redirect()
-            ->route('pages.site-audit.crawl.show', $crawl->id)
+            ->back(302, [], route('pages.site-audit') . '#sa-history')
             ->with('status', 'Краул остановлен');
     }
 

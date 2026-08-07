@@ -528,6 +528,7 @@
                                         <a class="btn btn-sm btn-outline-primary" href="{{ route('pages.site-audit.crawl.show', $c->id) }}">Сводка</a>
                                         @if(! $finished)
                                             <form method="POST" action="{{ route('pages.site-audit.crawl.cancel', $c->id) }}" class="d-inline"
+                                                  data-sa-cancel-crawl
                                                   onsubmit="return confirm('Остановить краул #{{ $c->id }}?');">
                                                 @csrf
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">Стоп</button>
@@ -824,6 +825,38 @@
                     if (!historyTable) return;
                     historyTable.querySelectorAll('tr[data-crawl-id][data-finished="0"]').forEach(pollRow);
                 }
+
+                document.querySelectorAll('form[data-sa-cancel-crawl]').forEach(function (form) {
+                    form.addEventListener('submit', function (e) {
+                        e.preventDefault();
+                        var row = form.closest('tr');
+                        var btn = form.querySelector('button');
+                        if (btn) btn.disabled = true;
+                        fetch(form.action, {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-CSRF-TOKEN': token
+                            },
+                            body: new FormData(form)
+                        }).then(function (r) {
+                            return r.json().then(function (j) { return { ok: r.ok, j: j }; });
+                        }).then(function (x) {
+                            if (!x.ok) {
+                                if (btn) btn.disabled = false;
+                                alert((x.j && x.j.message) ? x.j.message : 'Не удалось остановить');
+                                return;
+                            }
+                            if (row) {
+                                updateRow(row, x.j);
+                            }
+                        }).catch(function (err) {
+                            if (btn) btn.disabled = false;
+                            alert(String(err));
+                        });
+                    });
+                });
 
                 if (startBtn) {
                     startBtn.addEventListener('click', function () {

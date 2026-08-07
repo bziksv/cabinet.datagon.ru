@@ -152,14 +152,14 @@ class SiteAuditFetcher
                 $index = (int) $index;
                 $bodyPath = $bodyPaths[$index] ?? null;
                 SiteAuditBodyTemp::release($bodyPath);
-                $status = null;
+                if ($reason instanceof RequestException) {
+                    $results[$index] = $this->failFromException($urls[$index], $ua, $reason);
+                    return;
+                }
                 $message = is_object($reason) && method_exists($reason, 'getMessage')
                     ? $reason->getMessage()
                     : (string) $reason;
-                if ($reason instanceof RequestException && $reason->hasResponse() && $reason->getResponse()) {
-                    $status = $reason->getResponse()->getStatusCode();
-                }
-                $results[$index] = $this->fail($urls[$index], $ua, $status, $message);
+                $results[$index] = $this->fail($urls[$index], $ua, null, $message);
             },
         ]);
         $pool->promise()->wait();
@@ -209,9 +209,7 @@ class SiteAuditFetcher
         } catch (RequestException $e) {
             SiteAuditBodyTemp::release($bodyPath);
 
-            return $this->fail($url, $ua, $e->hasResponse() && $e->getResponse()
-                ? $e->getResponse()->getStatusCode()
-                : null, $e->getMessage());
+            return $this->failFromException($url, $ua, $e);
         } catch (\Throwable $e) {
             SiteAuditBodyTemp::release($bodyPath);
 
@@ -241,6 +239,7 @@ class SiteAuditFetcher
         if ($hist) {
             $final = end($hist) ?: $final;
         }
+        $loop = SiteAuditRedirectChain::analyze($url, $chain, $final);
 
         $maxBytes = max(1, (int) config('site_audit.large_page_bytes', 1_500_000));
         $body = null;
@@ -271,6 +270,7 @@ class SiteAuditFetcher
             'status_code' => $status,
             'final_url' => $final,
             'redirect_chain' => $chain,
+            'redirect_loop' => ! empty($loop['loop']),
             'body' => $body,
             'body_path' => $useTemp ? $bodyPath : null,
             'size_bytes' => $size,
@@ -294,13 +294,46 @@ class SiteAuditFetcher
         ];
     }
 
-    private function fail(string $url, string $ua, ?int $status, string $error): array
+    private function failFromException(string $url, string $ua, RequestException $e): array
     {
+        $status = null;
+        $chain = [];
+        $final = $url;
+        if ($e->hasResponse() && $e->getResponse()) {
+            $response = $e->getResponse();
+            $status = $response->getStatusCode();
+            $history = $response->getHeader(RedirectMiddleware::HISTORY_HEADER);
+            if (is_array($history)) {
+                foreach ($history as $h) {
+                    $chain[] = $h;
+                }
+            }
+            if ($chain) {
+                $final = end($chain) ?: $url;
+                reset($chain);
+            }
+        }
+        $msg = $e->getMessage();
+        $loop = SiteAuditRedirectChain::analyze($url, $chain, $final);
+
+        return $this->fail($url, $ua, $status, $msg, $chain, $final, ! empty($loop['loop']));
+    }
+
+    private function fail(
+        string $url,
+        string $ua,
+        ?int $status,
+        string $error,
+        array $chain = [],
+        ?string $finalUrl = null,
+        bool $redirectLoop = false
+    ): array {
         return [
             'ok' => false,
             'status_code' => $status,
-            'final_url' => $url,
-            'redirect_chain' => [],
+            'final_url' => $finalUrl ?: $url,
+            'redirect_chain' => $chain,
+            'redirect_loop' => $redirectLoop,
             'body' => null,
             'body_path' => null,
             'size_bytes' => 0,

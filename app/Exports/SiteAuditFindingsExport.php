@@ -81,7 +81,7 @@ class SiteAuditFindingsExport implements FromCollection, WithHeadings, WithTitle
                     $row->url,
                     $row->code,
                     SiteAuditFindingPresenter::severityLabel($row->severity),
-                    SiteAuditFindingPresenter::metaLine($row->code, $row->meta_json),
+                    SiteAuditFindingPresenter::metaLine($row->code, $row->meta_json, $row->url),
                 ];
             }
         });

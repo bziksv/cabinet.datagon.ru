@@ -1,5 +1,8 @@
 {{-- Тело отчёта (help + filters + table/groups + pagination). --}}
 @include('pages.partials.site-audit-report-help')
+@php
+    $isRedirectReport = in_array($code ?? '', ['redirect', 'redirect_chain_long', 'redirect_loop'], true);
+@endphp
 @include('pages.partials.site-audit-report-filters')
 
 @if(!empty($groupable))
@@ -53,16 +56,29 @@
         if (!empty($showReferrers)) { $colspan++; }
         if (!empty($canIgnore)) { $colspan++; }
         if (!empty($canNote)) { $colspan++; }
-        $urlTip = !empty($showReferrers)
-            ? "Это URL, который сам ответил ошибкой при обходе (404 и т.п.).\nНе путать со страницей, где стоит ссылка — она в колонке «Откуда ссылаются»."
-            : "Адрес страницы с проблемой.\nНажмите ссылку — откроется сайт в новой вкладке.";
+        $isRedirectReport = in_array($code ?? '', ['redirect', 'redirect_chain_long', 'redirect_loop'], true);
+        $isBrokenTarget = !empty($showReferrers) && ! $isRedirectReport;
+        $urlTip = $isRedirectReport
+            ? "URL, который сам отвечает редиректом.\nГде на него ссылаются — колонка «Откуда ссылаются» (меню, HTML, sitemap)."
+            : ($isBrokenTarget
+                ? "Это URL, который сам ответил ошибкой при обходе (404 и т.п.).\nНе путать со страницей, где стоит ссылка — она в колонке «Откуда ссылаются»."
+                : "Адрес страницы с проблемой.\nНажмите ссылку — откроется сайт в новой вкладке.");
+        $urlColTitle = $isRedirectReport
+            ? 'URL с редиректом'
+            : ($isBrokenTarget ? 'Битый URL (цель)' : 'Адрес страницы с проблемой');
+        $urlColLabel = $isRedirectReport
+            ? 'URL'
+            : ($isBrokenTarget ? 'Битый URL' : 'URL');
+        $refColTip = $isRedirectReport
+            ? "Страницы краула, где в HTML есть ссылка на этот URL (меню, футер, текст).\nЕсли ссылок нет — откуда URL взяли в очередь: sitemap.xml, посев или главная."
+            : "Страницы, где в HTML есть ссылка на этот URL.\nЕсли ссылок нет — пишем откуда URL взяли в очередь: sitemap.xml, посев или главная.";
     @endphp
     <div class="cabinet-sa-table-wrap">
         <table class="table table-sm table-hover mb-0">
             <thead class="table-light">
             <tr>
-                <th style="width:{{ !empty($showReferrers) ? '28%' : '38%' }}" title="{{ !empty($showReferrers) ? 'Битый URL (цель)' : 'Адрес страницы с проблемой' }}">
-                    {{ !empty($showReferrers) ? 'Битый URL' : 'URL' }}
+                <th style="width:{{ !empty($showReferrers) ? '28%' : '38%' }}" title="{{ $urlColTitle }}">
+                    {{ $urlColLabel }}
                     @include('pages.partials.site-audit-tip', ['tip' => $urlTip])
                 </th>
                 <th title="Насколько срочно чинить: Грубые → Прочие → Предупреждения → Инфо.">
@@ -74,10 +90,10 @@
                     @include('pages.partials.site-audit-tip', ['tip' => "Кратко что не так: код ответа, какой дубль, какой запрос и т.д."])
                 </th>
                 @if(!empty($showReferrers))
-                    <th style="width:28%" title="Страницы краула, на которых есть ссылка на этот битый URL.">
+                    <th style="width:28%" title="{{ $isRedirectReport ? 'Где в крауле нашли ссылку на этот URL' : 'Страницы краула со ссылкой на этот URL' }}">
                         Откуда ссылаются
                         @include('pages.partials.site-audit-tip', [
-                            'tip' => "Страницы, где в HTML есть ссылка на этот битый URL.\nЕсли пусто — URL попал в очередь из sitemap/посева, либо в крауле не сохранились исходящие ссылки (часто когда почти все ответы 4xx).",
+                            'tip' => $refColTip,
                         ])
                     </th>
                 @endif
@@ -124,7 +140,7 @@
                     </td>
                     <td>{{ \App\Services\SiteAudit\SiteAuditFindingPresenter::severityLabel($row->severity) }}</td>
                     <td class="small">
-                        {{ \App\Services\SiteAudit\SiteAuditFindingPresenter::metaLine($row->code ?? $code, $row->meta_json) }}
+                        {{ \App\Services\SiteAudit\SiteAuditFindingPresenter::metaLine($row->code ?? $code, $row->meta_json, $row->url) }}
                     </td>
                     @if(!empty($showReferrers))
                         <td class="small">
@@ -140,11 +156,21 @@
                                 @if(!empty($rowMeta['from_sitemap']))
                                     <div class="text-muted mt-1">также в sitemap</div>
                                 @endif
-                            @elseif(!empty($rowMeta['from_sitemap']))
-                                <span title="URL попал в краул из sitemap.xml, а не из внутренней ссылки HTML">из sitemap</span>
-                                <div class="text-muted">внутренних ссылок в крауле нет</div>
                             @else
-                                <span class="text-muted" title="Не из HTML-ссылок сохранённых страниц; мог быть seed/корень/ручной список">не из ссылок HTML</span>
+                                @php
+                                    $originLabel = trim((string) ($rowMeta['origin_label'] ?? ''));
+                                    $originHint = trim((string) ($rowMeta['origin_hint'] ?? ''));
+                                    if ($originLabel === '' && !empty($rowMeta['from_sitemap'])) {
+                                        $originLabel = 'из sitemap.xml';
+                                        $originHint = 'URL взяли из карты сайта при старте обхода.';
+                                    }
+                                    if ($originLabel === '') {
+                                        $originLabel = 'из стартовой очереди';
+                                        $originHint = 'Посев, главная или sitemap — не из HTML-ссылок страниц краула.';
+                                    }
+                                @endphp
+                                <span title="{{ $originHint }}">{{ $originLabel }}</span>
+                                <div class="text-muted">HTML-ссылок с других страниц краула нет</div>
                             @endif
                         </td>
                     @endif

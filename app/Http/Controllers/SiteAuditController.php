@@ -442,10 +442,20 @@ class SiteAuditController extends Controller
         if ($showReferrers && $rows instanceof \Illuminate\Support\Collection && $rows->isNotEmpty()) {
             $targetUrls = $rows->pluck('url')->filter()->unique()->values()->all();
             $refMap = SiteAuditLinkReferrers::forCrawl((int) $crawl->id, $targetUrls);
-            $inSitemap = SiteAuditLinkReferrers::inSitemapFlags($crawl, $targetUrls);
-            $rows = $rows->map(function ($row) use ($refMap, $inSitemap) {
+            $origins = SiteAuditLinkReferrers::originMeta($crawl, $targetUrls);
+            $rows = $rows->map(function ($row) use ($refMap, $origins) {
                 $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
-                $refs = $refMap[(string) $row->url] ?? [];
+                $url = (string) $row->url;
+                $refs = $refMap[$url] ?? [];
+                // слэш-вариант: /about ↔ /about/
+                $slashAlt = SiteAuditLinkReferrers::slashVariantPublic($url);
+                if ($slashAlt !== null && ! empty($refMap[$slashAlt])) {
+                    foreach ($refMap[$slashAlt] as $ref) {
+                        if (! in_array($ref, $refs, true)) {
+                            $refs[] = $ref;
+                        }
+                    }
+                }
                 // broken_internal_link already has meta.from — merge
                 if (! empty($meta['from'])) {
                     $from = (string) $meta['from'];
@@ -455,7 +465,10 @@ class SiteAuditController extends Controller
                 }
                 $meta['referrers'] = array_slice($refs, 0, 12);
                 $meta['referrer_count'] = count($refs);
-                $meta['from_sitemap'] = ! empty($inSitemap[(string) $row->url]);
+                $origin = $origins[$url] ?? null;
+                $meta['from_sitemap'] = ! empty($origin['from_sitemap']);
+                $meta['origin_label'] = is_array($origin) ? (string) ($origin['label'] ?? '') : '';
+                $meta['origin_hint'] = is_array($origin) ? (string) ($origin['hint'] ?? '') : '';
                 $row->meta_json = $meta;
 
                 return $row;
@@ -1002,14 +1015,25 @@ class SiteAuditController extends Controller
 
         $first = $started[0];
         $n = count($started);
+        $waiting = ($first['status'] ?? '') === SiteAuditCrawl::STATUS_QUEUED_WAIT;
         if ($pagesOnly) {
             $msg = $n === 1
-                ? 'Запущена проверка только указанных страниц.'
+                ? ($waiting
+                    ? 'Проверка страниц поставлена в очередь — сейчас идёт другой краул.'
+                    : 'Запущена проверка только указанных страниц.')
                 : "Запущено {$n} краула(ов) только по страницам (разные домены → разные проекты).";
         } else {
             $msg = $n === 1
-                ? 'Краул запущен. Прогресс — в истории краулов.'
+                ? ($waiting
+                    ? 'Краул в очереди — дождётся окончания текущего (или свободного слота на сервере).'
+                    : 'Краул запущен. Прогресс — в истории краулов.')
                 : "Запущено краулов: {$n}. Прогресс — в истории краулов.";
+        }
+        if ($waiting) {
+            $block = SiteAuditGlobalCap::blockingActiveSummary((int) $user->id, (int) $first['crawl_id']);
+            if ($block) {
+                $msg .= ' Сейчас: ' . $block;
+            }
         }
         if ($errors !== []) {
             $msg .= ' Не запущено: ' . implode('; ', $errors);

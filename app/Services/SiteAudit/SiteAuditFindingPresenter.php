@@ -29,7 +29,7 @@ class SiteAuditFindingPresenter
         return $map[$severity] ?? $severity;
     }
 
-    public static function metaLine(string $code, $meta): string
+    public static function metaLine(string $code, $meta, ?string $url = null): string
     {
         if (! is_array($meta) || ! $meta) {
             return '—';
@@ -208,17 +208,45 @@ class SiteAuditFindingPresenter
 
             case 'redirect':
             case 'redirect_chain_long':
-                $parts = [];
-                if (! empty($meta['final'])) {
-                    $parts[] = '→ ' . self::clip($meta['final'], 90);
+            case 'redirect_loop':
+                $chain = ! empty($meta['chain']) && is_array($meta['chain']) ? $meta['chain'] : [];
+                $final = ! empty($meta['final']) ? (string) $meta['final'] : null;
+                $start = $url ?: (! empty($meta['path'][0]) ? (string) $meta['path'][0] : '');
+                if ($start === '' && ! empty($meta['path']) && is_array($meta['path'])) {
+                    return SiteAuditRedirectChain::formatDetails(
+                        (string) $meta['path'][0],
+                        array_slice($meta['path'], 1),
+                        $final,
+                        64,
+                        $code === 'redirect_loop'
+                    );
                 }
-                if (! empty($meta['length'])) {
-                    $parts[] = 'длина: ' . (int) $meta['length'];
-                } elseif (! empty($meta['chain']) && is_array($meta['chain'])) {
-                    $parts[] = 'шагов: ' . count($meta['chain']);
+                if ($start !== '') {
+                    return SiteAuditRedirectChain::formatDetails(
+                        $start,
+                        $chain,
+                        $final,
+                        64,
+                        $code === 'redirect_loop'
+                    );
+                }
+                // Старые finding без start URL в meta
+                if ($chain) {
+                    $line = implode(' → ', array_map(function ($u) {
+                        return self::clip((string) $u, 64);
+                    }, $chain));
+                    if ($code === 'redirect_loop') {
+                        $line .= ' · цикл';
+                    }
+                    $line .= ' · шагов: ' . count($chain);
+
+                    return $line;
+                }
+                if ($final) {
+                    return '→ ' . self::clip($final, 90);
                 }
 
-                return $parts ? implode(' · ', $parts) : '—';
+                return '—';
 
             case 'http_4xx':
             case 'http_5xx':

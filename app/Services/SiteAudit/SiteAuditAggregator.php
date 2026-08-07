@@ -67,6 +67,7 @@ class SiteAuditAggregator
         'no_outbound_internal',
         'risky_query_params',
         'pagination_param',
+        'redirect_loop',
     ];
 
     public function aggregate(SiteAuditCrawl $crawl, bool $notify = true): void
@@ -81,6 +82,7 @@ class SiteAuditAggregator
         $this->emitDuplicates($crawl->id, 'content_hash', 'duplicate_content');
         $this->emitSimilarPages($crawl->id);
         $this->emitFromPages($crawl->id);
+        $this->emitRedirectLoops($crawl->id);
         $this->emitDuplicateUrlVariants($crawl->id);
         $this->emitOrphans($crawl->id);
         $this->emitNoOutboundInternal($crawl->id);
@@ -1928,6 +1930,67 @@ class SiteAuditAggregator
                     ],
                 ]);
             }
+        }
+    }
+
+    /**
+     * Циклы редиректов по уже сохранённым pages.redirect_chain (для старых краулов / reaggregate).
+     */
+    private function emitRedirectLoops(int $crawlId): void
+    {
+        $severity = config('site_audit.findings.redirect_loop.severity', 'critical');
+        $loopHashes = [];
+        $rows = [];
+        $now = now();
+
+        SiteAuditPage::query()
+            ->where('crawl_id', $crawlId)
+            ->whereNotNull('redirect_chain')
+            ->orderBy('id')
+            ->chunkById(200, function ($pages) use ($crawlId, $severity, &$loopHashes, &$rows, $now) {
+                foreach ($pages as $page) {
+                    $chain = is_array($page->redirect_chain) ? $page->redirect_chain : [];
+                    if ($chain === []) {
+                        continue;
+                    }
+                    $info = SiteAuditRedirectChain::analyze(
+                        (string) $page->url,
+                        $chain,
+                        $page->final_url ? (string) $page->final_url : null
+                    );
+                    if (! $info['loop']) {
+                        continue;
+                    }
+                    $loopHashes[] = (string) $page->url_hash;
+                    $rows[] = [
+                        'crawl_id' => $crawlId,
+                        'code' => 'redirect_loop',
+                        'severity' => $severity,
+                        'url' => $page->url,
+                        'url_hash' => $page->url_hash,
+                        'meta_json' => json_encode([
+                            'final' => $page->final_url,
+                            'chain' => $chain,
+                            'path' => $info['path'],
+                            'loop_at' => $info['at'],
+                            'length' => max(0, count($info['path']) - 1),
+                        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+            });
+
+        if ($loopHashes !== []) {
+            SiteAuditFinding::query()
+                ->where('crawl_id', $crawlId)
+                ->whereIn('code', ['redirect', 'redirect_chain_long'])
+                ->whereIn('url_hash', array_values(array_unique($loopHashes)))
+                ->delete();
+        }
+
+        foreach (array_chunk($rows, 100) as $chunk) {
+            SiteAuditFinding::query()->insert($chunk);
         }
     }
 }

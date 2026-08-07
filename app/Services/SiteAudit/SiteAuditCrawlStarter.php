@@ -11,8 +11,7 @@ use RuntimeException;
 class SiteAuditCrawlStarter
 {
     /**
-     * @param  bool  $skipActiveCheck  при пакетном запуске нескольких доменов — не блокировать 2-й+ краул у пользователя
-     *                                 (глобальный cap всё равно ставит лишние в queued_wait)
+     * @param  bool  $skipActiveCheck  устарело: оставлен для совместимости вызовов, не используется
      */
     public function start(
         User $user,
@@ -29,9 +28,9 @@ class SiteAuditCrawlStarter
             throw new RuntimeException('Исчерпан месячный лимит краулов аудита сайта');
         }
 
-        if (! $bypassLimits && ! $skipActiveCheck && SiteAuditLimits::hasActiveCrawl($user)) {
-            throw new RuntimeException('Уже выполняется или ждёт другой краул аудита — дождитесь завершения или запустите пакетно несколько доменов сразу');
-        }
+        // Активный краул у пользователя больше не блокирует запуск:
+        // новый уходит в queued_wait и стартует, когда слот/предыдущий освободятся.
+        // (Раньше одиночный домен падал с ошибкой, пакет из 2+ — нет. Путаница.)
 
         $domain = preg_replace('#^https?://#i', '', trim($domain));
         $domain = rtrim($domain, '/');

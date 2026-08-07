@@ -36,7 +36,10 @@
         @endif
         @if(! $crawl->isFinished())
             <form method="POST" action="{{ route('pages.site-audit.crawl.cancel', $crawl->id) }}" class="d-inline"
-                  onsubmit="return confirm('Остановить краул #{{ $crawl->id }}? Уже скачанные страницы останутся, дальше сканировать не будет.');">
+                  data-cabinet-confirm="Остановить краул #{{ $crawl->id }}? Уже скачанные страницы останутся, дальше сканировать не будет."
+                  data-cabinet-confirm-title="Остановка краула"
+                  data-cabinet-confirm-ok="Остановить"
+                  data-cabinet-confirm-danger="1">
                 @csrf
                 <button type="submit" class="btn btn-sm btn-outline-danger">Остановить</button>
             </form>
@@ -47,18 +50,25 @@
             @endphp
             @if($canResumeCrawl)
                 <form method="POST" action="{{ route('pages.site-audit.crawl.continue', $crawl->id) }}" class="d-inline"
-                      onsubmit="return confirm('Продолжить краул #{{ $crawl->id }} с {{ (int) $crawl->pages_fetched }} URL? Уже скачанные страницы сохранятся.');">
+                      data-cabinet-confirm="Продолжить краул #{{ $crawl->id }} с {{ number_format((int) $crawl->pages_fetched, 0, '', ' ') }} URL? Уже скачанные страницы сохранятся."
+                      data-cabinet-confirm-title="Продолжить краул"
+                      data-cabinet-confirm-ok="Продолжить">
                     @csrf
                     <button type="submit" class="btn btn-sm btn-primary">Продолжить сканирование</button>
                 </form>
             @endif
             <form method="POST" action="{{ route('pages.site-audit.crawl.repeat', $crawl->id) }}" class="d-inline"
-                  onsubmit="return confirm('Повторить краул для {{ e(optional($project)->domain ?? 'проекта') }} с теми же настройками? Начнётся новый краул с нуля.');">
+                  data-cabinet-confirm="Повторить краул для {{ e(optional($project)->domain ?? 'проекта') }} с теми же настройками? Начнётся новый краул с нуля."
+                  data-cabinet-confirm-title="Новый краул"
+                  data-cabinet-confirm-ok="Повторить">
                 @csrf
                 <button type="submit" class="btn btn-sm btn-outline-secondary">Повторить</button>
             </form>
             <form method="POST" action="{{ route('pages.site-audit.crawl.destroy', $crawl->id) }}" class="d-inline"
-                  onsubmit="return confirm('Удалить краул #{{ $crawl->id }} и все его findings?');">
+                  data-cabinet-confirm="Удалить краул #{{ $crawl->id }} и все его findings?"
+                  data-cabinet-confirm-title="Удаление краула"
+                  data-cabinet-confirm-ok="Удалить"
+                  data-cabinet-confirm-danger="1">
                 @csrf
                 @method('DELETE')
                 <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
@@ -445,6 +455,7 @@
     </div>
 
     @slot('js')
+        @include('partials.cabinet-confirm-modal')
         @include('pages.partials.site-audit-tree-nav-js')
         <script>
             (function () {

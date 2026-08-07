@@ -64,7 +64,10 @@
                         </form>
                     @else
                         <form method="POST" action="{{ route('pages.site-audit.ignore', $crawl->id) }}" class="d-inline"
-                              onsubmit="return confirm('Игнорировать все страницы в отчёте «{{ $meta['title'] ?? $code }}» для проекта?');">
+                              data-cabinet-confirm="Игнорировать все страницы в отчёте «{{ $meta['title'] ?? $code }}» для проекта?"
+                              data-cabinet-confirm-title="Игнорировать группу"
+                              data-cabinet-confirm-ok="Игнорировать"
+                              data-cabinet-confirm-danger="1">
                             @csrf
                             <input type="hidden" name="scope" value="code">
                             <input type="hidden" name="code" value="{{ $code }}">
@@ -189,6 +192,7 @@
     </div>
 
     @slot('js')
+        @include('partials.cabinet-confirm-modal')
         @include('pages.partials.site-audit-tree-nav-js')
         @include('pages.partials.site-audit-crawl-live-js')
     @endslot

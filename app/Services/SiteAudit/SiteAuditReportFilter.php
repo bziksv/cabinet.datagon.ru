@@ -15,13 +15,28 @@ class SiteAuditReportFilter
     private static $flipMap;
 
     /**
-     * @return array<int,array{key:string,label:string,param:string}>
+     * @return array<int,array{key:string,label:string,param:string,type?:string,options?:array<string,string>,tip?:string}>
      */
     public static function fieldsForCode(string $code): array
     {
         $fields = [
             ['key' => 'url', 'label' => 'URL', 'param' => 'q_url'],
         ];
+
+        if (in_array($code, ['redirect', 'redirect_chain_long', 'redirect_loop'], true)) {
+            $fields[] = [
+                'key' => 'redirect_kind',
+                'label' => 'Тип редиректа',
+                'param' => 'q_redirect_kind',
+                'type' => 'select',
+                'options' => [
+                    '' => 'Все',
+                    'other_page' => 'Другая страница',
+                    'slash_only' => 'Только слэш (/ ↔ /)',
+                ],
+                'tip' => "«Другая страница» — /old → /new, смена URL не только из‑за слэша.\n«Только слэш» — /about → /about/ (и наоборот).",
+            ];
+        }
 
         $extra = self::extraKeysForCode($code);
         $labels = [
@@ -81,6 +96,7 @@ class SiteAuditReportFilter
             'insecure_form' => ['details'],
             'redirect' => ['details'],
             'redirect_chain_long' => ['details'],
+            'redirect_loop' => ['details'],
             'broken_internal_link' => ['details'],
             'page_has_broken_links' => ['details'],
             'page_has_bad_links' => ['details'],
@@ -141,9 +157,15 @@ class SiteAuditReportFilter
         $out = [];
         foreach (self::fieldsForCode($code) as $field) {
             $v = trim((string) $request->input($field['param'], ''));
-            if ($v !== '') {
-                $out[$field['key']] = $v;
+            if ($v === '') {
+                continue;
             }
+            if (($field['key'] ?? '') === 'redirect_kind'
+                && ! in_array($v, ['other_page', 'slash_only'], true)
+            ) {
+                continue;
+            }
+            $out[$field['key']] = $v;
         }
 
         return $out;
@@ -183,7 +205,75 @@ class SiteAuditReportFilter
             self::applySmartLike($query, 'site_audit_findings.meta_json', $values['details']);
         }
 
+        if (isset($values['redirect_kind'])) {
+            self::applyRedirectKind($query, (string) $values['redirect_kind']);
+        }
+
         return $query;
+    }
+
+    /**
+     * Фильтр редиректов: слэш-only vs смена страницы (url + meta.final / meta.slash_only).
+     */
+    public static function applyRedirectKind(Builder $query, string $kind): void
+    {
+        if (! in_array($kind, ['other_page', 'slash_only'], true)) {
+            return;
+        }
+
+        $ids = [];
+        (clone $query)
+            ->select(['site_audit_findings.id', 'site_audit_findings.url', 'site_audit_findings.meta_json'])
+            ->orderBy('site_audit_findings.id')
+            ->chunkById(400, function ($rows) use (&$ids, $kind) {
+                foreach ($rows as $row) {
+                    if (self::findingMatchesRedirectKind($row, $kind)) {
+                        $ids[] = (int) $row->id;
+                    }
+                }
+            }, 'site_audit_findings.id', 'id');
+
+        if ($ids === []) {
+            $query->whereRaw('0 = 1');
+
+            return;
+        }
+
+        $query->whereIn('site_audit_findings.id', $ids);
+    }
+
+    /**
+     * @param object $row {url, meta_json}
+     */
+    public static function findingMatchesRedirectKind($row, string $kind): bool
+    {
+        $meta = $row->meta_json ?? null;
+        if (is_string($meta)) {
+            $decoded = json_decode($meta, true);
+            $meta = is_array($decoded) ? $decoded : [];
+        }
+        if (! is_array($meta)) {
+            $meta = [];
+        }
+
+        if (array_key_exists('slash_only', $meta) || isset($meta['redirect_kind'])) {
+            $slash = ! empty($meta['slash_only'])
+                || (($meta['redirect_kind'] ?? '') === 'slash_only');
+            if (($meta['redirect_kind'] ?? '') === 'loop') {
+                $slash = false;
+            }
+
+            return $kind === 'slash_only' ? $slash : ! $slash;
+        }
+
+        $final = (string) ($meta['final'] ?? '');
+        if ($final === '' && ! empty($meta['path']) && is_array($meta['path'])) {
+            $final = (string) end($meta['path']);
+        }
+        $slash = $final !== ''
+            && SiteAuditRedirectChain::isSlashOnlyRedirect((string) $row->url, $final);
+
+        return $kind === 'slash_only' ? $slash : ! $slash;
     }
 
     /**

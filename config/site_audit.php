@@ -323,12 +323,21 @@ return [
             'severity' => 'warning',
             'title' => 'Редиректы',
             'description' => 'URL отвечает редиректом на другой адрес.',
+            'group' => 'tech',
         ],
         'redirect_chain_long' => [
             'phase' => 'A',
             'severity' => 'other',
             'title' => 'Множественные редиректы',
             'description' => 'Слишком длинная цепочка редиректов.',
+            'group' => 'tech',
+        ],
+        'redirect_loop' => [
+            'phase' => 'A',
+            'severity' => 'critical',
+            'title' => 'Циклические редиректы',
+            'description' => 'Цепочка редиректов зацикливается (URL повторяется) — страница недоступна.',
+            'group' => 'tech',
         ],
         'duplicate_title' => [
             'phase' => 'A',

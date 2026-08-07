@@ -189,29 +189,35 @@ class SiteAuditPageProcessor
 
         $body = SiteAuditBodyTemp::takeBody($result);
 
+        $chain = is_array($result['redirect_chain'] ?? null) ? $result['redirect_chain'] : [];
+        $redirectFindings = $this->redirectFindings(
+            $url,
+            $urlHash,
+            $chain,
+            (string) ($result['final_url'] ?? ''),
+            ! empty($result['redirect_loop'])
+        );
+        $hasRedirectLoop = false;
+        foreach ($redirectFindings as $rf) {
+            $findings[] = $rf;
+            if (($rf['code'] ?? '') === 'redirect_loop') {
+                $hasRedirectLoop = true;
+            }
+        }
+
         if (! $result['ok'] || $body === null) {
-            $findings[] = $this->finding('unreachable', $url, $urlHash, ['error' => $result['error']]);
+            if (! $hasRedirectLoop) {
+                $findings[] = $this->finding('unreachable', $url, $urlHash, [
+                    'error' => $result['error'],
+                    'chain' => $chain ?: null,
+                ]);
+            }
         } else {
             $code = (int) $result['status_code'];
             if ($code >= 400 && $code < 500) {
                 $findings[] = $this->finding('http_4xx', $url, $urlHash, ['status' => $code]);
             } elseif ($code >= 500) {
                 $findings[] = $this->finding('http_5xx', $url, $urlHash, ['status' => $code]);
-            }
-
-            $chain = $result['redirect_chain'] ?: [];
-            if (count($chain) >= 1 && $result['final_url'] !== $url) {
-                $findings[] = $this->finding('redirect', $url, $urlHash, [
-                    'final' => $result['final_url'],
-                    'chain' => $chain,
-                ]);
-            }
-            $maxRedirects = (int) config('site_audit.max_redirects', 10);
-            if (count($chain) >= max(3, (int) floor($maxRedirects / 2))) {
-                $findings[] = $this->finding('redirect_chain_long', $url, $urlHash, [
-                    'length' => count($chain),
-                    'chain' => $chain,
-                ]);
             }
 
             $large = (int) config('site_audit.large_page_bytes', 1_500_000);
@@ -644,6 +650,69 @@ class SiteAuditPageProcessor
             'url_hash' => $urlHash,
             'meta_json' => $meta ?: null,
         ];
+    }
+
+    /**
+     * @param string[] $chain
+     * @return array<int, array>
+     */
+    private function redirectFindings(
+        string $url,
+        string $urlHash,
+        array $chain,
+        string $finalUrl,
+        bool $forceLoop = false
+    ): array {
+        $info = SiteAuditRedirectChain::analyze($url, $chain, $finalUrl !== '' ? $finalUrl : null);
+        $out = [];
+
+        $finalForKind = $finalUrl !== '' ? $finalUrl : (string) (end($info['path']) ?: '');
+        $slashOnly = $finalForKind !== ''
+            && SiteAuditRedirectChain::isSlashOnlyRedirect($url, $finalForKind);
+
+        if ($forceLoop || $info['loop']) {
+            $out[] = $this->finding('redirect_loop', $url, $urlHash, [
+                'final' => $finalUrl !== '' ? $finalUrl : null,
+                'chain' => $chain,
+                'path' => $info['path'],
+                'loop_at' => $info['at'],
+                'length' => max(0, count($info['path']) - 1),
+                'slash_only' => false,
+                'redirect_kind' => 'loop',
+            ]);
+
+            return $out;
+        }
+
+        $isRedirect = count($chain) >= 1
+            || ($finalUrl !== '' && SiteAuditRedirectChain::normalize($finalUrl) !== SiteAuditRedirectChain::normalize($url));
+        if (! $isRedirect) {
+            return $out;
+        }
+
+        $out[] = $this->finding('redirect', $url, $urlHash, [
+            'final' => $finalUrl !== '' ? $finalUrl : null,
+            'chain' => $chain,
+            'path' => $info['path'],
+            'length' => max(0, count($info['path']) - 1),
+            'slash_only' => $slashOnly,
+            'redirect_kind' => $slashOnly ? 'slash_only' : 'other_page',
+        ]);
+
+        $maxRedirects = (int) config('site_audit.max_redirects', 10);
+        $hops = max(0, count($info['path']) - 1);
+        if ($hops >= max(3, (int) floor($maxRedirects / 2))) {
+            $out[] = $this->finding('redirect_chain_long', $url, $urlHash, [
+                'final' => $finalUrl !== '' ? $finalUrl : null,
+                'length' => $hops,
+                'chain' => $chain,
+                'path' => $info['path'],
+                'slash_only' => $slashOnly,
+                'redirect_kind' => $slashOnly ? 'slash_only' : 'other_page',
+            ]);
+        }
+
+        return $out;
     }
 
     /**

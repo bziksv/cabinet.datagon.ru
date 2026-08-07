@@ -742,10 +742,9 @@
   gap: 8px 12px;
 }
 
-.cabinet-sa-filters__field {
-  flex: 1 1 160px;
-  min-width: 140px;
-  max-width: 320px;
+.cabinet-sa-filters__field--select {
+  flex: 0 1 200px;
+  max-width: 240px;
 }
 
 .cabinet-sa-filters__label {

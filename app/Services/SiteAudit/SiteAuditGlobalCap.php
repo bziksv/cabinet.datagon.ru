@@ -41,6 +41,47 @@ class SiteAuditGlobalCap
         return (int) $q->count();
     }
 
+    /** Есть ли у пользователя другой краул в работе (не queued_wait). */
+    public static function userHasOtherActive(int $userId, ?int $exceptCrawlId = null): bool
+    {
+        if ($userId < 1) {
+            return false;
+        }
+        $q = SiteAuditCrawl::query()
+            ->where('user_id', $userId)
+            ->whereIn('status', self::activeStatuses());
+        if ($exceptCrawlId !== null) {
+            $q->where('id', '!=', $exceptCrawlId);
+        }
+
+        return $q->exists();
+    }
+
+    /**
+     * Короткое описание, что блокирует слот у пользователя (для UI).
+     */
+    public static function blockingActiveSummary(int $userId, ?int $exceptCrawlId = null): ?string
+    {
+        if ($userId < 1) {
+            return null;
+        }
+        $q = SiteAuditCrawl::query()
+            ->where('user_id', $userId)
+            ->whereIn('status', self::activeStatuses())
+            ->with('project:id,domain')
+            ->orderBy('id');
+        if ($exceptCrawlId !== null) {
+            $q->where('id', '!=', $exceptCrawlId);
+        }
+        $crawl = $q->first();
+        if (! $crawl) {
+            return null;
+        }
+        $domain = optional($crawl->project)->domain ?: 'проект';
+
+        return '#' . $crawl->id . ' · ' . $domain . ' · ' . $crawl->statusLabelRu();
+    }
+
     /**
      * Зависшие active-краулы (нет updated_at дольше N мин) → failed, иначе слот вечный.
      */
@@ -110,6 +151,16 @@ class SiteAuditGlobalCap
 
                 self::reclaimStale();
 
+                // 1 активный краул на пользователя (остальные ждут в очереди)
+                if (self::userHasOtherActive((int) $crawl->user_id, (int) $crawl->id)) {
+                    if ($crawl->status !== SiteAuditCrawl::STATUS_QUEUED_WAIT) {
+                        $crawl->status = SiteAuditCrawl::STATUS_QUEUED_WAIT;
+                        $crawl->save();
+                    }
+
+                    return false;
+                }
+
                 if (self::countActive((int) $crawl->id) >= self::maxActive()) {
                     if ($crawl->status !== SiteAuditCrawl::STATUS_QUEUED_WAIT) {
                         $crawl->status = SiteAuditCrawl::STATUS_QUEUED_WAIT;
@@ -155,11 +206,17 @@ class SiteAuditGlobalCap
                 $waiting = SiteAuditCrawl::query()
                     ->where('status', SiteAuditCrawl::STATUS_QUEUED_WAIT)
                     ->orderBy('id')
-                    ->limit($slots)
+                    ->limit(max(20, $slots * 5))
                     ->get();
 
                 $started = 0;
                 foreach ($waiting as $crawl) {
+                    if ($started >= $slots) {
+                        break;
+                    }
+                    if (self::userHasOtherActive((int) $crawl->user_id, (int) $crawl->id)) {
+                        continue;
+                    }
                     if (self::countActive((int) $crawl->id) >= self::maxActive()) {
                         break;
                     }

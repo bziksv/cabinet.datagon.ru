@@ -32,6 +32,9 @@
                 @include('pages.partials.site-audit-report-help')
             </div>
 
+            @php
+                $isRedirectReport = in_array($code ?? '', ['redirect', 'redirect_chain_long', 'redirect_loop'], true);
+            @endphp
             @include('pages.partials.site-audit-report-filters')
 
             <div class="cabinet-sa-table-wrap">
@@ -51,7 +54,7 @@
                             </td>
                             <td>{{ \App\Services\SiteAudit\SiteAuditFindingPresenter::severityLabel($row->severity) }}</td>
                             <td class="small">
-                                {{ \App\Services\SiteAudit\SiteAuditFindingPresenter::metaLine($row->code ?? $code, $row->meta_json) }}
+                                {{ \App\Services\SiteAudit\SiteAuditFindingPresenter::metaLine($row->code ?? $code, $row->meta_json, $row->url) }}
                             </td>
                         </tr>
                     @empty

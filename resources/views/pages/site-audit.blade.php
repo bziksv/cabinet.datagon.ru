@@ -191,7 +191,10 @@
                                             @endif
                                         @endif
                                     <form method="POST" action="{{ route('pages.site-audit.project.destroy', $project->id) }}" class="d-inline"
-                                          onsubmit="return confirm('Удалить проект {{ $project->domain }} и все краулы?');">
+                                          data-cabinet-confirm="Удалить проект {{ e($project->domain) }} и все краулы?"
+                                          data-cabinet-confirm-title="Удаление проекта"
+                                          data-cabinet-confirm-ok="Удалить"
+                                          data-cabinet-confirm-danger="1">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
@@ -502,7 +505,10 @@
                                         @if(! $finished)
                                             <form method="POST" action="{{ route('pages.site-audit.crawl.cancel', $c->id) }}" class="d-inline"
                                                   data-sa-cancel-crawl
-                                                  onsubmit="return confirm('Остановить краул #{{ $c->id }}?');">
+                                                  data-cabinet-confirm="Остановить краул #{{ $c->id }}? Уже скачанные страницы останутся."
+                                                  data-cabinet-confirm-title="Остановка краула"
+                                                  data-cabinet-confirm-ok="Остановить"
+                                                  data-cabinet-confirm-danger="1">
                                                 @csrf
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">Стоп</button>
                                             </form>
@@ -513,18 +519,25 @@
                                             @endphp
                                             @if($canResume)
                                                 <form method="POST" action="{{ route('pages.site-audit.crawl.continue', $c->id) }}" class="d-inline"
-                                                      onsubmit="return confirm('Продолжить краул #{{ $c->id }} с {{ (int) $c->pages_fetched }} URL? Уже скачанные страницы сохранятся.');">
+                                                      data-cabinet-confirm="Продолжить краул #{{ $c->id }} с {{ number_format((int) $c->pages_fetched, 0, '', ' ') }} URL? Уже скачанные страницы сохранятся."
+                                                      data-cabinet-confirm-title="Продолжить краул"
+                                                      data-cabinet-confirm-ok="Продолжить">
                                                     @csrf
                                                     <button type="submit" class="btn btn-sm btn-outline-primary">Продолжить</button>
                                                 </form>
                                             @endif
                                             <form method="POST" action="{{ route('pages.site-audit.crawl.repeat', $c->id) }}" class="d-inline"
-                                                  onsubmit="return confirm('Повторить краул для {{ e(optional($c->project)->domain ?? 'проекта') }} с теми же настройками? Начнётся новый краул с нуля.');">
+                                                  data-cabinet-confirm="Повторить краул для {{ e(optional($c->project)->domain ?? 'проекта') }} с теми же настройками? Начнётся новый краул с нуля."
+                                                  data-cabinet-confirm-title="Новый краул"
+                                                  data-cabinet-confirm-ok="Повторить">
                                                 @csrf
                                                 <button type="submit" class="btn btn-sm btn-outline-secondary">Повторить</button>
                                             </form>
                                             <form method="POST" action="{{ route('pages.site-audit.crawl.destroy', $c->id) }}" class="d-inline"
-                                                  onsubmit="return confirm('Удалить краул #{{ $c->id }}?');">
+                                                  data-cabinet-confirm="Удалить краул #{{ $c->id }}?"
+                                                  data-cabinet-confirm-title="Удаление краула"
+                                                  data-cabinet-confirm-ok="Удалить"
+                                                  data-cabinet-confirm-danger="1">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
@@ -559,6 +572,7 @@
     </div>
 
     @slot('js')
+        @include('partials.cabinet-confirm-modal')
         <script>
             (function () {
                 var startBtn = document.getElementById('sa-start');
@@ -711,9 +725,11 @@
                                     cont.method = 'POST';
                                     cont.action = '{{ url('site-audit/crawl') }}/' + j.id + '/continue';
                                     cont.className = 'd-inline';
-                                    cont.onsubmit = function () {
-                                        return confirm('Продолжить краул #' + j.id + ' с ' + (j.pages_fetched || 0) + ' URL? Уже скачанные страницы сохранятся.');
-                                    };
+                                    cont.setAttribute('data-cabinet-confirm',
+                                        'Продолжить краул #' + j.id + ' с ' + (j.pages_fetched || 0) +
+                                        ' URL? Уже скачанные страницы сохранятся.');
+                                    cont.setAttribute('data-cabinet-confirm-title', 'Продолжить краул');
+                                    cont.setAttribute('data-cabinet-confirm-ok', 'Продолжить');
                                     cont.innerHTML =
                                         '<input type="hidden" name="_token" value="' + token + '">' +
                                         '<button type="submit" class="btn btn-sm btn-outline-primary">Продолжить</button>';
@@ -723,9 +739,10 @@
                                 repeat.method = 'POST';
                                 repeat.action = '{{ url('site-audit/crawl') }}/' + j.id + '/repeat';
                                 repeat.className = 'd-inline';
-                                repeat.onsubmit = function () {
-                                    return confirm('Повторить краул для ' + domain + ' с теми же настройками? Начнётся новый краул с нуля.');
-                                };
+                                repeat.setAttribute('data-cabinet-confirm',
+                                    'Повторить краул для ' + domain + ' с теми же настройками? Начнётся новый краул с нуля.');
+                                repeat.setAttribute('data-cabinet-confirm-title', 'Новый краул');
+                                repeat.setAttribute('data-cabinet-confirm-ok', 'Повторить');
                                 repeat.innerHTML =
                                     '<input type="hidden" name="_token" value="' + token + '">' +
                                     '<button type="submit" class="btn btn-sm btn-outline-secondary">Повторить</button>';
@@ -735,7 +752,10 @@
                                 del.method = 'POST';
                                 del.action = '{{ url('site-audit/crawl') }}/' + j.id;
                                 del.className = 'd-inline';
-                                del.onsubmit = function () { return confirm('Удалить краул #' + j.id + '?'); };
+                                del.setAttribute('data-cabinet-confirm', 'Удалить краул #' + j.id + '?');
+                                del.setAttribute('data-cabinet-confirm-title', 'Удаление краула');
+                                del.setAttribute('data-cabinet-confirm-ok', 'Удалить');
+                                del.setAttribute('data-cabinet-confirm-danger', '1');
                                 del.innerHTML =
                                     '<input type="hidden" name="_token" value="' + token + '">' +
                                     '<input type="hidden" name="_method" value="DELETE">' +

@@ -6,7 +6,7 @@
         <link rel="stylesheet" href="{{ asset('css/cabinet-site-audit.css') }}?v={{ @filemtime(public_path('css/cabinet-site-audit.css')) ?: time() }}">
     @endslot
 
-    <div class="cabinet-sa-page">
+    <div class="cabinet-sa-page cabinet-sa-page--lite">
         @if(session('status'))
             <div class="alert alert-success py-2">{{ session('status') }}</div>
         @endif
@@ -14,43 +14,85 @@
             <div class="alert alert-warning py-2">{{ session('error') }}</div>
         @endif
 
-        @include('pages.partials.site-audit-beta-banner')
-
-        <div class="cabinet-sa-lead px-4 py-3 mb-3">
-            <div class="d-flex gap-3 align-items-start">
-                <span class="cabinet-sa-lead__icon" aria-hidden="true"><i class="bi bi-clipboard2-pulse"></i></span>
-                <div class="flex-grow-1">
-                    <p class="mb-1 fw-semibold text-body">Технический аудит сайта</p>
-                    <p class="mb-2 small text-secondary">
-                        Обходим сайт по sitemap и ссылкам, смотрим robots, собираем ошибки в отчёт.
-                        Можно кинуть список URL — тогда только их, без дальнейшего обхода.
-                        Несколько доменов — отдельные проекты.
-                    </p>
-                    <button type="button" class="btn btn-sm btn-outline-primary cabinet-sa-tour-start" id="sa-tour-start">
-                        <i class="bi bi-lightbulb me-1" aria-hidden="true"></i>Как пользоваться…
-                    </button>
-                </div>
-            </div>
+        <div class="cabinet-sa-beta-wrap" data-sa-pro>
+            @include('pages.partials.site-audit-beta-banner')
         </div>
 
-        <div class="row g-3">
-            <div class="col-lg-5">
-                <section class="card border shadow-sm cabinet-sa-panel h-100" data-sa-tour="new-crawl">
-                    <div class="card-body">
-                        <h2 class="cabinet-sa-step-title h6 mb-3">
-                            <span class="cabinet-sa-step-badge">1</span>
-                            Новый краул
-                        </h2>
+        {{-- Шаг 1: явный выбор режима --}}
+        <section class="cabinet-sa-wizard-step cabinet-sa-wizard-step--mode mb-4" id="sa-step-mode" data-sa-wizard-step="mode">
+            <div class="cabinet-sa-wizard-head text-center mb-3">
+                <p class="cabinet-sa-hero__title mb-1">Как хотите начать?</p>
+                <p class="text-secondary mb-0">Выбор запомнится — потом можно сменить</p>
+            </div>
+            <div class="cabinet-sa-mode-cards">
+                <button type="button" class="cabinet-sa-mode-card" data-sa-pick-mode="lite" id="sa-pick-lite">
+                    <span class="cabinet-sa-mode-card__badge">Рекомендуем</span>
+                    <span class="cabinet-sa-mode-card__icon" aria-hidden="true"><i class="bi bi-lightning-charge"></i></span>
+                    <span class="cabinet-sa-mode-card__title">Простой</span>
+                    <span class="cabinet-sa-mode-card__text">Только адрес сайта и кнопка «Запустить». Без лишних настроек.</span>
+                    <span class="cabinet-sa-mode-card__cta">Выбрать простой →</span>
+                </button>
+                <button type="button" class="cabinet-sa-mode-card" data-sa-pick-mode="pro" id="sa-pick-pro">
+                    <span class="cabinet-sa-mode-card__icon" aria-hidden="true"><i class="bi bi-sliders"></i></span>
+                    <span class="cabinet-sa-mode-card__title">Расширенный</span>
+                    <span class="cabinet-sa-mode-card__text">Потоки, robots, список URL, авторасписание и тонкая настройка краула.</span>
+                    <span class="cabinet-sa-mode-card__cta">Выбрать расширенный →</span>
+                </button>
+            </div>
+        </section>
 
-                        <div class="mb-3 cabinet-sa-field" data-sa-tour="domains">
-                            <label class="form-label fw-medium" for="sa-domain">
-                                Домены
-                                @include('pages.partials.site-audit-tip', ['tip' => "Один или несколько сайтов — каждый домен с новой строки.\nМожно без https://: titlo.ru\nИли целиком URL: https://titlo.ru/ — возьмём только хост.\nДля каждого домена создаётся свой проект и краул (лимит — по тарифу). Доп. URL и исключения применяются ко всем."])
-                            </label>
-                            <textarea class="form-control" id="sa-domain" rows="3" placeholder="example.com&#10;shop.example.com&#10;https://another.ru/" autocomplete="off"></textarea>
-                        </div>
+        {{-- Шаг 2: форма запуска --}}
+        <div id="sa-step-workspace" data-sa-wizard-step="workspace" hidden>
+            <div class="cabinet-sa-steps mb-3" aria-label="Шаги">
+                <button type="button" class="cabinet-sa-steps__item" id="sa-steps-back-mode" title="Сменить режим">
+                    <span class="cabinet-sa-steps__num">1</span>
+                    <span class="cabinet-sa-steps__label">Режим · <strong id="sa-steps-mode-label">Простой</strong></span>
+                    <span class="cabinet-sa-steps__change">сменить</span>
+                </button>
+                <span class="cabinet-sa-steps__sep" aria-hidden="true"></span>
+                <div class="cabinet-sa-steps__item is-current">
+                    <span class="cabinet-sa-steps__num">2</span>
+                    <span class="cabinet-sa-steps__label">Сайт и запуск</span>
+                </div>
+            </div>
 
-                        <div class="mb-3 cabinet-sa-field">
+            <div class="cabinet-sa-lead px-4 py-3 mb-3" data-sa-pro>
+                <div class="d-flex gap-3 align-items-start">
+                    <span class="cabinet-sa-lead__icon" aria-hidden="true"><i class="bi bi-clipboard2-pulse"></i></span>
+                    <div class="flex-grow-1">
+                        <p class="mb-1 fw-semibold text-body">Технический аудит сайта</p>
+                        <p class="mb-2 small text-secondary">
+                            Обходим сайт по sitemap и ссылкам, смотрим robots, собираем ошибки в отчёт.
+                            Можно кинуть список URL — тогда только их, без дальнейшего обхода.
+                            Несколько доменов — отдельные проекты.
+                        </p>
+                        <button type="button" class="btn btn-sm btn-outline-primary cabinet-sa-tour-start" id="sa-tour-start">
+                            <i class="bi bi-lightbulb me-1" aria-hidden="true"></i>Как пользоваться…
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3 cabinet-sa-start-row">
+                <div class="col-lg-5 cabinet-sa-start-col">
+                    <section class="card border shadow-sm cabinet-sa-panel h-100" data-sa-tour="new-crawl">
+                        <div class="card-body">
+                            <h2 class="cabinet-sa-step-title h6 mb-3" data-sa-pro>
+                                <span class="cabinet-sa-step-badge">1</span>
+                                Новый краул
+                            </h2>
+
+                            <div class="mb-3 cabinet-sa-field" data-sa-tour="domains">
+                                <label class="form-label fw-medium" for="sa-domain">
+                                    <span class="cabinet-sa-label-lite">Сайт</span>
+                                    <span class="cabinet-sa-label-pro">Домены</span>
+                                    @include('pages.partials.site-audit-tip', ['tip' => "Один или несколько сайтов — каждый домен с новой строки.\nМожно без https://: titlo.ru\nИли целиком URL: https://titlo.ru/ — возьмём только хост.\nДля каждого домена создаётся свой проект и краул (лимит — по тарифу). Доп. URL и исключения применяются ко всем."])
+                                </label>
+                                <textarea class="form-control cabinet-sa-domain-input" id="sa-domain" rows="3" placeholder="example.com" data-placeholder-lite="сайт.ru" data-placeholder-pro="example.com&#10;shop.example.com&#10;https://another.ru/" autocomplete="off"></textarea>
+                                <div class="form-text cabinet-sa-domain-hint-lite">Можно без https:// — например kawe.su</div>
+                            </div>
+
+                        <div class="mb-3 cabinet-sa-field" data-sa-pro>
                             <label class="form-label fw-medium" for="sa-extra-hosts">
                                 Доп. хосты в одном project <span class="text-secondary fw-normal">(опционально)</span>
                                 @include('pages.partials.site-audit-tip', ['tip' => "Только если выше указан один основной домен.\nПоддомены (shop.example.com, blog.example.com) войдут в тот же краул как внутренние.\nНесколько доменов в поле «Домены» — по-прежнему отдельные проекты."])
@@ -58,7 +100,7 @@
                             <textarea class="form-control" id="sa-extra-hosts" rows="2" placeholder="shop.example.com&#10;blog.example.com" autocomplete="off"></textarea>
                         </div>
 
-                        <div class="mb-3 cabinet-sa-field">
+                        <div class="mb-3 cabinet-sa-field" data-sa-pro>
                             <label class="form-label fw-medium" for="sa-seeds">
                                 Страницы / доп. URL <span class="text-secondary fw-normal">(опционально)</span>
                                 @include('pages.partials.site-audit-tip', ['tip' => "По одному URL на строку, лучше с https://.\nБез галочки ниже — это доп. семена: сайт обходится как обычно (sitemap + ссылки), эти URL точно попадут в очередь.\nС галочкой «только эти страницы» — сканируются исключительно перечисленные URL: без sitemap, без главной «насильно» и без дообхода по ссылкам.\nURL с разных доменов автоматически разбиваются на отдельные проекты/краулы.\nМожно не заполнять «Домены», если галочка включена — домен возьмём из URL."])
@@ -73,7 +115,7 @@
                             </div>
                         </div>
 
-                        <div class="mb-3 cabinet-sa-field">
+                        <div class="mb-3 cabinet-sa-field" data-sa-pro>
                             <label class="form-label fw-medium" for="sa-robots">
                                 Виртуальный robots.txt <span class="text-secondary fw-normal">(опционально)</span>
                                 @include('pages.partials.site-audit-tip', ['tip' => "По умолчанию краул читает живой /robots.txt сайта и не ходит по Disallow (корень оставляем для диагностики).\nЕсли вставить сюда свой robots.txt — он подменит файл на сайте: теми же правилами режем обход и пишем findings.\nУдобно закрыть /cart, /admin, utm без отдельного списка исключений.\nПример:\nUser-agent: *\nDisallow: /cart\nDisallow: /admin\nAllow: /"])
@@ -82,7 +124,7 @@
                                       placeholder="User-agent: *&#10;Disallow: /cart&#10;Disallow: /admin&#10;Allow: /"></textarea>
                         </div>
 
-                        <div data-sa-tour="speed">
+                        <div data-sa-tour="speed" data-sa-pro>
                         <div class="mb-3 cabinet-sa-field">
                             <label class="form-label fw-medium" for="sa-speed">
                                 Скорость на поток
@@ -132,8 +174,8 @@
                         </div>
 
                         <div class="d-flex flex-wrap align-items-center gap-2">
-                            <button type="button" class="btn btn-primary" id="sa-start">
-                                <i class="bi bi-play-fill me-1"></i>Запустить
+                            <button type="button" class="btn btn-primary btn-lg cabinet-sa-start-btn" id="sa-start">
+                                <i class="bi bi-play-fill me-1"></i>Запустить проверку
                             </button>
                             <div id="sa-msg" class="small text-secondary"></div>
                         </div>
@@ -141,11 +183,11 @@
                 </section>
             </div>
 
-            <div class="col-lg-7">
+            <div class="col-lg-7 cabinet-sa-projects-col">
                 <section class="card border shadow-sm cabinet-sa-panel h-100" data-sa-tour="projects">
                     <div class="card-header py-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-                        <h2 class="h6 mb-0 fw-semibold">Проекты</h2>
-                        <div class="small text-secondary">
+                        <h2 class="h6 mb-0 fw-semibold">Ваши сайты</h2>
+                        <div class="small text-secondary" data-sa-pro>
                             @if(isset($projectsLimit))
                                 проектов {{ $projects->count() }} / {{ (int) $projectsLimit }}
                             @endif
@@ -197,12 +239,15 @@
                                           data-cabinet-confirm-danger="1">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger cabinet-sa-project-del" title="Удалить">
+                                            <i class="bi bi-trash" aria-hidden="true"></i>
+                                            <span class="cabinet-sa-project-del__text">Удалить</span>
+                                        </button>
                                     </form>
                                 </div>
                             </div>
                             @if(!empty($canSchedule))
-                                <form method="POST" action="{{ route('pages.site-audit.schedule', $project->id) }}" class="cabinet-sa-project__schedule" data-sa-tour="schedule">
+                                <form method="POST" action="{{ route('pages.site-audit.schedule', $project->id) }}" class="cabinet-sa-project__schedule" data-sa-tour="schedule" data-sa-pro>
                                     @csrf
                                     <div class="d-flex flex-wrap align-items-center gap-2">
                                         <div class="cabinet-sa-check-row mb-0">
@@ -297,7 +342,7 @@
                                     </div>
                                 </form>
                             @else
-                                <div class="cabinet-sa-project__schedule small text-secondary">
+                                <div class="cabinet-sa-project__schedule small text-secondary" data-sa-pro>
                                     Авторасписание недоступно на бесплатном тарифе (0 слотов). Optimal — 2, Ultimate — 5, Maximum — 10.
                                 </div>
                             @endif
@@ -569,12 +614,102 @@
                 @endif
             </div>
         </section>
+        </div>{{-- /sa-step-workspace --}}
     </div>
 
     @slot('js')
         @include('partials.cabinet-confirm-modal')
         <script>
             (function () {
+                var pageRoot = document.querySelector('.cabinet-sa-page');
+                var MODE_KEY = 'cabinet-sa-ui-mode';
+                var PICKED_KEY = 'cabinet-sa-ui-mode-picked';
+                var stepMode = document.getElementById('sa-step-mode');
+                var stepWork = document.getElementById('sa-step-workspace');
+                var modeLabel = document.getElementById('sa-steps-mode-label');
+
+                function showWizardStep(step) {
+                    if (stepMode) stepMode.hidden = step !== 'mode';
+                    if (stepWork) stepWork.hidden = step !== 'workspace';
+                    if (pageRoot) {
+                        pageRoot.classList.toggle('cabinet-sa-page--choosing', step === 'mode');
+                    }
+                }
+
+                function applySaMode(mode, opts) {
+                    opts = opts || {};
+                    mode = mode === 'pro' ? 'pro' : 'lite';
+                    if (pageRoot) {
+                        pageRoot.classList.toggle('cabinet-sa-page--lite', mode === 'lite');
+                        pageRoot.classList.toggle('cabinet-sa-page--pro', mode === 'pro');
+                    }
+                    document.querySelectorAll('.cabinet-sa-mode-card').forEach(function (card) {
+                        var on = card.getAttribute('data-sa-pick-mode') === mode;
+                        card.classList.toggle('is-selected', on);
+                        card.setAttribute('aria-pressed', on ? 'true' : 'false');
+                    });
+                    if (modeLabel) {
+                        modeLabel.textContent = mode === 'pro' ? 'Расширенный' : 'Простой';
+                    }
+                    var domainEl = document.getElementById('sa-domain');
+                    if (domainEl) {
+                        var ph = domainEl.getAttribute(mode === 'lite' ? 'data-placeholder-lite' : 'data-placeholder-pro');
+                        if (ph) domainEl.setAttribute('placeholder', ph.replace(/&#10;/g, '\n'));
+                        domainEl.rows = mode === 'lite' ? 1 : 3;
+                    }
+                    try {
+                        localStorage.setItem(MODE_KEY, mode);
+                        if (opts.rememberPick) {
+                            localStorage.setItem(PICKED_KEY, '1');
+                        }
+                    } catch (e) {}
+                }
+
+                function goWorkspace(mode, remember) {
+                    applySaMode(mode, { rememberPick: !!remember });
+                    showWizardStep('workspace');
+                    var domainEl = document.getElementById('sa-domain');
+                    if (domainEl && remember) {
+                        setTimeout(function () { domainEl.focus(); }, 50);
+                    }
+                }
+
+                function goModePick() {
+                    showWizardStep('mode');
+                }
+
+                var savedMode = 'lite';
+                var hasPicked = false;
+                try {
+                    var s = localStorage.getItem(MODE_KEY);
+                    if (s === 'pro' || s === 'lite') savedMode = s;
+                    hasPicked = localStorage.getItem(PICKED_KEY) === '1';
+                } catch (e) {}
+
+                // Если пришли с highlight/history — сразу рабочий экран
+                var forceWorkspace = window.location.hash === '#sa-history'
+                    || /[?&]highlight=/.test(window.location.search)
+                    || /[?&]domain=/.test(window.location.search);
+
+                if (hasPicked || forceWorkspace) {
+                    goWorkspace(savedMode, false);
+                } else {
+                    applySaMode(savedMode, { rememberPick: false });
+                    goModePick();
+                }
+
+                document.querySelectorAll('[data-sa-pick-mode]').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        goWorkspace(btn.getAttribute('data-sa-pick-mode'), true);
+                    });
+                });
+                var backMode = document.getElementById('sa-steps-back-mode');
+                if (backMode) {
+                    backMode.addEventListener('click', function () {
+                        goModePick();
+                    });
+                }
+
                 var startBtn = document.getElementById('sa-start');
                 var msg = document.getElementById('sa-msg');
                 var tokenMeta = document.querySelector('meta[name="csrf-token"]');

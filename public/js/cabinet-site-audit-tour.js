@@ -1,11 +1,12 @@
 /**
- * Interactive tour for Site Audit (same pattern as metplus basket-tour).
+ * Interactive tour for Site Audit.
+ * Всегда сам открывает workspace (Расширенный), иначе шаги без подсветки.
  */
 (function () {
 	'use strict';
 
-	var STORAGE_KEY = 'cabinet_sa_tour_seen_v1';
-	var PAD = 8;
+	var STORAGE_KEY = 'cabinet_sa_tour_seen_v3';
+	var PAD = 10;
 	var active = false;
 	var stepIndex = 0;
 	var overlay = null;
@@ -18,24 +19,99 @@
 		return (root || document).querySelector(sel);
 	}
 
+	function isShown(el) {
+		if (!el) {
+			return false;
+		}
+		if (el.hasAttribute && el.hasAttribute('hidden')) {
+			return false;
+		}
+		if (el.closest && el.closest('[hidden]')) {
+			return false;
+		}
+		var node = el;
+		while (node && node.nodeType === 1) {
+			var st = window.getComputedStyle(node);
+			if (st.display === 'none' || st.visibility === 'hidden' || Number(st.opacity) === 0) {
+				return false;
+			}
+			node = node.parentElement;
+		}
+		var r = el.getBoundingClientRect();
+		return r.width > 2 && r.height > 2;
+	}
+
 	function firstVisible(selectors) {
 		for (var i = 0; i < selectors.length; i++) {
-			var el = qs(selectors[i]);
-			if (!el) {
-				continue;
-			}
-			var r = el.getBoundingClientRect();
-			if (r.width > 0 || r.height > 0) {
-				return el;
+			var list = document.querySelectorAll(selectors[i]);
+			for (var j = 0; j < list.length; j++) {
+				if (isShown(list[j])) {
+					return list[j];
+				}
 			}
 		}
 		return null;
 	}
 
+	/** Жёстко открыть рабочий экран + pro — без надежды на click-хендлеры. */
+	function ensureTourContext() {
+		var page = document.querySelector('.cabinet-sa-page');
+		var stepMode = document.getElementById('sa-step-mode');
+		var stepWork = document.getElementById('sa-step-workspace');
+
+		if (stepMode) {
+			stepMode.hidden = true;
+			stepMode.setAttribute('hidden', '');
+		}
+		if (stepWork) {
+			stepWork.hidden = false;
+			stepWork.removeAttribute('hidden');
+			stepWork.style.display = '';
+		}
+		if (page) {
+			page.classList.remove('cabinet-sa-page--lite', 'cabinet-sa-page--choosing');
+			page.classList.add('cabinet-sa-page--pro');
+			page.setAttribute('data-sa-forced-tour', '1');
+		}
+
+		document.querySelectorAll('[data-sa-switch-mode]').forEach(function (btn) {
+			var on = btn.getAttribute('data-sa-switch-mode') === 'pro';
+			btn.classList.toggle('is-active', on);
+			btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+		});
+
+		document.querySelectorAll('details[data-sa-tour], details.cabinet-sa-section, details.cabinet-sa-site__more').forEach(function (d) {
+			d.open = true;
+		});
+
+		try {
+			localStorage.setItem('cabinet-sa-ui-mode', 'pro');
+			localStorage.setItem('cabinet-sa-ui-mode-picked', '1');
+		} catch (e) {}
+
+		// синхронизация с page JS, если есть
+		var switchPro = qs('[data-sa-switch-mode="pro"]');
+		if (switchPro) {
+			try {
+				switchPro.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+			} catch (e2) {
+				switchPro.click();
+			}
+		}
+	}
+
 	function openScheduleForTour() {
-		var form = qs('.cabinet-sa-project__schedule');
+		var form = firstVisible([
+			'[data-sa-tour="schedule"]',
+			'.cabinet-sa-site__schedule',
+			'.cabinet-sa-project__schedule'
+		]);
 		if (!form) {
 			return;
+		}
+		var details = form.closest('details');
+		if (details) {
+			details.open = true;
 		}
 		var cb = form.querySelector('input[name="enabled"]');
 		if (!cb || cb.checked) {
@@ -59,67 +135,74 @@
 		{
 			id: 'welcome',
 			title: 'Как пользоваться аудитом',
-			text: 'Короткий тур по форме запуска, проектам, авторасписанию и истории. Можно выйти в любой момент (Esc).',
+			text: 'Короткий тур: форма запуска, сайты, расписание, история. Esc — выйти.',
 			center: true
 		},
 		{
 			id: 'domains',
 			title: 'Новый краул',
-			text: 'Домены — по одному на строку; каждый сайт = свой проект. «Страницы / доп. URL» — точечные URL. Галочка «только эти страницы» — без sitemap и без дообхода по ссылкам (разные домены всё равно разъедутся по проектам).',
+			text: 'Сюда вводите домен (или несколько — с новой строки). Это старт проверки.',
 			find: function () {
-				return firstVisible(['[data-sa-tour="domains"]', '#sa-domain']);
+				return firstVisible(['[data-sa-tour="domains"]', '#sa-domain', '[data-sa-tour="new-crawl"]']);
 			},
 			placement: 'right'
 		},
 		{
 			id: 'speed',
 			title: 'Скорость, потоки и лимит',
-			text: 'Скорость — лимит запросов в секунду на один поток. Потоки — сколько запросов идёт параллельно. Итоговая нагрузка ≈ потоки × скорость. Не ставьте сразу много потоков и «турбо»: хостинги и антибот режут такие обходы (403/429, капча, бан IP). Для чужих сайтов начинайте с 1 потока и обычной/медленной скорости. Лимит URL — сколько страниц снять в этом крауле (не больше тарифа).',
+			text: 'Пресеты или ручная настройка. На чужих сайтах — 1 поток и обычная скорость. Лимит — сколько страниц снять.',
 			find: function () {
-				return firstVisible(['[data-sa-tour="speed"]', '#sa-speed']);
+				var speed = firstVisible(['[data-sa-tour="speed"]', '#sa-speed', '.cabinet-sa-presets']);
+				if (speed && speed.tagName === 'DETAILS') {
+					speed.open = true;
+				}
+				return speed || firstVisible(['[data-sa-tour="new-crawl"]']);
 			},
 			placement: 'right'
 		},
 		{
 			id: 'projects',
-			title: 'Проекты',
-			text: 'Список сайтов после первого краула: последний прогон, отчёт, удаление. Сверху — сколько проектов и слотов авторасписания осталось по тарифу.',
+			title: 'Ваши сайты',
+			text: 'Список проектов после первого краула: отчёт, команда, авторасписание.',
 			find: function () {
-				return firstVisible(['[data-sa-tour="projects"]', '.cabinet-sa-project']);
+				return firstVisible([
+					'[data-sa-tour="projects"]',
+					'.cabinet-sa-sites',
+					'.cabinet-sa-site',
+					'.cabinet-sa-project'
+				]) || firstVisible(['[data-sa-tour="new-crawl"]']);
 			},
-			placement: 'left',
-			fallbackTitle: 'Проекты появятся после первого краула',
-			fallbackText: 'Запустите краул слева — домен попадёт в список проектов. Тогда можно включить авторасписание.'
+			placement: 'left'
 		},
 		{
 			id: 'schedule',
 			title: 'Авторасписание',
-			text: 'Галочка открывает настройки: частота, день недели, час (МСК) и те же скорость/потоки/лимит, что у ручного краула. Часы 11–14 недоступны (пик нагрузки). Free — 0 слотов; Optimal 2 / Ultimate 5 / Maximum 10. Каждый автозапуск списывает краул из месячного лимита.',
+			text: 'В настройках сайта — день, час (МСК) и параметры краула. Пик 11–14 недоступен.',
 			find: function () {
 				openScheduleForTour();
 				return firstVisible([
 					'[data-sa-tour="schedule"]',
+					'.cabinet-sa-site__schedule',
 					'.cabinet-sa-project__schedule',
-					'.cabinet-sa-project'
+					'.cabinet-sa-site__more',
+					'[data-sa-tour="projects"]'
 				]);
 			},
-			placement: 'left',
-			fallbackTitle: 'Авторасписание',
-			fallbackText: 'После появления проекта здесь будет галочка «Авторасписание»: день недели, час МСК и параметры краула.'
+			placement: 'left'
 		},
 		{
 			id: 'history',
 			title: 'История краулов',
-			text: 'Статусы и прогресс, поиск по домену. В колонке настроек — потоки, скорость и лимит URL (с пробелами: 100 000). После окончания платного тарифа история хранится ещё 14 дней, затем удаляется.',
+			text: 'Прошлые прогоны: статус, прогресс, проблемы. Поиск по домену справа.',
 			find: function () {
-				return firstVisible(['[data-sa-tour="history"]', '#sa-history']);
+				return firstVisible(['[data-sa-tour="history"]', '#sa-history', '.cabinet-sa-history']);
 			},
 			placement: 'top'
 		},
 		{
 			id: 'done',
 			title: 'Готово!',
-			text: 'Тур можно запустить снова кнопкой «Как пользоваться…» вверху страницы.',
+			text: 'Снова открыть тур — «Как это работает?» у формы запуска.',
 			center: true
 		}
 	];
@@ -164,16 +247,16 @@
 
 		card.addEventListener('click', function (e) {
 			var t = e.target;
-			if (!t) {
+			if (!t || !t.closest) {
 				return;
 			}
-			if (t.closest && t.closest('[data-tour-next]')) {
+			if (t.closest('[data-tour-next]')) {
 				e.preventDefault();
 				go(1);
-			} else if (t.closest && t.closest('[data-tour-prev]')) {
+			} else if (t.closest('[data-tour-prev]')) {
 				e.preventDefault();
 				go(-1);
-			} else if (t.closest && (t.closest('[data-tour-skip]') || t.closest('.sa-tour-card__close'))) {
+			} else if (t.closest('[data-tour-skip]') || t.closest('.sa-tour-card__close')) {
 				e.preventDefault();
 				stopTour();
 			}
@@ -206,10 +289,10 @@
 			top = rect.top - ch - 14;
 			left = rect.left + rect.width / 2 - cw / 2;
 		} else if (placement === 'left') {
-			top = rect.top + rect.height / 2 - ch / 2;
+			top = rect.top + Math.min(rect.height / 2, 80) - ch / 2;
 			left = rect.left - cw - 14;
 		} else {
-			top = rect.top + rect.height / 2 - ch / 2;
+			top = rect.top + Math.min(rect.height / 2, 80) - ch / 2;
 			left = rect.right + 14;
 		}
 
@@ -222,7 +305,7 @@
 	}
 
 	function highlight(el, placement) {
-		if (!el) {
+		if (!el || !isShown(el)) {
 			spot.hidden = true;
 			spot.removeAttribute('data-arrow');
 			dim.style.clipPath = 'none';
@@ -235,6 +318,14 @@
 		var y = Math.max(0, rect.top - PAD);
 		var w = Math.min(window.innerWidth - x, rect.width + PAD * 2);
 		var h = Math.min(window.innerHeight - y, rect.height + PAD * 2);
+
+		// не подсвечивать «всю страницу» — бессмысленно
+		if (w > window.innerWidth * 0.92 && h > window.innerHeight * 0.7) {
+			spot.hidden = true;
+			dim.style.clipPath = 'none';
+			placeCard(rect, placement || 'bottom');
+			return;
+		}
 
 		spot.hidden = false;
 		spot.setAttribute('data-arrow', placement === 'center' ? '' : (placement || 'bottom'));
@@ -260,21 +351,16 @@
 			return;
 		}
 
-		var el = null;
-		var title = step.title;
-		var text = step.text;
+		ensureTourContext();
 
+		var el = null;
 		if (typeof step.find === 'function') {
 			el = step.find();
-			if (!el && step.fallbackTitle) {
-				title = step.fallbackTitle;
-				text = step.fallbackText || text;
-			}
 		}
 
 		card.querySelector('.sa-tour-card__step').textContent = 'Шаг ' + (stepIndex + 1) + ' из ' + STEPS.length;
-		card.querySelector('.sa-tour-card__title').textContent = title;
-		card.querySelector('.sa-tour-card__text').textContent = text;
+		card.querySelector('.sa-tour-card__title').textContent = step.title;
+		card.querySelector('.sa-tour-card__text').textContent = step.text;
 
 		var prevBtn = card.querySelector('[data-tour-prev]');
 		var nextBtn = card.querySelector('[data-tour-next]');
@@ -283,11 +369,17 @@
 
 		if (el && !step.center) {
 			try {
-				el.scrollIntoView({ block: 'center', behavior: 'smooth', inline: 'nearest' });
-			} catch (err) {}
-			window.setTimeout(function () {
-				highlight(el, step.placement || 'bottom');
-			}, 220);
+				el.scrollIntoView({ block: 'center', behavior: 'instant', inline: 'nearest' });
+			} catch (err) {
+				try {
+					el.scrollIntoView(true);
+				} catch (err2) {}
+			}
+			window.requestAnimationFrame(function () {
+				window.requestAnimationFrame(function () {
+					highlight(el, step.placement || 'bottom');
+				});
+			});
 		} else {
 			highlight(null, 'center');
 		}
@@ -331,6 +423,7 @@
 	}
 
 	function startTour() {
+		ensureTourContext();
 		buildOverlay();
 		active = true;
 		stepIndex = 0;
@@ -339,10 +432,13 @@
 		document.addEventListener('keydown', onKey);
 		window.addEventListener('resize', onResize);
 		window.addEventListener('scroll', onResize, true);
-		renderStep();
+		window.setTimeout(function () {
+			ensureTourContext();
+			renderStep();
+		}, 120);
 	}
 
-	function stopTour(completed) {
+	function stopTour() {
 		active = false;
 		document.documentElement.classList.remove('sa-tour-active');
 		document.removeEventListener('keydown', onKey);
@@ -371,13 +467,31 @@
 			seen = window.localStorage.getItem(STORAGE_KEY) === '1';
 		} catch (e) {}
 
-		if (!seen && window.location.hash !== '#sa-history') {
+		function tryAutoStart() {
+			if (seen || active || window.location.hash === '#sa-history') {
+				return;
+			}
+			// сначала открываем workspace, потом тур — иначе пустые шаги
+			ensureTourContext();
 			window.setTimeout(function () {
 				if (!active) {
 					startTour();
 				}
-			}, 600);
+			}, 450);
 		}
+
+		if (!seen) {
+			window.setTimeout(tryAutoStart, 700);
+		}
+
+		document.addEventListener('cabinet-sa-workspace-ready', function () {
+			try {
+				seen = window.localStorage.getItem(STORAGE_KEY) === '1';
+			} catch (e) {}
+			if (!seen && !active) {
+				window.setTimeout(tryAutoStart, 400);
+			}
+		});
 	}
 
 	if (document.readyState === 'loading') {

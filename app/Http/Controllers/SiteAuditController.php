@@ -55,6 +55,8 @@ class SiteAuditController extends Controller
         $crawls = collect();
 
         $checklistTeams = collect();
+        $teamCandidates = collect();
+        $teamRoleLabels = \App\SeoChecklist\SeoChecklistTeam::roleLabels();
         $teamAccessReady = SiteAuditProject::teamColumnReady()
             && class_exists(SeoChecklistService::class)
             && \App\SeoChecklist\SeoChecklistTeam::tableReady();
@@ -130,7 +132,9 @@ class SiteAuditController extends Controller
                 ->keyBy('project_id');
 
             if ($teamAccessReady) {
-                $checklistTeams = app(SeoChecklistService::class)->teamsForUser((int) $user->id);
+                $svc = app(SeoChecklistService::class);
+                $checklistTeams = $svc->teamsForUser((int) $user->id);
+                $teamCandidates = $svc->teamCandidates((int) $user->id);
             }
         } else {
             $schedules = collect();
@@ -167,6 +171,8 @@ class SiteAuditController extends Controller
             'bucketLabels' => self::BUCKET_LABELS,
             'checklistTeams' => $checklistTeams,
             'teamAccessReady' => $teamAccessReady,
+            'teamCandidates' => $teamCandidates,
+            'teamRoleLabels' => $teamRoleLabels,
         ]);
     }
 
@@ -191,10 +197,14 @@ class SiteAuditController extends Controller
         }
 
         $teamId = (int) $request->input('team_id', 0);
-        $toProfile = (string) $request->input('return_to') === 'profile';
-        $back = $toProfile
-            ? redirect()->to(route('profile.index') . '#team')
-            : redirect()->route('pages.site-audit');
+        $returnTo = (string) $request->input('return_to', '');
+        if ($returnTo === 'profile') {
+            $back = redirect()->to(route('profile.index') . '#team');
+        } elseif ($returnTo === 'history') {
+            $back = redirect()->to(route('pages.site-audit') . '#sa-history');
+        } else {
+            $back = redirect()->route('pages.site-audit');
+        }
 
         if ($teamId < 1) {
             $project->team_id = null;

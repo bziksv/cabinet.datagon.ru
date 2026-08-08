@@ -6,7 +6,19 @@
         <link rel="stylesheet" href="{{ asset('css/cabinet-site-audit.css') }}?v={{ @filemtime(public_path('css/cabinet-site-audit.css')) ?: time() }}">
     @endslot
 
-    <div class="cabinet-sa-page cabinet-sa-page--lite">
+    @php
+        $saPageUi = (int) config('cabinet-site-audit.page_ui', 2);
+        if (!in_array($saPageUi, [1, 2], true)) {
+            $saPageUi = 2;
+        }
+        // Аварийный откат: ?sa_ui=1 (без публичного переключателя)
+        $saUiOverride = (int) request()->query('sa_ui', 0);
+        if (in_array($saUiOverride, [1, 2], true)) {
+            $saPageUi = $saUiOverride;
+        }
+    @endphp
+
+    <div class="cabinet-sa-page cabinet-sa-page--lite cabinet-sa-page-ui--{{ $saPageUi }}" data-sa-page-ui="{{ $saPageUi }}">
         @if(session('status'))
             <div class="alert alert-success py-2">{{ session('status') }}</div>
         @endif
@@ -18,650 +30,31 @@
             @include('pages.partials.site-audit-beta-banner')
         </div>
 
-        {{-- Шаг 1: явный выбор режима --}}
-        <section class="cabinet-sa-wizard-step cabinet-sa-wizard-step--mode mb-4" id="sa-step-mode" data-sa-wizard-step="mode">
-            <div class="cabinet-sa-wizard-head text-center mb-3">
-                <p class="cabinet-sa-hero__title mb-1">Как хотите начать?</p>
-                <p class="text-secondary mb-0">Выбор запомнится — потом можно сменить</p>
-            </div>
-            <div class="cabinet-sa-mode-cards">
-                <button type="button" class="cabinet-sa-mode-card" data-sa-pick-mode="lite" id="sa-pick-lite">
-                    <span class="cabinet-sa-mode-card__badge">Рекомендуем для новичков</span>
-                    <span class="cabinet-sa-mode-card__icon" aria-hidden="true"><i class="bi bi-lightning-charge"></i></span>
-                    <span class="cabinet-sa-mode-card__title">Простой</span>
-                    <span class="cabinet-sa-mode-card__text">Только адрес сайта и кнопка «Запустить». Без лишних настроек.</span>
-                    <span class="cabinet-sa-mode-card__cta">Выбрать простой →</span>
-                </button>
-                <button type="button" class="cabinet-sa-mode-card" data-sa-pick-mode="pro" id="sa-pick-pro">
-                    <span class="cabinet-sa-mode-card__badge cabinet-sa-mode-card__badge--pro">Для Профи</span>
-                    <span class="cabinet-sa-mode-card__icon" aria-hidden="true"><i class="bi bi-sliders"></i></span>
-                    <span class="cabinet-sa-mode-card__title">Расширенный</span>
-                    <span class="cabinet-sa-mode-card__text">Потоки, robots, список URL, авторасписание и тонкая настройка краула.</span>
-                    <span class="cabinet-sa-mode-card__cta">Выбрать расширенный →</span>
-                </button>
-            </div>
-        </section>
-
-        {{-- Шаг 2: форма запуска --}}
-        <div id="sa-step-workspace" data-sa-wizard-step="workspace" hidden>
-            <div class="cabinet-sa-steps mb-3" aria-label="Шаги">
-                <button type="button" class="cabinet-sa-steps__item" id="sa-steps-back-mode" title="Сменить режим">
-                    <span class="cabinet-sa-steps__num">1</span>
-                    <span class="cabinet-sa-steps__label">Режим · <strong id="sa-steps-mode-label">Простой</strong></span>
-                    <span class="cabinet-sa-steps__change">сменить</span>
-                </button>
-                <span class="cabinet-sa-steps__sep" aria-hidden="true"></span>
-                <div class="cabinet-sa-steps__item is-current">
-                    <span class="cabinet-sa-steps__num">2</span>
-                    <span class="cabinet-sa-steps__label">Сайт и запуск</span>
-                </div>
-            </div>
-
-            <div class="cabinet-sa-lead px-4 py-3 mb-3" data-sa-pro>
-                <div class="d-flex gap-3 align-items-start">
-                    <span class="cabinet-sa-lead__icon" aria-hidden="true"><i class="bi bi-clipboard2-pulse"></i></span>
-                    <div class="flex-grow-1">
-                        <p class="mb-1 fw-semibold text-body">Технический аудит сайта</p>
-                        <p class="mb-2 small text-secondary">
-                            Обходим сайт по sitemap и ссылкам, смотрим robots, собираем ошибки в отчёт.
-                            Можно кинуть список URL — тогда только их, без дальнейшего обхода.
-                            Несколько доменов — отдельные проекты.
-                        </p>
-                        <button type="button" class="btn btn-sm btn-outline-primary cabinet-sa-tour-start" id="sa-tour-start">
-                            <i class="bi bi-lightbulb me-1" aria-hidden="true"></i>Как пользоваться…
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row g-3 cabinet-sa-start-row">
-                <div class="col-lg-5 cabinet-sa-start-col">
-                    <section class="card border shadow-sm cabinet-sa-panel h-100" data-sa-tour="new-crawl">
-                        <div class="card-body">
-                            <h2 class="cabinet-sa-step-title h6 mb-3" data-sa-pro>
-                                <span class="cabinet-sa-step-badge">1</span>
-                                Новый краул
-                            </h2>
-
-                            <div class="mb-3 cabinet-sa-field" data-sa-tour="domains">
-                                <label class="form-label fw-medium" for="sa-domain">
-                                    <span class="cabinet-sa-label-lite">Сайт</span>
-                                    <span class="cabinet-sa-label-pro">Домены</span>
-                                    @include('pages.partials.site-audit-tip', ['tip' => "Один или несколько сайтов — каждый домен с новой строки.\nМожно без https://: titlo.ru\nИли целиком URL: https://titlo.ru/ — возьмём только хост.\nДля каждого домена создаётся свой проект и краул (лимит — по тарифу). Доп. URL и исключения применяются ко всем."])
-                                </label>
-                                <textarea class="form-control cabinet-sa-domain-input" id="sa-domain" rows="3" placeholder="example.com" data-placeholder-lite="сайт.ru" data-placeholder-pro="example.com&#10;shop.example.com&#10;https://another.ru/" autocomplete="off"></textarea>
-                                <div class="form-text cabinet-sa-domain-hint-lite">Можно без https:// — например kawe.su</div>
-                            </div>
-
-                        <div class="mb-3 cabinet-sa-field" data-sa-pro>
-                            <label class="form-label fw-medium" for="sa-extra-hosts">
-                                Доп. хосты в одном project <span class="text-secondary fw-normal">(опционально)</span>
-                                @include('pages.partials.site-audit-tip', ['tip' => "Только если выше указан один основной домен.\nПоддомены (shop.example.com, blog.example.com) войдут в тот же краул как внутренние.\nНесколько доменов в поле «Домены» — по-прежнему отдельные проекты."])
-                            </label>
-                            <textarea class="form-control" id="sa-extra-hosts" rows="2" placeholder="shop.example.com&#10;blog.example.com" autocomplete="off"></textarea>
-                        </div>
-
-                        <div class="mb-3 cabinet-sa-field" data-sa-pro>
-                            <label class="form-label fw-medium" for="sa-seeds">
-                                Страницы / доп. URL <span class="text-secondary fw-normal">(опционально)</span>
-                                @include('pages.partials.site-audit-tip', ['tip' => "По одному URL на строку, лучше с https://.\nБез галочки ниже — это доп. семена: сайт обходится как обычно (sitemap + ссылки), эти URL точно попадут в очередь.\nС галочкой «только эти страницы» — сканируются исключительно перечисленные URL: без sitemap, без главной «насильно» и без дообхода по ссылкам.\nURL с разных доменов автоматически разбиваются на отдельные проекты/краулы.\nМожно не заполнять «Домены», если галочка включена — домен возьмём из URL."])
-                            </label>
-                            <textarea class="form-control" id="sa-seeds" rows="3" placeholder="https://example.com/page&#10;https://other.ru/about"></textarea>
-                            <div class="form-check mt-2 mb-0">
-                                <input type="checkbox" class="form-check-input" id="sa-pages-only">
-                                <label class="form-check-label" for="sa-pages-only">
-                                    Сканировать только эти страницы
-                                    <span class="text-secondary">(без sitemap и дообхода; разные сайты → разные проекты)</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="mb-3 cabinet-sa-field" data-sa-pro>
-                            <label class="form-label fw-medium" for="sa-robots">
-                                Виртуальный robots.txt <span class="text-secondary fw-normal">(опционально)</span>
-                                @include('pages.partials.site-audit-tip', ['tip' => "По умолчанию краул читает живой /robots.txt сайта и не ходит по Disallow (корень оставляем для диагностики).\nЕсли вставить сюда свой robots.txt — он подменит файл на сайте: теми же правилами режем обход и пишем findings.\nУдобно закрыть /cart, /admin, utm без отдельного списка исключений.\nПример:\nUser-agent: *\nDisallow: /cart\nDisallow: /admin\nAllow: /"])
-                            </label>
-                            <textarea class="form-control font-monospace" id="sa-robots" rows="5"
-                                      placeholder="User-agent: *&#10;Disallow: /cart&#10;Disallow: /admin&#10;Allow: /"></textarea>
-                        </div>
-
-                        <div data-sa-tour="speed" data-sa-pro>
-                        <div class="mb-3 cabinet-sa-field">
-                            <label class="form-label fw-medium" for="sa-speed">
-                                Скорость на поток
-                                @include('pages.partials.site-audit-tip', ['tip' => "Лимит стартов запросов в секунду на один поток.\nИтоговая нагрузка ≈ потоки × скорость на поток (но сайт/CDN могут отвечать медленнее).\nМедленнее — мягче к хостингу и антиботу.\nТурбо и высокая скорость на чужих сайтах часто дают 403/429 или временный бан — начинайте с обычной/медленной."])
-                            </label>
-                            <select class="form-select" id="sa-speed">
-                                <option value="slow">Медленно (~1 URL/с на поток)</option>
-                                <option value="normal" selected>Обычная (~5 URL/с на поток)</option>
-                                <option value="fast">Быстрая (~10 URL/с на поток)</option>
-                                <option value="turbo">Турбо (~15 URL/с на поток) — только свои сайты</option>
-                            </select>
-                        </div>
-
-                        <div class="mb-3 cabinet-sa-field">
-                            <label class="form-label fw-medium" for="sa-concurrency">
-                                Потоки (параллельные запросы)
-                                @include('pages.partials.site-audit-tip', ['tip' => "Сколько HTTP-запросов к сайту одновременно.\nЛимит тарифа: Free 1 / Optimal 2 / Ultimate 4 / Maximum 8.\nНе лупите сразу максимум потоков: хостинги и WAF ограничивают параллельность — получите 429/бан и пустые findings.\nНа тяжёлых своих сайтах можно поднять потоки осторожно, смотря на ответы сервера."])
-                            </label>
-                            <select class="form-select" id="sa-concurrency"
-                                    data-lite-default="{{ min(2, max(1, (int) ($concurrencyLimit ?? config('site_audit.max_concurrency', 8)))) }}">
-                                @php
-                                    $maxConc = max(1, (int) ($concurrencyLimit ?? config('site_audit.max_concurrency', 8)));
-                                    $defaultConc = min(2, $maxConc);
-                                @endphp
-                                @for($n = 1; $n <= $maxConc; $n++)
-                                    <option value="{{ $n }}" @if($n === $defaultConc) selected @endif>
-                                        {{ $n }} {{ $n === 1 ? 'поток' : ($n < 5 ? 'потока' : 'потоков') }}
-                                    </option>
-                                @endfor
-                            </select>
-                            <div class="form-text">По тарифу доступно до {{ $maxConc }}</div>
-                        </div>
-
-                        <div class="mb-3 cabinet-sa-field">
-                            <label class="form-label fw-medium" for="sa-limit">
-                                Лимит URL
-                                @include('pages.partials.site-audit-tip', ['tip' => "Сколько страниц сканировать в этом крауле.\nНе выше лимита тарифа (сейчас {{ number_format((int) ($pagesLimit ?? 100), 0, '', ' ') }}).\nМожно поставить меньше, чтобы быстрее прогнать важные разделы."])
-                            </label>
-                            <input type="text" class="form-control sa-num-space" id="sa-limit"
-                                   inputmode="numeric" autocomplete="off"
-                                   value="{{ number_format((int) ($pagesLimit ?? 100), 0, '', ' ') }}"
-                                   data-min="1"
-                                   data-max="{{ (int) ($pagesLimit ?? 100) }}">
-                            <div class="form-text">
-                                Макс. по тарифу: {{ number_format((int) ($pagesLimit ?? 100), 0, '', ' ') }}
-                                · проектов {{ (int) ($projectsUsed ?? 0) }}/{{ (int) ($projectsLimit ?? 1) }}
-                            </div>
-                        </div>
-                        </div>
-
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            <button type="button" class="btn btn-primary btn-lg cabinet-sa-start-btn" id="sa-start">
-                                <i class="bi bi-play-fill me-1"></i>Запустить проверку
-                            </button>
-                            <div id="sa-msg" class="small text-secondary"></div>
-                        </div>
-                    </div>
-                </section>
-            </div>
+        @include('pages.partials.site-audit-launch-v' . $saPageUi)
 
             <div class="col-lg-7 cabinet-sa-projects-col">
-                <section class="card border shadow-sm cabinet-sa-panel h-100" data-sa-tour="projects">
-                    <div class="card-header py-2 px-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
-                        <h2 class="h6 mb-0 fw-semibold">Ваши сайты</h2>
-                        <div class="small text-secondary" data-sa-pro>
-                            @if(isset($projectsLimit))
-                                проектов {{ $projects->count() }} / {{ (int) $projectsLimit }}
-                            @endif
-                            @if(isset($schedulesLimit))
-                                · автоснятий {{ (int) ($schedulesUsed ?? 0) }} / {{ (int) $schedulesLimit }}
-                            @endif
-                        </div>
-                    </div>
-                    @forelse($projects as $project)
-                        @php
-                            $last = $project->crawls->first();
-                            $sch = ($schedules ?? collect())->get($project->id);
-                            $schSettings = ($sch && is_array($sch->settings_json)) ? $sch->settings_json : [];
-                            $schWeekday = (int) ($schSettings['weekday'] ?? now()->dayOfWeekIso);
-                            $schHour = (int) ($schSettings['hour'] ?? 4);
-                            $schSpeed = (string) ($schSettings['crawl_speed'] ?? 'normal');
-                            $schConc = max(1, (int) ($schSettings['concurrency'] ?? 1));
-                            $schPages = (int) ($schSettings['pages_limit'] ?? ($pagesLimit ?? 100));
-                            $maxConc = max(1, (int) ($concurrencyLimit ?? 1));
-                            $maxPages = max(1, (int) ($pagesLimit ?? 100));
-                        @endphp
-                        @php
-                            $isProjectOwner = auth()->id() && (int) $project->user_id === (int) auth()->id();
-                        @endphp
-                        <div class="cabinet-sa-project">
-                            <div class="cabinet-sa-project__main">
-                                <div class="min-w-0">
-                                    <div class="fw-semibold text-body text-truncate">{{ $project->domain }}</div>
-                                    <div class="small text-secondary">
-                                        @if($last)
-                                            последний краул
-                                            <a href="{{ route('pages.site-audit.crawl.show', $last->id) }}">#{{ $last->id }}</a>
-                                            · {{ $last->statusLabelRu() }}
-                                            · {{ $last->pages_fetched }}/{{ $last->pages_total }}
-                                        @else
-                                            ещё не запускался
-                                        @endif
-                                        @if(!empty($project->team))
-                                            · <span class="text-body">команда {{ $project->team->title }}</span>
-                                        @elseif(!$isProjectOwner)
-                                            · <span class="text-body">доступ по команде</span>
-                                        @endif
-                                    </div>
-                                </div>
-                                <div class="d-flex flex-shrink-0 gap-1">
-                                        @if($last)
-                                            <a class="btn btn-sm btn-outline-primary" href="{{ route('pages.site-audit.crawl.show', $last->id) }}">Открыть</a>
-                                            @if(($project->crawls_count ?? 0) > 1)
-                                                <a class="btn btn-sm btn-outline-secondary"
-                                                   href="{{ route('pages.site-audit.crawl.show', $last->id) }}#sa-archive">Архив</a>
-                                            @endif
-                                        @endif
-                                    @if($isProjectOwner)
-                                    <form method="POST" action="{{ route('pages.site-audit.project.destroy', $project->id) }}" class="d-inline"
-                                          data-cabinet-confirm="Удалить проект {{ e($project->domain) }} и все краулы?"
-                                          data-cabinet-confirm-title="Удаление проекта"
-                                          data-cabinet-confirm-ok="Удалить"
-                                          data-cabinet-confirm-danger="1">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger cabinet-sa-project-del" title="Удалить">
-                                            <i class="bi bi-trash" aria-hidden="true"></i>
-                                            <span class="cabinet-sa-project-del__text">Удалить</span>
-                                        </button>
-                                    </form>
-                                    @endif
-                                </div>
-                            </div>
-                            @if($isProjectOwner && !empty($teamAccessReady))
-                                <form method="POST" action="{{ route('pages.site-audit.project.team', $project->id) }}" class="cabinet-sa-project__team">
-                                    @csrf
-                                    <div class="d-flex flex-wrap align-items-end gap-2">
-                                        <div class="flex-grow-1" style="min-width:10rem">
-                                            <label class="form-label small mb-1" for="sa-team-{{ $project->id }}">Команда из чеклиста</label>
-                                            <select name="team_id" id="sa-team-{{ $project->id }}" class="form-select form-select-sm">
-                                                <option value="0">Без команды</option>
-                                                @foreach(($checklistTeams ?? []) as $team)
-                                                    <option value="{{ $team->id }}" @if((int) ($project->team_id ?? 0) === (int) $team->id) selected @endif>
-                                                        {{ $team->title }}
-                                                        @if(isset($team->members_count)) · {{ (int) $team->members_count }} чел.@endif
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                        </div>
-                                        <button type="submit" class="btn btn-sm btn-outline-primary">Сохранить</button>
-                                        <a href="{{ route('profile.index') }}#team" class="btn btn-sm btn-link px-1">Управление</a>
-                                    </div>
-                                    <div class="form-text">Участники команды увидят отчёты этого сайта в Аудите.</div>
-                                </form>
-                            @elseif($isProjectOwner && empty($teamAccessReady))
-                                <div class="cabinet-sa-project__team small text-secondary">
-                                    Команды чеклиста пока недоступны.
-                                </div>
-                            @endif
-                            @if($isProjectOwner && !empty($canSchedule))
-                                <form method="POST" action="{{ route('pages.site-audit.schedule', $project->id) }}" class="cabinet-sa-project__schedule" data-sa-tour="schedule" data-sa-pro>
-                                    @csrf
-                                    <div class="d-flex flex-wrap align-items-center gap-2">
-                                        <div class="cabinet-sa-check-row mb-0">
-                                            <div class="form-check mb-0">
-                                                <input type="checkbox" class="form-check-input" id="sa-sch-{{ $project->id }}"
-                                                       name="enabled" value="1" {{ $sch && $sch->enabled ? 'checked' : '' }}>
-                                                <label class="form-check-label fw-medium" for="sa-sch-{{ $project->id }}">Авторасписание</label>
-                                            </div>
-                                            @include('pages.partials.site-audit-tip', ['tip' => "Автозапуск аудита в выбранный день и час (МСК).\nЛимит слотов: Free 0 / Optimal 2 / Ultimate 5 / Maximum 10.\nЧасы 11–14 недоступны (пик).\nСписывает краул из месячного лимита."])
-                                        </div>
-                                        @if($sch && $sch->enabled && $sch->next_run_at)
-                                            <span class="badge text-bg-primary">
-                                                след. {{ $sch->next_run_at->format('d.m.Y H:i') }} МСК
-                                            </span>
-                                        @else
-                                            <span class="small text-secondary">выкл. — настройки скрыты</span>
-                                        @endif
-                                    </div>
-                                    <div class="cabinet-sa-project__schedule-body">
-                                    <div class="row g-2 align-items-end">
-                                        <div class="col-6 col-md-3">
-                                            <label class="form-label small mb-1" for="sa-sch-freq-{{ $project->id }}">Как часто</label>
-                                            <select name="frequency" id="sa-sch-freq-{{ $project->id }}" class="form-select form-select-sm">
-                                                @foreach(($scheduleFrequencies ?? []) as $freqCode => $freqLabel)
-                                                    <option value="{{ $freqCode }}"
-                                                        {{ ($sch ? \App\SiteAuditSchedule::normalizeFrequency($sch->frequency) : 'weekly') === $freqCode ? 'selected' : '' }}>
-                                                        {{ $freqLabel }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                        </div>
-                                        <div class="col-6 col-md-3">
-                                            <label class="form-label small mb-1" for="sa-sch-wd-{{ $project->id }}">День недели</label>
-                                            <select name="weekday" id="sa-sch-wd-{{ $project->id }}" class="form-select form-select-sm">
-                                                @foreach(($scheduleWeekdays ?? []) as $wd => $wdLabel)
-                                                    <option value="{{ $wd }}" {{ (int) $schWeekday === (int) $wd ? 'selected' : '' }}>{{ $wdLabel }}</option>
-                                                @endforeach
-                                            </select>
-                                        </div>
-                                        <div class="col-6 col-md-2">
-                                            <label class="form-label small mb-1" for="sa-sch-hour-{{ $project->id }}">Час (МСК)</label>
-                                            <select name="hour" id="sa-sch-hour-{{ $project->id }}" class="form-select form-select-sm">
-                                                @php
-                                                    $peakHours = [11, 12, 13, 14];
-                                                    if (in_array($schHour, $peakHours, true)) {
-                                                        $schHour = 4;
-                                                    }
-                                                @endphp
-                                                @for($h = 0; $h <= 23; $h++)
-                                                    @if(in_array($h, $peakHours, true))
-                                                        <option value="{{ $h }}" disabled>{{ sprintf('%02d:00', $h) }} — пик</option>
-                                                    @else
-                                                        <option value="{{ $h }}" {{ $schHour === $h ? 'selected' : '' }}>
-                                                            {{ sprintf('%02d:00', $h) }}
-                                                        </option>
-                                                    @endif
-                                                @endfor
-                                            </select>
-                                        </div>
-                                        <div class="col-12 col-md-4">
-                                            <label class="form-label small mb-1" for="sa-sch-speed-{{ $project->id }}">Скорость на поток</label>
-                                            <select name="crawl_speed" id="sa-sch-speed-{{ $project->id }}" class="form-select form-select-sm">
-                                                <option value="slow" {{ $schSpeed === 'slow' ? 'selected' : '' }}>Медленно (~1 URL/с на поток)</option>
-                                                <option value="normal" {{ $schSpeed === 'normal' ? 'selected' : '' }}>Обычная (~5 URL/с на поток)</option>
-                                                <option value="fast" {{ $schSpeed === 'fast' ? 'selected' : '' }}>Быстрая (~10 URL/с на поток)</option>
-                                                <option value="turbo" {{ $schSpeed === 'turbo' ? 'selected' : '' }}>Турбо (~15 URL/с на поток) — только свои сайты</option>
-                                            </select>
-                                        </div>
-                                        <div class="col-6 col-md-2">
-                                            <label class="form-label small mb-1" for="sa-sch-conc-{{ $project->id }}">Потоки</label>
-                                            <select name="concurrency" id="sa-sch-conc-{{ $project->id }}" class="form-select form-select-sm">
-                                                @for($n = 1; $n <= $maxConc; $n++)
-                                                    <option value="{{ $n }}" {{ $schConc === $n ? 'selected' : '' }}>{{ $n }}</option>
-                                                @endfor
-                                            </select>
-                                        </div>
-                                        <div class="col-6 col-md-3">
-                                            <label class="form-label small mb-1" for="sa-sch-limit-{{ $project->id }}">Лимит URL</label>
-                                            <input type="text" class="form-control form-control-sm sa-num-space" name="pages_limit"
-                                                   id="sa-sch-limit-{{ $project->id }}"
-                                                   inputmode="numeric" autocomplete="off"
-                                                   value="{{ number_format((int) min($schPages, $maxPages), 0, '', ' ') }}"
-                                                   data-min="1" data-max="{{ $maxPages }}">
-                                        </div>
-                                        <div class="col-6 col-md-3">
-                                            <button type="submit" class="btn btn-sm btn-primary w-100">Сохранить</button>
-                                        </div>
-                                    </div>
-                                    <div class="small cabinet-sa-project__schedule-note mt-2">
-                                        Запуск в выбранный день и час (МСК). 11:00–14:00 недоступны (пик). После сохранения — точная дата «след. …».
-                                    </div>
-                                    </div>
-                                </form>
-                            @elseif($isProjectOwner)
-                                <div class="cabinet-sa-project__schedule small text-secondary" data-sa-pro>
-                                    Авторасписание недоступно на бесплатном тарифе (0 слотов). Optimal — 2, Ultimate — 5, Maximum — 10.
-                                </div>
-                            @endif
-                        </div>
-                    @empty
-                        <div class="card-body">
-                            <div class="alert alert-light border text-center py-4 mb-0 text-secondary">
-                                Проектов пока нет — запустите первый краул.
-                            </div>
-                        </div>
-                    @endforelse
-                </section>
+                @if($saPageUi === 2)
+                    @include('pages.partials.site-audit-projects-v2')
+                @else
+                    @include('pages.partials.site-audit-projects-v1')
+                @endif
             </div>
         </div>
 
-        <section class="card border shadow-sm cabinet-sa-panel mt-3" id="sa-history" data-sa-tour="history">
-            <div class="card-header py-2 px-3">
-                <div class="d-flex flex-wrap align-items-center gap-2 justify-content-between">
-                    <h2 class="h6 mb-0 fw-semibold">История краулов</h2>
-                    <form method="GET" action="{{ route('pages.site-audit') }}#sa-history" class="d-flex align-items-center gap-2 ms-auto" id="sa-history-search">
-                        <label class="visually-hidden" for="sa-history-domain">Поиск по домену</label>
-                        <input type="search" class="form-control form-control-sm" id="sa-history-domain" name="domain"
-                               value="{{ $historyDomain ?? '' }}"
-                               placeholder="Поиск по домену…"
-                               style="min-width:11rem;max-width:16rem"
-                               autocomplete="off">
-                        <button type="submit" class="btn btn-sm btn-outline-secondary">Найти</button>
-                        @if(!empty($historyDomain))
-                            <a href="{{ route('pages.site-audit') }}#sa-history" class="btn btn-sm btn-link text-secondary px-1">Сбросить</a>
-                        @endif
-                    </form>
-                </div>
-                @if(!empty($historyDomain))
-                    <div class="small text-secondary mt-1">
-                        Найдено: {{ method_exists($crawls, 'total') ? $crawls->total() : $crawls->count() }} по «{{ $historyDomain }}»
-                    </div>
-                @endif
-                <div class="small text-secondary mt-1 mb-0">
-                    После окончания платного тарифа история аудита хранится ещё 14 дней, затем удаляется автоматически.
-                </div>
-            </div>
-            @if(!empty($historyPurgeNotice['show']))
-                <div class="alert alert-warning border-0 rounded-0 mb-0 px-3 py-2 small">
-                    Вы на бесплатном тарифе после платного.
-                    История аудита будет удалена
-                    @if(($historyPurgeNotice['days_left'] ?? 0) > 0)
-                        через {{ $historyPurgeNotice['days_left'] }} дн. ({{ $historyPurgeNotice['purge_at'] ?? '' }}).
-                    @else
-                        в ближайшее время (срок {{ $historyPurgeNotice['purge_at'] ?? '' }}).
-                    @endif
-                    Продлите тариф, чтобы сохранить данные.
-                </div>
-            @endif
-            <div class="card-body p-0">
-                <div class="table-responsive cabinet-sa-table-wrap cabinet-sa-table-wrap--flush">
-                    <table class="table table-sm table-hover align-middle mb-0" id="sa-history-table">
-                        <thead class="table-light">
-                        <tr>
-                            <th>ID</th>
-                            <th>Домен</th>
-                            <th>Статус</th>
-                            <th style="min-width:8rem">Прогресс</th>
-                            <th class="text-nowrap">Начало</th>
-                            <th class="text-nowrap">Конец</th>
-                            <th>Настройки</th>
-                            <th>Размер</th>
-                            <th>Грубые</th>
-                            <th>Прочие</th>
-                            <th>Пред.</th>
-                            <th>Инфо</th>
-                            <th class="text-end"></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        @forelse($crawls as $c)
-                            @php
-                                $isCrawlOwner = auth()->id() && (int) $c->user_id === (int) auth()->id();
-                                $b = $c->buckets_json ?: [];
-                                $stClass = $c->statusCssClass();
-                                $sizeBytes = (int) (($crawlSizes ?? [])[$c->id] ?? 0);
-                                $pct = $c->pages_total > 0
-                                    ? (int) round(100 * $c->pages_fetched / max(1, $c->pages_total))
-                                    : 0;
-                                $finished = $c->isFinished();
-                                $rawSettings = $c->settings_json_raw ?? null;
-                                if (is_string($rawSettings)) {
-                                    $s = json_decode($rawSettings, true) ?: [];
-                                } elseif (is_array($rawSettings)) {
-                                    $s = $rawSettings;
-                                } else {
-                                    $s = [];
-                                }
-                                $concurrency = max(1, (int) ($s['concurrency'] ?? 1));
-                                $speed = (string) ($s['crawl_speed'] ?? '—');
-                                $rps = isset($s['rps']) ? (float) $s['rps'] : null;
-                                $pagesOnly = ! empty($s['pages_only']);
-                                $limitShow = (int) ($c->pages_limit ?: ($s['pages_limit'] ?? 0));
-                            @endphp
-                            <tr data-crawl-id="{{ $c->id }}"
-                                data-finished="{{ $finished ? '1' : '0' }}"
-                                data-status-url="{{ route('pages.site-audit.crawl.status', $c->id) }}"
-                                class="{{ $finished ? '' : 'cabinet-sa-row--active' }}">
-                                <td class="text-secondary">#{{ $c->id }}</td>
-                                <td class="fw-medium">
-                                    {{ optional($c->project)->domain ?? '—' }}
-                                    @if($pagesOnly)
-                                        <span class="badge text-bg-light border ms-1" title="Только указанные страницы">страницы</span>
-                                    @endif
-                                    @if(optional($c->project)->team)
-                                        <div class="small text-secondary fw-normal">{{ $c->project->team->title }}</div>
-                                    @endif
-                                </td>
-                                <td>
-                                    <span class="cabinet-sa-status cabinet-sa-status--{{ $stClass }}" data-sa-status>
-                                        {{ $c->statusLabelRu() }}
-                                    </span>
-                                </td>
-                                <td class="cabinet-sa-progress-cell" data-sa-progress>
-                                    @php
-                                        $fetchedN = (int) $c->pages_fetched;
-                                        $totalN = max(0, (int) $c->pages_total);
-                                        $isFailed = $c->status === 'failed' || $c->status === 'cancelled';
-                                        $indeterminate = ! $finished && ($totalN < 1 || in_array($c->status, ['queued', 'queued_wait', 'discovering'], true));
-                                        // /html/UI/general.html — Progress
-                                        if ($finished && ! $isFailed) {
-                                            $barClass = 'progress-bar bg-success';
-                                            $fillPct = 100;
-                                            $labelText = $fetchedN . '/' . $totalN;
-                                        } elseif ($isFailed) {
-                                            $barClass = 'progress-bar progress-bar-striped progress-bar-animated bg-danger';
-                                            $fillPct = $totalN > 0 ? (int) round(100 * $fetchedN / max(1, $totalN)) : 0;
-                                            if ($fillPct < 1) {
-                                                $fillPct = 100;
-                                            }
-                                            $labelText = $fetchedN . '/' . $totalN;
-                                        } elseif ($indeterminate) {
-                                            $barClass = 'progress-bar progress-bar-striped progress-bar-animated bg-warning';
-                                            $fillPct = 100;
-                                            $labelText = $totalN > 0 ? ($fetchedN . '/' . $totalN) : '…';
-                                        } else {
-                                            $barClass = 'progress-bar progress-bar-striped progress-bar-animated bg-info';
-                                            $fillPct = max(0, (int) $pct);
-                                            $labelText = $fetchedN . '/' . $totalN;
-                                        }
-                                        $hint = $c->status === 'queued_wait'
-                                            ? 'ждёт свободный слот на сервере'
-                                            : ($c->status === 'queued'
-                                                ? 'запуск'
-                                                : ($c->status === 'discovering' ? 'сбор URL' : ($c->status === 'aggregating' ? 'агрегация' : ($isFailed ? 'ошибка' : ($finished ? 'готово' : 'сканирование')))));
-                                    @endphp
-                                    <div class="progress"
-                                         role="progressbar"
-                                         aria-label="{{ $hint }}"
-                                         aria-valuenow="{{ $fillPct }}"
-                                         aria-valuemin="0"
-                                         aria-valuemax="100"
-                                         title="{{ $hint }} · {{ $fetchedN }}/{{ $totalN }}">
-                                        <div class="{{ $barClass }}" style="width: {{ $fillPct }}%; border-radius: 0.375rem">{{ $labelText }}</div>
-                                    </div>
-                                </td>
-                                <td class="text-nowrap small text-secondary" data-sa-started>
-                                    {{ $c->started_at ? $c->started_at->format('d.m.Y H:i') : ($c->created_at ? $c->created_at->format('d.m.Y H:i') : '—') }}
-                                </td>
-                                <td class="text-nowrap small text-secondary" data-sa-finished>
-                                    @if($c->finished_at)
-                                        {{ $c->finished_at->format('d.m.Y H:i') }}
-                                    @elseif($finished)
-                                        —
-                                    @else
-                                        @php $eta = $c->estimateFinishedAtFormatted(); @endphp
-                                        @if($eta)
-                                            <span class="text-muted" title="Оценка по текущей скорости">~{{ $eta }}</span>
-                                        @else
-                                            <span class="text-muted" title="Слишком рано для оценки">~…</span>
-                                        @endif
-                                    @endif
-                                </td>
-                                <td class="small" data-sa-settings>
-                                    <div class="text-nowrap">
-                                        {{ $concurrency }} {{ $concurrency === 1 ? 'поток' : ($concurrency < 5 ? 'потока' : 'потоков') }}
-                                        · {{ $speed }}@if($rps !== null) ({{ rtrim(rtrim(number_format($rps, 1, '.', ''), '0'), '.') }}/с)@endif
-                                    </div>
-                                    <div class="text-secondary text-nowrap">
-                                        @if($limitShow > 0)
-                                            лимит {{ number_format($limitShow, 0, '', ' ') }}
-                                        @endif
-                                    </div>
-                                </td>
-                                <td class="text-nowrap" data-sa-size>
-                                    @php
-                                        $sizeClass = 'cabinet-sa-size--sm';
-                                        if ($sizeBytes >= 80 * 1024) {
-                                            $sizeClass = 'cabinet-sa-size--lg';
-                                        } elseif ($sizeBytes >= 30 * 1024) {
-                                            $sizeClass = 'cabinet-sa-size--md';
-                                        }
-                                    @endphp
-                                    <span class="cabinet-sa-size {{ $sizeClass }}" title="payload в БД (pages + findings + meta), без HTML">
-                                        ~{{ \App\Services\SiteAudit\SiteAuditCrawlStorage::formatBytes($sizeBytes) }}
-                                    </span>
-                                </td>
-                                <td data-sa-bucket="critical">{{ $b['critical'] ?? '—' }}</td>
-                                <td data-sa-bucket="other">{{ $b['other'] ?? '—' }}</td>
-                                <td data-sa-bucket="warning">{{ $b['warning'] ?? '—' }}</td>
-                                <td data-sa-bucket="info">{{ $b['info'] ?? '—' }}</td>
-                                <td class="text-end text-nowrap">
-                                    <span class="cabinet-sa-row-actions">
-                                        <a class="btn btn-sm btn-outline-primary" href="{{ route('pages.site-audit.crawl.show', $c->id) }}">Сводка</a>
-                                        @if($isCrawlOwner && ! $finished)
-                                            <form method="POST" action="{{ route('pages.site-audit.crawl.cancel', $c->id) }}" class="d-inline"
-                                                  data-sa-cancel-crawl
-                                                  data-cabinet-confirm="Остановить краул #{{ $c->id }}? Уже скачанные страницы останутся."
-                                                  data-cabinet-confirm-title="Остановка краула"
-                                                  data-cabinet-confirm-ok="Остановить"
-                                                  data-cabinet-confirm-danger="1">
-                                                @csrf
-                                                <button type="submit" class="btn btn-sm btn-outline-danger">Стоп</button>
-                                            </form>
-                                        @endif
-                                        @if($isCrawlOwner && $finished)
-                                            @php
-                                                $canResume = (new \App\Services\SiteAudit\SiteAuditCrawlEngine())->canResume($c);
-                                            @endphp
-                                            @if($canResume)
-                                                <form method="POST" action="{{ route('pages.site-audit.crawl.continue', $c->id) }}" class="d-inline"
-                                                      data-cabinet-confirm="Продолжить краул #{{ $c->id }} с {{ number_format((int) $c->pages_fetched, 0, '', ' ') }} URL? Уже скачанные страницы сохранятся."
-                                                      data-cabinet-confirm-title="Продолжить краул"
-                                                      data-cabinet-confirm-ok="Продолжить">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-outline-primary">Продолжить</button>
-                                                </form>
-                                            @endif
-                                            <form method="POST" action="{{ route('pages.site-audit.crawl.repeat', $c->id) }}" class="d-inline"
-                                                  data-cabinet-confirm="Повторить краул для {{ e(optional($c->project)->domain ?? 'проекта') }} с теми же настройками? Начнётся новый краул с нуля."
-                                                  data-cabinet-confirm-title="Новый краул"
-                                                  data-cabinet-confirm-ok="Повторить">
-                                                @csrf
-                                                <button type="submit" class="btn btn-sm btn-outline-secondary">Повторить</button>
-                                            </form>
-                                            <form method="POST" action="{{ route('pages.site-audit.crawl.destroy', $c->id) }}" class="d-inline"
-                                                  data-cabinet-confirm="Удалить краул #{{ $c->id }}?"
-                                                  data-cabinet-confirm-title="Удаление краула"
-                                                  data-cabinet-confirm-ok="Удалить"
-                                                  data-cabinet-confirm-danger="1">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
-                                            </form>
-                                        @endif
-                                    </span>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr data-sa-empty><td colspan="13" class="text-secondary px-3 py-4 text-center">История пуста</td></tr>
-                        @endforelse
-                        </tbody>
-                    </table>
-                </div>
-                @if(method_exists($crawls, 'hasPages') && $crawls->hasPages())
-                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 py-2 border-top">
-                        <div class="small text-secondary">
-                            {{ $crawls->firstItem() }}–{{ $crawls->lastItem() }}
-                            из {{ number_format($crawls->total(), 0, '', ' ') }}
-                        </div>
-                        <nav title="Страницы истории краулов">
-                            {{ $crawls->links('pagination::bootstrap-4') }}
-                        </nav>
-                    </div>
-                @elseif(method_exists($crawls, 'total') && $crawls->total() > 0)
-                    <div class="small text-secondary px-3 py-2 border-top">
-                        Всего {{ number_format($crawls->total(), 0, '', ' ') }}
-                    </div>
-                @endif
-            </div>
-        </section>
+        @if($saPageUi === 2)
+            @include('pages.partials.site-audit-history-v2')
+        @else
+            @include('pages.partials.site-audit-history-v1')
+        @endif
+
         </div>{{-- /sa-step-workspace --}}
     </div>
 
     @slot('js')
         @include('partials.cabinet-confirm-modal')
+        @if(!empty($teamAccessReady))
+            @include('pages.partials.site-audit-team-create-modal')
+        @endif
         <script>
             (function () {
                 var pageRoot = document.querySelector('.cabinet-sa-page');
@@ -669,13 +62,29 @@
                 var PICKED_KEY = 'cabinet-sa-ui-mode-picked';
                 var stepMode = document.getElementById('sa-step-mode');
                 var stepWork = document.getElementById('sa-step-workspace');
+                var backModeBtn = document.getElementById('sa-steps-back-mode');
                 var modeLabel = document.getElementById('sa-steps-mode-label');
-
                 function showWizardStep(step) {
                     if (stepMode) stepMode.hidden = step !== 'mode';
                     if (stepWork) stepWork.hidden = step !== 'workspace';
                     if (pageRoot) {
                         pageRoot.classList.toggle('cabinet-sa-page--choosing', step === 'mode');
+                    }
+                }
+
+                function syncModeSwitcher(mode) {
+                    document.querySelectorAll('[data-sa-switch-mode]').forEach(function (btn) {
+                        var on = btn.getAttribute('data-sa-switch-mode') === mode;
+                        btn.classList.toggle('is-active', on);
+                        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+                    });
+                    document.querySelectorAll('.cabinet-sa-mode-card').forEach(function (card) {
+                        var on = card.getAttribute('data-sa-pick-mode') === mode;
+                        card.classList.toggle('is-selected', on);
+                        card.setAttribute('aria-pressed', on ? 'true' : 'false');
+                    });
+                    if (modeLabel) {
+                        modeLabel.textContent = mode === 'pro' ? 'Расширенный' : 'Простой';
                     }
                 }
 
@@ -686,14 +95,7 @@
                         pageRoot.classList.toggle('cabinet-sa-page--lite', mode === 'lite');
                         pageRoot.classList.toggle('cabinet-sa-page--pro', mode === 'pro');
                     }
-                    document.querySelectorAll('.cabinet-sa-mode-card').forEach(function (card) {
-                        var on = card.getAttribute('data-sa-pick-mode') === mode;
-                        card.classList.toggle('is-selected', on);
-                        card.setAttribute('aria-pressed', on ? 'true' : 'false');
-                    });
-                    if (modeLabel) {
-                        modeLabel.textContent = mode === 'pro' ? 'Расширенный' : 'Простой';
-                    }
+                    syncModeSwitcher(mode);
                     var domainEl = document.getElementById('sa-domain');
                     if (domainEl) {
                         var ph = domainEl.getAttribute(mode === 'lite' ? 'data-placeholder-lite' : 'data-placeholder-pro');
@@ -722,6 +124,11 @@
                     if (domainEl && remember) {
                         setTimeout(function () { domainEl.focus(); }, 50);
                     }
+                    try {
+                        document.dispatchEvent(new CustomEvent('cabinet-sa-workspace-ready', {
+                            detail: { mode: mode, remember: !!remember }
+                        }));
+                    } catch (e) {}
                 }
 
                 function goModePick() {
@@ -753,12 +160,50 @@
                         goWorkspace(btn.getAttribute('data-sa-pick-mode'), true);
                     });
                 });
-                var backMode = document.getElementById('sa-steps-back-mode');
-                if (backMode) {
-                    backMode.addEventListener('click', function () {
+                document.querySelectorAll('[data-sa-switch-mode]').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        goWorkspace(btn.getAttribute('data-sa-switch-mode'), true);
+                    });
+                });
+                if (backModeBtn) {
+                    backModeBtn.addEventListener('click', function () {
                         goModePick();
                     });
                 }
+
+                function syncSpeedPresets() {
+                    var speedEl = document.getElementById('sa-speed');
+                    var concEl = document.getElementById('sa-concurrency');
+                    if (!speedEl || !concEl) return;
+                    var speed = speedEl.value;
+                    var conc = String(concEl.value);
+                    document.querySelectorAll('[data-sa-preset]').forEach(function (btn) {
+                        var on = btn.getAttribute('data-speed') === speed
+                            && String(btn.getAttribute('data-concurrency')) === conc;
+                        btn.classList.toggle('is-active', on);
+                    });
+                }
+                document.querySelectorAll('[data-sa-preset]').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        var speedEl = document.getElementById('sa-speed');
+                        var concEl = document.getElementById('sa-concurrency');
+                        if (speedEl) speedEl.value = btn.getAttribute('data-speed') || 'normal';
+                        if (concEl) {
+                            var c = parseInt(btn.getAttribute('data-concurrency') || '1', 10) || 1;
+                            if (concEl.querySelector('option[value="' + c + '"]')) {
+                                concEl.value = String(c);
+                            } else if (concEl.options.length) {
+                                concEl.selectedIndex = Math.min(Math.max(c - 1, 0), concEl.options.length - 1);
+                            }
+                        }
+                        syncSpeedPresets();
+                    });
+                });
+                var speedEl = document.getElementById('sa-speed');
+                var concEl = document.getElementById('sa-concurrency');
+                if (speedEl) speedEl.addEventListener('change', syncSpeedPresets);
+                if (concEl) concEl.addEventListener('change', syncSpeedPresets);
+                syncSpeedPresets();
 
                 var startBtn = document.getElementById('sa-start');
                 var msg = document.getElementById('sa-msg');
@@ -828,44 +273,73 @@
                         var isFailed = st === 'failed' || st === 'cancelled';
                         var finished = !!j.finished;
                         var indeterminate = !finished && (total < 1 || st === 'queued' || st === 'queued_wait' || st === 'discovering');
-                        var barClass, fill, label, hint;
-                        // /html/UI/general.html — Progress
+                        var fillClass, fill, label, hint;
                         if (finished && !isFailed) {
-                            barClass = 'progress-bar bg-success';
+                            fillClass = 'cabinet-sa-prog__fill is-done';
                             fill = 100;
-                            label = fetched + '/' + total;
+                            label = fetched + ' / ' + total;
                             hint = 'готово';
                         } else if (isFailed) {
-                            barClass = 'progress-bar progress-bar-striped progress-bar-animated bg-danger';
+                            fillClass = 'cabinet-sa-prog__fill is-fail';
                             fill = total > 0 ? Math.round(100 * fetched / Math.max(1, total)) : 0;
                             if (fill < 1) fill = 100;
-                            label = fetched + '/' + total;
+                            label = fetched + ' / ' + total;
                             hint = st === 'cancelled' ? 'остановлен' : 'ошибка';
                         } else if (indeterminate) {
-                            barClass = 'progress-bar progress-bar-striped progress-bar-animated bg-warning';
+                            fillClass = 'cabinet-sa-prog__fill is-wait';
                             fill = 100;
-                            label = total > 0 ? (fetched + '/' + total) : '…';
+                            label = total > 0 ? (fetched + ' / ' + total) : '…';
                             hint = (st === 'queued_wait')
-                                ? 'ждёт свободный слот на сервере'
+                                ? 'ждёт слот'
                                 : ((st === 'queued') ? 'запуск' : (st === 'discovering' ? 'сбор URL' : 'ожидание'));
                         } else {
-                            barClass = 'progress-bar progress-bar-striped progress-bar-animated bg-info';
+                            fillClass = 'cabinet-sa-prog__fill is-run';
                             fill = pct;
-                            label = fetched + '/' + total;
+                            label = fetched + ' / ' + total;
                             hint = st === 'aggregating' ? 'агрегация' : 'сканирование';
                         }
-                        prog.innerHTML =
-                            '<div class="progress" role="progressbar" aria-label="' + hint +
-                            '" aria-valuenow="' + fill + '" aria-valuemin="0" aria-valuemax="100" title="' +
-                            hint + ' · ' + fetched + '/' + total + '">' +
-                            '<div class="' + barClass + '" style="width:' + fill + '%; border-radius: 0.375rem">' +
-                            label + '</div></div>';
+                        var fmtN = function (n) {
+                            return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+                        };
+                        var shortLabel = (total > 0 || fetched > 0) ? (fetched + '/' + total) : '…';
+                        var spacedLabel = (total > 0 || fetched > 0)
+                            ? (fmtN(fetched) + ' / ' + fmtN(total))
+                            : '…';
+                        // v2 compact mini-progress
+                        if (prog.querySelector('.cabinet-sa-mini-prog') || prog.closest('.cabinet-sa-history-table')) {
+                            var barHtml = '';
+                            var miniFillClass = fillClass.replace('cabinet-sa-prog__fill ', '');
+                            if (!finished || isFailed) {
+                                barHtml = '<span class="cabinet-sa-mini-prog__bar"><i class="' + miniFillClass + '" style="width:' + fill + '%"></i></span>';
+                            }
+                            prog.innerHTML =
+                                '<div class="cabinet-sa-mini-prog" title="' + hint + ' · ' + spacedLabel + '">' +
+                                '<span class="cabinet-sa-mini-prog__n">' + spacedLabel + '</span>' + barHtml + '</div>';
+                        } else {
+                            // v1 table progress
+                            var barClass = finished && !isFailed
+                                ? 'progress-bar bg-success'
+                                : (isFailed
+                                    ? 'progress-bar progress-bar-striped progress-bar-animated bg-danger'
+                                    : (indeterminate
+                                        ? 'progress-bar progress-bar-striped progress-bar-animated bg-warning'
+                                        : 'progress-bar progress-bar-striped progress-bar-animated bg-info'));
+                            prog.innerHTML =
+                                '<div class="progress" role="progressbar" aria-label="' + hint +
+                                '" aria-valuenow="' + fill + '" aria-valuemin="0" aria-valuemax="100" title="' +
+                                hint + ' · ' + fetched + '/' + total + '">' +
+                                '<div class="' + barClass + '" style="width:' + fill + '%; border-radius: 0.375rem">' +
+                                shortLabel + '</div></div>';
+                        }
                     }
                     if (j.buckets) {
                         ['critical', 'other', 'warning', 'info'].forEach(function (k) {
                             var cell = row.querySelector('[data-sa-bucket="' + k + '"]');
                             if (cell && typeof j.buckets[k] !== 'undefined') {
-                                cell.textContent = j.buckets[k];
+                                var n = parseInt(j.buckets[k], 10);
+                                cell.textContent = isNaN(n)
+                                    ? j.buckets[k]
+                                    : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
                             }
                         });
                     }
@@ -903,7 +377,8 @@
                                 }
                             });
                             if (!actions.querySelector('form[action*="/repeat"]')) {
-                                var domain = (row.querySelector('td.fw-medium') || {}).textContent || 'проекта';
+                                var domainEl = row.querySelector('[data-sa-domain]') || row.querySelector('td.fw-medium');
+                                var domain = (domainEl && domainEl.textContent) ? domainEl.textContent.trim() : 'проекта';
                                 domain = String(domain).trim() || 'проекта';
                                 if (j.can_resume && !actions.querySelector('form[action*="/continue"]')) {
                                     var cont = document.createElement('form');
@@ -981,7 +456,7 @@
 
                 function pollActiveRows() {
                     if (!historyTable) return;
-                    historyTable.querySelectorAll('tr[data-crawl-id][data-finished="0"]').forEach(pollRow);
+                    historyTable.querySelectorAll('[data-crawl-id][data-finished="0"]').forEach(pollRow);
                 }
 
                 document.querySelectorAll('form[data-sa-cancel-crawl]').forEach(function (form) {
@@ -1077,7 +552,7 @@
                     setTimeout(scrollToHistory, 100);
                     var m = window.location.search.match(/[?&]highlight=(\d+)/);
                     if (m) {
-                        var hi = historyTable && historyTable.querySelector('tr[data-crawl-id="' + m[1] + '"]');
+                        var hi = historyTable && historyTable.querySelector('[data-crawl-id="' + m[1] + '"]');
                         if (hi) hi.classList.add('table-active');
                     }
                 }

@@ -439,17 +439,67 @@ class SeoChecklistController extends Controller
 
     public function storeTeam(Request $request): RedirectResponse
     {
+        $userId = (int) Auth::id();
         $result = $this->service->createTeam(
-            (int) Auth::id(),
+            $userId,
             (string) $request->input('title', ''),
             $request->input('description')
         );
 
-        return $this->teamRedirect(
-            $request,
-            $result['ok'] ? 'success' : 'error',
-            $result['ok'] ? __('SEO checklist team created') : ($result['message'] ?? __('Error'))
-        );
+        if (empty($result['ok']) || empty($result['team'])) {
+            return $this->teamRedirect(
+                $request,
+                'error',
+                $result['message'] ?? __('Error')
+            );
+        }
+
+        $memberErrors = [];
+        $members = $request->input('members', []);
+        if (! is_array($members)) {
+            $members = [];
+        }
+
+        // Один участник из «черновика» формы, если JS не успел сложить в members[]
+        if ($members === [] && ($request->filled('user_id') || $request->filled('email'))) {
+            $members[] = [
+                'user_id' => $request->input('user_id'),
+                'email' => $request->input('email'),
+                'role' => $request->input('role', 'participant'),
+            ];
+        }
+
+        foreach ($members as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $role = (string) ($row['role'] ?? 'participant');
+            $email = trim((string) ($row['email'] ?? ''));
+            $memberUserId = (int) ($row['user_id'] ?? 0);
+
+            if ($memberUserId > 0) {
+                $add = $this->service->addTeamMember($result['team'], $memberUserId, $role);
+            } elseif ($email !== '') {
+                $add = $this->service->addTeamMemberByEmail($result['team'], $email, $role);
+            } else {
+                continue;
+            }
+
+            if (empty($add['ok'])) {
+                $who = $email !== '' ? $email : ('#' . $memberUserId);
+                $memberErrors[] = $who . ': ' . ($add['message'] ?? __('Error'));
+            }
+        }
+
+        if ($memberErrors !== []) {
+            return $this->teamRedirect(
+                $request,
+                'error',
+                __('SEO checklist team created') . ' Часть участников не добавлена: ' . implode('; ', $memberErrors)
+            );
+        }
+
+        return $this->teamRedirect($request, 'success', __('SEO checklist team created'));
     }
 
     public function updateTeamMeta(Request $request, int $teamId): RedirectResponse
@@ -572,10 +622,18 @@ class SeoChecklistController extends Controller
 
     private function teamRedirect(Request $request, string $flashKey, string $message): RedirectResponse
     {
-        if ((string) $request->input('return_to') === 'profile') {
+        $returnTo = (string) $request->input('return_to');
+
+        if ($returnTo === 'profile') {
             return redirect()
                 ->to(route('profile.index') . '#team')
                 ->with($flashKey === 'success' ? 'status' : $flashKey, $message);
+        }
+
+        if ($returnTo === 'site-audit') {
+            return redirect()
+                ->to(route('pages.site-audit') . '#sa-projects')
+                ->with($flashKey === 'success' ? 'status' : 'error', $message);
         }
 
         return redirect()

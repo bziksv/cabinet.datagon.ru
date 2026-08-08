@@ -14,25 +14,46 @@
     <div class="alert alert-success py-2 px-3 small">{{ session('status') }}</div>
 @endif
 
-<form method="post" action="{{ route('pages.seo-checklist.teams.store') }}" class="cabinet-sc-panel cabinet-sc-panel--create mb-3">
-    @csrf
-    @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
-    <div class="cabinet-sc-panel__title">{{ __('Create team') }}</div>
-    <div class="cabinet-sc-create__row">
-        <input type="text" name="title" class="form-control form-control-sm" required
-               placeholder="{{ __('Team name') }}" value="{{ old('title') }}">
-        <input type="text" name="description" class="form-control form-control-sm"
-               placeholder="{{ __('Description') }} ({{ __('Optional') }})" value="{{ old('description') }}">
-        <button type="submit" class="btn btn-primary btn-sm">{{ __('Create') }}</button>
+@php
+    $teamCreateModalId = 'cabinet-team-create-modal';
+@endphp
+
+<div class="cabinet-sc-panel cabinet-sc-panel--create mb-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div>
+            <div class="cabinet-sc-panel__title mb-1">{{ __('Create team') }}</div>
+            <p class="small text-secondary mb-0">{{ $teamsLead }}</p>
+        </div>
+        <button type="button"
+                class="btn btn-primary btn-sm"
+                data-bs-toggle="modal"
+                data-bs-target="#{{ $teamCreateModalId }}">
+            <i class="bi bi-plus-lg" aria-hidden="true"></i>
+            {{ __('Create team') }}
+        </button>
     </div>
-    <p class="small text-secondary mb-0 mt-2">{{ $teamsLead }}</p>
-</form>
+</div>
+
+@include('pages.partials.team-create-modal', [
+    'modalId' => $teamCreateModalId,
+    'returnTo' => $returnTo,
+    'showManageLink' => false,
+    'lead' => $teamsLead,
+    'teamCandidates' => $teamCandidates ?? collect(),
+    'teamRoleLabels' => $teamRoleLabels ?? \App\SeoChecklist\SeoChecklistTeam::roleLabels(),
+])
 
 @if(isset($teams) && $teams->isEmpty())
     <div class="cabinet-sc-empty mb-3">
         <i class="bi bi-people display-6 d-block mb-2 opacity-50"></i>
         <p class="fw-semibold mb-1">{{ __('No teams yet') }}</p>
-        <p class="small text-secondary mb-0">{{ __('No teams yet hint') }}</p>
+        <p class="small text-secondary mb-2">{{ __('No teams yet hint') }}</p>
+        <button type="button"
+                class="btn btn-primary btn-sm"
+                data-bs-toggle="modal"
+                data-bs-target="#{{ $teamCreateModalId }}">
+            {{ __('Create team') }}
+        </button>
     </div>
 @elseif(isset($teams))
     <div class="cabinet-sc-section-label">
@@ -119,7 +140,6 @@
                             @csrf
                             @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
                             <input type="text" name="title" class="form-control form-control-sm" required value="{{ $team->title }}" placeholder="{{ __('Team name') }}">
-                            <input type="text" name="description" class="form-control form-control-sm" value="{{ $team->description }}" placeholder="{{ __('Description') }}">
                             <button type="submit" class="btn btn-sm btn-outline-primary">{{ __('Save') }}</button>
                         </form>
                     </div>

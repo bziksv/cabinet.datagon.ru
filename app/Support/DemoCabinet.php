@@ -500,6 +500,51 @@ class DemoCabinet
     }
 
     /**
+     * Редирект после /demo-cabinet?to=/monitoring-v2 (с маркетинга).
+     * Только относительные пути из allowlist — без open redirect.
+     */
+    public static function resolveEntryPath(?string $to): string
+    {
+        $default = self::homePath();
+        if ($to === null) {
+            return $default;
+        }
+
+        $to = trim($to);
+        if ($to === '' || strpos($to, '://') !== false || strpos($to, '\\') !== false) {
+            return $default;
+        }
+
+        if (isset($to[0]) && $to[0] !== '/') {
+            $to = '/' . $to;
+        }
+
+        if (strpos($to, '//') === 0 || strpos($to, '/.') !== false) {
+            return $default;
+        }
+
+        $path = parse_url($to, PHP_URL_PATH);
+        if (! is_string($path) || $path === '' || $path[0] !== '/') {
+            return $default;
+        }
+
+        $path = rtrim($path, '/') ?: '/';
+        $allowed = config('cabinet-demo-cabinet.entry_paths', []);
+        if (! is_array($allowed) || $allowed === []) {
+            return $default;
+        }
+
+        foreach ($allowed as $prefix) {
+            $prefix = rtrim((string) $prefix, '/') ?: '/';
+            if ($path === $prefix || strpos($path, $prefix . '/') === 0) {
+                return $path;
+            }
+        }
+
+        return $default;
+    }
+
+    /**
      * Готовый снимок анализа конкурентов для витрины.
      *
      * @return array{phrases: list<string>, count: int, search_engines: list<string>, regions_yandex: list<string>, result: array}|null

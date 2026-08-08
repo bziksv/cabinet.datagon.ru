@@ -40,6 +40,40 @@ return [
      */
     'home_path' => env('DEMO_CABINET_HOME_PATH', '/'),
 
+    /**
+     * Разрешённые пути для ?to= с маркетинга (префиксы).
+     * Пример: /demo-cabinet?to=/monitoring-v2
+     */
+    'entry_paths' => [
+        '/monitoring-v2',
+        '/monitoring',
+        '/analyze-relevance',
+        '/competitor-analysis',
+        '/site-monitoring',
+        '/meta-tags',
+        '/keyword-generator',
+        '/counting-text-length',
+        '/password-generator',
+        '/list-comparison',
+        '/duplicates',
+        '/utm-marks',
+        '/roi-calculator',
+        '/http-headers',
+        '/index-check',
+        '/esenin-text-check',
+        '/search-suggestions',
+        '/domain-records',
+        '/site-types',
+        '/phrase-commerce',
+        '/html-editor',
+        '/unique',
+        '/backlink',
+        '/domain-information',
+        '/text-analyzer',
+        '/cluster',
+        '/site-audit',
+    ],
+
     /** URL регистрации с маркетинга */
     'register_hint' => 'https://titlo.ru/register/',
 ];

@@ -33,7 +33,10 @@ class DemoCabinetController extends Controller
         $request->session()->regenerate();
         $request->session()->put('demo_cabinet', true);
 
-        return redirect(DemoCabinet::homePath($user))->with('demo_cabinet_welcome', true);
+        $rawTo = $request->query('to');
+        $to = DemoCabinet::resolveEntryPath(is_string($rawTo) ? $rawTo : null);
+
+        return redirect($to)->with('demo_cabinet_welcome', true);
     }
 
     public function exit(Request $request): RedirectResponse

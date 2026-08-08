@@ -2,7 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\SeoChecklist\SeoChecklistProject;
+use App\SeoChecklist\SeoChecklistTeam;
+use App\SeoReports\SeoReportProject;
+use App\Services\SeoChecklist\SeoChecklistService;
 use App\Services\UserNotificationPreferenceService;
+use App\SiteAuditProject;
 use App\Support\SignupEmailPolicy;
 use App\TariffSetting;
 use App\TariffSettingUserValue;
@@ -66,6 +71,42 @@ class ProfilesController extends Controller
             $tariffProperties[$property['id']]['fields'][] = $tariffSetting;
         }
 
+        $teamReady = SeoChecklistTeam::tableReady();
+        $teams = collect();
+        $teamCandidates = collect();
+        $checklistProjects = collect();
+        $seoReportProjects = collect();
+        $siteAuditProjects = collect();
+        if ($teamReady) {
+            $svc = app(SeoChecklistService::class);
+            $teams = $svc->teamsForUser((int) $user->id);
+            $teamCandidates = $svc->teamCandidates((int) $user->id);
+            if (SeoChecklistProject::tableReady()) {
+                $checklistProjects = SeoChecklistProject::query()
+                    ->where('user_id', $user->id)
+                    ->where('status', 'active')
+                    ->with('team:id,title')
+                    ->orderBy('domain')
+                    ->get(['id', 'domain', 'team_id', 'user_id', 'status']);
+            }
+            if (SeoReportProject::teamColumnReady()) {
+                $seoReportProjects = SeoReportProject::query()
+                    ->where('user_id', $user->id)
+                    ->where('status', 'active')
+                    ->with('team:id,title')
+                    ->orderBy('domain')
+                    ->get(['id', 'domain', 'team_id', 'user_id', 'status']);
+            }
+            if (SiteAuditProject::teamColumnReady()) {
+                $siteAuditProjects = SiteAuditProject::query()
+                    ->where('user_id', $user->id)
+                    ->with('team:id,title')
+                    ->orderBy('domain')
+                    ->limit(100)
+                    ->get(['id', 'domain', 'team_id', 'user_id']);
+            }
+        }
+
         return view('profile.index', [
             'user' => $user,
             'lang' => $lang,
@@ -74,6 +115,13 @@ class ProfilesController extends Controller
             'tariffProperties' => $tariffProperties,
             'telegramConnected' => $user->isTelegramConnected(),
             'notificationGroups' => app(UserNotificationPreferenceService::class)->profileGroupsForUser($user),
+            'teamReady' => $teamReady,
+            'teams' => $teams,
+            'teamCandidates' => $teamCandidates,
+            'teamRoleLabels' => SeoChecklistTeam::roleLabels(),
+            'checklistProjects' => $checklistProjects,
+            'seoReportProjects' => $seoReportProjects,
+            'siteAuditProjects' => $siteAuditProjects,
         ]);
     }
 

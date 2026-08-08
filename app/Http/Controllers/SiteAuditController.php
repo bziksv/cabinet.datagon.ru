@@ -191,28 +191,27 @@ class SiteAuditController extends Controller
         }
 
         $teamId = (int) $request->input('team_id', 0);
+        $toProfile = (string) $request->input('return_to') === 'profile';
+        $back = $toProfile
+            ? redirect()->to(route('profile.index') . '#team')
+            : redirect()->route('pages.site-audit');
+
         if ($teamId < 1) {
             $project->team_id = null;
             $project->save();
 
-            return redirect()
-                ->route('pages.site-audit')
-                ->with('status', 'Команда отключена от проекта ' . $project->domain);
+            return $back->with('status', 'Команда отключена от проекта ' . $project->domain);
         }
 
         $team = app(SeoChecklistService::class)->findOwnedTeam((int) $user->id, $teamId);
         if (! $team) {
-            return redirect()
-                ->route('pages.site-audit')
-                ->with('error', 'Команда не найдена');
+            return $back->with('error', 'Команда не найдена');
         }
 
         $project->team_id = $team->id;
         $project->save();
 
-        return redirect()
-            ->route('pages.site-audit')
-            ->with('status', 'Команда «' . $team->title . '» подключена к ' . $project->domain);
+        return $back->with('status', 'Команда «' . $team->title . '» подключена к ' . $project->domain);
     }
 
     public function showCrawl(int $id): View

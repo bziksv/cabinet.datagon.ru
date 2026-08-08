@@ -352,13 +352,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('checklist/time', 'SeoChecklistController@timesheet')->name('pages.seo-checklist.timesheet')->middleware('permission:SEO Checklist');
     Route::get('checklist/time/export', 'SeoChecklistController@timesheetExport')->name('pages.seo-checklist.timesheet.export')->middleware('permission:SEO Checklist');
     Route::get('checklist/team', 'SeoChecklistController@team')->name('pages.seo-checklist.team')->middleware('permission:SEO Checklist');
-    Route::post('checklist/teams', 'SeoChecklistController@storeTeam')->name('pages.seo-checklist.teams.store')->middleware('permission:SEO Checklist');
-    Route::post('checklist/teams/{teamId}', 'SeoChecklistController@updateTeamMeta')->name('pages.seo-checklist.teams.update')->middleware('permission:SEO Checklist')->where('teamId', '[0-9]+');
-    Route::post('checklist/teams/{teamId}/delete', 'SeoChecklistController@destroyTeam')->name('pages.seo-checklist.teams.delete')->middleware('permission:SEO Checklist')->where('teamId', '[0-9]+');
-    Route::post('checklist/teams/{teamId}/members', 'SeoChecklistController@storeTeamMember')->name('pages.seo-checklist.teams.members.store')->middleware('permission:SEO Checklist')->where('teamId', '[0-9]+');
-    Route::post('checklist/teams/{teamId}/members/{memberId}', 'SeoChecklistController@updateTeamMember')->name('pages.seo-checklist.teams.members.update')->middleware('permission:SEO Checklist')->where(['teamId' => '[0-9]+', 'memberId' => '[0-9]+']);
-    Route::post('checklist/teams/{teamId}/members/{memberId}/delete', 'SeoChecklistController@destroyTeamMember')->name('pages.seo-checklist.teams.members.delete')->middleware('permission:SEO Checklist')->where(['teamId' => '[0-9]+', 'memberId' => '[0-9]+']);
-    Route::post('checklist/{id}/assign-team', 'SeoChecklistController@assignProjectTeam')->name('pages.seo-checklist.assign-team')->middleware('permission:SEO Checklist')->where('id', '[0-9]+');
+    // CRUD команд доступен из профиля без permission SEO Checklist (общая сущность кабинета)
+    Route::post('checklist/teams', 'SeoChecklistController@storeTeam')->name('pages.seo-checklist.teams.store');
+    Route::post('checklist/teams/{teamId}', 'SeoChecklistController@updateTeamMeta')->name('pages.seo-checklist.teams.update')->where('teamId', '[0-9]+');
+    Route::post('checklist/teams/{teamId}/delete', 'SeoChecklistController@destroyTeam')->name('pages.seo-checklist.teams.delete')->where('teamId', '[0-9]+');
+    Route::post('checklist/teams/{teamId}/members', 'SeoChecklistController@storeTeamMember')->name('pages.seo-checklist.teams.members.store')->where('teamId', '[0-9]+');
+    Route::post('checklist/teams/{teamId}/members/{memberId}', 'SeoChecklistController@updateTeamMember')->name('pages.seo-checklist.teams.members.update')->where(['teamId' => '[0-9]+', 'memberId' => '[0-9]+']);
+    Route::post('checklist/teams/{teamId}/members/{memberId}/delete', 'SeoChecklistController@destroyTeamMember')->name('pages.seo-checklist.teams.members.delete')->where(['teamId' => '[0-9]+', 'memberId' => '[0-9]+']);
+    Route::post('checklist/{id}/assign-team', 'SeoChecklistController@assignProjectTeam')->name('pages.seo-checklist.assign-team')->where('id', '[0-9]+');
     Route::get('checklist/templates', 'SeoChecklistController@templates')->name('pages.seo-checklist.templates')->middleware('permission:SEO Checklist');
     Route::post('checklist/timer/stop', 'SeoChecklistController@stopActiveTimer')->name('pages.seo-checklist.timer.stop-active')->middleware('permission:SEO Checklist');
     Route::post('checklist/templates', 'SeoChecklistController@storeTemplate')->name('pages.seo-checklist.templates.store')->middleware('permission:SEO Checklist');

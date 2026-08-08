@@ -276,7 +276,7 @@
                                             </select>
                                         </div>
                                         <button type="submit" class="btn btn-sm btn-outline-primary">Сохранить</button>
-                                        <a href="{{ route('pages.seo-checklist.team') }}" class="btn btn-sm btn-link px-1">Управление</a>
+                                        <a href="{{ route('profile.index') }}#team" class="btn btn-sm btn-link px-1">Управление</a>
                                     </div>
                                     <div class="form-text">Участники команды увидят отчёты этого сайта в Аудите.</div>
                                 </form>

@@ -1631,28 +1631,27 @@ class SeoReportsController extends Controller
         }
 
         $teamId = (int) $request->input('team_id', 0);
+        $toProfile = (string) $request->input('return_to') === 'profile';
+        $back = $toProfile
+            ? redirect()->to(route('profile.index') . '#team')
+            : redirect()->route('pages.seo-reports.show', ['id' => $project->id]);
+
         if ($teamId < 1) {
             $project->team_id = null;
             $project->save();
 
-            return redirect()
-                ->route('pages.seo-reports.show', ['id' => $project->id])
-                ->with('success', __('Team detached from report project'));
+            return $back->with($toProfile ? 'status' : 'success', __('Team detached from report project'));
         }
 
         $team = app(SeoChecklistService::class)->findOwnedTeam((int) Auth::id(), $teamId);
         if (!$team) {
-            return redirect()
-                ->route('pages.seo-reports.show', ['id' => $project->id])
-                ->with('error', __('Team not found'));
+            return $back->with('error', __('Team not found'));
         }
 
         $project->team_id = $team->id;
         $project->save();
 
-        return redirect()
-            ->route('pages.seo-reports.show', ['id' => $project->id])
-            ->with('success', __('Team assigned to report project'));
+        return $back->with($toProfile ? 'status' : 'success', __('Team assigned to report project'));
     }
 
     /**

@@ -445,16 +445,18 @@ class SeoChecklistController extends Controller
             $request->input('description')
         );
 
-        return redirect()
-            ->route('pages.seo-checklist.team')
-            ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? __('SEO checklist team created') : ($result['message'] ?? __('Error')));
+        return $this->teamRedirect(
+            $request,
+            $result['ok'] ? 'success' : 'error',
+            $result['ok'] ? __('SEO checklist team created') : ($result['message'] ?? __('Error'))
+        );
     }
 
     public function updateTeamMeta(Request $request, int $teamId): RedirectResponse
     {
         $team = $this->service->findOwnedTeam((int) Auth::id(), $teamId);
         if (!$team) {
-            return redirect()->route('pages.seo-checklist.team')->with('error', __('Team not found'));
+            return $this->teamRedirect($request, 'error', __('Team not found'));
         }
 
         $result = $this->service->updateTeam(
@@ -463,30 +465,34 @@ class SeoChecklistController extends Controller
             $request->input('description')
         );
 
-        return redirect()
-            ->route('pages.seo-checklist.team')
-            ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? __('Saved') : ($result['message'] ?? __('Error')));
+        return $this->teamRedirect(
+            $request,
+            $result['ok'] ? 'success' : 'error',
+            $result['ok'] ? __('Saved') : ($result['message'] ?? __('Error'))
+        );
     }
 
-    public function destroyTeam(int $teamId): RedirectResponse
+    public function destroyTeam(Request $request, int $teamId): RedirectResponse
     {
         $team = $this->service->findOwnedTeam((int) Auth::id(), $teamId);
         if (!$team) {
-            return redirect()->route('pages.seo-checklist.team')->with('error', __('Team not found'));
+            return $this->teamRedirect($request, 'error', __('Team not found'));
         }
 
         $result = $this->service->deleteTeam($team);
 
-        return redirect()
-            ->route('pages.seo-checklist.team')
-            ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? __('SEO checklist team deleted') : ($result['message'] ?? __('Error')));
+        return $this->teamRedirect(
+            $request,
+            $result['ok'] ? 'success' : 'error',
+            $result['ok'] ? __('SEO checklist team deleted') : ($result['message'] ?? __('Error'))
+        );
     }
 
     public function storeTeamMember(Request $request, int $teamId): RedirectResponse
     {
         $team = $this->service->findOwnedTeam((int) Auth::id(), $teamId);
         if (!$team) {
-            return redirect()->route('pages.seo-checklist.team')->with('error', __('Team not found'));
+            return $this->teamRedirect($request, 'error', __('Team not found'));
         }
 
         $role = (string) $request->input('role', 'participant');
@@ -499,47 +505,56 @@ class SeoChecklistController extends Controller
             $result = ['ok' => false, 'message' => __('User not found')];
         }
 
-        return redirect()
-            ->route('pages.seo-checklist.team')
-            ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? __('Member added') : ($result['message'] ?? __('Error')));
+        return $this->teamRedirect(
+            $request,
+            $result['ok'] ? 'success' : 'error',
+            $result['ok'] ? __('Member added') : ($result['message'] ?? __('Error'))
+        );
     }
 
     public function updateTeamMember(Request $request, int $teamId, int $memberId): RedirectResponse
     {
         $team = $this->service->findOwnedTeam((int) Auth::id(), $teamId);
         if (!$team) {
-            return redirect()->route('pages.seo-checklist.team')->with('error', __('Team not found'));
+            return $this->teamRedirect($request, 'error', __('Team not found'));
         }
 
         $result = $this->service->updateTeamMemberRole($team, $memberId, (string) $request->input('role', 'participant'));
 
-        return redirect()
-            ->route('pages.seo-checklist.team')
-            ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? __('Saved') : ($result['message'] ?? __('Error')));
+        return $this->teamRedirect(
+            $request,
+            $result['ok'] ? 'success' : 'error',
+            $result['ok'] ? __('Saved') : ($result['message'] ?? __('Error'))
+        );
     }
 
-    public function destroyTeamMember(int $teamId, int $memberId): RedirectResponse
+    public function destroyTeamMember(Request $request, int $teamId, int $memberId): RedirectResponse
     {
         $team = $this->service->findOwnedTeam((int) Auth::id(), $teamId);
         if (!$team) {
-            return redirect()->route('pages.seo-checklist.team')->with('error', __('Team not found'));
+            return $this->teamRedirect($request, 'error', __('Team not found'));
         }
 
         $result = $this->service->removeTeamMember($team, $memberId);
 
-        return redirect()
-            ->route('pages.seo-checklist.team')
-            ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? __('Member removed') : ($result['message'] ?? __('Error')));
+        return $this->teamRedirect(
+            $request,
+            $result['ok'] ? 'success' : 'error',
+            $result['ok'] ? __('Member removed') : ($result['message'] ?? __('Error'))
+        );
     }
 
     public function assignProjectTeam(Request $request, int $id): RedirectResponse
     {
         $project = $this->findManageableProject($id);
         if (!$project) {
-            return redirect()->route('pages.seo-checklist.team')->with('error', __('Project not found'));
+            return $this->teamRedirect($request, 'error', __('Project not found'));
         }
 
         $teamId = $request->filled('team_id') ? (int) $request->input('team_id') : null;
+        if ($teamId === 0) {
+            $teamId = null;
+        }
         $result = $this->service->assignTeamToProject($project, $teamId);
 
         if ((string) $request->input('return_to') === 'show') {
@@ -548,9 +563,24 @@ class SeoChecklistController extends Controller
                 ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? __('SEO checklist team assigned') : ($result['message'] ?? __('Error')));
         }
 
+        return $this->teamRedirect(
+            $request,
+            $result['ok'] ? 'success' : 'error',
+            $result['ok'] ? __('SEO checklist team assigned') : ($result['message'] ?? __('Error'))
+        );
+    }
+
+    private function teamRedirect(Request $request, string $flashKey, string $message): RedirectResponse
+    {
+        if ((string) $request->input('return_to') === 'profile') {
+            return redirect()
+                ->to(route('profile.index') . '#team')
+                ->with($flashKey === 'success' ? 'status' : $flashKey, $message);
+        }
+
         return redirect()
             ->route('pages.seo-checklist.team')
-            ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? __('SEO checklist team assigned') : ($result['message'] ?? __('Error')));
+            ->with($flashKey, $message);
     }
 
     public function store(Request $request): RedirectResponse

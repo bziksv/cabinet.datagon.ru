@@ -680,5 +680,11 @@
     "Users notify event ideas created title": "New idea",
     "Users notify event ideas created trigger": "User submitted an idea for moderation",
     "Users notify event ideas created audience": "admin and Super Admin with Telegram connected",
-    "Users notify event ideas created tg example": "💡 New idea pending moderation…"
+    "Users notify event ideas created tg example": "💡 New idea pending moderation…",
+    "My team": "My team",
+    "Profile team lead": "Create a team once — connect it to Checklist, SEO Reports, and Site Audit.",
+    "Connect team to modules": "Connect team to modules",
+    "Profile team modules hint": "Assign a team to projects in Checklist, SEO Reports, and Site Audit. Members get access to those reports.",
+    "Profile team modules empty": "Create projects in modules first — they will appear here for team assignment.",
+    "Team also in profile": "Team management is also available in your profile:"
 }

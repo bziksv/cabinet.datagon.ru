@@ -148,7 +148,7 @@
                                 </select>
                             </div>
                             <button type="submit" class="btn btn-outline-primary btn-sm">{{ __('Save') }}</button>
-                            <a class="btn btn-link btn-sm" href="{{ route('pages.seo-checklist.team') }}">{{ __('Manage teams') }}</a>
+                            <a class="btn btn-link btn-sm" href="{{ route('profile.index') }}#team">{{ __('Manage teams') }}</a>
                         </div>
                     </form>
                     @if(!empty($assignedTeam))

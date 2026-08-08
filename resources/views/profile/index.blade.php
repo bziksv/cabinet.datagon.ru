@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.css') }}">
     <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.css') }}">
     <link rel="stylesheet" href="{{ asset('css/cabinet-profile.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/cabinet-seo-checklist.css') }}?v={{ @filemtime(public_path('css/cabinet-seo-checklist.css')) ?: time() }}">
 @endsection
 
 @section('content')
@@ -78,6 +79,16 @@
                                     </button>
                                 </li>
                             @endhasanyrole
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="profile-team-tab" data-bs-toggle="tab"
+                                        data-bs-target="#profile-team" type="button" role="tab"
+                                        aria-controls="profile-team" aria-selected="false">
+                                    <i class="bi bi-people me-1"></i>{{ __('My team') }}
+                                    @if(!empty($teams) && $teams->count() > 0)
+                                        <span class="badge text-bg-secondary ms-1">{{ $teams->count() }}</span>
+                                    @endif
+                                </button>
+                            </li>
                         </ul>
                     </div>
                     <div class="card-body">
@@ -261,6 +272,29 @@
                                     @include('profile._tariff', ['embedded' => true])
                                 </div>
                             @endhasanyrole
+
+                            <div class="tab-pane fade" id="profile-team" role="tabpanel" aria-labelledby="profile-team-tab" tabindex="0">
+                                @if(empty($teamReady))
+                                    <div class="alert alert-light border small mb-0">{{ __('Teams are not available') }}</div>
+                                @else
+                                    <div class="cabinet-sc-page" data-sc-hub="team">
+                                        @include('pages.partials.seo-checklist-team-body', [
+                                            'teams' => $teams ?? collect(),
+                                            'teamRoleLabels' => $teamRoleLabels ?? [],
+                                            'teamCandidates' => $teamCandidates ?? collect(),
+                                            'returnTo' => 'profile',
+                                            'showChecklistAssign' => false,
+                                            'teamsLead' => __('Profile team lead'),
+                                        ])
+                                        @include('profile.partials.team-module-assign', [
+                                            'teams' => $teams ?? collect(),
+                                            'checklistProjects' => $checklistProjects ?? collect(),
+                                            'seoReportProjects' => $seoReportProjects ?? collect(),
+                                            'siteAuditProjects' => $siteAuditProjects ?? collect(),
+                                        ])
+                                    </div>
+                                @endif
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -289,7 +323,8 @@
                     password: 'profile-password-tab',
                     telegram: 'profile-telegram-tab',
                     notifications: 'profile-notifications-tab',
-                    tariff: 'profile-tariff-tab'
+                    tariff: 'profile-tariff-tab',
+                    team: 'profile-team-tab'
                 };
                 var id = map[hash];
                 if (!id) {
@@ -332,6 +367,8 @@
                             history.replaceState(null, '', '#notifications');
                         } else if (target === '#profile-tariff') {
                             history.replaceState(null, '', '#tariff');
+                        } else if (target === '#profile-team') {
+                            history.replaceState(null, '', '#team');
                         } else {
                             history.replaceState(null, '', window.location.pathname);
                         }
@@ -401,4 +438,5 @@
             });
         })(jQuery);
     </script>
+    <script src="{{ asset('js/cabinet-seo-checklist-hub.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-hub.js')) ?: time() }}"></script>
 @endsection

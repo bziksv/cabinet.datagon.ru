@@ -229,7 +229,7 @@
                             </div>
                             <p class="cabinet-sc-team__hint small text-secondary mb-2">
                                 {{ __('SEO checklist assign team hint') }}
-                                <a href="{{ route('pages.seo-checklist.team') }}">{{ __('Manage teams') }}</a>
+                                <a href="{{ route('profile.index') }}#team">{{ __('Manage teams') }}</a>
                             </p>
                             <button type="submit" class="btn btn-sm btn-primary">{{ __('Save') }}</button>
                         </form>

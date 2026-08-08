@@ -18,6 +18,7 @@ use App\Services\SiteAudit\SiteAuditExternalPlagiarismRunner;
 use App\Services\SiteAudit\SiteAuditGlobalCap;
 use App\Services\SiteAudit\SiteAuditLinkReferrers;
 use App\Services\SiteAudit\SiteAuditUserAgentSession;
+use App\Services\SeoChecklist\SeoChecklistService;
 use App\SiteAuditCrawl;
 use App\SiteAuditFinding;
 use App\SiteAuditFindingNote;
@@ -30,6 +31,7 @@ use App\Support\SiteAuditLimits;
 use App\Support\TextUniquenessLimits;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -52,9 +54,21 @@ class SiteAuditController extends Controller
         $projects = collect();
         $crawls = collect();
 
+        $checklistTeams = collect();
+        $teamAccessReady = SiteAuditProject::teamColumnReady()
+            && class_exists(SeoChecklistService::class)
+            && \App\SeoChecklist\SeoChecklistTeam::tableReady();
+
         if ($user && ! DemoCabinet::isCurrentUser()) {
-            $projects = SiteAuditProject::query()
-                ->where('user_id', $user->id)
+            $teamIds = SiteAuditProject::teamIdsForMember((int) $user->id);
+
+            $projectsQuery = SiteAuditProject::query()
+                ->where(function ($q) use ($user, $teamIds) {
+                    $q->where('user_id', $user->id);
+                    if ($teamIds !== [] && SiteAuditProject::teamColumnReady()) {
+                        $q->orWhereIn('team_id', $teamIds);
+                    }
+                })
                 ->withCount('crawls')
                 ->with(['crawls' => function ($q) {
                     $q->orderByDesc('id')->limit(1)
@@ -62,7 +76,11 @@ class SiteAuditController extends Controller
                             'id', 'project_id', 'user_id', 'status',
                             'pages_total', 'pages_fetched', 'finished_at', 'created_at',
                         ]);
-                }])
+                }]);
+            if (SiteAuditProject::teamColumnReady()) {
+                $projectsQuery->with('team:id,title');
+            }
+            $projects = $projectsQuery
                 ->orderByDesc('id')
                 ->limit(50)
                 ->get();
@@ -70,8 +88,19 @@ class SiteAuditController extends Controller
             $historyDomain = trim((string) $request->input('domain', ''));
 
             $crawlsQuery = SiteAuditCrawl::query()
-                ->where('user_id', $user->id)
-                ->with('project')
+                ->where(function ($q) use ($user, $teamIds) {
+                    $q->where('user_id', $user->id);
+                    if ($teamIds !== [] && SiteAuditProject::teamColumnReady()) {
+                        $q->orWhereHas('project', function ($pq) use ($teamIds) {
+                            $pq->whereIn('team_id', $teamIds);
+                        });
+                    }
+                })
+                ->with(['project' => function ($q) {
+                    if (SiteAuditProject::teamColumnReady()) {
+                        $q->with('team:id,title');
+                    }
+                }])
                 ->orderByDesc('id')
                 ->select([
                     'id', 'project_id', 'user_id', 'status',
@@ -99,6 +128,10 @@ class SiteAuditController extends Controller
                 ->where('user_id', $user->id)
                 ->get()
                 ->keyBy('project_id');
+
+            if ($teamAccessReady) {
+                $checklistTeams = app(SeoChecklistService::class)->teamsForUser((int) $user->id);
+            }
         } else {
             $schedules = collect();
             $crawlSizes = [];
@@ -132,7 +165,54 @@ class SiteAuditController extends Controller
             'historyPurgeNotice' => SiteAuditLimits::historyPurgeNotice($user),
             'findingsCatalog' => config('site_audit.findings', []),
             'bucketLabels' => self::BUCKET_LABELS,
+            'checklistTeams' => $checklistTeams,
+            'teamAccessReady' => $teamAccessReady,
         ]);
+    }
+
+    public function assignProjectTeam(Request $request, int $id): RedirectResponse
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            abort(403);
+        }
+
+        $user = Auth::user();
+        abort_unless($user, 401);
+
+        $project = SiteAuditProject::query()
+            ->where('id', $id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        if (! SiteAuditProject::teamColumnReady()) {
+            return redirect()
+                ->route('pages.site-audit')
+                ->with('error', 'Команды пока недоступны (нужна миграция)');
+        }
+
+        $teamId = (int) $request->input('team_id', 0);
+        if ($teamId < 1) {
+            $project->team_id = null;
+            $project->save();
+
+            return redirect()
+                ->route('pages.site-audit')
+                ->with('status', 'Команда отключена от проекта ' . $project->domain);
+        }
+
+        $team = app(SeoChecklistService::class)->findOwnedTeam((int) $user->id, $teamId);
+        if (! $team) {
+            return redirect()
+                ->route('pages.site-audit')
+                ->with('error', 'Команда не найдена');
+        }
+
+        $project->team_id = $team->id;
+        $project->save();
+
+        return redirect()
+            ->route('pages.site-audit')
+            ->with('status', 'Команда «' . $team->title . '» подключена к ' . $project->domain);
     }
 
     public function showCrawl(int $id): View
@@ -182,9 +262,15 @@ class SiteAuditController extends Controller
 
         $plagiarismRunner = new SiteAuditExternalPlagiarismRunner();
 
+        $project = $crawl->project;
+        if ($project && SiteAuditProject::teamColumnReady()) {
+            $project->loadMissing('team:id,title');
+        }
+
         return view('pages.site-audit-crawl', [
             'crawl' => $crawl,
-            'project' => $crawl->project,
+            'project' => $project,
+            'canManageCrawl' => Auth::user() && (int) $crawl->user_id === (int) Auth::id(),
             'buckets' => $bucketsTech,
             'bucketsAll' => $bucketsAll,
             'bucketsSeo' => $bucketsSeo,
@@ -256,6 +342,7 @@ class SiteAuditController extends Controller
         }
 
         $crawl = $this->ownedCrawl($id);
+        $this->assertCrawlOwner($crawl);
         if ($crawl->status !== SiteAuditCrawl::STATUS_DONE) {
             return response()->json(['error' => 'status', 'message' => 'Только для готового краула'], 422);
         }
@@ -526,6 +613,7 @@ class SiteAuditController extends Controller
         }
 
         $crawl = $this->ownedCrawl($id);
+        $this->assertCrawlOwner($crawl);
         if ($crawl->isFinished()) {
             if ($request->expectsJson()) {
                 return response()->json([
@@ -577,6 +665,7 @@ class SiteAuditController extends Controller
         }
 
         $crawl = $this->ownedCrawl($id);
+        $this->assertCrawlOwner($crawl);
         if (! $crawl->isFinished()) {
             if ($request->expectsJson()) {
                 return response()->json([
@@ -726,6 +815,7 @@ class SiteAuditController extends Controller
         }
 
         $crawl = $this->ownedCrawl($id);
+        $this->assertCrawlOwner($crawl);
         if ($crawl->status !== SiteAuditCrawl::STATUS_DONE) {
             return response()->json(['error' => 'status', 'message' => 'Шаринг только для готового краула'], 422);
         }
@@ -799,6 +889,7 @@ class SiteAuditController extends Controller
         }
 
         $crawl = $this->ownedCrawl($id);
+        $this->assertCrawlOwner($crawl);
         $crawl->share_enabled_at = null;
         // token и white-label настройки оставляем — можно снова включить ту же ссылку
         $crawl->save();
@@ -813,6 +904,7 @@ class SiteAuditController extends Controller
         }
 
         $crawl = $this->ownedCrawl($id);
+        $this->assertCrawlOwner($crawl);
         if ($crawl->status !== SiteAuditCrawl::STATUS_DONE) {
             return response()->json(['error' => 'status', 'message' => 'План только для готового краула'], 422);
         }
@@ -1094,6 +1186,7 @@ class SiteAuditController extends Controller
         }
 
         $crawl = $this->ownedCrawl($id);
+        $this->assertCrawlOwner($crawl);
         $engine = new \App\Services\SiteAudit\SiteAuditCrawlEngine();
 
         try {
@@ -1140,6 +1233,7 @@ class SiteAuditController extends Controller
         }
 
         $source = $this->ownedCrawl($id);
+        $this->assertCrawlOwner($source);
         $project = $source->project;
         if (! $project || ! $project->domain) {
             if ($request->expectsJson()) {
@@ -1568,9 +1662,7 @@ class SiteAuditController extends Controller
             'share_white_label', 'share_brand_name', 'share_brand_url', 'share_brand_logo',
         ];
 
-        $query = SiteAuditCrawl::query()
-            ->where('id', $id)
-            ->where('user_id', $user->id);
+        $query = SiteAuditCrawl::query()->where('id', $id);
 
         // Полный progress_json тянет landings/sitemap (100+ KB) — на remote DB это секунды.
         if ($withProgress && $slimProgress) {
@@ -1578,16 +1670,47 @@ class SiteAuditController extends Controller
                 return 'site_audit_crawls.' . $c;
             }, $base));
 
-            return $query
+            $crawl = $query
                 ->selectRaw("{$cols}, JSON_REMOVE(site_audit_crawls.progress_json, '\$.landings', '\$.sitemap', '\$.robots') as progress_json")
                 ->firstOrFail();
+        } elseif (! $withProgress) {
+            $crawl = $query->firstOrFail($base);
+        } else {
+            $crawl = $query->firstOrFail();
         }
 
-        if (! $withProgress) {
-            return $query->firstOrFail($base);
+        $this->assertCrawlAccessible($crawl, (int) $user->id);
+
+        return $crawl;
+    }
+
+    private function assertCrawlAccessible(SiteAuditCrawl $crawl, int $userId): void
+    {
+        if ((int) $crawl->user_id === $userId) {
+            return;
         }
 
-        return $query->firstOrFail();
+        $project = $crawl->relationLoaded('project')
+            ? $crawl->project
+            : SiteAuditProject::query()->find($crawl->project_id);
+
+        abort_unless($project && $project->isAccessibleBy($userId), 403);
+    }
+
+    private function assertCrawlOwner(SiteAuditCrawl $crawl): void
+    {
+        $user = Auth::user();
+        abort_unless($user, 401);
+
+        if ((int) $crawl->user_id === (int) $user->id) {
+            return;
+        }
+
+        $project = $crawl->relationLoaded('project')
+            ? $crawl->project
+            : SiteAuditProject::query()->find($crawl->project_id);
+
+        abort_unless($project && $project->canManageBy((int) $user->id), 403);
     }
 
     /**

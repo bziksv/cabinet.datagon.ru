@@ -281,6 +281,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('site-audit', 'SiteAuditController@index')->name('pages.site-audit')->middleware('permission:Site audit');
     Route::post('site-audit/start', 'SiteAuditController@start')->name('pages.site-audit.start')->middleware('permission:Site audit');
     Route::delete('site-audit/project/{id}', 'SiteAuditController@destroyProject')->name('pages.site-audit.project.destroy')->middleware('permission:Site audit');
+    Route::post('site-audit/project/{id}/team', 'SiteAuditController@assignProjectTeam')->name('pages.site-audit.project.team')->middleware('permission:Site audit');
     Route::post('site-audit/project/{id}/schedule', 'SiteAuditController@saveSchedule')->name('pages.site-audit.schedule')->middleware('permission:Site audit');
     Route::get('site-audit/crawl/{id}', 'SiteAuditController@showCrawl')->name('pages.site-audit.crawl.show')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/repeat', 'SiteAuditController@repeatCrawl')->name('pages.site-audit.crawl.repeat')->middleware('permission:Site audit');

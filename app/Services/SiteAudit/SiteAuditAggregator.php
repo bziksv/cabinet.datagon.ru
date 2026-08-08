@@ -6,12 +6,47 @@ use App\SiteAuditCrawl;
 use App\SiteAuditCrawlStat;
 use App\SiteAuditFinding;
 use App\SiteAuditPage;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 class SiteAuditAggregator
 {
+    /** Порядок этапов агрегации (тяжёлые режутся тиками внутри этапа). */
+    private const STAGES = [
+        'cleanup',
+        'duplicates_title',
+        'duplicates_description',
+        'duplicates_content',
+        'similar_pages',
+        'from_pages',
+        'redirect_loops',
+        'duplicate_url_variants',
+        'orphans',
+        'no_outbound',
+        'url_param_risks',
+        'broken_links',
+        'image_assets',
+        'lost_files',
+        'incremental_head',
+        'error_spikes',
+        'click_depth',
+        'sitemap_coverage',
+        'landing_coverage',
+        'landing_plagiarism',
+        'landing_no_inbound',
+        'cannibalization',
+        'ad_cannibalization',
+        'landing_query_match',
+        'availability',
+        'serp_index',
+        'serp_snippets',
+        'serp_cannibalization',
+        'psi',
+        'finalize',
+    ];
+
     /** Коды, которые считаются только на этапе aggregate (можно пересчитать) */
     private const AGGREGATE_CODES = [
         'duplicate_title',
@@ -70,41 +105,266 @@ class SiteAuditAggregator
         'redirect_loop',
     ];
 
+    /**
+     * Полная агрегация синхронно (CLI reaggregate). Крупные краулы тоже идут этапами, но без паузы очереди.
+     */
     public function aggregate(SiteAuditCrawl $crawl, bool $notify = true): void
     {
-        SiteAuditFinding::query()
-            ->where('crawl_id', $crawl->id)
-            ->whereIn('code', self::AGGREGATE_CODES)
-            ->delete();
+        $this->resetAggregateState($crawl, $notify);
+        if ($crawl->status !== SiteAuditCrawl::STATUS_AGGREGATING) {
+            $crawl->status = SiteAuditCrawl::STATUS_AGGREGATING;
+            $crawl->error = null;
+            $crawl->save();
+        }
+        while ($this->processTick($crawl, $notify, 86400.0)) {
+            // следующий этап / кусок
+        }
+    }
 
-        $this->emitDuplicates($crawl->id, 'title_hash', 'duplicate_title');
-        $this->emitDuplicates($crawl->id, 'description_hash', 'duplicate_description');
-        $this->emitDuplicates($crawl->id, 'content_hash', 'duplicate_content');
-        $this->emitSimilarPages($crawl->id);
-        $this->emitFromPages($crawl->id);
-        $this->emitRedirectLoops($crawl->id);
-        $this->emitDuplicateUrlVariants($crawl->id);
-        $this->emitOrphans($crawl->id);
-        $this->emitNoOutboundInternal($crawl->id);
-        $this->emitUrlParamRisks($crawl->id);
-        $this->emitBrokenLinks($crawl);
-        $this->emitImageAssets($crawl);
-        $this->emitLostFiles($crawl);
-        $this->copyIncrementalHeadFindings($crawl);
-        $this->emitErrorSpikes($crawl);
-        $depthMeta = $this->emitClickDepth($crawl->id);
-        $this->emitSitemapCoverage($crawl);
-        $this->emitLandingCoverage($crawl);
-        $this->emitLandingPlagiarismLite($crawl);
-        $this->emitLandingNoInbound($crawl);
-        (new SiteAuditCannibalizationProbe())->run($crawl);
-        (new SiteAuditAdCannibalizationProbe())->run($crawl);
-        (new SiteAuditLandingQueryMatchProbe())->run($crawl);
-        (new SiteAuditAvailabilityProbe())->run($crawl);
-        (new SiteAuditSerpIndexProbe())->run($crawl);
-        (new SiteAuditSerpSnippetsProbe())->run($crawl);
-        (new SiteAuditSerpCannibalizationProbe())->run($crawl);
-        (new SiteAuditPsiProbe())->run($crawl);
+    /**
+     * Один тик агрегации. @return bool true — нужно продолжить (ещё этапы/куски)
+     */
+    public function processTick(SiteAuditCrawl $crawl, bool $notify = true, ?float $budgetSeconds = null): bool
+    {
+        $budget = $budgetSeconds ?? (float) config('site_audit.aggregate_tick_seconds', 150);
+        $budget = max(30.0, $budget);
+        $started = microtime(true);
+        $deadline = $started + $budget;
+
+        $state = $this->getAggregateState($crawl);
+        if (($state['stage'] ?? '') === '' || ($state['stage'] ?? '') === 'done') {
+            // уже финализировали — или холодный старт после failed
+            if (($state['stage'] ?? '') === 'done' && $crawl->status === SiteAuditCrawl::STATUS_DONE) {
+                return false;
+            }
+            $state = $this->freshAggregateState($notify);
+            $this->putAggregateState($crawl, $state);
+        } else {
+            $state['notify'] = $notify;
+        }
+
+        while (($state['stage'] ?? 'done') !== 'done') {
+            $moreInStage = $this->runStage($crawl, $state, $deadline);
+            $this->putAggregateState($crawl, $state);
+            $this->heartbeatAggregate($crawl, $state);
+
+            if ($moreInStage) {
+                return true;
+            }
+
+            $state['stage'] = $this->nextStage((string) $state['stage']);
+            $state['meta'] = [];
+            $state['tick'] = (int) ($state['tick'] ?? 0) + 1;
+            $this->putAggregateState($crawl, $state);
+            $this->heartbeatAggregate($crawl, $state);
+
+            if (($state['stage'] ?? 'done') === 'done') {
+                return false;
+            }
+
+            if (microtime(true) >= $deadline) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function freshAggregateState(bool $notify): array
+    {
+        return [
+            'stage' => self::STAGES[0],
+            'meta' => [],
+            'tick' => 0,
+            'notify' => $notify,
+            'depth' => [],
+            'started_at' => now()->toDateTimeString(),
+        ];
+    }
+
+    public function resetAggregateState(SiteAuditCrawl $crawl, bool $notify = true): void
+    {
+        Cache::forget($this->brokenLinksCacheKey((int) $crawl->id));
+        Cache::forget($this->brokenLinksCacheKey((int) $crawl->id) . '_head');
+        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+        $progress['aggregate'] = $this->freshAggregateState($notify);
+        $crawl->progress_json = $progress;
+        $crawl->save();
+    }
+
+    private function getAggregateState(SiteAuditCrawl $crawl): array
+    {
+        $crawl->refresh();
+        $state = $crawl->progress_json['aggregate'] ?? null;
+
+        return is_array($state) ? $state : [];
+    }
+
+    private function putAggregateState(SiteAuditCrawl $crawl, array $state): void
+    {
+        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+        $progress['aggregate'] = $state;
+        $crawl->progress_json = $progress;
+        // updated_at трогаем в heartbeat
+        $crawl->save();
+    }
+
+    private function heartbeatAggregate(SiteAuditCrawl $crawl, array $state): void
+    {
+        $crawl->updated_at = now();
+        if ($crawl->status !== SiteAuditCrawl::STATUS_AGGREGATING
+            && ! $crawl->isFinished()
+        ) {
+            $crawl->status = SiteAuditCrawl::STATUS_AGGREGATING;
+        }
+        $crawl->save();
+        Log::info('SiteAudit aggregate tick', [
+            'crawl_id' => $crawl->id,
+            'stage' => $state['stage'] ?? null,
+            'tick' => $state['tick'] ?? null,
+        ]);
+    }
+
+    private function nextStage(string $stage): string
+    {
+        $i = array_search($stage, self::STAGES, true);
+        if ($i === false) {
+            return 'done';
+        }
+        $next = $i + 1;
+        if ($next >= count(self::STAGES)) {
+            return 'done';
+        }
+
+        return self::STAGES[$next];
+    }
+
+    /**
+     * @return bool true если этап ещё не закончен (нужен ещё тик на том же stage)
+     */
+    private function runStage(SiteAuditCrawl $crawl, array &$state, float $deadline): bool
+    {
+        $stage = (string) ($state['stage'] ?? '');
+        $meta = is_array($state['meta'] ?? null) ? $state['meta'] : [];
+
+        switch ($stage) {
+            case 'cleanup':
+                SiteAuditFinding::query()
+                    ->where('crawl_id', $crawl->id)
+                    ->whereIn('code', self::AGGREGATE_CODES)
+                    ->delete();
+                Cache::forget($this->brokenLinksCacheKey((int) $crawl->id));
+                Cache::forget($this->brokenLinksCacheKey((int) $crawl->id) . '_head');
+                break;
+            case 'duplicates_title':
+                $this->emitDuplicates($crawl->id, 'title_hash', 'duplicate_title');
+                break;
+            case 'duplicates_description':
+                $this->emitDuplicates($crawl->id, 'description_hash', 'duplicate_description');
+                break;
+            case 'duplicates_content':
+                $this->emitDuplicates($crawl->id, 'content_hash', 'duplicate_content');
+                break;
+            case 'similar_pages':
+                $this->emitSimilarPages($crawl->id);
+                break;
+            case 'from_pages':
+                $more = $this->emitFromPages($crawl->id, $meta, $deadline);
+                $state['meta'] = $meta;
+
+                return $more;
+            case 'redirect_loops':
+                $this->emitRedirectLoops($crawl->id);
+                break;
+            case 'duplicate_url_variants':
+                $this->emitDuplicateUrlVariants($crawl->id);
+                break;
+            case 'orphans':
+                $this->emitOrphans($crawl->id);
+                break;
+            case 'no_outbound':
+                $this->emitNoOutboundInternal($crawl->id);
+                break;
+            case 'url_param_risks':
+                $this->emitUrlParamRisks($crawl->id);
+                break;
+            case 'broken_links':
+                $more = $this->emitBrokenLinks($crawl, $meta, $deadline);
+                $state['meta'] = $meta;
+
+                return $more;
+            case 'image_assets':
+                $this->emitImageAssets($crawl);
+                break;
+            case 'lost_files':
+                $this->emitLostFiles($crawl);
+                break;
+            case 'incremental_head':
+                $this->copyIncrementalHeadFindings($crawl);
+                break;
+            case 'error_spikes':
+                $this->emitErrorSpikes($crawl);
+                break;
+            case 'click_depth':
+                $state['depth'] = $this->emitClickDepth($crawl->id);
+                break;
+            case 'sitemap_coverage':
+                $this->emitSitemapCoverage($crawl);
+                break;
+            case 'landing_coverage':
+                $this->emitLandingCoverage($crawl);
+                break;
+            case 'landing_plagiarism':
+                $this->emitLandingPlagiarismLite($crawl);
+                break;
+            case 'landing_no_inbound':
+                $this->emitLandingNoInbound($crawl);
+                break;
+            case 'cannibalization':
+                (new SiteAuditCannibalizationProbe())->run($crawl);
+                break;
+            case 'ad_cannibalization':
+                (new SiteAuditAdCannibalizationProbe())->run($crawl);
+                break;
+            case 'landing_query_match':
+                (new SiteAuditLandingQueryMatchProbe())->run($crawl);
+                break;
+            case 'availability':
+                (new SiteAuditAvailabilityProbe())->run($crawl);
+                break;
+            case 'serp_index':
+                (new SiteAuditSerpIndexProbe())->run($crawl);
+                break;
+            case 'serp_snippets':
+                (new SiteAuditSerpSnippetsProbe())->run($crawl);
+                break;
+            case 'serp_cannibalization':
+                (new SiteAuditSerpCannibalizationProbe())->run($crawl);
+                break;
+            case 'psi':
+                (new SiteAuditPsiProbe())->run($crawl);
+                break;
+            case 'finalize':
+                $this->finalizeAggregate($crawl, $state);
+                $state['stage'] = 'done';
+                break;
+            default:
+                Log::warning('SiteAudit unknown aggregate stage', [
+                    'crawl_id' => $crawl->id,
+                    'stage' => $stage,
+                ]);
+                break;
+        }
+
+        $state['meta'] = [];
+
+        return false;
+    }
+
+    private function finalizeAggregate(SiteAuditCrawl $crawl, array $state): void
+    {
+        $depthMeta = is_array($state['depth'] ?? null) ? $state['depth'] : [];
+        $notify = (bool) ($state['notify'] ?? true);
 
         $buckets = [
             'critical' => 0,
@@ -149,8 +409,11 @@ class SiteAuditAggregator
         $crawl->buckets_json = $buckets;
         $crawl->counts_json = $byCode;
         $crawl->status = SiteAuditCrawl::STATUS_DONE;
+        $crawl->error = null;
         $crawl->finished_at = now();
         $crawl->save();
+
+        Cache::forget($this->brokenLinksCacheKey((int) $crawl->id));
 
         try {
             (new SiteAuditPruner())->pruneProject((int) $crawl->project_id);
@@ -167,19 +430,39 @@ class SiteAuditAggregator
         SiteAuditGlobalCap::promoteWaiting();
     }
 
-    private function emitFromPages(int $crawlId): void
+    private function brokenLinksCacheKey(int $crawlId): string
+    {
+        return 'site_audit_agg_broken_' . $crawlId;
+    }
+
+    /**
+     * @param array<string,mixed> $meta
+     * @return bool true = ещё есть страницы
+     */
+    private function emitFromPages(int $crawlId, array &$meta = [], ?float $deadline = null): bool
     {
         $thin = (int) config('site_audit.thin_words', 150);
         $titleMin = (int) config('site_audit.title_min', 30);
         $titleMax = (int) config('site_audit.title_max', 70);
         $descMin = (int) config('site_audit.description_min', 70);
         $descMax = (int) config('site_audit.description_max', 160);
+        $chunkSize = max(50, (int) config('site_audit.aggregate_from_pages_chunk', 200));
+        $afterId = (int) ($meta['after_id'] ?? 0);
 
-        SiteAuditPage::query()
-            ->where('crawl_id', $crawlId)
-            ->orderBy('id')
-            ->chunkById(200, function ($pages) use ($crawlId, $thin, $titleMin, $titleMax, $descMin, $descMax) {
-                foreach ($pages as $page) {
+        while (true) {
+            $pages = SiteAuditPage::query()
+                ->where('crawl_id', $crawlId)
+                ->where('id', '>', $afterId)
+                ->orderBy('id')
+                ->limit($chunkSize)
+                ->get();
+
+            if ($pages->isEmpty()) {
+                return false;
+            }
+
+            foreach ($pages as $page) {
+                $afterId = (int) $page->id;
                     // SEO/контент-находки только для успешно открытых HTML-страниц.
                     // На 4xx/5xx/unreachable HTML не парсился → img/title = 0 по умолчанию,
                     // иначе «Нет уникальных изображений» и т.п. заливают весь отчёт битыми URL.
@@ -374,8 +657,15 @@ class SiteAuditAggregator
                     foreach ($findings as $f) {
                         SiteAuditFinding::query()->create($f);
                     }
-                }
-            });
+            }
+
+            $meta['after_id'] = $afterId;
+            if ($deadline !== null && microtime(true) >= $deadline) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function looksLikeSoft404(SiteAuditPage $page, int $thin): bool
@@ -1062,165 +1352,216 @@ class SiteAuditAggregator
         }
     }
 
-    private function emitBrokenLinks(SiteAuditCrawl $crawl): void
+    /**
+     * Битые ссылки чанками: индекс URL лёгкий, out_links — порциями, uniqueBroken в Cache.
+     *
+     * @param array<string,mixed> $meta
+     * @return bool true = ещё есть страницы
+     */
+    private function emitBrokenLinks(SiteAuditCrawl $crawl, array &$meta = [], ?float $deadline = null): bool
     {
         $settings = is_array($crawl->progress_json['settings'] ?? null)
             ? $crawl->progress_json['settings']
             : [];
         if (array_key_exists('check_broken_links', $settings) && ! $settings['check_broken_links']) {
-            return;
+            return false;
         }
 
-        $pages = SiteAuditPage::query()
+        $chunkSize = max(50, (int) config('site_audit.aggregate_broken_links_chunk', 250));
+        $afterId = (int) ($meta['after_id'] ?? 0);
+        $cacheKey = $this->brokenLinksCacheKey((int) $crawl->id);
+
+        // Лёгкий индекс всех URL краула (без out_links) — для сверки целей.
+        $indexRows = SiteAuditPage::query()
             ->where('crawl_id', $crawl->id)
-            ->get(['id', 'url', 'url_hash', 'out_links_json', 'status_code', 'content_unchanged']);
-
-        if ($pages->isEmpty()) {
-            return;
+            ->get(['url', 'url_hash', 'status_code']);
+        if ($indexRows->isEmpty()) {
+            return false;
         }
-
         $byUrl = [];
         $byHash = [];
-        foreach ($pages as $page) {
-            $byUrl[$page->url] = $page;
-            $byHash[$page->url_hash] = $page;
+        foreach ($indexRows as $row) {
+            $byUrl[$row->url] = $row;
+            $byHash[$row->url_hash] = $row;
         }
+        unset($indexRows);
 
         $maxHead = (int) config('site_audit.broken_link_head_max', 40);
         $checker = new SiteAuditLinkChecker();
-        $headCache = [];
-        $headBudget = $maxHead;
+        $headCacheKey = $cacheKey . '_head';
+        $headCache = Cache::get($headCacheKey);
+        if (! is_array($headCache)) {
+            $headCache = [];
+        }
+        $headBudget = array_key_exists('head_budget', $meta)
+            ? (int) $meta['head_budget']
+            : $maxHead;
         $skipUnchangedHead = config('site_audit.incremental_by_content_hash', true);
 
         $pageSev = config('site_audit.findings.page_has_broken_links.severity', 'warning');
         $linkSev = config('site_audit.findings.broken_internal_link.severity', 'critical');
 
-        // Один битый URL → один finding (а не N копий по числу страниц со ссылкой).
-        // brokenUrl => ['status'=>?, 'source'=>?, 'from'=>[pageUrl...]]
-        $uniqueBroken = [];
+        $uniqueBroken = Cache::get($cacheKey);
+        if (! is_array($uniqueBroken)) {
+            $uniqueBroken = [];
+        }
 
-        foreach ($pages as $page) {
-            $outs = is_array($page->out_links_json) ? $page->out_links_json : [];
-            if (! $outs) {
-                continue;
+        while (true) {
+            $pages = SiteAuditPage::query()
+                ->where('crawl_id', $crawl->id)
+                ->where('id', '>', $afterId)
+                ->orderBy('id')
+                ->limit($chunkSize)
+                ->get(['id', 'url', 'url_hash', 'out_links_json', 'status_code', 'content_unchanged']);
+
+            if ($pages->isEmpty()) {
+                $this->flushBrokenLinkFindings($crawl->id, $uniqueBroken, $linkSev);
+                Cache::forget($cacheKey);
+                Cache::forget($headCacheKey);
+                $meta = [];
+
+                return false;
             }
-            $pageUnchanged = $skipUnchangedHead && ! empty($page->content_unchanged);
 
-            $brokenSamples = [];
-            foreach ($outs as $out) {
-                $out = (string) $out;
-                if ($out === '' || (strlen($out) === 64 && ctype_xdigit($out))) {
-                    // старый формат hash — только сверка с краулом
-                    if (isset($byHash[$out])) {
-                        $target = $byHash[$out];
+            foreach ($pages as $page) {
+                $afterId = (int) $page->id;
+                $outs = is_array($page->out_links_json) ? $page->out_links_json : [];
+                if (! $outs) {
+                    continue;
+                }
+                $pageUnchanged = $skipUnchangedHead && ! empty($page->content_unchanged);
+
+                $brokenSamples = [];
+                foreach ($outs as $out) {
+                    $out = (string) $out;
+                    if ($out === '' || (strlen($out) === 64 && ctype_xdigit($out))) {
+                        if (isset($byHash[$out])) {
+                            $target = $byHash[$out];
+                            $code = $target->status_code;
+                            if ($code === null || (int) $code >= 400) {
+                                $brokenSamples[] = [
+                                    'url' => $target->url,
+                                    'status' => $code !== null ? (int) $code : null,
+                                    'source' => 'crawl',
+                                ];
+                            }
+                        }
+                        continue;
+                    }
+
+                    if (isset($byUrl[$out])) {
+                        $target = $byUrl[$out];
                         $code = $target->status_code;
                         if ($code === null || (int) $code >= 400) {
                             $brokenSamples[] = [
-                                'url' => $target->url,
+                                'url' => $out,
                                 'status' => $code !== null ? (int) $code : null,
                                 'source' => 'crawl',
                             ];
                         }
+                        continue;
                     }
-                    continue;
-                }
 
-                if (isset($byUrl[$out])) {
-                    $target = $byUrl[$out];
-                    $code = $target->status_code;
-                    if ($code === null || (int) $code >= 400) {
+                    $h = SiteAuditUrlNormalizer::hash($out);
+                    if (isset($byHash[$h])) {
+                        $target = $byHash[$h];
+                        $code = $target->status_code;
+                        if ($code === null || (int) $code >= 400) {
+                            $brokenSamples[] = [
+                                'url' => $out,
+                                'status' => $code !== null ? (int) $code : null,
+                                'source' => 'crawl',
+                            ];
+                        }
+                        continue;
+                    }
+
+                    if ($pageUnchanged || $headBudget <= 0) {
+                        continue;
+                    }
+                    if (! array_key_exists($out, $headCache)) {
+                        $headCache[$out] = $checker->check($out);
+                        $headBudget--;
+                    }
+                    $res = $headCache[$out];
+                    if (! $res['ok']) {
                         $brokenSamples[] = [
                             'url' => $out,
-                            'status' => $code !== null ? (int) $code : null,
-                            'source' => 'crawl',
+                            'status' => $res['status'],
+                            'error' => $res['error'],
+                            'source' => 'head',
                         ];
                     }
+                }
+
+                if (! $brokenSamples) {
                     continue;
                 }
 
-                $h = SiteAuditUrlNormalizer::hash($out);
-                if (isset($byHash[$h])) {
-                    $target = $byHash[$h];
-                    $code = $target->status_code;
-                    if ($code === null || (int) $code >= 400) {
-                        $brokenSamples[] = [
-                            'url' => $out,
-                            'status' => $code !== null ? (int) $code : null,
-                            'source' => 'crawl',
+                $brokenSamples = array_slice($brokenSamples, 0, 10);
+                SiteAuditFinding::query()->create([
+                    'crawl_id' => $crawl->id,
+                    'code' => 'page_has_broken_links',
+                    'severity' => $pageSev,
+                    'url' => $page->url,
+                    'url_hash' => $page->url_hash,
+                    'meta_json' => [
+                        'count' => count($brokenSamples),
+                        'samples' => $brokenSamples,
+                    ],
+                ]);
+
+                foreach ($brokenSamples as $sample) {
+                    $bu = (string) ($sample['url'] ?? '');
+                    if ($bu === '') {
+                        continue;
+                    }
+                    if (! isset($uniqueBroken[$bu])) {
+                        $uniqueBroken[$bu] = [
+                            'status' => $sample['status'] ?? null,
+                            'source' => $sample['source'] ?? null,
+                            'error' => $sample['error'] ?? null,
+                            'from' => [],
                         ];
                     }
-                    continue;
-                }
-
-                // не в крауле — выборочный HEAD (не тратим бюджет на неизменённые страницы)
-                if ($pageUnchanged || $headBudget <= 0) {
-                    continue;
-                }
-                if (! array_key_exists($out, $headCache)) {
-                    $headCache[$out] = $checker->check($out);
-                    $headBudget--;
-                }
-                $res = $headCache[$out];
-                if (! $res['ok']) {
-                    $brokenSamples[] = [
-                        'url' => $out,
-                        'status' => $res['status'],
-                        'error' => $res['error'],
-                        'source' => 'head',
-                    ];
+                    if (count($uniqueBroken[$bu]['from']) < 50
+                        && ! in_array($page->url, $uniqueBroken[$bu]['from'], true)) {
+                        $uniqueBroken[$bu]['from'][] = $page->url;
+                    }
                 }
             }
 
-            if (! $brokenSamples) {
-                continue;
-            }
+            $meta['after_id'] = $afterId;
+            $meta['head_budget'] = $headBudget;
+            Cache::put($cacheKey, $uniqueBroken, 7200);
+            Cache::put($headCacheKey, $headCache, 7200);
 
-            $brokenSamples = array_slice($brokenSamples, 0, 10);
-            SiteAuditFinding::query()->create([
-                'crawl_id' => $crawl->id,
-                'code' => 'page_has_broken_links',
-                'severity' => $pageSev,
-                'url' => $page->url,
-                'url_hash' => $page->url_hash,
-                'meta_json' => [
-                    'count' => count($brokenSamples),
-                    'samples' => $brokenSamples,
-                ],
-            ]);
-
-            foreach ($brokenSamples as $sample) {
-                $bu = (string) ($sample['url'] ?? '');
-                if ($bu === '') {
-                    continue;
-                }
-                if (! isset($uniqueBroken[$bu])) {
-                    $uniqueBroken[$bu] = [
-                        'status' => $sample['status'] ?? null,
-                        'source' => $sample['source'] ?? null,
-                        'error' => $sample['error'] ?? null,
-                        'from' => [],
-                    ];
-                }
-                if (count($uniqueBroken[$bu]['from']) < 50
-                    && ! in_array($page->url, $uniqueBroken[$bu]['from'], true)) {
-                    $uniqueBroken[$bu]['from'][] = $page->url;
-                }
+            if ($deadline !== null && microtime(true) >= $deadline) {
+                return true;
             }
         }
 
+        return false;
+    }
+
+    /**
+     * @param array<string,array<string,mixed>> $uniqueBroken
+     */
+    private function flushBrokenLinkFindings(int $crawlId, array $uniqueBroken, string $linkSev): void
+    {
         $maxBrokenFindings = max(1, (int) config('site_audit.broken_link_max_findings', 200));
         $emitted = 0;
         foreach ($uniqueBroken as $bu => $info) {
             if ($emitted >= $maxBrokenFindings) {
                 break;
             }
-            $fromList = $info['from'];
+            $fromList = $info['from'] ?? [];
             SiteAuditFinding::query()->create([
-                'crawl_id' => $crawl->id,
+                'crawl_id' => $crawlId,
                 'code' => 'broken_internal_link',
                 'severity' => $linkSev,
                 'url' => $bu,
-                'url_hash' => SiteAuditUrlNormalizer::hash($bu),
+                'url_hash' => SiteAuditUrlNormalizer::hash((string) $bu),
                 'meta_json' => [
                     'from' => $fromList[0] ?? null,
                     'referrers' => array_slice($fromList, 0, 12),

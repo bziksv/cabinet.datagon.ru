@@ -26,13 +26,14 @@
             </div>
             <div class="cabinet-sa-mode-cards">
                 <button type="button" class="cabinet-sa-mode-card" data-sa-pick-mode="lite" id="sa-pick-lite">
-                    <span class="cabinet-sa-mode-card__badge">Рекомендуем</span>
+                    <span class="cabinet-sa-mode-card__badge">Рекомендуем для новичков</span>
                     <span class="cabinet-sa-mode-card__icon" aria-hidden="true"><i class="bi bi-lightning-charge"></i></span>
                     <span class="cabinet-sa-mode-card__title">Простой</span>
                     <span class="cabinet-sa-mode-card__text">Только адрес сайта и кнопка «Запустить». Без лишних настроек.</span>
                     <span class="cabinet-sa-mode-card__cta">Выбрать простой →</span>
                 </button>
                 <button type="button" class="cabinet-sa-mode-card" data-sa-pick-mode="pro" id="sa-pick-pro">
+                    <span class="cabinet-sa-mode-card__badge cabinet-sa-mode-card__badge--pro">Для Профи</span>
                     <span class="cabinet-sa-mode-card__icon" aria-hidden="true"><i class="bi bi-sliders"></i></span>
                     <span class="cabinet-sa-mode-card__title">Расширенный</span>
                     <span class="cabinet-sa-mode-card__text">Потоки, robots, список URL, авторасписание и тонкая настройка краула.</span>
@@ -143,12 +144,14 @@
                                 Потоки (параллельные запросы)
                                 @include('pages.partials.site-audit-tip', ['tip' => "Сколько HTTP-запросов к сайту одновременно.\nЛимит тарифа: Free 1 / Optimal 2 / Ultimate 4 / Maximum 8.\nНе лупите сразу максимум потоков: хостинги и WAF ограничивают параллельность — получите 429/бан и пустые findings.\nНа тяжёлых своих сайтах можно поднять потоки осторожно, смотря на ответы сервера."])
                             </label>
-                            <select class="form-select" id="sa-concurrency">
+                            <select class="form-select" id="sa-concurrency"
+                                    data-lite-default="{{ min(2, max(1, (int) ($concurrencyLimit ?? config('site_audit.max_concurrency', 8)))) }}">
                                 @php
                                     $maxConc = max(1, (int) ($concurrencyLimit ?? config('site_audit.max_concurrency', 8)));
+                                    $defaultConc = min(2, $maxConc);
                                 @endphp
                                 @for($n = 1; $n <= $maxConc; $n++)
-                                    <option value="{{ $n }}" @if($n === 1) selected @endif>
+                                    <option value="{{ $n }}" @if($n === $defaultConc) selected @endif>
                                         {{ $n }} {{ $n === 1 ? 'поток' : ($n < 5 ? 'потока' : 'потоков') }}
                                     </option>
                                 @endfor
@@ -209,6 +212,9 @@
                             $maxConc = max(1, (int) ($concurrencyLimit ?? 1));
                             $maxPages = max(1, (int) ($pagesLimit ?? 100));
                         @endphp
+                        @php
+                            $isProjectOwner = auth()->id() && (int) $project->user_id === (int) auth()->id();
+                        @endphp
                         <div class="cabinet-sa-project">
                             <div class="cabinet-sa-project__main">
                                 <div class="min-w-0">
@@ -222,6 +228,11 @@
                                         @else
                                             ещё не запускался
                                         @endif
+                                        @if(!empty($project->team))
+                                            · <span class="text-body">команда {{ $project->team->title }}</span>
+                                        @elseif(!$isProjectOwner)
+                                            · <span class="text-body">доступ по команде</span>
+                                        @endif
                                     </div>
                                 </div>
                                 <div class="d-flex flex-shrink-0 gap-1">
@@ -232,6 +243,7 @@
                                                    href="{{ route('pages.site-audit.crawl.show', $last->id) }}#sa-archive">Архив</a>
                                             @endif
                                         @endif
+                                    @if($isProjectOwner)
                                     <form method="POST" action="{{ route('pages.site-audit.project.destroy', $project->id) }}" class="d-inline"
                                           data-cabinet-confirm="Удалить проект {{ e($project->domain) }} и все краулы?"
                                           data-cabinet-confirm-title="Удаление проекта"
@@ -244,9 +256,36 @@
                                             <span class="cabinet-sa-project-del__text">Удалить</span>
                                         </button>
                                     </form>
+                                    @endif
                                 </div>
                             </div>
-                            @if(!empty($canSchedule))
+                            @if($isProjectOwner && !empty($teamAccessReady))
+                                <form method="POST" action="{{ route('pages.site-audit.project.team', $project->id) }}" class="cabinet-sa-project__team">
+                                    @csrf
+                                    <div class="d-flex flex-wrap align-items-end gap-2">
+                                        <div class="flex-grow-1" style="min-width:10rem">
+                                            <label class="form-label small mb-1" for="sa-team-{{ $project->id }}">Команда из чеклиста</label>
+                                            <select name="team_id" id="sa-team-{{ $project->id }}" class="form-select form-select-sm">
+                                                <option value="0">Без команды</option>
+                                                @foreach(($checklistTeams ?? []) as $team)
+                                                    <option value="{{ $team->id }}" @if((int) ($project->team_id ?? 0) === (int) $team->id) selected @endif>
+                                                        {{ $team->title }}
+                                                        @if(isset($team->members_count)) · {{ (int) $team->members_count }} чел.@endif
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">Сохранить</button>
+                                        <a href="{{ route('pages.seo-checklist.team') }}" class="btn btn-sm btn-link px-1">Управление</a>
+                                    </div>
+                                    <div class="form-text">Участники команды увидят отчёты этого сайта в Аудите.</div>
+                                </form>
+                            @elseif($isProjectOwner && empty($teamAccessReady))
+                                <div class="cabinet-sa-project__team small text-secondary">
+                                    Команды чеклиста пока недоступны.
+                                </div>
+                            @endif
+                            @if($isProjectOwner && !empty($canSchedule))
                                 <form method="POST" action="{{ route('pages.site-audit.schedule', $project->id) }}" class="cabinet-sa-project__schedule" data-sa-tour="schedule" data-sa-pro>
                                     @csrf
                                     <div class="d-flex flex-wrap align-items-center gap-2">
@@ -341,7 +380,7 @@
                                     </div>
                                     </div>
                                 </form>
-                            @else
+                            @elseif($isProjectOwner)
                                 <div class="cabinet-sa-project__schedule small text-secondary" data-sa-pro>
                                     Авторасписание недоступно на бесплатном тарифе (0 слотов). Optimal — 2, Ultimate — 5, Maximum — 10.
                                 </div>
@@ -419,6 +458,7 @@
                         <tbody>
                         @forelse($crawls as $c)
                             @php
+                                $isCrawlOwner = auth()->id() && (int) $c->user_id === (int) auth()->id();
                                 $b = $c->buckets_json ?: [];
                                 $stClass = $c->statusCssClass();
                                 $sizeBytes = (int) (($crawlSizes ?? [])[$c->id] ?? 0);
@@ -449,6 +489,9 @@
                                     {{ optional($c->project)->domain ?? '—' }}
                                     @if($pagesOnly)
                                         <span class="badge text-bg-light border ms-1" title="Только указанные страницы">страницы</span>
+                                    @endif
+                                    @if(optional($c->project)->team)
+                                        <div class="small text-secondary fw-normal">{{ $c->project->team->title }}</div>
                                     @endif
                                 </td>
                                 <td>
@@ -547,7 +590,7 @@
                                 <td class="text-end text-nowrap">
                                     <span class="cabinet-sa-row-actions">
                                         <a class="btn btn-sm btn-outline-primary" href="{{ route('pages.site-audit.crawl.show', $c->id) }}">Сводка</a>
-                                        @if(! $finished)
+                                        @if($isCrawlOwner && ! $finished)
                                             <form method="POST" action="{{ route('pages.site-audit.crawl.cancel', $c->id) }}" class="d-inline"
                                                   data-sa-cancel-crawl
                                                   data-cabinet-confirm="Остановить краул #{{ $c->id }}? Уже скачанные страницы останутся."
@@ -558,7 +601,7 @@
                                                 <button type="submit" class="btn btn-sm btn-outline-danger">Стоп</button>
                                             </form>
                                         @endif
-                                        @if($finished)
+                                        @if($isCrawlOwner && $finished)
                                             @php
                                                 $canResume = (new \App\Services\SiteAudit\SiteAuditCrawlEngine())->canResume($c);
                                             @endphp
@@ -656,6 +699,13 @@
                         var ph = domainEl.getAttribute(mode === 'lite' ? 'data-placeholder-lite' : 'data-placeholder-pro');
                         if (ph) domainEl.setAttribute('placeholder', ph.replace(/&#10;/g, '\n'));
                         domainEl.rows = mode === 'lite' ? 1 : 3;
+                    }
+                    if (mode === 'lite') {
+                        var concEl = document.getElementById('sa-concurrency');
+                        if (concEl) {
+                            var liteDef = String(parseInt(concEl.getAttribute('data-lite-default') || '1', 10) || 1);
+                            concEl.value = liteDef;
+                        }
                     }
                     try {
                         localStorage.setItem(MODE_KEY, mode);
@@ -971,6 +1021,13 @@
                         startBtn.disabled = true;
                         msg.textContent = 'Запуск…';
                         var pagesOnlyEl = document.getElementById('sa-pages-only');
+                        var concEl = document.getElementById('sa-concurrency');
+                        var isLite = pageRoot && pageRoot.classList.contains('cabinet-sa-page--lite');
+                        var concurrency = (concEl && concEl.value) ? concEl.value : '1';
+                        if (isLite) {
+                            var liteDef = parseInt((concEl && concEl.getAttribute('data-lite-default')) || '1', 10);
+                            concurrency = String(Math.max(1, liteDef || 1));
+                        }
                         var body = {
                             domain: document.getElementById('sa-domain').value,
                             seed_urls: document.getElementById('sa-seeds').value,
@@ -978,7 +1035,7 @@
                             extra_hosts: (document.getElementById('sa-extra-hosts') || {}).value || '',
                             virtual_robots: document.getElementById('sa-robots').value,
                             crawl_speed: document.getElementById('sa-speed').value,
-                            concurrency: (document.getElementById('sa-concurrency') || {}).value || '1',
+                            concurrency: concurrency,
                             unify_www: true,
                             force_https: true,
                             strip_trailing_slash: true,

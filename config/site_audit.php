@@ -31,6 +31,12 @@ return [
     'batch_max_seconds' => (int) env('SITE_AUDIT_BATCH_SECONDS', 240),
     // Активный краул без updated_at дольше N мин → failed (иначе держит слот навечно)
     'stale_active_minutes' => (int) env('SITE_AUDIT_STALE_ACTIVE_MINUTES', 120),
+    // Агрегация большими пачками не влезает в timeout → тики/этапы + пауза (разгрузка БД/CPU)
+    'aggregate_tick_seconds' => (float) env('SITE_AUDIT_AGG_TICK_SECONDS', 150),
+    'aggregate_tick_pause_seconds' => (int) env('SITE_AUDIT_AGG_TICK_PAUSE', 3),
+    'aggregate_job_timeout' => (int) env('SITE_AUDIT_AGG_JOB_TIMEOUT', 600),
+    'aggregate_from_pages_chunk' => (int) env('SITE_AUDIT_AGG_FROM_PAGES_CHUNK', 200),
+    'aggregate_broken_links_chunk' => (int) env('SITE_AUDIT_AGG_BROKEN_CHUNK', 250),
     // local/тесты: не резать по тарифу, пока UI/модуль сырые
     'bypass_limits' => (bool) env('SITE_AUDIT_BYPASS_LIMITS', false),
     'thin_words' => (int) env('SITE_AUDIT_THIN_WORDS', 150),

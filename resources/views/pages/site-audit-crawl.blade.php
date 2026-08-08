@@ -20,6 +20,7 @@
             @if(!empty($compareCandidates) && $compareCandidates->count() > 0)
                 <a href="{{ route('pages.site-audit.crawl.diff', $crawl->id) }}" class="btn btn-sm btn-outline-info">Сравнить с предыдущим</a>
             @endif
+            @if(!empty($canManageCrawl))
             <button type="button" class="btn btn-sm btn-outline-primary" id="sa-share-btn"
                     data-create="{{ route('pages.site-audit.share.create', $crawl->id) }}"
                     data-revoke="{{ route('pages.site-audit.share.revoke', $crawl->id) }}"
@@ -33,8 +34,9 @@
                     data-has-ai="{{ !empty($canActionPlanAi) ? '1' : '0' }}">
                 План работ
             </button>
+            @endif
         @endif
-        @if(! $crawl->isFinished())
+        @if(!empty($canManageCrawl) && ! $crawl->isFinished())
             <form method="POST" action="{{ route('pages.site-audit.crawl.cancel', $crawl->id) }}" class="d-inline"
                   data-cabinet-confirm="Остановить краул #{{ $crawl->id }}? Уже скачанные страницы останутся, дальше сканировать не будет."
                   data-cabinet-confirm-title="Остановка краула"
@@ -44,7 +46,7 @@
                 <button type="submit" class="btn btn-sm btn-outline-danger">Остановить</button>
             </form>
         @endif
-        @if($crawl->isFinished())
+        @if(!empty($canManageCrawl) && $crawl->isFinished())
             @php
                 $canResumeCrawl = (new \App\Services\SiteAudit\SiteAuditCrawlEngine())->canResume($crawl);
             @endphp
@@ -87,6 +89,9 @@
                     <div class="h5 mb-1">{{ optional($project)->domain ?? '—' }}</div>
                 <div class="small text-muted">
                     Краул #{{ $crawl->id }}
+                    @if(optional($project)->team)
+                        · команда {{ $project->team->title }}
+                    @endif
                     · лимит {{ number_format((int) $crawl->pages_limit, 0, '', ' ') }} URL
                     @php $s = $crawl->progress_json['settings'] ?? []; @endphp
                     @if(!empty($s))

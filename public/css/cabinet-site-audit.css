@@ -71,14 +71,22 @@
   position: absolute;
   top: 0.75rem;
   right: 0.75rem;
-  font-size: 0.68rem;
+  max-width: calc(100% - 3.5rem);
+  font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  line-height: 1.25;
+  text-align: center;
   color: #065f46;
   background: #d1fae5;
   border-radius: 999px;
   padding: 0.2rem 0.5rem;
+}
+
+.cabinet-sa-mode-card__badge--pro {
+  color: #334155;
+  background: #e2e8f0;
 }
 
 .cabinet-sa-mode-card__icon {
@@ -400,6 +408,17 @@ button.cabinet-sa-steps__item:hover {
   gap: 0.75rem;
   padding: 0.9rem 1rem;
   border-bottom: 1px solid #eef1f5;
+}
+
+.cabinet-sa-project__team {
+  margin: 0;
+  padding: 0.65rem 1rem 0.75rem;
+  background: #fafbfc;
+  border-top: 1px dashed #cfd8e6;
+}
+
+.cabinet-sa-project__team + .cabinet-sa-project__schedule {
+  border-radius: 0;
 }
 
 .cabinet-sa-project__schedule {

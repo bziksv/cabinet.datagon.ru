@@ -5,6 +5,7 @@ namespace App\Services\SiteAudit;
 use App\SiteAuditFinding;
 use App\SiteAuditPage;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Schema;
 
 class SiteAuditPageProcessor
 {
@@ -16,6 +17,9 @@ class SiteAuditPageProcessor
 
     /** @var string|null ключ настроек, для которых уже создан $fetcher (keep-alive между URL) */
     private $fetcherKey;
+
+    /** @var bool|null */
+    private static $discoveredColumnsReady;
 
     public function __construct(?SiteAuditFetcher $fetcher = null, ?SiteAuditHtmlParser $parser = null)
     {
@@ -56,14 +60,23 @@ class SiteAuditPageProcessor
         string $url,
         array $result,
         string $projectHost,
-        array $crawlSettings = []
+        array $crawlSettings = [],
+        ?array $discovery = null
     ): array {
         $this->ensureFetcher($crawlId, $crawlSettings);
         $urlHash = SiteAuditUrlNormalizer::hash($url);
         $bodyPath = isset($result['body_path']) ? (string) $result['body_path'] : null;
 
         try {
-            return $this->processFetched($crawlId, $url, $urlHash, $result, $crawlSettings, $projectHost);
+            return $this->processFetched(
+                $crawlId,
+                $url,
+                $urlHash,
+                $result,
+                $crawlSettings,
+                $projectHost,
+                $discovery
+            );
         } finally {
             SiteAuditBodyTemp::release($bodyPath);
         }
@@ -73,10 +86,16 @@ class SiteAuditPageProcessor
      * Параллельный fetch + последовательный parse.
      *
      * @param string[] $urls
+     * @param array<string, array{via?:string,from?:?string}> $originsByUrl
      * @return array<int, array{internal_links:string[],content_unchanged?:bool}>
      */
-    public function processMany(int $crawlId, array $urls, string $projectHost, array $crawlSettings = []): array
-    {
+    public function processMany(
+        int $crawlId,
+        array $urls,
+        string $projectHost,
+        array $crawlSettings = [],
+        array $originsByUrl = []
+    ): array {
         $urls = array_values($urls);
         if ($urls === []) {
             return [];
@@ -109,13 +128,38 @@ class SiteAuditPageProcessor
                 'ua_rotated' => false,
             ];
             try {
-                $outs[] = $this->processFetchedResult($crawlId, $url, $result, $projectHost, $crawlSettings);
+                $discovery = isset($originsByUrl[$url]) && is_array($originsByUrl[$url])
+                    ? $originsByUrl[$url]
+                    : null;
+                $outs[] = $this->processFetchedResult(
+                    $crawlId,
+                    $url,
+                    $result,
+                    $projectHost,
+                    $crawlSettings,
+                    $discovery
+                );
             } catch (\Throwable $e) {
                 $outs[] = ['internal_links' => [], 'content_unchanged' => false];
             }
         }
 
         return $outs;
+    }
+
+    private static function discoveredColumnsReady(): bool
+    {
+        if (self::$discoveredColumnsReady !== null) {
+            return self::$discoveredColumnsReady;
+        }
+        try {
+            self::$discoveredColumnsReady = Schema::hasColumn('site_audit_pages', 'discovered_via')
+                && Schema::hasColumn('site_audit_pages', 'discovered_from');
+        } catch (\Throwable $e) {
+            self::$discoveredColumnsReady = false;
+        }
+
+        return self::$discoveredColumnsReady;
     }
 
     private function ensureFetcher(int $crawlId, array $crawlSettings): void
@@ -145,7 +189,8 @@ class SiteAuditPageProcessor
         string $urlHash,
         array $result,
         array $crawlSettings,
-        string $projectHost
+        string $projectHost,
+        ?array $discovery = null
     ): array {
         $findings = [];
         $internalLinks = [];
@@ -158,6 +203,15 @@ class SiteAuditPageProcessor
                     'source' => 'robots.txt',
                 ]);
             }
+        }
+
+        $via = is_array($discovery) ? trim((string) ($discovery['via'] ?? '')) : '';
+        $from = is_array($discovery) ? trim((string) ($discovery['from'] ?? '')) : '';
+        if ($via !== '' && ! in_array($via, ['sitemap', 'seed', 'home', 'link'], true)) {
+            $via = '';
+        }
+        if ($via !== 'link') {
+            $from = '';
         }
 
         $pageData = [
@@ -186,6 +240,10 @@ class SiteAuditPageProcessor
             'img_count' => 0,
             'img_without_alt' => 0,
         ];
+        if ($via !== '' && self::discoveredColumnsReady()) {
+            $pageData['discovered_via'] = $via;
+            $pageData['discovered_from'] = $from !== '' ? $from : null;
+        }
 
         $body = SiteAuditBodyTemp::takeBody($result);
 
@@ -282,7 +340,8 @@ class SiteAuditPageProcessor
                 );
                 $internalLinks = $links['internal'];
                 // URL-строки (не только hash) — для orphan + broken links
-                $pageData['out_links_json'] = array_slice($internalLinks, 0, 150) ?: null;
+                // Больше ссылок — точнее колонка «Откуда» на крупных сайтах с жирным меню.
+                $pageData['out_links_json'] = array_slice($internalLinks, 0, 400) ?: null;
                 $pageData['img_srcs_json'] = ! empty($links['img_srcs'])
                     ? array_slice($links['img_srcs'], 0, 40)
                     : null;
@@ -546,6 +605,17 @@ class SiteAuditPageProcessor
         }
 
         unset($result['body'], $body);
+
+        if ($via !== '') {
+            foreach ($findings as $fi => $findingRow) {
+                $meta = is_array($findingRow['meta_json'] ?? null) ? $findingRow['meta_json'] : [];
+                $meta['discovered_via'] = $via;
+                if ($from !== '') {
+                    $meta['discovered_from'] = $from;
+                }
+                $findings[$fi]['meta_json'] = $meta;
+            }
+        }
 
         SiteAuditPage::query()->updateOrCreate(
             ['crawl_id' => $crawlId, 'url_hash' => $urlHash],

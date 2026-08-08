@@ -6,7 +6,7 @@
     @endslot
 
     @slot('tools')
-        <a href="{{ route('pages.site-audit') }}" class="btn btn-sm btn-outline-secondary">← К списку</a>
+        <a href="{{ route('pages.site-audit') }}" class="btn btn-sm btn-outline-secondary">← К проектам</a>
         @if(!empty($archiveCrawls) && $archiveCrawls->count() > 0)
             <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#sa-archive-modal">
                 Архив
@@ -83,6 +83,12 @@
          data-finished="{{ $crawl->isFinished() ? '1' : '0' }}">
 
         @include('pages.partials.site-audit-beta-banner')
+
+        @include('pages.partials.site-audit-breadcrumbs', [
+            'crawl' => $crawl,
+            'project' => $project ?? optional($crawl)->project,
+            'level' => 'crawl',
+        ])
 
         <div class="d-flex flex-wrap justify-content-between align-items-start mb-3">
             <div>

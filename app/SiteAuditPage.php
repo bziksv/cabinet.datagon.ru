@@ -35,6 +35,8 @@ class SiteAuditPage extends Model
         'img_srcs_json',
         'asset_srcs_json',
         'click_depth',
+        'discovered_via',
+        'discovered_from',
         'img_count',
         'img_without_alt',
         'unique_img_src_count',

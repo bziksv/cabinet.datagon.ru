@@ -538,12 +538,26 @@ class SiteAuditController extends Controller
         if ($showReferrers && $rows instanceof \Illuminate\Support\Collection && $rows->isNotEmpty()) {
             $targetUrls = $rows->pluck('url')->filter()->unique()->values()->all();
             $refMap = SiteAuditLinkReferrers::forCrawl((int) $crawl->id, $targetUrls);
-            $origins = SiteAuditLinkReferrers::originMeta($crawl, $targetUrls);
-            $rows = $rows->map(function ($row) use ($refMap, $origins) {
+            $pageOrigins = SiteAuditLinkReferrers::pageDiscoveryMap((int) $crawl->id, $targetUrls);
+            $rows = $rows->map(function ($row) use ($refMap, $pageOrigins) {
                 $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
                 $url = (string) $row->url;
+
+                // Жёсткий источник постановки в очередь (новый краул пишет в meta/page).
+                $via = trim((string) ($meta['discovered_via'] ?? ''));
+                $from = trim((string) ($meta['discovered_from'] ?? ''));
+                if ($via === '' && isset($pageOrigins[$url])) {
+                    $via = (string) ($pageOrigins[$url]['via'] ?? '');
+                    $from = (string) ($pageOrigins[$url]['from'] ?? '');
+                }
+                $source = SiteAuditLinkReferrers::formatDiscoverySource($via, $from !== '' ? $from : null);
+                $meta['origin_label'] = $source['label'];
+                $meta['origin_hint'] = '';
+                $meta['discovered_via'] = $via;
+                $meta['discovered_from'] = $from !== '' ? $from : null;
+                $meta['from_sitemap'] = $via === 'sitemap';
+
                 $refs = $refMap[$url] ?? [];
-                // слэш-вариант: /about ↔ /about/
                 $slashAlt = SiteAuditLinkReferrers::slashVariantPublic($url);
                 if ($slashAlt !== null && ! empty($refMap[$slashAlt])) {
                     foreach ($refMap[$slashAlt] as $ref) {
@@ -552,19 +566,18 @@ class SiteAuditController extends Controller
                         }
                     }
                 }
-                // broken_internal_link already has meta.from — merge
                 if (! empty($meta['from'])) {
-                    $from = (string) $meta['from'];
-                    if ($from !== '' && ! in_array($from, $refs, true)) {
-                        array_unshift($refs, $from);
+                    $metaFrom = (string) $meta['from'];
+                    if ($metaFrom !== '' && ! in_array($metaFrom, $refs, true)) {
+                        array_unshift($refs, $metaFrom);
                     }
+                }
+                // via=link — страница-источник всегда первая в списке
+                if ($via === 'link' && $from !== '' && ! in_array($from, $refs, true)) {
+                    array_unshift($refs, $from);
                 }
                 $meta['referrers'] = array_slice($refs, 0, 12);
                 $meta['referrer_count'] = count($refs);
-                $origin = $origins[$url] ?? null;
-                $meta['from_sitemap'] = ! empty($origin['from_sitemap']);
-                $meta['origin_label'] = is_array($origin) ? (string) ($origin['label'] ?? '') : '';
-                $meta['origin_hint'] = is_array($origin) ? (string) ($origin['hint'] ?? '') : '';
                 $row->meta_json = $meta;
 
                 return $row;

@@ -70,8 +70,8 @@
             ? 'URL'
             : ($isBrokenTarget ? 'Битый URL' : 'URL');
         $refColTip = $isRedirectReport
-            ? "Страницы краула, где в HTML есть ссылка на этот URL (меню, футер, текст).\nЕсли ссылок нет — откуда URL взяли в очередь: sitemap.xml, посев или главная."
-            : "Страницы, где в HTML есть ссылка на этот URL.\nЕсли ссылок нет — пишем откуда URL взяли в очередь: sitemap.xml, посев или главная.";
+            ? "Откуда URL попал в краул: sitemap.xml, посев, главная или страница со ссылкой."
+            : "Откуда URL попал в краул или страницы со ссылкой.";
     @endphp
     <div class="cabinet-sa-table-wrap">
         <table class="table table-sm table-hover mb-0">
@@ -90,8 +90,8 @@
                     @include('pages.partials.site-audit-tip', ['tip' => "Кратко что не так: код ответа, какой дубль, какой запрос и т.д."])
                 </th>
                 @if(!empty($showReferrers))
-                    <th style="width:28%" title="{{ $isRedirectReport ? 'Где в крауле нашли ссылку на этот URL' : 'Страницы краула со ссылкой на этот URL' }}">
-                        Откуда ссылаются
+                    <th style="width:28%" title="Откуда URL попал в очередь краула">
+                        Откуда
                         @include('pages.partials.site-audit-tip', [
                             'tip' => $refColTip,
                         ])
@@ -144,33 +144,29 @@
                     </td>
                     @if(!empty($showReferrers))
                         <td class="small">
-                            @if($referrerCount > 0)
-                                <ul class="list-unstyled mb-0 cabinet-sa-referrers">
+                            @php
+                                $originLabel = trim((string) ($rowMeta['origin_label'] ?? ''));
+                                $discoveredVia = trim((string) ($rowMeta['discovered_via'] ?? ''));
+                                $discoveredFrom = trim((string) ($rowMeta['discovered_from'] ?? ''));
+                                if ($originLabel === '') {
+                                    $originLabel = 'не записано — перезапустите краул';
+                                }
+                            @endphp
+                            @if($discoveredVia === 'link' && $discoveredFrom !== '')
+                                <div class="fw-semibold mb-1">страница:</div>
+                                <a href="{{ $discoveredFrom }}" target="_blank" rel="noopener noreferrer">{{ \Illuminate\Support\Str::limit($discoveredFrom, 70) }}</a>
+                            @elseif(in_array($discoveredVia, ['sitemap', 'seed', 'home'], true) || $originLabel !== '')
+                                <div class="fw-semibold">{{ $originLabel }}</div>
+                            @endif
+                            @if($referrerCount > 0 && !($discoveredVia === 'link' && $discoveredFrom !== '' && $referrerCount === 1 && ($referrers[0] ?? '') === $discoveredFrom))
+                                <ul class="list-unstyled mb-0 cabinet-sa-referrers mt-1">
                                     @foreach(array_slice($referrers, 0, 5) as $ref)
+                                        @if($discoveredVia === 'link' && $ref === $discoveredFrom)
+                                            @continue
+                                        @endif
                                         <li><a href="{{ $ref }}" target="_blank" rel="noopener noreferrer">{{ \Illuminate\Support\Str::limit($ref, 55) }}</a></li>
                                     @endforeach
                                 </ul>
-                                @if($referrerCount > 5)
-                                    <div class="text-muted">ещё {{ $referrerCount - 5 }}…</div>
-                                @endif
-                                @if(!empty($rowMeta['from_sitemap']))
-                                    <div class="text-muted mt-1">также в sitemap</div>
-                                @endif
-                            @else
-                                @php
-                                    $originLabel = trim((string) ($rowMeta['origin_label'] ?? ''));
-                                    $originHint = trim((string) ($rowMeta['origin_hint'] ?? ''));
-                                    if ($originLabel === '' && !empty($rowMeta['from_sitemap'])) {
-                                        $originLabel = 'из sitemap.xml';
-                                        $originHint = 'URL взяли из карты сайта при старте обхода.';
-                                    }
-                                    if ($originLabel === '') {
-                                        $originLabel = 'из стартовой очереди';
-                                        $originHint = 'Посев, главная или sitemap — не из HTML-ссылок страниц краула.';
-                                    }
-                                @endphp
-                                <span title="{{ $originHint }}">{{ $originLabel }}</span>
-                                <div class="text-muted">HTML-ссылок с других страниц краула нет</div>
                             @endif
                         </td>
                     @endif
@@ -226,14 +222,8 @@
     </div>
 @endif
 
-@if($pages > 1)
-    <nav class="mt-3" title="Листать страницы списка">
-        <ul class="pagination pagination-sm mb-0">
-            @for($p = 1; $p <= $pages; $p++)
-                <li class="page-item {{ $p === $page ? 'active' : '' }}">
-                    <a class="page-link" href="{{ request()->fullUrlWithQuery(['page' => $p]) }}">{{ $p }}</a>
-                </li>
-            @endfor
-        </ul>
-    </nav>
-@endif
+@include('pages.partials.site-audit-pager', [
+    'page' => $page,
+    'pages' => $pages,
+    'total' => $total ?? null,
+])

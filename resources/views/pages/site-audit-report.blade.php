@@ -6,7 +6,8 @@
     @endslot
 
     @slot('tools')
-        <a href="{{ route('pages.site-audit.crawl.show', $crawl->id) }}" class="btn btn-sm btn-outline-secondary">← Сводка</a>
+        <a href="{{ route('pages.site-audit') }}" class="btn btn-sm btn-outline-secondary">← К проектам</a>
+        <a href="{{ route('pages.site-audit.crawl.show', $crawl->id) }}" class="btn btn-sm btn-outline-secondary">Сводка краула</a>
         <a href="{{ route('pages.site-audit.report.csv', [$crawl->id, $code]) }}{{ !empty($filterParams) ? ('?' . http_build_query($filterParams)) : '' }}" class="btn btn-sm btn-outline-primary">CSV</a>
         <a href="{{ route('pages.site-audit.report.xlsx', [$crawl->id, $code]) }}{{ !empty($filterParams) ? ('?' . http_build_query($filterParams)) : '' }}" class="btn btn-sm btn-outline-success">XLSX</a>
         <button type="button" class="btn btn-sm btn-outline-secondary cabinet-sa-print-btn" onclick="window.print()">Печать</button>
@@ -21,6 +22,13 @@
         @endif
 
         @include('pages.partials.site-audit-beta-banner')
+
+        @include('pages.partials.site-audit-breadcrumbs', [
+            'crawl' => $crawl,
+            'project' => $project ?? optional($crawl)->project,
+            'level' => 'report',
+            'reportTitle' => $meta['title'] ?? $code,
+        ])
 
         @include('pages.partials.site-audit-crawl-live', [
             'crawl' => $crawl,

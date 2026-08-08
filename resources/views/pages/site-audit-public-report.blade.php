@@ -64,17 +64,11 @@
                 </table>
             </div>
 
-            @if($pages > 1)
-                <nav class="mt-3">
-                    <ul class="pagination pagination-sm mb-0">
-                        @for($p = 1; $p <= min($pages, 30); $p++)
-                            <li class="page-item {{ $p === $page ? 'active' : '' }}">
-                                <a class="page-link" href="{{ request()->fullUrlWithQuery(['page' => $p]) }}">{{ $p }}</a>
-                            </li>
-                        @endfor
-                    </ul>
-                </nav>
-            @endif
+            @include('pages.partials.site-audit-pager', [
+                'page' => $page,
+                'pages' => $pages,
+                'total' => $total ?? null,
+            ])
         </div>
     </div>
 @endsection

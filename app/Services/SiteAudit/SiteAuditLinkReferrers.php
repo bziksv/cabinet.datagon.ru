@@ -12,76 +12,148 @@ use App\SiteAuditPage;
  */
 class SiteAuditLinkReferrers
 {
+    /** Сколько «откуда» держим на цель в UI-отчёте. */
+    private const MAX_REFS_PER_TARGET = 12;
+
     /**
-     * @param string[]|null $targetUrls если задано — только эти цели
+     * Сколько страниц-кандидатов тянем одним SQL (LIKE по out_links) на страницу отчёта.
+     */
+    private const TARGETED_SQL_LIMIT = 600;
+
+    /**
+     * @param string[]|null $targetUrls если задано — только эти цели (SQL LIKE, без полной выгрузки краула)
      * @return array<string, list<string>> targetUrl => [referrerUrl, ...]
      */
     public static function forCrawl(int $crawlId, ?array $targetUrls = null): array
     {
-        $targets = null;
+        // outUrl / slash-вариант → канонический target из запроса отчёта
+        $lookup = null;
+        $pending = null;
         if ($targetUrls !== null) {
-            $targets = [];
+            $lookup = [];
+            $pending = [];
             foreach ($targetUrls as $u) {
                 $u = trim((string) $u);
-                if ($u !== '') {
-                    $targets[$u] = true;
+                if ($u === '') {
+                    continue;
+                }
+                $lookup[$u] = $u;
+                $pending[$u] = true;
+                $alt = self::slashVariant($u);
+                if ($alt !== null) {
+                    $lookup[$alt] = $u;
                 }
             }
-            if ($targets === []) {
+            if ($pending === []) {
                 return [];
             }
         }
 
         $map = [];
+        $maxRefs = self::MAX_REFS_PER_TARGET;
 
-        $pages = SiteAuditPage::query()
-            ->where('crawl_id', $crawlId)
-            ->whereNotNull('out_links_json')
-            ->get(['url', 'out_links_json']);
+        $addRef = static function (string $to, string $from) use (&$map, &$pending, $maxRefs): void {
+            if ($to === '' || $from === '' || $from === $to) {
+                return;
+            }
+            if (! isset($map[$to])) {
+                $map[$to] = [];
+            }
+            if (count($map[$to]) >= $maxRefs) {
+                return;
+            }
+            if (! in_array($from, $map[$to], true)) {
+                $map[$to][] = $from;
+            }
+            if ($pending !== null && isset($map[$to][0])) {
+                unset($pending[$to]);
+            }
+        };
 
-        foreach ($pages as $page) {
-            $from = (string) $page->url;
-            $outs = is_array($page->out_links_json) ? $page->out_links_json : [];
-            foreach ($outs as $out) {
-                $out = (string) $out;
-                if ($out === '' || (strlen($out) === 64 && ctype_xdigit($out))) {
-                    continue;
+        $pagesFetched = (int) (SiteAuditCrawl::query()->whereKey($crawlId)->value('pages_fetched') ?? 0);
+
+        if ($lookup !== null && $pagesFetched > 0 && $pagesFetched <= 12000) {
+            // Точечный поиск на умеренных краулах: SQL LIKE по URL, без полной выгрузки.
+            // На 40k+ это слишком тяжело, а out_links всё равно часто обрезаны (лимит 150).
+            $needles = array_keys($lookup);
+            $query = SiteAuditPage::query()
+                ->where('crawl_id', $crawlId)
+                ->whereNotNull('out_links_json')
+                ->where(function ($w) use ($needles) {
+                    foreach ($needles as $needle) {
+                        $w->orWhere('out_links_json', 'like', '%' . self::escapeLike($needle) . '%');
+                    }
+                })
+                ->orderBy('id')
+                ->limit(self::TARGETED_SQL_LIMIT)
+                ->get(['url', 'out_links_json']);
+
+            foreach ($query as $page) {
+                $from = (string) $page->url;
+                $outs = is_array($page->out_links_json) ? $page->out_links_json : [];
+                foreach ($outs as $out) {
+                    $out = (string) $out;
+                    if ($out === '' || (strlen($out) === 64 && ctype_xdigit($out))) {
+                        continue;
+                    }
+                    if (! isset($lookup[$out])) {
+                        continue;
+                    }
+                    $addRef($lookup[$out], $from);
                 }
-                if ($targets !== null && ! isset($targets[$out])) {
-                    continue;
-                }
-                if (! isset($map[$out])) {
-                    $map[$out] = [];
-                }
-                if (! in_array($from, $map[$out], true)) {
-                    $map[$out][] = $from;
+                if ($pending === []) {
+                    break;
                 }
             }
+        } elseif ($lookup === null) {
+            // Полный индекс (редко): только чанками, без одного гигантского get().
+            SiteAuditPage::query()
+                ->where('crawl_id', $crawlId)
+                ->whereNotNull('out_links_json')
+                ->orderBy('id')
+                ->select(['id', 'url', 'out_links_json'])
+                ->chunkById(250, function ($pages) use ($addRef) {
+                    foreach ($pages as $page) {
+                        $from = (string) $page->url;
+                        $outs = is_array($page->out_links_json) ? $page->out_links_json : [];
+                        foreach ($outs as $out) {
+                            $out = (string) $out;
+                            if ($out === '' || (strlen($out) === 64 && ctype_xdigit($out))) {
+                                continue;
+                            }
+                            $addRef($out, $from);
+                        }
+                    }
+
+                    return true;
+                });
         }
+        // else: крупный краул + точечные цели — referrer'ы из out_links не сканируем
+        // (память/таймаут). Источник покажет originMeta (sitemap seed и т.п.).
 
         // Дополняем из findings «битая внутренняя ссылка» (meta.from).
         $q = SiteAuditFinding::query()
             ->where('crawl_id', $crawlId)
             ->where('code', 'broken_internal_link');
-        if ($targets !== null) {
-            $q->whereIn('url', array_keys($targets));
+        if ($lookup !== null) {
+            $q->whereIn('url', array_values(array_unique(array_values($lookup))));
         }
         foreach ($q->get(['url', 'meta_json']) as $row) {
             $to = (string) $row->url;
+            if ($lookup !== null) {
+                $to = $lookup[$to] ?? $to;
+            }
             $meta = is_array($row->meta_json) ? $row->meta_json : [];
             $from = trim((string) ($meta['from'] ?? ''));
-            if ($to === '' || $from === '') {
-                continue;
-            }
-            if (! isset($map[$to])) {
-                $map[$to] = [];
-            }
-            if (! in_array($from, $map[$to], true)) {
-                $map[$to][] = $from;
-            }
+            $addRef($to, $from);
         }
 
         return $map;
+    }
+
+    private static function escapeLike(string $value): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
     }
 
     /**
@@ -125,17 +197,7 @@ class SiteAuditLinkReferrers
         }
 
         foreach ($flags as $url => $_) {
-            if (isset($byExact[$url])) {
-                $flags[$url] = true;
-                continue;
-            }
-            $alt = self::slashVariant($url);
-            if ($alt !== null && isset($byExact[$alt])) {
-                $flags[$url] = true;
-                continue;
-            }
-            $key = SiteAuditUrlNormalizer::canonicalKey($url);
-            if ($key && isset($byKey[$key])) {
+            if (self::urlMatchesSitemapSets($url, $byExact, $byKey)) {
                 $flags[$url] = true;
             }
         }
@@ -144,7 +206,117 @@ class SiteAuditLinkReferrers
     }
 
     /**
-     * Откуда URL попал в краул, если HTML-referrer'ов нет.
+     * @param array<string, true> $byExact
+     * @param array<string, true> $byKey
+     */
+    private static function urlMatchesSitemapSets(string $url, array $byExact, array $byKey): bool
+    {
+        $candidates = [$url];
+        $alt = self::slashVariant($url);
+        if ($alt !== null) {
+            $candidates[] = $alt;
+        }
+        // http ↔ https
+        if (stripos($url, 'https://') === 0) {
+            $candidates[] = 'http://' . substr($url, 8);
+            if ($alt !== null) {
+                $candidates[] = 'http://' . substr($alt, 8);
+            }
+        } elseif (stripos($url, 'http://') === 0) {
+            $candidates[] = 'https://' . substr($url, 7);
+            if ($alt !== null) {
+                $candidates[] = 'https://' . substr($alt, 7);
+            }
+        }
+        foreach ($candidates as $c) {
+            if (isset($byExact[$c])) {
+                return true;
+            }
+            $key = SiteAuditUrlNormalizer::canonicalKey($c);
+            if ($key && isset($byKey[$key])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Источник постановки URL в очередь с страниц краула.
+     *
+     * @param string[] $targetUrls
+     * @return array<string, array{via:string,from:?string}>
+     */
+    public static function pageDiscoveryMap(int $crawlId, array $targetUrls): array
+    {
+        $urls = [];
+        foreach ($targetUrls as $u) {
+            $u = trim((string) $u);
+            if ($u !== '') {
+                $urls[$u] = true;
+            }
+        }
+        if ($urls === []) {
+            return [];
+        }
+        try {
+            if (! \Illuminate\Support\Facades\Schema::hasColumn('site_audit_pages', 'discovered_via')) {
+                return [];
+            }
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $out = [];
+        $rows = SiteAuditPage::query()
+            ->where('crawl_id', $crawlId)
+            ->whereIn('url', array_keys($urls))
+            ->get(['url', 'discovered_via', 'discovered_from']);
+        foreach ($rows as $row) {
+            $via = trim((string) ($row->discovered_via ?? ''));
+            if ($via === '') {
+                continue;
+            }
+            $from = trim((string) ($row->discovered_from ?? ''));
+            $out[(string) $row->url] = [
+                'via' => $via,
+                'from' => $from !== '' ? $from : null,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Короткая подпись источника без советов «что делать».
+     *
+     * @return array{label:string,via:string,from:?string}
+     */
+    public static function formatDiscoverySource(string $via, ?string $from = null): array
+    {
+        $via = trim($via);
+        $from = $from !== null ? trim($from) : '';
+        if ($via === 'sitemap') {
+            return ['label' => 'sitemap.xml', 'via' => $via, 'from' => null];
+        }
+        if ($via === 'seed') {
+            return ['label' => 'посев (список URL)', 'via' => $via, 'from' => null];
+        }
+        if ($via === 'home') {
+            return ['label' => 'главная', 'via' => $via, 'from' => null];
+        }
+        if ($via === 'link' && $from !== '') {
+            return ['label' => $from, 'via' => $via, 'from' => $from];
+        }
+        if ($via === 'link') {
+            return ['label' => 'внутренняя ссылка', 'via' => $via, 'from' => null];
+        }
+
+        return ['label' => 'не записано — перезапустите краул', 'via' => '', 'from' => null];
+    }
+
+    /**
+     * Откуда URL попал в краул, если HTML-referrer'ов нет (старые краулы без discovered_*).
      *
      * @param string[] $targetUrls
      * @return array<string, array{label:string,hint:string,from_sitemap:bool,from_seed:bool,from_home:bool,orphan:bool}>
@@ -205,12 +377,20 @@ class SiteAuditLinkReferrers
             ->whereIn('url', array_keys($out))
             ->pluck('click_depth', 'url');
 
-        $sitemapAvailable = SiteAuditSitemapProbe::urlsFromProgress($crawl) !== []
-            || ! empty($crawl->progress_json['sitemap']['urls_gz_file'])
-            || ! empty($crawl->progress_json['sitemap']['found']);
+        $sitemapMeta = is_array($crawl->progress_json['sitemap'] ?? null)
+            ? $crawl->progress_json['sitemap']
+            : [];
+        $sitemapSeedCount = (int) ($sitemapMeta['seed_count'] ?? $sitemapMeta['url_count'] ?? 0);
+        $sitemapSeeded = ! empty($sitemapMeta['found'])
+            || $sitemapSeedCount > 0
+            || ! empty($sitemapMeta['urls_gz_file'])
+            || ! empty($sitemapMeta['urls_gz']);
+        $sitemapListLoaded = SiteAuditSitemapProbe::urlsFromProgress($crawl) !== [];
 
         foreach ($out as $url => $_) {
             $fromSitemap = ! empty($inSitemap[$url]);
+            // Список sitemap стёрт с диска, но посев из карты был большим — типичный источник.
+            $bulkSitemap = $sitemapSeeded && $sitemapSeedCount >= 100 && ! $sitemapListLoaded;
             $norm = $domain !== ''
                 ? (SiteAuditUrlNormalizer::normalize($url, $domain, $urlOpts) ?: $url)
                 : $url;
@@ -222,41 +402,49 @@ class SiteAuditLinkReferrers
                 || ($homeKey && $key && $key === $homeKey)
             );
             $depth = $depths[$url] ?? null;
-            $orphan = $depth === null; // нет пути по HTML от главной
+            $orphan = $depth === null;
+            $slashAlt = self::slashVariant($url);
+            $slashTip = $slashAlt
+                ? (' В меню часто уже правильный адрес: ' . $slashAlt . ' — в sitemap/старых ссылках уберите вариант без нужного слэша.')
+                : '';
 
-            $label = '';
-            $hint = '';
-            if ($fromSitemap) {
+            // Короткие тексты для SEO-шника: откуда взять и что править. Без «out_links»/«глубины».
+            if ($fromSitemap || $bulkSitemap) {
                 $label = 'из sitemap.xml';
-                $hint = 'URL взяли из карты сайта при старте обхода.';
+                $hint = $fromSitemap
+                    ? ('Этот URL есть в карте сайта. Исправьте запись в sitemap на финальный адрес без редиректа.' . $slashTip)
+                    : ('В крауле подхватили '
+                        . number_format($sitemapSeedCount, 0, '', ' ')
+                        . ' URL из sitemap — таких адресов нет среди сохранённых HTML-ссылок меню. Проверьте sitemap.xml и старые ссылки на этот URL.'
+                        . $slashTip);
             } elseif ($pagesOnly && $fromSeed) {
-                $label = 'из списка URL';
-                $hint = 'Режим «только страницы»: URL задали вручную в посеве.';
+                $label = 'из вашего списка URL';
+                $hint = 'URL задали вручную при запуске. Уберите или замените на финальный адрес в списке посева.';
             } elseif ($fromSeed) {
-                $label = 'из посева (список URL)';
-                $hint = 'URL добавили вручную в seed при запуске.';
+                $label = 'из посева (ваш список)';
+                $hint = 'URL добавили в seed при запуске. Замените на финальный адрес без редиректа.';
             } elseif ($fromHome) {
-                $label = 'стартовый URL (главная)';
-                $hint = 'Корень проекта — всегда в очереди на старте.';
-            } elseif ($orphan && $sitemapAvailable) {
-                // sitemap-файл мог уже стереться, но URL недостижим по ссылкам → почти наверняка sitemap/seed
-                $label = 'из sitemap / посева';
-                $hint = 'Внутренних HTML-ссылок с других страниц краула нет: URL попал в очередь при старте (обычно sitemap).';
-            } elseif ($orphan) {
-                $label = 'из стартовой очереди';
-                $hint = 'Не из HTML-ссылок сохранённых страниц: посев, главная или sitemap при старте.';
+                $label = 'главная сайта';
+                $hint = 'Стартовый URL проекта. Настройте редирект/canonical на канонический адрес главной.';
+            } elseif ($sitemapSeeded) {
+                // HTML-ссылку не нашли, но sitemap в крауле был — не вводим «по внутренним ссылкам».
+                $label = 'скорее всего sitemap.xml';
+                $hint = 'Среди сохранённых ссылок со страниц этого URL нет. Обычно такие адреса приходят из карты сайта или закладок. Проверьте sitemap и поиск по сайту на этот URL.'
+                    . $slashTip;
             } else {
-                $label = 'источник ссылки не сохранён';
-                $hint = 'По графу глубины URL достижим, но исходящие ссылки со страниц-источников в крауле не записаны (часто если источник тоже 4xx/пусто).';
+                $label = 'страницу со ссылкой не нашли';
+                $hint = 'В сохранённых HTML-ссылках краула этого URL нет. Ищите в sitemap.xml, во внешних ссылках и через поиск по коду/сайту.'
+                    . $slashTip;
             }
 
             $out[$url] = [
                 'label' => $label,
                 'hint' => $hint,
-                'from_sitemap' => $fromSitemap,
+                'from_sitemap' => $fromSitemap || $bulkSitemap || ($sitemapSeeded && $orphan),
                 'from_seed' => $fromSeed,
                 'from_home' => $fromHome,
                 'orphan' => $orphan,
+                'fix' => $hint,
             ];
         }
 

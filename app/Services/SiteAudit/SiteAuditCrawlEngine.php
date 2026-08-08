@@ -123,6 +123,7 @@ class SiteAuditCrawlEngine
             $seen = $state['seen'];
             $unchanged = $state['unchanged'];
             $expanded = $state['expanded'];
+            $origins = $state['origins'];
             $robotsGroups = is_array($crawl->progress_json['robots']['groups'] ?? null)
                 ? $crawl->progress_json['robots']['groups']
                 : null;
@@ -130,7 +131,7 @@ class SiteAuditCrawlEngine
             // сразу снять огромный engine / urls_gz из MySQL (миграция mid-crawl)
             $dirtyProgress = false;
             if (isset($crawl->progress_json['engine'])) {
-                $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
+                $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded, $origins);
                 $dirtyProgress = true;
             }
             if (! empty($crawl->progress_json['sitemap']['urls_gz'])) {
@@ -160,7 +161,7 @@ class SiteAuditCrawlEngine
                 // cancel/fail — редко; не долбим MySQL на каждом URL
                 if ($processed === 0 || $processed % 10 === 0) {
                     if ($this->crawlStatusIsTerminal((int) $crawl->id)) {
-                        $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
+                        $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded, $origins);
 
                         return false;
                     }
@@ -178,8 +179,15 @@ class SiteAuditCrawlEngine
                     $i++;
                 }
 
+                $waveOrigins = [];
+                foreach ($wave as $wu) {
+                    if (isset($origins[$wu]) && is_array($origins[$wu])) {
+                        $waveOrigins[$wu] = $origins[$wu];
+                    }
+                }
+
                 try {
-                    $outs = $processor->processMany($crawl->id, $wave, $host, $settings);
+                    $outs = $processor->processMany($crawl->id, $wave, $host, $settings, $waveOrigins);
                 } catch (\Throwable $e) {
                     Log::warning('SiteAudit wave process failed', [
                         'crawl_id' => $crawl->id,
@@ -215,6 +223,9 @@ class SiteAuditCrawlEngine
                             }
                             $seen[$link] = true;
                             $queue[] = $link;
+                            if (! isset($origins[$link])) {
+                                $origins[$link] = ['via' => 'link', 'from' => $url];
+                            }
                             $expanded++;
                             $known++;
                         }
@@ -225,14 +236,14 @@ class SiteAuditCrawlEngine
                         $this->touchProgress($crawl, $fetched, $pagesTotal, $unchanged, $expanded);
                     }
                     if ($processed % self::ENGINE_FILE_EVERY === 0) {
-                        $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
+                        $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded, $origins);
                     }
                 }
             }
 
             // закончили всю очередь
             if ($i >= count($queue)) {
-                $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
+                $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded, $origins);
                 $this->finishFetch($crawl, $dispatchContinue);
 
                 return false;
@@ -240,7 +251,7 @@ class SiteAuditCrawlEngine
 
             // ещё есть URL — следующий тик
             $pagesTotal = max(count($seen), $fetched + (count($queue) - $i));
-            $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded);
+            $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded, $origins);
             $this->touchProgress($crawl, $fetched, $pagesTotal, $unchanged, $expanded);
 
             if ($dispatchContinue) {
@@ -297,13 +308,23 @@ class SiteAuditCrawlEngine
         $urlOpts = SiteAuditUrlNormalizer::optionsFromSettings($settings, $project->domain);
         $pagesOnly = ! empty($settings['pages_only']);
 
+        /** @var array<string, true> $seed */
         $seed = [];
+        /** @var array<string, array{via:string,from:?string}> $origins */
+        $origins = [];
+        $markOrigin = static function (string $url, string $via, ?string $from = null) use (&$seed, &$origins): void {
+            $seed[$url] = true;
+            if (! isset($origins[$url])) {
+                $origins[$url] = ['via' => $via, 'from' => $from];
+            }
+        };
+
         $manual = $project->setting('seed_urls', []);
         if (is_array($manual)) {
             foreach ($manual as $u) {
                 $norm = SiteAuditUrlNormalizer::normalize((string) $u, $project->domain, $urlOpts);
                 if ($norm) {
-                    $seed[$norm] = true;
+                    $markOrigin($norm, 'seed');
                 }
             }
         }
@@ -335,14 +356,14 @@ class SiteAuditCrawlEngine
             $crawl->save();
         } else {
             if ($home) {
-                $seed[$home] = true;
+                $markOrigin($home, 'home');
             }
 
             $extraHosts = SiteAuditUrlNormalizer::parseExtraHosts($settings['extra_hosts'] ?? []);
             foreach ($extraHosts as $extraHost) {
                 $extraHome = SiteAuditUrlNormalizer::normalize('https://' . $extraHost . '/', $extraHost, $urlOpts);
                 if ($extraHome) {
-                    $seed[$extraHome] = true;
+                    $markOrigin($extraHome, 'home');
                 }
             }
             if ($extraHosts !== []) {
@@ -357,7 +378,7 @@ class SiteAuditCrawlEngine
                 $crawl->refresh();
                 foreach ($discovered['seed_urls'] as $u) {
                     $norm = SiteAuditUrlNormalizer::normalize($u, $project->domain, $urlOpts) ?: $u;
-                    $seed[$norm] = true;
+                    $markOrigin($norm, 'sitemap');
                 }
             } catch (\Throwable $e) {
                 if (! $seed) {
@@ -398,6 +419,7 @@ class SiteAuditCrawlEngine
         }
 
         $queue = array_slice($queue, 0, $limit);
+        $origins = array_intersect_key($origins, array_flip($queue));
 
         $seen = [];
         foreach ($queue as $u) {
@@ -412,7 +434,7 @@ class SiteAuditCrawlEngine
         $progress['total'] = count($queue);
         $progress['links_expanded'] = 0;
         $crawl->progress_json = $progress;
-        $this->persistEngineState($crawl, $queue, 0, 0, $seen, 0, 0);
+        $this->persistEngineState($crawl, $queue, 0, 0, $seen, 0, 0, $origins);
         $this->offloadSitemapUrlsGz($crawl);
         $crawl->save();
 
@@ -633,7 +655,7 @@ class SiteAuditCrawlEngine
     }
 
     /**
-     * @return array{queue: string[], index: int, fetched: int, seen: array<string,bool>, unchanged: int, expanded: int}
+     * @return array{queue: string[], index: int, fetched: int, seen: array<string,bool>, unchanged: int, expanded: int, origins: array<string, array{via:string,from:?string}>}
      */
     private function loadEngineState(SiteAuditCrawl $crawl): array
     {
@@ -671,6 +693,22 @@ class SiteAuditCrawlEngine
             $seen[$u] = true;
         }
 
+        $origins = [];
+        $rawOrigins = is_array($engine['origins'] ?? null) ? $engine['origins'] : [];
+        foreach ($rawOrigins as $u => $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $via = (string) ($row['via'] ?? '');
+            if ($via === '') {
+                continue;
+            }
+            $from = isset($row['from']) && is_string($row['from']) && $row['from'] !== ''
+                ? $row['from']
+                : null;
+            $origins[(string) $u] = ['via' => $via, 'from' => $from];
+        }
+
         return [
             'queue' => $queue,
             'index' => $index,
@@ -678,12 +716,14 @@ class SiteAuditCrawlEngine
             'seen' => $seen,
             'unchanged' => (int) ($engine['unchanged'] ?? 0),
             'expanded' => (int) ($engine['expanded'] ?? 0),
+            'origins' => $origins,
         ];
     }
 
     /**
      * @param string[] $queue
      * @param array<string,bool> $seen
+     * @param array<string, array{via:string,from:?string}> $origins
      */
     private function persistEngineState(
         SiteAuditCrawl $crawl,
@@ -692,9 +732,21 @@ class SiteAuditCrawlEngine
         int $fetched,
         array $seen,
         int $unchanged,
-        int $expanded
+        int $expanded,
+        array $origins = []
     ): void {
         $remaining = array_values(array_slice($queue, max(0, $index)));
+        $originsPersist = [];
+        foreach ($remaining as $u) {
+            if (isset($origins[$u]) && is_array($origins[$u])) {
+                $originsPersist[$u] = [
+                    'via' => (string) ($origins[$u]['via'] ?? ''),
+                    'from' => isset($origins[$u]['from']) && is_string($origins[$u]['from']) && $origins[$u]['from'] !== ''
+                        ? $origins[$u]['from']
+                        : null,
+                ];
+            }
+        }
         $payload = [
             'queue' => $remaining,
             'index' => 0,
@@ -702,6 +754,7 @@ class SiteAuditCrawlEngine
             'seen' => array_keys($seen),
             'unchanged' => $unchanged,
             'expanded' => $expanded,
+            'origins' => $originsPersist,
         ];
 
         $path = $this->engineStatePath((int) $crawl->id);

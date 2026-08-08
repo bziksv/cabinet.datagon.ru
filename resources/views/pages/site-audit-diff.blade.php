@@ -6,11 +6,18 @@
     @endslot
 
     @slot('tools')
-        <a href="{{ route('pages.site-audit.crawl.show', $crawl->id) }}" class="btn btn-sm btn-outline-secondary">← К краулу #{{ $crawl->id }}</a>
+        <a href="{{ route('pages.site-audit') }}" class="btn btn-sm btn-outline-secondary">← К проектам</a>
+        <a href="{{ route('pages.site-audit.crawl.show', $crawl->id) }}" class="btn btn-sm btn-outline-secondary">Сводка #{{ $crawl->id }}</a>
         <a href="{{ route('pages.site-audit.crawl.show', $baseline->id) }}" class="btn btn-sm btn-outline-secondary">Краул #{{ $baseline->id }}</a>
     @endslot
 
     <div class="cabinet-sa-page">
+        @include('pages.partials.site-audit-breadcrumbs', [
+            'crawl' => $crawl,
+            'project' => $project ?? optional($crawl)->project,
+            'level' => 'diff',
+        ])
+
         <div class="d-flex flex-wrap justify-content-between align-items-start mb-3">
             <div>
                 <div class="h5 mb-1">{{ optional($project)->domain ?? '—' }}</div>

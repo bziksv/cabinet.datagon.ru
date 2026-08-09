@@ -1217,7 +1217,7 @@
 
         return (
             '<div class="btn-group cabinet-mon-v2-row-menu">' +
-            '<button type="button" data-bs-toggle="dropdown" aria-expanded="false" class="btn btn-outline-secondary btn-sm cabinet-mon-v2-card__menu-btn">' +
+            '<button type="button" data-bs-toggle="dropdown" data-bs-popper-config=\'{"strategy":"fixed"}\' aria-expanded="false" class="btn btn-outline-secondary btn-sm cabinet-mon-v2-card__menu-btn">' +
             '<i class="fas fa-bars" aria-hidden="true"></i></button>' +
             '<div class="dropdown-menu dropdown-menu-end shadow-sm">' +
             menuHtml +

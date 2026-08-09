@@ -1188,8 +1188,22 @@ button.cabinet-mon-v2-favicon-btn {
     min-width: 11rem;
 }
 
-.cabinet-mon-v2-quick-actions .dropdown-menu {
-    z-index: 1060;
+/* После фильтра строк мало — меню уезжает вниз и рисуется под админ-логом / следующей секцией */
+.cabinet-mon-v2-table tbody tr:has(.dropdown.show),
+.cabinet-mon-v2-card:has(.dropdown.show) {
+    position: relative;
+    z-index: 40;
+}
+
+.cabinet-mon-v2-table-panel:has(.dropdown.show),
+.cabinet-mon-v2-cards:has(.dropdown.show) {
+    position: relative;
+    z-index: 40;
+}
+
+.cabinet-mon-v2-quick-actions .dropdown-menu,
+.cabinet-mon-v2-card__menu .dropdown-menu {
+    z-index: 1080;
     min-width: 13rem;
     padding: 0.35rem 0;
     border-color: #dee2e6;
@@ -1737,6 +1751,8 @@ button.cabinet-mon-v2-favicon-btn {
 }
 
 .cabinet-mon-v2-admin-strip {
+    position: relative;
+    z-index: 1;
     padding: 0.5rem 0.75rem;
     border-radius: var(--cabinet-mon-v2-radius);
     background: var(--mon-v2-muted);

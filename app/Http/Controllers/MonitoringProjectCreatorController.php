@@ -116,14 +116,15 @@ class MonitoringProjectCreatorController extends Controller
         switch ($request->input('action')) {
             case 'create':
                 return $this->createQueries($request);
-                break;
+            case 'bulk_create':
+                return $this->bulkCreateQueries($request);
             case 'edit':
                 return $this->editQueries($request);
-                break;
             case 'remove':
                 return $this->removeQueries($request);
-                break;
         }
+
+        return response()->json(['message' => 'Unknown action'], 422);
     }
 
     public function getQueries(Request $request)
@@ -338,12 +339,87 @@ class MonitoringProjectCreatorController extends Controller
     private function createQueries(Request $request)
     {
         $data = $request->input('data');
-        foreach ($data as $item){
-            $item['group'] = $this->firstOrCreateGroup($item['group']);
+        if (! is_array($data)) {
+            return $this->emptyDataCollection();
+        }
+        foreach ($data as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+            $query = trim((string) ($item['query'] ?? ''));
+            if ($query === '') {
+                continue;
+            }
+            $item['query'] = $query;
+            $item['group'] = $this->firstOrCreateGroup($item['group'] ?? null);
             $this->createKeywords($item);
         }
 
         return $this->emptyDataCollection();
+    }
+
+    /**
+     * Массовое добавление запросов (CSV/textarea) — JSON-чанками, без DataTables Editor.
+     */
+    private function bulkCreateQueries(Request $request)
+    {
+        $items = $request->input('queries');
+        if (! is_array($items) || $items === []) {
+            return response()->json(['created' => 0, 'skipped' => 0]);
+        }
+
+        // защита от гигантского одного запроса
+        if (count($items) > 500) {
+            $items = array_slice($items, 0, 500);
+        }
+
+        $existing = $this->project->keywords()
+            ->pluck('query')
+            ->map(static function ($q) {
+                return mb_strtolower(trim((string) $q));
+            })
+            ->flip()
+            ->all();
+
+        $created = 0;
+        $skipped = 0;
+        $groupCache = [];
+
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                $skipped++;
+                continue;
+            }
+            $query = trim((string) ($item['query'] ?? ''));
+            if ($query === '') {
+                $skipped++;
+                continue;
+            }
+            $key = mb_strtolower($query);
+            if (isset($existing[$key])) {
+                $skipped++;
+                continue;
+            }
+
+            $groupName = isset($item['group']) ? (string) $item['group'] : 'Основная';
+            if (! isset($groupCache[$groupName])) {
+                $groupCache[$groupName] = $this->firstOrCreateGroup($groupName);
+            }
+
+            $this->createKeywords([
+                'group' => $groupCache[$groupName],
+                'query' => $query,
+                'page' => isset($item['page']) ? (string) $item['page'] : '',
+                'target' => isset($item['target']) ? $item['target'] : 10,
+            ]);
+            $existing[$key] = true;
+            $created++;
+        }
+
+        return response()->json([
+            'created' => $created,
+            'skipped' => $skipped,
+        ]);
     }
 
     private function editQueries(Request $request)

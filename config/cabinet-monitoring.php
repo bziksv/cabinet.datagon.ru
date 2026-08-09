@@ -6,7 +6,7 @@
  * @see App\Http\Controllers\MonitoringV2Controller
  */
 return [
-    'version' => '3.5.158-dev',
+    'version' => '3.5.159-dev',
 
     /**
      * «Зависшие расписания» (/monitoring/admin): владелец не заходил N дней, но auto_update включён.

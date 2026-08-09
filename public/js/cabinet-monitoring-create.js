@@ -745,17 +745,61 @@
             });
     }
 
-    function createQueries(data) {
-        const dataSet = { query: {}, page: {}, group: {}, target: {} };
-        $.each(data, function (i, v) {
-            dataSet.query[i] = v.query;
-            dataSet.page[i] = v.page;
-            dataSet.group[i] = v.group;
-            dataSet.target[i] = v.target;
+    function uniqueByQuery(rows) {
+        const seen = Object.create(null);
+        const out = [];
+        $.each(rows, function (_, row) {
+            const q = String(row && row.query != null ? row.query : '')
+                .trim()
+                .toLowerCase();
+            if (!q || seen[q]) {
+                return;
+            }
+            seen[q] = 1;
+            out.push(row);
         });
-        dataTableEditor.create(data.length, false);
-        dataTableEditor.multiSet(dataSet);
-        dataTableEditor.submit();
+        return out;
+    }
+
+    /** Чанками через JSON — Editor/max_input_vars на 4k строк ломались молча. */
+    function createQueries(data) {
+        const id = getProjectId();
+        if (!id) {
+            return Promise.reject(new Error(cfg.i18n.needProject || 'Сначала сохраните проект'));
+        }
+        const list = uniqueByQuery(data || []);
+        if (!list.length) {
+            return Promise.resolve({ created: 0, skipped: 0, total: 0 });
+        }
+
+        const chunkSize = 250;
+        let created = 0;
+        let skipped = 0;
+        let chain = Promise.resolve();
+
+        for (let offset = 0; offset < list.length; offset += chunkSize) {
+            const chunk = list.slice(offset, offset + chunkSize);
+            chain = chain.then(function () {
+                return window.axios
+                    .post(cfg.urls.queries, {
+                        action: 'bulk_create',
+                        id: id,
+                        queries: chunk,
+                    })
+                    .then(function (res) {
+                        created += Number((res.data && res.data.created) || 0);
+                        skipped += Number((res.data && res.data.skipped) || 0);
+                    });
+            });
+        }
+
+        return chain.then(function () {
+            if (dataTable) {
+                dataTable.ajax.reload(null, false);
+            }
+            loadKeywordGroups();
+            return { created: created, skipped: skipped, total: list.length };
+        });
     }
 
     function bindRegionsSelect2() {
@@ -883,41 +927,97 @@
             const target = $('select[name="target"]');
             const delimiter = $('#csv-delimiter').val();
 
+            const $btn = $(this);
+            if ($btn.data('busy')) {
+                return false;
+            }
+
+            function finishAdd(promise) {
+                $btn.data('busy', 1).prop('disabled', true);
+                promise
+                    .then(function (stat) {
+                        const n = (stat && stat.created) || 0;
+                        if (n < 1) {
+                            showError(
+                                cfg.i18n.errKeywords ||
+                                    'Не удалось добавить запросы (пустые или уже есть в проекте)'
+                            );
+                            return;
+                        }
+                        let msg = (cfg.i18n.added || 'Добавлено запросов:') + ' ' + n;
+                        if (stat.skipped) {
+                            msg += ' (пропущено ' + stat.skipped + ')';
+                        }
+                        showSuccess(msg);
+                    })
+                    .catch(function (err) {
+                        const msg =
+                            (err.response && err.response.data && err.response.data.message) ||
+                            cfg.i18n.saveError ||
+                            'Ошибка сохранения запросов';
+                        showError(msg);
+                    })
+                    .finally(function () {
+                        $btn.data('busy', 0).prop('disabled', false);
+                    });
+            }
+
             if (csv[0].files.length) {
-                if (csv[0].files[0].type !== 'text/csv' && !csv[0].files[0].name.match(/\.csv$/i)) {
+                const fileName = csv[0].files[0].name || '';
+                if (
+                    csv[0].files[0].type !== 'text/csv' &&
+                    !/\.(csv|txt)$/i.test(fileName)
+                ) {
                     showError(cfg.i18n.errCsv || 'Загрузите файл .csv');
                     return false;
                 }
                 Papa.parse(csv[0].files[0], {
-                    delimiter: delimiter,
+                    delimiter: delimiter || '',
                     skipEmptyLines: 'greedy',
                     complete: function (result) {
-                        let rows = result.data;
-                        if (duplicates.prop('checked')) {
-                            rows = $.unique(rows);
-                        }
-                        const data = [];
+                        const rows = result.data || [];
+                        const relevant = $('#relevant-url').val() || '';
+                        let data = [];
                         $.each(rows, function (i, value) {
+                            if (!$.isArray(value) || !value.length) {
+                                return;
+                            }
+                            const query = String(value[0] == null ? '' : value[0]).trim();
+                            if (!query) {
+                                return;
+                            }
+                            // пропускаем строку-заголовок
+                            if (
+                                i === 0 &&
+                                /^(query|запрос|keyword|фраза)$/i.test(query)
+                            ) {
+                                return;
+                            }
                             let group = groupInput.find('option:selected').text();
                             if (value[1] && String(value[1]).trim()) {
                                 group = value[1];
                             }
                             group = String(group).replace(/[!\[\]]/g, '');
                             data.push({
-                                query: value[0],
-                                page: value[2] || '',
+                                query: query,
+                                page: (value[2] && String(value[2]).trim()) || relevant,
                                 group: group,
                                 target: target.val(),
                             });
                         });
-                        if (data.length) {
-                            csv.val('');
-                            textarea.val('');
-                            createQueries(data);
-                            showSuccess(
-                                (cfg.i18n.added || 'Добавлено запросов:') + ' ' + data.length
-                            );
+                        if (duplicates.prop('checked')) {
+                            data = uniqueByQuery(data);
                         }
+                        if (!data.length) {
+                            showError(cfg.i18n.errKeywords || 'Введите или загрузите список запросов');
+                            return;
+                        }
+                        csv.val('');
+                        textarea.val('');
+                        finishAdd(createQueries(data));
+                    },
+                    error: function () {
+                        showError(cfg.i18n.errCsv || 'Загрузите файл .csv');
                     },
                 });
                 return false;
@@ -925,23 +1025,22 @@
 
             if (textarea.val().trim().length > 0) {
                 let list = _.compact(textarea.val().split(/[\r\n]+/));
-                if (duplicates.prop('checked')) {
-                    list = $.unique(list);
-                }
                 const relevant = $('#relevant-url').val();
-                const data = [];
+                let data = [];
                 $.each(list, function (i, value) {
                     data.push({
-                        query: value,
+                        query: String(value).trim(),
                         page: relevant,
                         group: groupInput.find('option:selected').text(),
                         target: target.val(),
                     });
                 });
+                if (duplicates.prop('checked')) {
+                    data = uniqueByQuery(data);
+                }
                 if (data.length) {
                     textarea.val('');
-                    createQueries(data);
-                    showSuccess((cfg.i18n.added || 'Добавлено запросов:') + ' ' + data.length);
+                    finishAdd(createQueries(data));
                     return false;
                 }
             }

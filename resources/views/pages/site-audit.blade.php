@@ -386,13 +386,13 @@
                                     cont.action = '{{ url('site-audit/crawl') }}/' + j.id + '/continue';
                                     cont.className = 'd-inline';
                                     cont.setAttribute('data-cabinet-confirm',
-                                        'Продолжить краул #' + j.id + ' с ' + (j.pages_fetched || 0) +
+                                        'Возобновить краул #' + j.id + ' с ' + (j.pages_fetched || 0) +
                                         ' URL? Уже скачанные страницы сохранятся.');
-                                    cont.setAttribute('data-cabinet-confirm-title', 'Продолжить краул');
-                                    cont.setAttribute('data-cabinet-confirm-ok', 'Продолжить');
+                                    cont.setAttribute('data-cabinet-confirm-title', 'Возобновить краул');
+                                    cont.setAttribute('data-cabinet-confirm-ok', 'Возобновить');
                                     cont.innerHTML =
                                         '<input type="hidden" name="_token" value="' + token + '">' +
-                                        '<button type="submit" class="btn btn-sm btn-outline-primary">Продолжить</button>';
+                                        '<button type="submit" class="btn btn-sm btn-outline-primary">Возобновить</button>';
                                     actions.appendChild(cont);
                                 }
                                 var repeat = document.createElement('form');

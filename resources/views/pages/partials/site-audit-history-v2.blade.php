@@ -215,11 +215,11 @@
                                 @endphp
                                 @if($canResume)
                                     <form method="POST" action="{{ route('pages.site-audit.crawl.continue', $c->id) }}" class="d-inline"
-                                          data-cabinet-confirm="Продолжить краул #{{ $c->id }}?"
-                                          data-cabinet-confirm-title="Продолжить краул"
-                                          data-cabinet-confirm-ok="Продолжить">
+                                          data-cabinet-confirm="Возобновить краул #{{ $c->id }}?"
+                                          data-cabinet-confirm-title="Возобновить краул"
+                                          data-cabinet-confirm-ok="Возобновить">
                                         @csrf
-                                        <button type="submit" class="btn btn-sm btn-outline-primary">Далее</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">Возобновить</button>
                                     </form>
                                 @endif
                                 <form method="POST" action="{{ route('pages.site-audit.crawl.repeat', $c->id) }}" class="d-inline"

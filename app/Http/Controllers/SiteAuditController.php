@@ -1343,8 +1343,8 @@ class SiteAuditController extends Controller
             'progress_pct' => $crawl->pages_total > 0
                 ? (int) round(100 * $crawl->pages_fetched / $crawl->pages_total)
                 : 0,
-            'started_at' => optional($crawl->started_at)->format('d.m.Y H:i'),
-            'finished_at' => optional($crawl->finished_at)->format('d.m.Y H:i'),
+            'started_at' => optional($crawl->started_at)->format('d.m H:i'),
+            'finished_at' => optional($crawl->finished_at)->format('d.m H:i'),
             'eta_at' => $crawl->estimateFinishedAtFormatted(),
         ]);
     }

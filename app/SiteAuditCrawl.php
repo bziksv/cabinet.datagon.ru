@@ -156,7 +156,7 @@ class SiteAuditCrawl extends Model
     {
         $at = $this->estimateFinishedAt();
 
-        return $at ? $at->format('d.m.Y H:i') : null;
+        return $at ? $at->format('d.m H:i') : null;
     }
 
     public function isShared(): bool

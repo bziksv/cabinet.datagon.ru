@@ -1,7 +1,7 @@
 <section class="cabinet-sa-history" id="sa-history" data-sa-tour="history">
     <header class="cabinet-sa-history__head">
         <div class="cabinet-sa-history__titles">
-            <h2 class="cabinet-sa-history__title">История краулов</h2>
+            <h2 class="cabinet-sa-history__title">История проверок</h2>
             <p class="cabinet-sa-history__note mb-0" title="После окончания платного тарифа история хранится ещё 14 дней">
                 @if(method_exists($crawls, 'total'))
                     {{ number_format($crawls->total(), 0, '', ' ') }}
@@ -41,15 +41,15 @@
         <table class="cabinet-sa-history-table" id="sa-history-table">
             <thead>
             <tr>
-                <th>Краул</th>
+                <th class="cabinet-sa-ht-crawl">Проверка</th>
                 <th>Команда</th>
                 <th>Статус</th>
                 <th>Прогресс</th>
-                <th>Время</th>
-                <th class="cabinet-sa-ht-num is-critical" title="Грубые ошибки">Грубые</th>
-                <th class="cabinet-sa-ht-num is-other" title="Прочие ошибки">Прочие</th>
-                <th class="cabinet-sa-ht-num is-warning" title="Предупреждения">Пред.</th>
-                <th class="cabinet-sa-ht-num is-info" title="Информация">Инфо</th>
+                <th class="cabinet-sa-ht-when">Время</th>
+                <th class="cabinet-sa-ht-num is-critical" title="Грубые ошибки">Гр.</th>
+                <th class="cabinet-sa-ht-num is-other" title="Прочие ошибки">Пр.</th>
+                <th class="cabinet-sa-ht-num is-warning" title="Предупреждения">Прд.</th>
+                <th class="cabinet-sa-ht-num is-info" title="Информация">Инф.</th>
                 <th></th>
             </tr>
             </thead>
@@ -124,7 +124,7 @@
                     <td class="cabinet-sa-ht-crawl">
                         <div class="cabinet-sa-ht-crawl__row">
                             <span class="cabinet-sa-ht-crawl__id">#{{ $c->id }}</span>
-                            <span class="cabinet-sa-ht-crawl__domain" data-sa-domain>{{ $domain }}</span>
+                            <span class="cabinet-sa-ht-crawl__domain" data-sa-domain title="{{ $domain }}">{{ $domain }}</span>
                             @if($pagesOnly)
                                 <span class="cabinet-sa-ht-tag">только URL</span>
                             @endif

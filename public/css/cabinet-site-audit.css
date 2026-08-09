@@ -2385,10 +2385,10 @@ html.sa-tour-active body {
 }
 
 .cabinet-sa-history-table thead th {
-  padding: 0.5rem 0.75rem;
-  font-size: 0.7rem;
+  padding: 0.45rem 0.4rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   color: #64748b;
   background: #fff;
@@ -2397,19 +2397,19 @@ html.sa-tour-active body {
   vertical-align: middle;
 }
 
-.cabinet-sa-history-table thead th:nth-child(1) { width: 22%; } /* краул */
-.cabinet-sa-history-table thead th:nth-child(2) { width: 12%; } /* команда */
-.cabinet-sa-history-table thead th:nth-child(3) { width: 8%; }  /* статус */
+.cabinet-sa-history-table thead th:nth-child(1) { width: 16%; } /* проверка */
+.cabinet-sa-history-table thead th:nth-child(2) { width: 14%; } /* команда */
+.cabinet-sa-history-table thead th:nth-child(3) { width: 7%; }  /* статус */
 .cabinet-sa-history-table thead th:nth-child(4) { width: 9%; }  /* прогресс */
-.cabinet-sa-history-table thead th:nth-child(5) { width: 8%; }  /* время */
+.cabinet-sa-history-table thead th:nth-child(5) { width: 5.5rem; } /* время */
 .cabinet-sa-history-table thead th:nth-child(6),
 .cabinet-sa-history-table thead th:nth-child(7),
 .cabinet-sa-history-table thead th:nth-child(8),
-.cabinet-sa-history-table thead th:nth-child(9) { width: 7%; }  /* проблемы */
-.cabinet-sa-history-table thead th:nth-child(10) { width: 13%; } /* действия */
+.cabinet-sa-history-table thead th:nth-child(9) { width: 4.5rem; } /* проблемы */
+.cabinet-sa-history-table thead th:nth-child(10) { width: auto; } /* действия */
 
 .cabinet-sa-history-table tbody td {
-  padding: 0.65rem 0.75rem;
+  padding: 0.55rem 0.4rem;
   vertical-align: middle;
   border-bottom: 1px solid #f1f5f9;
   color: #0f172a;
@@ -2448,7 +2448,11 @@ html.sa-tour-active body {
 .cabinet-sa-ht-crawl__domain {
   font-weight: 700;
   color: #0f172a;
-  word-break: break-all;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 11rem;
 }
 
 .cabinet-sa-ht-tag {
@@ -2462,16 +2466,24 @@ html.sa-tour-active body {
 
 .cabinet-sa-ht-crawl__meta {
   margin-top: 0.2rem;
-  font-size: 0.75rem;
-  line-height: 1.35;
+  font-size: 0.72rem;
+  line-height: 1.3;
   color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .cabinet-sa-ht-when {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   color: #334155;
   white-space: nowrap;
+  width: 5.5rem;
+  max-width: 5.5rem;
+  padding-left: 0.25rem !important;
+  padding-right: 0.25rem !important;
 }
 
 .cabinet-sa-ht-when__end {
@@ -2543,10 +2555,12 @@ html.sa-tour-active body {
   text-align: right;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   white-space: nowrap;
-  padding-left: 0.4rem !important;
-  padding-right: 0.55rem !important;
+  width: 4.5rem;
+  max-width: 4.5rem;
+  padding-left: 0.15rem !important;
+  padding-right: 0.25rem !important;
 }
 
 .cabinet-sa-history-table thead th.cabinet-sa-ht-num {

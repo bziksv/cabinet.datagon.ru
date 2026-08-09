@@ -6,11 +6,13 @@ use App\Events\MonitoringProjectCreated;
 use App\Classes\Monitoring\MonitoringGoogleDepth;
 use App\Classes\Monitoring\MonitoringLocationLabel;
 use App\Classes\Monitoring\ProjectFaviconService;
+use App\MonitoringKeywordPrice;
 use App\Support\MonitoringPositionsSchedule;
 use App\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class MonitoringProjectCreatorController extends Controller
 {
@@ -122,6 +124,8 @@ class MonitoringProjectCreatorController extends Controller
                 return $this->editQueries($request);
             case 'remove':
                 return $this->removeQueries($request);
+            case 'clear':
+                return $this->clearQueries();
         }
 
         return response()->json(['message' => 'Unknown action'], 422);
@@ -269,6 +273,7 @@ class MonitoringProjectCreatorController extends Controller
         }
 
         $engine = $this->project->searchengines()->updateOrCreate($attrs, $values);
+        $this->applyPendingImportPrices((int) $engine->id);
 
         return response()->json([
             'ok' => true,
@@ -368,23 +373,13 @@ class MonitoringProjectCreatorController extends Controller
             return response()->json(['created' => 0, 'skipped' => 0]);
         }
 
-        // защита от гигантского одного запроса
         if (count($items) > 500) {
             $items = array_slice($items, 0, 500);
         }
 
-        $existing = $this->project->keywords()
-            ->pluck('query')
-            ->map(static function ($q) {
-                return mb_strtolower(trim((string) $q));
-            })
-            ->flip()
-            ->all();
-
-        $created = 0;
+        $prepared = [];
+        $seenInChunk = [];
         $skipped = 0;
-        $groupCache = [];
-
         foreach ($items as $item) {
             if (! is_array($item)) {
                 $skipped++;
@@ -396,30 +391,232 @@ class MonitoringProjectCreatorController extends Controller
                 continue;
             }
             $key = mb_strtolower($query);
-            if (isset($existing[$key])) {
+            if (isset($seenInChunk[$key])) {
                 $skipped++;
                 continue;
             }
+            $seenInChunk[$key] = true;
+            $prepared[] = [
+                'query' => $query,
+                'page' => isset($item['page']) ? (string) $item['page'] : '',
+                'group' => isset($item['group']) ? (string) $item['group'] : 'Основная',
+                'target' => (int) ($item['target'] ?? 10) ?: 10,
+                'key' => $key,
+                'prices' => $this->extractPriceFields($item),
+            ];
+        }
 
-            $groupName = isset($item['group']) ? (string) $item['group'] : 'Основная';
+        if ($prepared === []) {
+            return response()->json([
+                'created' => 0,
+                'skipped' => $skipped,
+                'prices_saved' => 0,
+                'prices_deferred' => 0,
+            ]);
+        }
+
+        $queries = array_column($prepared, 'query');
+        $existing = $this->project->keywords()
+            ->whereIn('query', $queries)
+            ->pluck('query')
+            ->map(static function ($q) {
+                return mb_strtolower(trim((string) $q));
+            })
+            ->flip()
+            ->all();
+
+        $groupCache = [];
+        $rows = [];
+        $pricesByKey = [];
+        $now = now();
+
+        foreach ($prepared as $item) {
+            if (isset($existing[$item['key']])) {
+                $skipped++;
+                continue;
+            }
+            $groupName = $item['group'] !== '' ? $item['group'] : 'Основная';
             if (! isset($groupCache[$groupName])) {
                 $groupCache[$groupName] = $this->firstOrCreateGroup($groupName);
             }
+            $rows[] = [
+                'monitoring_project_id' => (int) $this->project->id,
+                'monitoring_group_id' => (int) $groupCache[$groupName],
+                'query' => $item['query'],
+                'page' => $item['page'],
+                'target' => $item['target'],
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+            if (! empty($item['prices'])) {
+                $pricesByKey[$item['key']] = $item['prices'];
+            }
+            $existing[$item['key']] = true;
+        }
 
-            $this->createKeywords([
-                'group' => $groupCache[$groupName],
-                'query' => $query,
-                'page' => isset($item['page']) ? (string) $item['page'] : '',
-                'target' => isset($item['target']) ? $item['target'] : 10,
-            ]);
-            $existing[$key] = true;
-            $created++;
+        $created = 0;
+        foreach (array_chunk($rows, 100) as $chunk) {
+            \DB::table('monitoring_keywords')->insert($chunk);
+            $created += count($chunk);
+        }
+
+        $priceStat = ['saved' => 0, 'deferred' => 0];
+        if ($pricesByKey !== [] && $created > 0) {
+            $priceStat = $this->saveImportPrices(
+                array_column($rows, 'query'),
+                $pricesByKey
+            );
         }
 
         return response()->json([
             'created' => $created,
             'skipped' => $skipped,
+            'prices_saved' => $priceStat['saved'],
+            'prices_deferred' => $priceStat['deferred'],
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @return array<string, float>
+     */
+    private function extractPriceFields(array $item): array
+    {
+        $out = [];
+        foreach (['top1', 'top3', 'top5', 'top10', 'top20', 'top50', 'top100'] as $field) {
+            if (! array_key_exists($field, $item)) {
+                continue;
+            }
+            $raw = $item[$field];
+            if ($raw === null || $raw === '') {
+                continue;
+            }
+            if (is_string($raw)) {
+                $raw = str_replace([' ', ','], ['', '.'], $raw);
+            }
+            if (! is_numeric($raw)) {
+                continue;
+            }
+            $out[$field] = round((float) $raw, 2);
+        }
+
+        // одна колонка «цена» / price → TOP 10 (самый частый кейс)
+        if ($out === [] && array_key_exists('price', $item)) {
+            $raw = $item['price'];
+            if (is_string($raw)) {
+                $raw = str_replace([' ', ','], ['', '.'], $raw);
+            }
+            if (is_numeric($raw)) {
+                $out['top10'] = round((float) $raw, 2);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  string[]  $createdQueries
+     * @param  array<string, array<string, float>>  $pricesByKey
+     * @return array{saved: int, deferred: int}
+     */
+    private function saveImportPrices(array $createdQueries, array $pricesByKey): array
+    {
+        $keywords = $this->project->keywords()
+            ->whereIn('query', $createdQueries)
+            ->get(['id', 'query']);
+
+        $pending = [];
+        foreach ($keywords as $kw) {
+            $key = mb_strtolower(trim((string) $kw->query));
+            if (! isset($pricesByKey[$key])) {
+                continue;
+            }
+            $pending[] = [
+                'keyword_id' => (int) $kw->id,
+                'prices' => $pricesByKey[$key],
+            ];
+        }
+
+        if ($pending === []) {
+            return ['saved' => 0, 'deferred' => 0];
+        }
+
+        $this->mergePendingImportPrices($pending);
+
+        $engineIds = $this->project->searchengines()->pluck('id')->all();
+        if ($engineIds === []) {
+            return ['saved' => 0, 'deferred' => count($pending)];
+        }
+
+        $saved = 0;
+        foreach ($pending as $row) {
+            foreach ($engineIds as $engineId) {
+                MonitoringKeywordPrice::updateOrCreate(
+                    [
+                        'monitoring_keyword_id' => $row['keyword_id'],
+                        'monitoring_searchengine_id' => (int) $engineId,
+                    ],
+                    $row['prices']
+                );
+                $saved++;
+            }
+        }
+
+        return ['saved' => $saved, 'deferred' => 0];
+    }
+
+    private function pendingImportPricesCacheKey(): string
+    {
+        return 'mon_import_prices_' . (int) $this->project->id;
+    }
+
+    /**
+     * @param  array<int, array{keyword_id: int, prices: array<string, float>}>  $rows
+     */
+    private function mergePendingImportPrices(array $rows): void
+    {
+        $key = $this->pendingImportPricesCacheKey();
+        $existing = Cache::get($key, []);
+        if (! is_array($existing)) {
+            $existing = [];
+        }
+        $byId = [];
+        foreach ($existing as $row) {
+            if (! is_array($row) || empty($row['keyword_id'])) {
+                continue;
+            }
+            $byId[(int) $row['keyword_id']] = $row;
+        }
+        foreach ($rows as $row) {
+            $byId[(int) $row['keyword_id']] = $row;
+        }
+        Cache::put($key, array_values($byId), now()->addDays(14));
+    }
+
+    private function applyPendingImportPrices(int $engineId): void
+    {
+        $pending = Cache::get($this->pendingImportPricesCacheKey(), []);
+        if (! is_array($pending) || $pending === []) {
+            return;
+        }
+
+        foreach ($pending as $row) {
+            if (! is_array($row) || empty($row['keyword_id']) || empty($row['prices']) || ! is_array($row['prices'])) {
+                continue;
+            }
+            MonitoringKeywordPrice::updateOrCreate(
+                [
+                    'monitoring_keyword_id' => (int) $row['keyword_id'],
+                    'monitoring_searchengine_id' => $engineId,
+                ],
+                $row['prices']
+            );
+        }
+    }
+
+    private function forgetPendingImportPrices(): void
+    {
+        Cache::forget($this->pendingImportPricesCacheKey());
     }
 
     private function editQueries(Request $request)
@@ -445,6 +642,27 @@ class MonitoringProjectCreatorController extends Controller
         $this->deleteEmptyGroups();
 
         return $this->emptyDataCollection();
+    }
+
+    /**
+     * Очистить все запросы проекта (мастер создания / ошибка разметки CSV).
+     */
+    private function clearQueries()
+    {
+        $deleted = 0;
+        while (true) {
+            $ids = $this->project->keywords()->orderBy('id')->limit(500)->pluck('id');
+            if ($ids->isEmpty()) {
+                break;
+            }
+            $this->project->keywords()->whereIn('id', $ids)->delete();
+            $deleted += $ids->count();
+        }
+
+        $this->deleteEmptyGroups();
+        $this->forgetPendingImportPrices();
+
+        return response()->json(['deleted' => $deleted]);
     }
 
     private function updateKeywords(int $id, array $data)

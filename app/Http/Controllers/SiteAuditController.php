@@ -698,7 +698,7 @@ class SiteAuditController extends Controller
 
             return redirect()
                 ->route('pages.site-audit.crawl.show', $crawl->id)
-                ->with('status', 'Нельзя удалить незавершённый краул — сначала остановите');
+                ->with('status', 'Нельзя удалить незавершённую проверку — сначала остановите');
         }
 
         (new SiteAuditPruner())->deleteCrawl($crawl);
@@ -710,7 +710,7 @@ class SiteAuditController extends Controller
             ]);
         }
 
-        return redirect()->route('pages.site-audit')->with('status', 'Краул удалён');
+        return redirect()->route('pages.site-audit')->with('status', 'Проверка удалена');
     }
 
     public function destroyProject(Request $request, int $id)

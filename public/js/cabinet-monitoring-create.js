@@ -708,9 +708,74 @@
                 },
             ],
             initComplete: function () {
-                const title = $('div.card-title');
+                const $header = $(DATA_TABLE_ID).closest('.card').find('.card-header').first();
+                const title = $header.find('div.card-title');
                 title.text(cfg.i18n.queryList || 'Список запросов');
+                if (!$header.find('#clear-keywords').length) {
+                    const $clear = $(
+                        '<button type="button" id="clear-keywords" class="btn btn-sm btn-outline-danger float-end">' +
+                            (cfg.i18n.clearList || 'Очистить список') +
+                            '</button>'
+                    );
+                    const $length = $header.find('.dataTables_length');
+                    if ($length.length) {
+                        $clear.insertAfter($length);
+                    } else {
+                        $clear.insertAfter(title);
+                    }
+                }
             },
+        });
+    }
+
+    function bindKeywordsClear() {
+        $(document).on('click', '#clear-keywords', function () {
+            const id = getProjectId();
+            if (!id) {
+                showError(cfg.i18n.needProject || 'Сначала сохраните проект');
+                return false;
+            }
+            if (!dataTable) {
+                showError(cfg.i18n.needTable || 'Дождитесь загрузки таблицы');
+                return false;
+            }
+            const total = Number(dataTable.page.info().recordsTotal) || 0;
+            if (total < 1) {
+                showError(cfg.i18n.clearEmpty || 'Список запросов уже пуст');
+                return false;
+            }
+            const msg = (cfg.i18n.clearConfirm || 'Удалить все запросы из проекта?') +
+                ' (' + total + ')';
+            if (!window.confirm(msg)) {
+                return false;
+            }
+
+            const $btn = $(this);
+            if ($btn.data('busy')) {
+                return false;
+            }
+            $btn.data('busy', 1).prop('disabled', true);
+            window.axios
+                .post(cfg.urls.queries, { action: 'clear', id: id })
+                .then(function (res) {
+                    const n = Number((res.data && res.data.deleted) || 0);
+                    dataTable.ajax.reload(null, false);
+                    loadKeywordGroups();
+                    showSuccess(
+                        (cfg.i18n.cleared || 'Удалено запросов:') + ' ' + n
+                    );
+                })
+                .catch(function (err) {
+                    const msgErr =
+                        (err.response && err.response.data && err.response.data.message) ||
+                        cfg.i18n.saveError ||
+                        'Не удалось очистить список';
+                    showError(msgErr);
+                })
+                .finally(function () {
+                    $btn.data('busy', 0).prop('disabled', false);
+                });
+            return false;
         });
     }
 
@@ -761,6 +826,180 @@
         return out;
     }
 
+    const PRICE_COLS = ['top1', 'top3', 'top5', 'top10', 'top20', 'top50', 'top100'];
+
+    function normalizeCsvHeader(cell) {
+        return String(cell == null ? '' : cell)
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, ' ');
+    }
+
+    function buildCsvHeaderMap(cells) {
+        const map = Object.create(null);
+        $.each(cells, function (idx, cell) {
+            const h = normalizeCsvHeader(cell);
+            if (!h) {
+                return;
+            }
+            if (/^(query|запрос|keyword|фраза|phrase)$/i.test(h)) {
+                map.query = idx;
+            } else if (/^(group|группа)$/i.test(h)) {
+                map.group = idx;
+            } else if (/^(page|url|relevant|релевант)/i.test(h)) {
+                map.page = idx;
+            } else if (/^(price|цена|cost|стоимость)$/i.test(h)) {
+                map.price = idx;
+            } else if (/^top\s*1$/i.test(h) || h === 'топ 1' || h === 'топ1') {
+                map.top1 = idx;
+            } else if (/^top\s*3$/i.test(h) || h === 'топ 3' || h === 'топ3') {
+                map.top3 = idx;
+            } else if (/^top\s*5$/i.test(h) || h === 'топ 5' || h === 'топ5') {
+                map.top5 = idx;
+            } else if (/^top\s*10$/i.test(h) || h === 'топ 10' || h === 'топ10') {
+                map.top10 = idx;
+            } else if (/^top\s*20$/i.test(h) || h === 'топ 20' || h === 'топ20') {
+                map.top20 = idx;
+            } else if (/^top\s*50$/i.test(h) || h === 'топ 50' || h === 'топ50') {
+                map.top50 = idx;
+            } else if (/^top\s*100$/i.test(h) || h === 'топ 100' || h === 'топ100') {
+                map.top100 = idx;
+            }
+        });
+        return map;
+    }
+
+    function csvRowLooksLikeHeader(cells) {
+        const h0 = normalizeCsvHeader(cells[0]);
+        if (/^(query|запрос|keyword|фраза|phrase)$/i.test(h0)) {
+            return true;
+        }
+        for (let i = 0; i < cells.length; i++) {
+            const h = normalizeCsvHeader(cells[i]);
+            if (/^top\s*\d+$/i.test(h) || /^(price|цена|cost)$/i.test(h)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function parseCsvKeywordRow(cells, headerMap, defaults) {
+        let query;
+        let group = defaults.group;
+        let page = defaults.page;
+        const prices = Object.create(null);
+
+        if (headerMap && headerMap.query != null) {
+            query = String(cells[headerMap.query] == null ? '' : cells[headerMap.query]).trim();
+            if (headerMap.group != null && cells[headerMap.group] != null) {
+                const g = String(cells[headerMap.group]).trim();
+                if (g) {
+                    group = g;
+                }
+            }
+            if (headerMap.page != null && cells[headerMap.page] != null) {
+                const p = String(cells[headerMap.page]).trim();
+                if (p) {
+                    page = p;
+                }
+            }
+            $.each(PRICE_COLS, function (_, key) {
+                if (headerMap[key] == null || cells[headerMap[key]] == null) {
+                    return;
+                }
+                const v = String(cells[headerMap[key]]).trim();
+                if (v !== '') {
+                    prices[key] = v;
+                }
+            });
+            if (headerMap.price != null && cells[headerMap.price] != null) {
+                const v = String(cells[headerMap.price]).trim();
+                if (v !== '') {
+                    prices.price = v;
+                }
+            }
+        } else {
+            query = String(cells[0] == null ? '' : cells[0]).trim();
+            if (cells[1] && String(cells[1]).trim()) {
+                group = String(cells[1]).trim();
+            }
+            if (cells[2] && String(cells[2]).trim()) {
+                page = String(cells[2]).trim();
+            }
+            // позиционно после page: top1, top3, top5, top10, top20, top50, top100
+            for (let i = 0; i < PRICE_COLS.length; i++) {
+                const cell = cells[3 + i];
+                if (cell == null || String(cell).trim() === '') {
+                    continue;
+                }
+                prices[PRICE_COLS[i]] = String(cell).trim();
+            }
+        }
+
+        if (!query) {
+            return null;
+        }
+        group = String(group).replace(/[!\[\]]/g, '');
+        const row = {
+            query: query,
+            page: page,
+            group: group,
+            target: defaults.target,
+        };
+        $.each(prices, function (k, v) {
+            row[k] = v;
+        });
+        return row;
+    }
+
+    function kwProgressEls() {
+        const $wrap = $('#cabinet-mon-kw-progress');
+        return {
+            $wrap: $wrap,
+            $label: $wrap.find('[data-kw-progress-label]'),
+            $bar: $wrap.find('[data-kw-progress-bar]'),
+            $meta: $wrap.find('[data-kw-progress-meta]'),
+            $btn: $('#add-keywords'),
+        };
+    }
+
+    function showKwProgress(opts) {
+        const els = kwProgressEls();
+        const total = Math.max(0, Number(opts.total) || 0);
+        const done = Math.max(0, Math.min(total, Number(opts.done) || 0));
+        const pct = total > 0 ? Math.round((done / total) * 100) : opts.indeterminate ? 100 : 0;
+        const label =
+            opts.label ||
+            cfg.i18n.adding ||
+            'Добавляем запросы…';
+        els.$wrap.removeClass('d-none');
+        els.$label.text(label);
+        els.$meta.text(total > 0 ? done + ' / ' + total : '…');
+        els.$bar.css('width', pct + '%').attr('aria-valuenow', pct);
+        if (opts.indeterminate) {
+            els.$bar.addClass('progress-bar-animated');
+        }
+        if (!els.$btn.data('idle-label')) {
+            els.$btn.data('idle-label', els.$btn.data('label') || els.$btn.text());
+        }
+        if (total > 0) {
+            els.$btn.text((cfg.i18n.addingShort || 'Добавление…') + ' ' + done + '/' + total);
+        } else {
+            els.$btn.text(cfg.i18n.addingShort || 'Добавление…');
+        }
+    }
+
+    function hideKwProgress() {
+        const els = kwProgressEls();
+        const idle = els.$btn.data('idle-label') || els.$btn.data('label');
+        els.$wrap.addClass('d-none');
+        els.$bar.css('width', '0%').attr('aria-valuenow', 0);
+        els.$meta.text('0 / 0');
+        if (idle) {
+            els.$btn.text(idle);
+        }
+    }
+
     /** Чанками через JSON — Editor/max_input_vars на 4k строк ломались молча. */
     function createQueries(data) {
         const id = getProjectId();
@@ -775,7 +1014,16 @@
         const chunkSize = 250;
         let created = 0;
         let skipped = 0;
+        let pricesSaved = 0;
+        let pricesDeferred = 0;
+        let processed = 0;
         let chain = Promise.resolve();
+
+        showKwProgress({
+            label: cfg.i18n.adding || 'Добавляем запросы…',
+            done: 0,
+            total: list.length,
+        });
 
         for (let offset = 0; offset < list.length; offset += chunkSize) {
             const chunk = list.slice(offset, offset + chunkSize);
@@ -789,16 +1037,35 @@
                     .then(function (res) {
                         created += Number((res.data && res.data.created) || 0);
                         skipped += Number((res.data && res.data.skipped) || 0);
+                        pricesSaved += Number((res.data && res.data.prices_saved) || 0);
+                        pricesDeferred += Number((res.data && res.data.prices_deferred) || 0);
+                        processed += chunk.length;
+                        showKwProgress({
+                            label: cfg.i18n.adding || 'Добавляем запросы…',
+                            done: processed,
+                            total: list.length,
+                        });
                     });
             });
         }
 
         return chain.then(function () {
+            showKwProgress({
+                label: cfg.i18n.addingDone || 'Обновляем таблицу…',
+                done: list.length,
+                total: list.length,
+            });
             if (dataTable) {
                 dataTable.ajax.reload(null, false);
             }
             loadKeywordGroups();
-            return { created: created, skipped: skipped, total: list.length };
+            return {
+                created: created,
+                skipped: skipped,
+                total: list.length,
+                pricesSaved: pricesSaved,
+                pricesDeferred: pricesDeferred,
+            };
         });
     }
 
@@ -939,14 +1206,31 @@
                         const n = (stat && stat.created) || 0;
                         if (n < 1) {
                             showError(
-                                cfg.i18n.errKeywords ||
+                                cfg.i18n.errKeywordsEmpty ||
                                     'Не удалось добавить запросы (пустые или уже есть в проекте)'
                             );
                             return;
                         }
                         let msg = (cfg.i18n.added || 'Добавлено запросов:') + ' ' + n;
                         if (stat.skipped) {
-                            msg += ' (пропущено ' + stat.skipped + ')';
+                            msg +=
+                                ' (' +
+                                (cfg.i18n.skipped || 'пропущено') +
+                                ' ' +
+                                stat.skipped +
+                                ')';
+                        }
+                        if (stat.pricesSaved) {
+                            msg +=
+                                '. ' +
+                                (cfg.i18n.pricesSaved || 'Цены записаны') +
+                                ': ' +
+                                stat.pricesSaved;
+                        } else if (stat.pricesDeferred) {
+                            msg +=
+                                '. ' +
+                                (cfg.i18n.pricesDeferred ||
+                                    'Цены сохранятся после добавления региона');
                         }
                         showSuccess(msg);
                     })
@@ -958,6 +1242,7 @@
                         showError(msg);
                     })
                     .finally(function () {
+                        hideKwProgress();
                         $btn.data('busy', 0).prop('disabled', false);
                     });
             }
@@ -971,44 +1256,45 @@
                     showError(cfg.i18n.errCsv || 'Загрузите файл .csv');
                     return false;
                 }
+                $btn.data('busy', 1).prop('disabled', true);
+                showKwProgress({
+                    label: cfg.i18n.parsing || 'Читаем файл…',
+                    done: 0,
+                    total: 0,
+                    indeterminate: true,
+                });
                 Papa.parse(csv[0].files[0], {
                     delimiter: delimiter || '',
                     skipEmptyLines: 'greedy',
                     complete: function (result) {
                         const rows = result.data || [];
                         const relevant = $('#relevant-url').val() || '';
+                        const defaults = {
+                            group: groupInput.find('option:selected').text(),
+                            page: relevant,
+                            target: target.val(),
+                        };
+                        let headerMap = null;
                         let data = [];
                         $.each(rows, function (i, value) {
                             if (!$.isArray(value) || !value.length) {
                                 return;
                             }
-                            const query = String(value[0] == null ? '' : value[0]).trim();
-                            if (!query) {
+                            if (i === 0 && csvRowLooksLikeHeader(value)) {
+                                headerMap = buildCsvHeaderMap(value);
                                 return;
                             }
-                            // пропускаем строку-заголовок
-                            if (
-                                i === 0 &&
-                                /^(query|запрос|keyword|фраза)$/i.test(query)
-                            ) {
-                                return;
+                            const row = parseCsvKeywordRow(value, headerMap, defaults);
+                            if (row) {
+                                data.push(row);
                             }
-                            let group = groupInput.find('option:selected').text();
-                            if (value[1] && String(value[1]).trim()) {
-                                group = value[1];
-                            }
-                            group = String(group).replace(/[!\[\]]/g, '');
-                            data.push({
-                                query: query,
-                                page: (value[2] && String(value[2]).trim()) || relevant,
-                                group: group,
-                                target: target.val(),
-                            });
                         });
                         if (duplicates.prop('checked')) {
                             data = uniqueByQuery(data);
                         }
                         if (!data.length) {
+                            hideKwProgress();
+                            $btn.data('busy', 0).prop('disabled', false);
                             showError(cfg.i18n.errKeywords || 'Введите или загрузите список запросов');
                             return;
                         }
@@ -1017,6 +1303,8 @@
                         finishAdd(createQueries(data));
                     },
                     error: function () {
+                        hideKwProgress();
+                        $btn.data('busy', 0).prop('disabled', false);
                         showError(cfg.i18n.errCsv || 'Загрузите файл .csv');
                     },
                 });
@@ -1175,6 +1463,7 @@
 
         bindRegionsSelect2();
         bindKeywordsAdd();
+        bindKeywordsClear();
         bindScanMode();
         loadExistingProject();
         if (!getProjectId()) {

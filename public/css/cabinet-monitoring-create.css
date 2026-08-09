@@ -1,3 +1,32 @@
+.cabinet-mon-kw-progress {
+    margin-bottom: 0.75rem;
+}
+
+.cabinet-mon-kw-progress__label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.35rem;
+}
+
+.cabinet-mon-kw-progress__bar {
+    height: 0.65rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+}
+
+.cabinet-mon-kw-progress__bar .progress-bar {
+    background-color: #2563eb;
+}
+
+.cabinet-mon-kw-progress__meta {
+    margin-top: 0.3rem;
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: #64748b;
+}
+
 .cabinet-mon-create__lead {
     font-size: 0.9375rem;
     color: #64748b;
@@ -70,6 +99,14 @@
 
 .cabinet-mon-create #myTable_wrapper .card-header {
     background: #f8fafc;
+}
+
+.cabinet-mon-create #myTable_wrapper .dataTables_length {
+    margin-right: 0.25rem;
+}
+
+.cabinet-mon-create #clear-keywords {
+    margin-left: 0.85rem;
 }
 
 .cabinet-mon-create #myTable_wrapper .dataTables_processing {

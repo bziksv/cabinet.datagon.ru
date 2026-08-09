@@ -98,9 +98,15 @@
                     needKeywords: @json(__('Monitoring v2 create need keywords')),
                     needRegions: @json(__('Monitoring v2 create need regions')),
                     added: @json(__('Monitoring v2 create added')),
+                    adding: @json(__('Monitoring v2 create adding')),
+                    addingShort: @json(__('Monitoring v2 create adding short')),
+                    addingDone: @json(__('Monitoring v2 create adding done')),
+                    parsing: @json(__('Monitoring v2 create parsing')),
+                    skipped: @json(__('Monitoring v2 create skipped')),
+                    errKeywordsEmpty: @json(__('Monitoring v2 create err keywords empty')),
                     groupAdded: @json(__('Monitoring v2 create group added')),
                     colQuery: @json(__('Query')),
-                    colPage: @json(__('Relevant page')),
+                    colPage: @json(__('Relevant Page')),
                     colGroup: @json(__('Group')),
                     colTarget: @json(__('Target')),
                     queryList: @json(__('Monitoring v2 create query list')),
@@ -113,11 +119,17 @@
                     deleteTitle: @json(__('Delete')),
                     deleteMsg: @json(__('Monitoring v2 create delete confirm')),
                     deleteBtn: @json(__('Delete')),
+                    clearList: @json(__('Monitoring v2 create clear list')),
+                    clearConfirm: @json(__('Monitoring v2 create clear confirm')),
+                    clearEmpty: @json(__('Monitoring v2 create clear empty')),
+                    cleared: @json(__('Monitoring v2 create cleared')),
+                    pricesSaved: @json(__('Monitoring v2 create prices saved')),
+                    pricesDeferred: @json(__('Monitoring v2 create prices deferred')),
                     rangesHint: @json(__('Monitoring v2 create ranges hint')),
                 },
             };
         </script>
-        <script src="{{ asset('js/cabinet-monitoring-create.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-create.js')) ?: time()) . '-r3' }}"></script>
+        <script src="{{ asset('js/cabinet-monitoring-create.js') }}?v={{ (@filemtime(public_path('js/cabinet-monitoring-create.js')) ?: time()) . '-r7' }}"></script>
     @endslot
 
 @endcomponent

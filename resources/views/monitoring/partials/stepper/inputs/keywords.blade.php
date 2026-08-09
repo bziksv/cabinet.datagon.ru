@@ -12,7 +12,7 @@
                 </div>
                 <div class="form-group">
                     <label for="csv-keywords">{{ __('Monitoring v2 create csv label') }}</label>
-                    <input type="file" id="csv-keywords" class="form-control form-control-sm" accept=".csv,text/csv">
+                    <input type="file" id="csv-keywords" class="form-control form-control-sm" accept=".csv,.txt,text/csv,text/plain">
                     <small class="text-muted d-block mt-1">{{ __('Monitoring v2 create csv help') }}</small>
                 </div>
                 <div class="form-group">
@@ -54,7 +54,17 @@
                 </div>
             </div>
             <div class="card-footer">
-                <button type="button" id="add-keywords" class="btn btn-primary w-100">
+                <div id="cabinet-mon-kw-progress" class="cabinet-mon-kw-progress d-none" aria-live="polite">
+                    <div class="cabinet-mon-kw-progress__label" data-kw-progress-label>
+                        {{ __('Monitoring v2 create adding') }}
+                    </div>
+                    <div class="progress cabinet-mon-kw-progress__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" data-kw-progress-bar style="width: 0%"></div>
+                    </div>
+                    <div class="cabinet-mon-kw-progress__meta" data-kw-progress-meta>0 / 0</div>
+                </div>
+                <button type="button" id="add-keywords" class="btn btn-primary w-100"
+                        data-label="{{ __('Monitoring v2 create add keywords btn') }}">
                     {{ __('Monitoring v2 create add keywords btn') }}
                 </button>
             </div>

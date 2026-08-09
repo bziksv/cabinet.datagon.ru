@@ -650,14 +650,25 @@ class MonitoringProjectListSerializer
             'icon' => 'far fa-folder',
         ];
 
+        // «Покинуть» — только если есть другие участники. Единственный создатель
+        // не может «выйти», оставляя сироту: ему нужен «Удалить проект».
         if ($perms['leave']) {
-            $actions[] = [
-                'kind' => 'detach_self',
-                'project_id' => $id,
-                'user_id' => $auth->id,
-                'label' => 'Покинуть проект',
-                'icon' => 'fas fa-door-open',
-            ];
+            if ($project->users->count() > 1) {
+                $actions[] = [
+                    'kind' => 'detach_self',
+                    'project_id' => $id,
+                    'user_id' => $auth->id,
+                    'label' => 'Покинуть проект',
+                    'icon' => 'fas fa-door-open',
+                ];
+            } else {
+                $actions[] = [
+                    'kind' => 'delete_project',
+                    'id' => $id,
+                    'label' => 'Удалить проект',
+                    'icon' => 'fas fa-trash',
+                ];
+            }
         }
 
         return $actions;

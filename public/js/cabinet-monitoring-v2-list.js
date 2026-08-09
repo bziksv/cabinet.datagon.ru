@@ -1200,6 +1200,16 @@
                         escHtml(a.label) +
                         '</a>';
                     break;
+                case 'delete_project':
+                    menuHtml +=
+                        '<a class="dropdown-item text-danger cabinet-mon-v2-delete-project" href="#" data-id="' +
+                        a.id +
+                        '"><i class="' +
+                        escHtml(a.icon) +
+                        ' me-2"></i>' +
+                        escHtml(a.label) +
+                        '</a>';
+                    break;
                 case 'public_share':
                     menuHtml +=
                         '<a class="dropdown-item cabinet-mon-v2-public-share-open" href="#" data-id="' +
@@ -2632,8 +2642,24 @@
         updateSelectionBadge();
     });
 
-    $('#cabinet-mon-v2-delete-selected').on('click', function () {
-        const ids = getSelectedIds();
+    function removeProjectFromList(id) {
+        $grid.find('[data-project-id="' + id + '"]').remove();
+        allRows = allRows.filter(function (r) {
+            return String(r.id) !== String(id);
+        });
+        if (dataTable) {
+            dataTable
+                .rows(function (idx, data) {
+                    return String(data.id) === String(id);
+                })
+                .remove()
+                .draw(false);
+        }
+        loadedCount -= 1;
+        refreshDashboard();
+    }
+
+    function deleteProjects(ids) {
         if (!ids.length) {
             toastr.error(cfg.i18n.selectOne);
             return;
@@ -2643,20 +2669,17 @@
         }
         ids.forEach(function (id) {
             axios.delete('monitoring/' + id);
-            $grid.find('[data-project-id="' + id + '"]').remove();
-            allRows = allRows.filter(function (r) {
-                return String(r.id) !== String(id);
-            });
-            if (dataTable) {
-                dataTable.rows(function (idx, data) {
-                    return String(data.id) === String(id);
-                })
-                    .remove()
-                    .draw(false);
-            }
-            loadedCount -= 1;
-            refreshDashboard();
+            removeProjectFromList(id);
         });
+    }
+
+    $('#cabinet-mon-v2-root').on('click', '.cabinet-mon-v2-delete-project', function (e) {
+        e.preventDefault();
+        deleteProjects([$(this).data('id')]);
+    });
+
+    $('#cabinet-mon-v2-delete-selected').on('click', function () {
+        deleteProjects(getSelectedIds());
     });
 
     window.cabinetMonV2List = {

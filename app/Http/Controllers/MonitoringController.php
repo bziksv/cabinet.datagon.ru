@@ -172,6 +172,13 @@ class MonitoringController extends Controller
         $user = User::findOrFail($userId);
         $project = $user->monitoringProjects()->findOrFail($projectId);
 
+        // Единственный участник не может «покинуть» — получится сирота; только удаление.
+        if ((int) $project->users()->count() <= 1) {
+            return response()->json([
+                'message' => 'Вы единственный участник — удалите проект, а не покидайте его.',
+            ], 422);
+        }
+
         $user->syncRoles([]);
 
         return $user->monitoringProjects()->detach($project['id']);

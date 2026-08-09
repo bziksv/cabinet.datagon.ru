@@ -31,6 +31,8 @@ return [
     'batch_max_seconds' => (int) env('SITE_AUDIT_BATCH_SECONDS', 240),
     // Активный краул без updated_at дольше N мин → failed (иначе держит слот навечно)
     'stale_active_minutes' => (int) env('SITE_AUDIT_STALE_ACTIVE_MINUTES', 120),
+    // Раньше reclaim: если цепочка Continue/Discover оборвалась — пнуть job снова
+    'kick_idle_minutes' => (int) env('SITE_AUDIT_KICK_IDLE_MINUTES', 5),
     // Агрегация большими пачками не влезает в timeout → тики/этапы + пауза (разгрузка БД/CPU)
     'aggregate_tick_seconds' => (float) env('SITE_AUDIT_AGG_TICK_SECONDS', 150),
     'aggregate_tick_pause_seconds' => (int) env('SITE_AUDIT_AGG_TICK_PAUSE', 3),

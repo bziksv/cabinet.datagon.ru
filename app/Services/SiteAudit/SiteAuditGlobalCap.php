@@ -6,6 +6,7 @@ use App\Jobs\SiteAudit\DiscoverSiteAuditUrlsJob;
 use App\SiteAuditCrawl;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
 
 /**
  * Глобальный backpressure: одновременно N краулов на весь сервер.
@@ -113,6 +114,82 @@ class SiteAuditGlobalCap
     }
 
     /**
+     * Оживить краулы, у которых оборвалась цепочка job (lock/deadlock/restart),
+     * до того как reclaimStale убьёт слот.
+     */
+    public static function kickStuckActive(): int
+    {
+        $idleMinutes = max(2, (int) config('site_audit.kick_idle_minutes', 5));
+        $staleMinutes = max(15, (int) config('site_audit.stale_active_minutes', 120));
+        $idleCutoff = now()->subMinutes($idleMinutes);
+        // Не трогаем тех, кого уже пора reclaim'ить — их снимет reclaimStale.
+        $staleCutoff = now()->subMinutes($staleMinutes);
+
+        $stuck = SiteAuditCrawl::query()
+            ->whereIn('status', [
+                SiteAuditCrawl::STATUS_QUEUED,
+                SiteAuditCrawl::STATUS_DISCOVERING,
+                SiteAuditCrawl::STATUS_FETCHING,
+            ])
+            ->where('updated_at', '<', $idleCutoff)
+            ->where('updated_at', '>=', $staleCutoff)
+            ->orderBy('id')
+            ->limit(20)
+            ->get();
+
+        if ($stuck->isEmpty()) {
+            return 0;
+        }
+
+        $engine = new SiteAuditCrawlEngine();
+        $n = 0;
+        foreach ($stuck as $crawl) {
+            $dedupe = 'site_audit_kick_' . $crawl->id;
+            if (! Cache::add($dedupe, 1, max(60, $idleMinutes * 60))) {
+                continue;
+            }
+
+            try {
+                if ($crawl->status === SiteAuditCrawl::STATUS_FETCHING || $engine->hasEngineState($crawl)) {
+                    $engine->pushContinueJob((int) $crawl->id);
+                } else {
+                    self::pushDiscoverJob((int) $crawl->id);
+                }
+                $n++;
+                Log::warning('SiteAudit kicked stuck crawl', [
+                    'crawl_id' => $crawl->id,
+                    'status' => $crawl->status,
+                    'updated_at' => (string) $crawl->updated_at,
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('SiteAudit kick stuck failed: ' . $e->getMessage(), [
+                    'crawl_id' => $crawl->id,
+                ]);
+            }
+        }
+
+        return $n;
+    }
+
+    private static function pushDiscoverJob(int $crawlId): void
+    {
+        for ($attempt = 0; $attempt < 4; $attempt++) {
+            try {
+                Queue::push(new DiscoverSiteAuditUrlsJob($crawlId));
+
+                return;
+            } catch (\Throwable $e) {
+                $msg = $e->getMessage();
+                $deadlock = stripos($msg, 'Deadlock') !== false || strpos($msg, '1213') !== false;
+                if (! $deadlock || $attempt >= 3) {
+                    throw $e;
+                }
+                usleep(150000 * ($attempt + 1));
+            }
+        }
+    }
+
+    /**
      * @param callable $fn
      * @return mixed
      */
@@ -197,6 +274,7 @@ class SiteAuditGlobalCap
         try {
             return (int) self::withLock(function () {
                 self::reclaimStale();
+                self::kickStuckActive();
 
                 $slots = self::maxActive() - self::countActive();
                 if ($slots <= 0) {

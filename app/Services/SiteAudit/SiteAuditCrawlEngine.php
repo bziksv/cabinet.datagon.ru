@@ -8,6 +8,7 @@ use App\SiteAuditCrawl;
 use App\SiteAuditProject;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
 
 /**
  * Полный прогон краула: sitemap + дообход по внутренним ссылкам до лимита.
@@ -75,7 +76,12 @@ class SiteAuditCrawlEngine
         $lockKey = 'site_audit_crawl_tick_' . $crawl->id;
         $lockTtl = max(120, (int) config('site_audit.batch_max_seconds', 240) + 180);
         if (! Cache::add($lockKey, 1, $lockTtl)) {
-            return true; // другой воркер уже крутит — Continue уже в работе / в очереди
+            // Иначе при убитом воркере с живым lock цепочка Continue обрывается навсегда.
+            if ($dispatchContinue) {
+                $this->scheduleContinue((int) $crawl->id, 45);
+            }
+
+            return true;
         }
 
         try {
@@ -87,6 +93,14 @@ class SiteAuditCrawlEngine
                 return false;
             }
             if (! $this->hasEngineState($crawl)) {
+                if ($crawl->status === SiteAuditCrawl::STATUS_FETCHING) {
+                    $crawl->status = SiteAuditCrawl::STATUS_FAILED;
+                    $crawl->error = 'Прерван: потеряно состояние очереди краула';
+                    $crawl->finished_at = now();
+                    $crawl->save();
+                    SiteAuditGlobalCap::promoteWaiting();
+                }
+
                 return false;
             }
 
@@ -207,12 +221,18 @@ class SiteAuditCrawlEngine
                     }
 
                     if (! empty($out['internal_links']) && empty($settings['pages_only'])) {
-                        $known = $fetched + (count($queue) - $i);
+                        // $i уже сдвинут на всю волну, а в $fetched ещё нет «хвоста» волны —
+                        // без inFlight known занижается → при turbo лимит 10000 превращался в 10007.
+                        $inFlight = max(0, count($wave) - $wi - 1);
+                        $known = $fetched + (count($queue) - $i) + $inFlight;
                         foreach ($out['internal_links'] as $link) {
                             if (isset($seen[$link])) {
                                 continue;
                             }
                             if ($known >= $limit) {
+                                break;
+                            }
+                            if (count($seen) >= $limit) {
                                 break;
                             }
                             if ($patterns && SiteAuditUrlFilter::isExcluded($link, $patterns)) {
@@ -231,7 +251,10 @@ class SiteAuditCrawlEngine
                         }
                     }
 
-                    $pagesTotal = max(count($seen), $fetched + (count($queue) - $i));
+                    $pagesTotal = min(
+                        $limit,
+                        max(count($seen), $fetched + (count($queue) - $i) + max(0, count($wave) - $wi - 1))
+                    );
                     if ($processed % self::PROGRESS_DB_EVERY === 0 || $processed === 1) {
                         $this->touchProgress($crawl, $fetched, $pagesTotal, $unchanged, $expanded);
                     }
@@ -255,12 +278,58 @@ class SiteAuditCrawlEngine
             $this->touchProgress($crawl, $fetched, $pagesTotal, $unchanged, $expanded);
 
             if ($dispatchContinue) {
-                ContinueSiteAuditCrawlJob::dispatch($crawl->id);
+                $this->pushContinueJob((int) $crawl->id);
             }
 
             return true;
         } finally {
             Cache::forget($lockKey);
+        }
+    }
+
+    /**
+     * Safety Continue с debounce — не забиваем очередь при живом батче.
+     */
+    public function scheduleContinue(int $crawlId, int $delaySeconds = 45): void
+    {
+        $delaySeconds = max(5, $delaySeconds);
+        $key = 'site_audit_continue_sched_' . $crawlId;
+        if (! Cache::add($key, 1, $delaySeconds + 30)) {
+            return;
+        }
+        $this->pushContinueJob($crawlId, $delaySeconds);
+    }
+
+    /**
+     * Push Continue в database-queue с retry на deadlock (иначе цепочка батчей рвётся).
+     */
+    public function pushContinueJob(int $crawlId, int $delaySeconds = 0): void
+    {
+        for ($attempt = 0; $attempt < 4; $attempt++) {
+            try {
+                $job = new ContinueSiteAuditCrawlJob($crawlId);
+                if ($delaySeconds > 0) {
+                    Queue::later(now()->addSeconds($delaySeconds), $job);
+                } else {
+                    Queue::push($job);
+                }
+
+                return;
+            } catch (\Throwable $e) {
+                $msg = $e->getMessage();
+                $deadlock = stripos($msg, 'Deadlock') !== false || strpos($msg, '1213') !== false;
+                if (! $deadlock || $attempt >= 3) {
+                    Log::warning('SiteAudit continue dispatch failed', [
+                        'crawl_id' => $crawlId,
+                        'delay' => $delaySeconds,
+                        'attempt' => $attempt + 1,
+                        'error' => $msg,
+                    ]);
+
+                    return;
+                }
+                usleep(150000 * ($attempt + 1));
+            }
         }
     }
 
@@ -581,14 +650,14 @@ class SiteAuditCrawlEngine
             return false;
         }
 
-        // Лёгкий флаг в progress_json (история не грузит 5MB queue на каждый ряд).
+        // Без файла/blob очереди resume бесполезен — meta.remaining врёт после потери engine.
+        if (! $this->hasEngineState($crawl)) {
+            return false;
+        }
+
         $meta = $this->engineResumeMeta($crawl);
         if ($meta !== null) {
             return (int) ($meta['remaining'] ?? 0) > 0;
-        }
-
-        if (! $this->hasEngineState($crawl)) {
-            return false;
         }
 
         $state = $this->loadEngineState($crawl);

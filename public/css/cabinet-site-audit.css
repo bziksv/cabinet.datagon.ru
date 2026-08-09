@@ -2397,16 +2397,17 @@ html.sa-tour-active body {
   vertical-align: middle;
 }
 
-.cabinet-sa-history-table thead th:nth-child(1) { width: 16%; } /* проверка */
-.cabinet-sa-history-table thead th:nth-child(2) { width: 14%; } /* команда */
-.cabinet-sa-history-table thead th:nth-child(3) { width: 7%; }  /* статус */
-.cabinet-sa-history-table thead th:nth-child(4) { width: 9%; }  /* прогресс */
-.cabinet-sa-history-table thead th:nth-child(5) { width: 5.5rem; } /* время */
-.cabinet-sa-history-table thead th:nth-child(6),
+.cabinet-sa-history-table thead th:nth-child(1) { width: 14%; } /* проверка */
+.cabinet-sa-history-table thead th:nth-child(2) { width: 12%; } /* команда */
+.cabinet-sa-history-table thead th:nth-child(3) { width: 7.5rem; } /* статус */
+.cabinet-sa-history-table thead th:nth-child(4) { width: 6.5rem; } /* прогресс */
+.cabinet-sa-history-table thead th:nth-child(5),
+.cabinet-sa-history-table thead th:nth-child(6) { width: 5.25rem; } /* начало / конец */
 .cabinet-sa-history-table thead th:nth-child(7),
 .cabinet-sa-history-table thead th:nth-child(8),
-.cabinet-sa-history-table thead th:nth-child(9) { width: 4.5rem; } /* проблемы */
-.cabinet-sa-history-table thead th:nth-child(10) { width: auto; } /* действия */
+.cabinet-sa-history-table thead th:nth-child(9),
+.cabinet-sa-history-table thead th:nth-child(10) { width: 4.25rem; } /* проблемы */
+.cabinet-sa-history-table thead th:nth-child(11) { width: auto; } /* действия */
 
 .cabinet-sa-history-table tbody td {
   padding: 0.55rem 0.4rem;
@@ -2475,19 +2476,31 @@ html.sa-tour-active body {
   max-width: 100%;
 }
 
+.cabinet-sa-ht-status {
+  width: 7.5rem;
+  max-width: 7.5rem;
+  padding-right: 0.65rem !important;
+  white-space: nowrap;
+}
+
+.cabinet-sa-ht-progress {
+  width: 6.5rem;
+  max-width: 6.5rem;
+  padding-left: 0.35rem !important;
+}
+
 .cabinet-sa-ht-when {
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   color: #334155;
   white-space: nowrap;
-  width: 5.5rem;
-  max-width: 5.5rem;
+  width: 5.25rem;
+  max-width: 5.25rem;
   padding-left: 0.25rem !important;
   padding-right: 0.25rem !important;
 }
 
-.cabinet-sa-ht-when__end {
-  margin-top: 0.1rem;
+.cabinet-sa-ht-when--end {
   color: #64748b;
 }
 
@@ -2604,8 +2617,12 @@ html.sa-tour-active body {
 }
 
 .cabinet-sa-history-table .cabinet-sa-status {
-  font-size: 0.75rem;
-  padding: 0.15rem 0.45rem;
+  display: inline-block;
+  max-width: 100%;
+  font-size: 0.72rem;
+  padding: 0.15rem 0.4rem;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 .cabinet-sa-history-table .cabinet-sa-row-actions {

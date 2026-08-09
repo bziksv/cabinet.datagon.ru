@@ -43,9 +43,10 @@
             <tr>
                 <th class="cabinet-sa-ht-crawl">Проверка</th>
                 <th>Команда</th>
-                <th>Статус</th>
-                <th>Прогресс</th>
-                <th class="cabinet-sa-ht-when">Время</th>
+                <th class="cabinet-sa-ht-status">Статус</th>
+                <th class="cabinet-sa-ht-progress">Прогресс</th>
+                <th class="cabinet-sa-ht-when">Начало</th>
+                <th class="cabinet-sa-ht-when">Конец</th>
                 <th class="cabinet-sa-ht-num is-critical" title="Грубые ошибки">Гр.</th>
                 <th class="cabinet-sa-ht-num is-other" title="Прочие ошибки">Пр.</th>
                 <th class="cabinet-sa-ht-num is-warning" title="Предупреждения">Прд.</th>
@@ -162,12 +163,12 @@
                             <span class="text-secondary">—</span>
                         @endif
                     </td>
-                    <td>
+                    <td class="cabinet-sa-ht-status">
                         <span class="cabinet-sa-status cabinet-sa-status--{{ $stClass }}" data-sa-status>
                             {{ $c->statusLabelRu() }}
                         </span>
                     </td>
-                    <td data-sa-progress>
+                    <td class="cabinet-sa-ht-progress" data-sa-progress>
                         <div class="cabinet-sa-mini-prog" title="{{ $labelText }}">
                             <span class="cabinet-sa-mini-prog__n">{{ $labelText }}</span>
                             @if(! $finished || $isFailed)
@@ -175,22 +176,20 @@
                             @endif
                         </div>
                     </td>
-                    <td class="cabinet-sa-ht-when">
-                        <div data-sa-started title="Начало: {{ $startedFull }}">{{ $startedLabel }}</div>
-                        <div class="cabinet-sa-ht-when__end" data-sa-finished>
-                            @if($c->finished_at)
-                                {{ $c->finished_at->format('d.m H:i') }}
-                            @elseif($finished)
-                                —
+                    <td class="cabinet-sa-ht-when" data-sa-started title="{{ $startedFull }}">{{ $startedLabel }}</td>
+                    <td class="cabinet-sa-ht-when cabinet-sa-ht-when--end" data-sa-finished>
+                        @if($c->finished_at)
+                            {{ $c->finished_at->format('d.m H:i') }}
+                        @elseif($finished)
+                            —
+                        @else
+                            @php $eta = $c->estimateFinishedAtFormatted(); @endphp
+                            @if($eta)
+                                <span class="text-muted" title="Оценка конца">~{{ $eta }}</span>
                             @else
-                                @php $eta = $c->estimateFinishedAtFormatted(); @endphp
-                                @if($eta)
-                                    <span class="text-muted" title="Оценка конца">~{{ $eta }}</span>
-                                @else
-                                    <span class="text-muted">идёт…</span>
-                                @endif
+                                <span class="text-muted">идёт…</span>
                             @endif
-                        </div>
+                        @endif
                     </td>
                     <td class="cabinet-sa-ht-num is-critical" data-sa-bucket="critical">{{ number_format($crit, 0, '', ' ') }}</td>
                     <td class="cabinet-sa-ht-num is-other" data-sa-bucket="other">{{ number_format($other, 0, '', ' ') }}</td>
@@ -247,7 +246,7 @@
                 </tr>
             @empty
                 <tr data-sa-empty>
-                    <td colspan="10" class="cabinet-sa-history__empty">История пуста — запустите первую проверку.</td>
+                    <td colspan="11" class="cabinet-sa-history__empty">История пуста — запустите первую проверку.</td>
                 </tr>
             @endforelse
             </tbody>

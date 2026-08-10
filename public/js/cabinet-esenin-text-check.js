@@ -705,11 +705,24 @@
     }
 
     function showError(message) {
+        message = String(message || 'Не удалось выполнить проверку');
+        if (checkStatusTextEl) {
+            root.classList.add('is-loading');
+            setCheckStatusText('<strong class="text-danger">' + escapeHtml(message) + '</strong>');
+            setTimeout(function () {
+                if (checkInFlight === 0) {
+                    root.classList.remove('is-loading');
+                    setCheckStatusText('');
+                }
+            }, 6000);
+        }
         if (window.toastr) {
             window.toastr.error(message);
             return;
         }
-        window.alert(message);
+        if (!checkStatusTextEl) {
+            window.alert(message);
+        }
     }
 
     function isCkEditorReady() {

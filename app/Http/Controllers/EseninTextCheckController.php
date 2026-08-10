@@ -203,6 +203,12 @@ class EseninTextCheckController extends Controller
                 'message' => $e->getMessage(),
             ], 502);
         } catch (\Throwable $e) {
+            \Log::warning('Esenin text check failed', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
             return response()->json([
                 'error' => 'fetch_failed',
                 'message' => 'Не удалось выполнить проверку. Попробуйте позже.',

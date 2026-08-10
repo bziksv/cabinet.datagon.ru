@@ -49,7 +49,7 @@ final class EseninPlainIndexMap
      * @param  array<int, array{node: DOMText, offset: int}|null>  $map
      * @param  array<string, mixed>  $mark
      */
-    public static function wrapPlainRange(DOMDocument $dom, DOMElement $root, string $plain, int $start, int $length, array $mark, array $map): bool
+    public static function wrapPlainRange(DOMDocument $dom, DOMElement $root, string $plain, int $start, int $length, array $mark, array &$map): bool
     {
         if ($length <= 0) {
             return false;
@@ -105,7 +105,7 @@ final class EseninPlainIndexMap
         }
 
         foreach (array_reverse($segments) as $segment) {
-            self::wrapTextNodeSegment($dom, $segment, $mark);
+            self::wrapTextNodeSegment($dom, $segment, $mark, $map);
         }
 
         return true;
@@ -263,8 +263,9 @@ final class EseninPlainIndexMap
     /**
      * @param  array{node: DOMText, startOffset: int, endOffset: int}  $segment
      * @param  array<string, mixed>  $mark
+     * @param  array<int, array{node: DOMText, offset: int}|null>  $map
      */
-    private static function wrapTextNodeSegment(DOMDocument $dom, array $segment, array $mark): void
+    private static function wrapTextNodeSegment(DOMDocument $dom, array $segment, array $mark, array &$map): void
     {
         $node = $segment['node'];
         if (! $node->parentNode) {
@@ -283,7 +284,8 @@ final class EseninPlainIndexMap
         $after = mb_substr($text, $end, null, 'UTF-8');
 
         $markEl = self::createMarkElement($dom, $mark);
-        $markEl->appendChild($dom->createTextNode($middle));
+        $middleNode = $dom->createTextNode($middle);
+        $markEl->appendChild($middleNode);
         $icon = $dom->createElement('span');
         $icon->setAttribute('class', 'esenin-mark__icon');
         $icon->setAttribute('aria-hidden', 'true');
@@ -292,19 +294,47 @@ final class EseninPlainIndexMap
 
         $parent = $node->parentNode;
         $next = $node->nextSibling;
+        $beforeNode = null;
+        $afterNode = null;
 
         if ($before !== '') {
-            $parent->insertBefore($dom->createTextNode($before), $node);
+            $beforeNode = $dom->createTextNode($before);
+            $parent->insertBefore($beforeNode, $node);
         }
 
         $parent->insertBefore($markEl, $node);
         $parent->removeChild($node);
 
         if ($after !== '') {
+            $afterNode = $dom->createTextNode($after);
             if ($next) {
-                $parent->insertBefore($dom->createTextNode($after), $next);
+                $parent->insertBefore($afterNode, $next);
             } else {
-                $parent->appendChild($dom->createTextNode($after));
+                $parent->appendChild($afterNode);
+            }
+        }
+
+        // После split старые указатели на $node нужно перепривязать — иначе fromDom на каждую метку.
+        foreach ($map as $plainOffset => $entry) {
+            if (! is_array($entry) || ($entry['node'] ?? null) !== $node) {
+                continue;
+            }
+
+            $nodeOffset = (int) ($entry['offset'] ?? -1);
+            if ($nodeOffset < $start) {
+                if ($beforeNode instanceof DOMText) {
+                    $map[$plainOffset] = ['node' => $beforeNode, 'offset' => $nodeOffset];
+                } else {
+                    $map[$plainOffset] = null;
+                }
+            } elseif ($nodeOffset >= $end) {
+                if ($afterNode instanceof DOMText) {
+                    $map[$plainOffset] = ['node' => $afterNode, 'offset' => $nodeOffset - $end];
+                } else {
+                    $map[$plainOffset] = null;
+                }
+            } else {
+                $map[$plainOffset] = ['node' => $middleNode, 'offset' => $nodeOffset - $start];
             }
         }
     }

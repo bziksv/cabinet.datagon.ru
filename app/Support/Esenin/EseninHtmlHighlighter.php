@@ -27,19 +27,33 @@ final class EseninHtmlHighlighter
             return self::sanitizeHtml($html);
         }
 
+        // Слишком много меток на длинном HTML — оставляем самые весомые (карта DOM дорогая).
+        $maxMarks = 120;
+        if (count($accepted) > $maxMarks) {
+            usort($accepted, static function ($a, $b) {
+                return ((int) ($b['weight'] ?? 1) <=> (int) ($a['weight'] ?? 1))
+                    ?: ((int) ($b['length'] ?? 0) <=> (int) ($a['length'] ?? 0));
+            });
+            $accepted = array_slice($accepted, 0, $maxMarks);
+            usort($accepted, static function ($a, $b) {
+                return ((int) ($b['offset'] ?? 0) <=> (int) ($a['offset'] ?? 0));
+            });
+        }
+
         $dom = self::loadDom($html);
         $root = $dom->getElementById('esenin-root');
         if (! $root instanceof DOMElement) {
             return EseninAnalyzer::renderHighlightedPlainHtml($plain, $marks, $block);
         }
 
-        foreach ($accepted as $mark) {
-            $index = EseninPlainIndexMap::fromDom($root);
-            $domPlain = (string) ($index['plain'] ?? '');
-            if ($domPlain === '') {
-                continue;
-            }
+        $index = EseninPlainIndexMap::fromDom($root);
+        $domPlain = (string) ($index['plain'] ?? '');
+        if ($domPlain === '') {
+            return self::sanitizeHtml($html);
+        }
 
+        $map = $index['map'];
+        foreach ($accepted as $mark) {
             EseninPlainIndexMap::wrapPlainRange(
                 $dom,
                 $root,
@@ -47,7 +61,7 @@ final class EseninHtmlHighlighter
                 (int) $mark['offset'],
                 (int) $mark['length'],
                 $mark,
-                $index['map']
+                $map
             );
         }
 

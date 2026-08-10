@@ -422,7 +422,7 @@ return [
             'phase' => 'A',
             'severity' => 'info',
             'title' => 'Страницы без canonical',
-            'description' => 'Не задан rel=canonical (инфо).',
+            'description' => 'Нет rel=canonical — сложнее указать поисковику предпочтительный URL при дублях и параметрах.',
         ],
         'multiple_canonical' => [
             'phase' => 'B',

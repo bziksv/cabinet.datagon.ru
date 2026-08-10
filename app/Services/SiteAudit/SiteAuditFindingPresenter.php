@@ -884,9 +884,29 @@ class SiteAuditFindingPresenter
                 return $bits ? implode(' · ', $bits) : 'проблемы доступности';
 
             case 'index_count_mismatch':
+                if (($meta['kind'] ?? '') === 'missing_url') {
+                    $bits = [];
+                    $engine = (string) ($meta['engine'] ?? 'yandex');
+                    $bits[] = $engine === 'yandex' ? 'Яндекс' : ($engine === 'google' ? 'Google' : $engine);
+                    if (($meta['source'] ?? '') === 'webmaster') {
+                        $bits[] = 'Вебмастер';
+                    } elseif (($meta['source'] ?? '') === 'gsc') {
+                        $bits[] = 'GSC';
+                    }
+                    $bits[] = 'нет в индексе';
+                    if (! empty($meta['list_truncated'])) {
+                        $bits[] = 'список ПС мог быть неполным';
+                    }
+
+                    return implode(' · ', $bits);
+                }
                 $engine = (string) ($meta['engine'] ?? '');
                 $bits = [];
-                if ($engine !== '') {
+                if ($engine === 'yandex') {
+                    $bits[] = 'Яндекс';
+                } elseif ($engine === 'google') {
+                    $bits[] = 'Google';
+                } elseif ($engine !== '') {
                     $bits[] = $engine;
                 }
                 $source = (string) ($meta['source'] ?? '');
@@ -1004,13 +1024,14 @@ class SiteAuditFindingPresenter
                     : 'нет в индексе ПС';
 
             case 'index_url_missing':
+                // устаревший code; новые сверки пишут в index_count_mismatch
                 $bits = [];
                 $engine = (string) ($meta['engine'] ?? 'yandex');
-                $bits[] = $engine === 'yandex' ? 'Яндекс' : $engine;
+                $bits[] = $engine === 'yandex' ? 'Яндекс' : ($engine === 'google' ? 'Google' : $engine);
                 if (($meta['source'] ?? '') === 'webmaster') {
                     $bits[] = 'Вебмастер';
                 }
-                $bits[] = 'нет в поиске';
+                $bits[] = 'нет в индексе';
                 if (! empty($meta['list_truncated'])) {
                     $bits[] = 'список ПС мог быть неполным';
                 }

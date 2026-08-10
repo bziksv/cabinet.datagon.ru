@@ -128,7 +128,6 @@ class SiteAuditReportFilter
             'duplicate_url_variants' => ['details'],
             'site_availability' => ['details'],
             'index_count_mismatch' => ['details'],
-            'index_url_missing' => ['details'],
             'no_outbound_internal' => ['details'],
             'risky_query_params' => ['details'],
             'pagination_param' => ['details'],

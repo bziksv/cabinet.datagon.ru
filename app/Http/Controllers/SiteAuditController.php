@@ -649,12 +649,12 @@ class SiteAuditController extends Controller
             'showFixed' => $showFixed,
             'ignoredMap' => $ignoredMap,
             'probeStatus' => SiteAuditProbeStatus::forCode($crawl, $code),
-            'serpIndexDeep' => in_array($code, ['index_count_mismatch', 'index_url_missing'], true)
+            'serpIndexDeep' => $code === 'index_count_mismatch'
                 ? (is_array($crawl->progress_json['serp_index']['deep'] ?? null)
                     ? $crawl->progress_json['serp_index']['deep']
                     : null)
                 : null,
-            'serpIndexWebmaster' => in_array($code, ['index_count_mismatch', 'index_url_missing'], true)
+            'serpIndexWebmaster' => $code === 'index_count_mismatch'
                 ? (new SiteAuditSerpIndexProbe())->webmasterStatusPayload($crawl)
                 : null,
             'notesMap' => $notesMap,

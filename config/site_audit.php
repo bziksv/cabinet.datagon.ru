@@ -264,7 +264,6 @@ return [
         'deep_pages',
         'site_availability',
             'index_count_mismatch',
-            'index_url_missing',
             'serp_snippets',
             'serp_title_mismatch',
             'serp_not_indexed',
@@ -965,15 +964,8 @@ return [
         'index_count_mismatch' => [
             'phase' => 'B',
             'severity' => 'warning',
-            'title' => 'Индекс ПС ≠ страниц сайта',
-            'description' => 'Сводка сверки списка «в поиске» Яндекс.Вебмастера с краулом.',
-            'group' => 'seo',
-        ],
-        'index_url_missing' => [
-            'phase' => 'B',
-            'severity' => 'warning',
-            'title' => 'URL краула нет в индексе ПС',
-            'description' => 'Страница найдена краулом (не robots, не noindex), но отсутствует в списке «в поиске» Вебмастера / GSC.',
+            'title' => 'Страницы на сайте не в индексе поисковых',
+            'description' => 'Сверка «в поиске» (Вебмастер / GSC) с краулом: сводка и URL, которых нет в индексе — в деталях указана ПС.',
             'group' => 'seo',
         ],
         'serp_snippets' => [

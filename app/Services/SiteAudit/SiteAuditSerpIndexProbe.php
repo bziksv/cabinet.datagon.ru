@@ -360,45 +360,50 @@ class SiteAuditSerpIndexProbe
         $urlFindingsMax = max(0, min(20000, (int) config('site_audit.serp_index_url_findings_max', 5000)));
         $missingForFindings = array_slice($missingInIndex, 0, $urlFindingsMax);
 
-        SiteAuditFinding::query()->create([
-            'crawl_id' => $crawl->id,
-            'code' => 'index_count_mismatch',
-            'severity' => $severity,
-            'url' => $ctx['root_url'],
-            'url_hash' => SiteAuditUrlNormalizer::hash($ctx['root_url']),
-            'meta_json' => [
-                'engine' => $ctx['engine'],
-                'source' => $ctx['source'],
-                'pages_total' => $ctx['pages_total'],
-                'capped' => false,
-                'deep' => true,
-                'mode' => $ctx['mode'],
-                'query' => $ctx['query'],
-                'host_id' => $ctx['host_id'] ?? null,
-                'found' => $found,
-                'serp_count' => $serpCount,
-                'crawl_count' => $crawlCount,
-                'matched' => $matched,
-                'missing_in_index' => $missingCount,
-                'extra_in_index' => $extraCount,
-                'truncated' => $truncated,
-                'list_complete' => $listComplete,
-                'url_findings' => count($missingForFindings),
-                'url_findings_capped' => $missingCount > count($missingForFindings),
-                'excluded_robots' => true,
-                'missing_urls' => array_slice($missingInIndex, 0, 20),
-                'extra_urls' => array_slice($extraInIndex, 0, 12),
-                'during_audit' => true,
-            ],
-        ]);
-
-        $this->emitMissingUrlFindings(
-            $crawl->id,
-            (string) $ctx['engine'],
-            (string) $ctx['source'],
-            $missingForFindings,
-            $truncated
-        );
+        // В таблице отчёта — только страницы не в индексе (ПС в деталях).
+        // Сводка живёт в progress_json и в жёлтом блоке сверху.
+        if ($missingForFindings === []) {
+            SiteAuditFinding::query()->create([
+                'crawl_id' => $crawl->id,
+                'code' => 'index_count_mismatch',
+                'severity' => $severity,
+                'url' => $ctx['root_url'],
+                'url_hash' => SiteAuditUrlNormalizer::hash($ctx['root_url']),
+                'meta_json' => [
+                    'kind' => 'summary',
+                    'engine' => $ctx['engine'],
+                    'source' => $ctx['source'],
+                    'pages_total' => $ctx['pages_total'],
+                    'capped' => false,
+                    'deep' => true,
+                    'mode' => $ctx['mode'],
+                    'query' => $ctx['query'],
+                    'host_id' => $ctx['host_id'] ?? null,
+                    'found' => $found,
+                    'serp_count' => $serpCount,
+                    'crawl_count' => $crawlCount,
+                    'matched' => $matched,
+                    'missing_in_index' => $missingCount,
+                    'extra_in_index' => $extraCount,
+                    'truncated' => $truncated,
+                    'list_complete' => $listComplete,
+                    'url_findings' => 0,
+                    'url_findings_capped' => false,
+                    'excluded_robots' => true,
+                    'missing_urls' => [],
+                    'extra_urls' => array_slice($extraInIndex, 0, 12),
+                    'during_audit' => true,
+                ],
+            ]);
+        } else {
+            $this->emitMissingUrlFindings(
+                $crawl->id,
+                (string) $ctx['engine'],
+                (string) $ctx['source'],
+                $missingForFindings,
+                $truncated
+            );
+        }
 
         $msg = 'Вебмастер: ' . $serpCount . ' URL'
             . ($found !== null ? (' (в поиске ~' . $found . ')') : '')
@@ -424,6 +429,8 @@ class SiteAuditSerpIndexProbe
     }
 
     /**
+     * URL-находки в том же отчёте index_count_mismatch (не отдельный code).
+     *
      * @param list<string> $urls
      */
     private function emitMissingUrlFindings(
@@ -437,7 +444,7 @@ class SiteAuditSerpIndexProbe
             return;
         }
 
-        $cfg = config('site_audit.findings.index_url_missing', []);
+        $cfg = config('site_audit.findings.index_count_mismatch', []);
         $severity = (string) ($cfg['severity'] ?? 'warning');
         $now = now()->toDateTimeString();
         $rows = [];
@@ -448,11 +455,12 @@ class SiteAuditSerpIndexProbe
             }
             $rows[] = [
                 'crawl_id' => $crawlId,
-                'code' => 'index_url_missing',
+                'code' => 'index_count_mismatch',
                 'severity' => $severity,
                 'url' => $url,
                 'url_hash' => SiteAuditUrlNormalizer::hash($url),
                 'meta_json' => json_encode([
+                    'kind' => 'missing_url',
                     'engine' => $engine,
                     'source' => $source,
                     'reason' => 'not_in_search',
@@ -472,6 +480,7 @@ class SiteAuditSerpIndexProbe
         }
     }
 
+    /** Старый code до объединения в index_count_mismatch — подчистка при пересверке. */
     private function deleteUrlMissingFindings(int $crawlId): void
     {
         SiteAuditFinding::query()

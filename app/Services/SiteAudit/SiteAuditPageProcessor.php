@@ -730,7 +730,6 @@ class SiteAuditPageProcessor
                 'landing_url_changed',
                 'site_availability',
                 'index_count_mismatch',
-                'index_url_missing',
                 'serp_snippets',
                 'serp_title_mismatch',
                 'serp_not_indexed',

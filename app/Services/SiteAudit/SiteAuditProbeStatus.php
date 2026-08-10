@@ -39,8 +39,8 @@ class SiteAuditProbeStatus
                 'config_key' => 'site_audit.serp_cannibalization_enabled',
             ],
             'serp_index' => [
-                'codes' => ['index_count_mismatch', 'index_url_missing'],
-                'title' => 'Индекс ПС ≠ страниц',
+                'codes' => ['index_count_mismatch'],
+                'title' => 'Страницы на сайте не в индексе поисковых',
                 'progress_key' => 'serp_index',
                 'config_key' => 'site_audit.serp_index_enabled',
             ],

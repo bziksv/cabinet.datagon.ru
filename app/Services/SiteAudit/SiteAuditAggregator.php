@@ -92,7 +92,6 @@ class SiteAuditAggregator
         'landing_query_mismatch',
         'site_availability',
         'index_count_mismatch',
-        'index_url_missing',
         'serp_snippets',
         'serp_title_mismatch',
         'serp_not_indexed',

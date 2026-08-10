@@ -3,7 +3,7 @@
 @php
     $isRedirectReport = in_array($code ?? '', ['redirect', 'redirect_chain_long', 'redirect_loop'], true);
     $probeSkipped = is_array($probeStatus ?? null) && ($probeStatus['status'] ?? '') === 'skipped';
-    $isIndexMismatch = in_array($code ?? '', ['index_count_mismatch', 'index_url_missing'], true);
+    $isIndexMismatch = ($code ?? '') === 'index_count_mismatch';
 @endphp
 @if($probeSkipped && ! $isIndexMismatch)
     <div class="alert alert-warning border small mb-3 cabinet-sa-probe-cta">
@@ -89,11 +89,8 @@
             @endphp
             @if($missingN > 0)
                 <div class="mt-2 mb-0">
-                    В крауле нет в индексе Яндекса: <strong>{{ $missingN }}</strong>
-                    (без robots/noindex) —
-                    <a href="{{ route('pages.site-audit.report.show', [$crawl->id, 'index_url_missing']) }}">
-                        полный список URL
-                    </a>
+                    Нет в индексе: <strong>{{ $missingN }}</strong> URL краула
+                    (без robots/noindex). В таблице ниже — URL и ПС в «деталях».
                 </div>
             @endif
             @if($extraN > 0)

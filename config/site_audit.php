@@ -1138,7 +1138,7 @@ return [
             'phase' => 'C',
             'severity' => 'info',
             'title' => 'Нет Content-Security-Policy',
-            'description' => 'Ответ не задаёт Content-Security-Policy (XSS / injection риск).',
+            'description' => 'Нет Content-Security-Policy — браузер не ограничивает, откуда можно грузить скрипты и ресурсы.',
             'group' => 'tech',
         ],
         'missing_referrer_policy' => [

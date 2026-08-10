@@ -118,9 +118,9 @@ return [
     'psi_max_urls' => (int) env('SITE_AUDIT_PSI_MAX_URLS', 20),
     'psi_strategies' => ['mobile', 'desktop'],
     'psi_score_warn' => (float) env('SITE_AUDIT_PSI_SCORE_WARN', 0.5),
-    'psi_timeout' => (int) env('SITE_AUDIT_PSI_TIMEOUT', 90),
-    // Сколько URL мерять за один тик агрегации (каждый URL = mobile+desktop).
-    'psi_urls_per_tick' => (int) env('SITE_AUDIT_PSI_URLS_PER_TICK', 2),
+    'psi_timeout' => (int) env('SITE_AUDIT_PSI_TIMEOUT', 75),
+    // 1 URL/тик: rich PSI (4 категории × mobile/desktop) иначе тик легко вылезает за budget.
+    'psi_urls_per_tick' => (int) env('SITE_AUDIT_PSI_URLS_PER_TICK', 1),
 
     // Content risk lite (keyword classifiers + word repeats). Cheap — on by default.
     'content_risk_enabled' => (bool) env('SITE_AUDIT_CONTENT_RISK', true),

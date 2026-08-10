@@ -3188,7 +3188,7 @@ html.sa-tour-active body {
 
 .cabinet-sa-history-table thead th:nth-child(1) { width: 18%; } /* проверка */
 .cabinet-sa-history-table thead th:nth-child(2) { width: 14%; } /* команда */
-.cabinet-sa-history-table thead th:nth-child(3) { width: 8.75rem; } /* статус */
+.cabinet-sa-history-table thead th:nth-child(3) { width: 9.5rem; } /* статус */
 .cabinet-sa-history-table thead th:nth-child(4) { width: 6.5rem; } /* прогресс */
 .cabinet-sa-history-table thead th:nth-child(5),
 .cabinet-sa-history-table thead th:nth-child(6) { width: 5.25rem; } /* начало / конец */
@@ -3266,13 +3266,14 @@ html.sa-tour-active body {
 }
 
 .cabinet-sa-ht-status {
-  width: 8.75rem;
-  max-width: 9.5rem;
+  width: 9.5rem;
+  max-width: 10.5rem;
   padding-right: 0.65rem !important;
   white-space: nowrap;
 }
 .cabinet-sa-ht-status .cabinet-sa-status {
   white-space: nowrap;
+  max-width: 100%;
 }
 
 .cabinet-sa-ht-progress {

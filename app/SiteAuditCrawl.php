@@ -111,12 +111,68 @@ class SiteAuditCrawl extends Model
 
     public function statusLabelRu(): string
     {
+        if ($this->status === self::STATUS_AGGREGATING) {
+            $detail = $this->aggregateStageLabel();
+            if ($detail !== null) {
+                return $detail;
+            }
+        }
+
         return self::statusLabel($this->status);
     }
 
     public function statusLabelFullRu(): string
     {
+        if ($this->status === self::STATUS_AGGREGATING) {
+            $detail = $this->aggregateStageLabel();
+            if ($detail !== null) {
+                return 'Агрегация: ' . $detail . ' (финальный этап после сканирования)';
+            }
+        }
+
         return self::statusLabelFull($this->status);
+    }
+
+    /**
+     * Короткая подпись текущего этапа агрегации (чтобы не казалось, что «Агрегация» зависла).
+     */
+    public function aggregateStageLabel(): ?string
+    {
+        $progress = is_array($this->progress_json) ? $this->progress_json : [];
+        $stage = (string) (($progress['aggregate']['stage'] ?? '') ?: '');
+        if ($stage === '' || $stage === 'done') {
+            return null;
+        }
+
+        if ($stage === 'psi') {
+            $psi = is_array($progress['psi'] ?? null) ? $progress['psi'] : [];
+            if (! empty($psi['skipped'])) {
+                return 'PSI пропуск';
+            }
+            $cursor = (int) ($psi['cursor'] ?? 0);
+            $sampled = (int) ($psi['sampled'] ?? 0);
+            if ($sampled > 0) {
+                return 'PSI ' . min($cursor, $sampled) . '/' . $sampled;
+            }
+
+            return 'PageSpeed';
+        }
+
+        $map = [
+            'serp_snippets' => 'Сниппеты',
+            'serp_index' => 'Индекс',
+            'serp_cannibalization' => 'Каннибал.',
+            'availability' => 'Доступность',
+            'cannibalization' => 'Каннибал.',
+            'finalize' => 'Финиш',
+            'click_depth' => 'Глубина',
+            'sitemap_coverage' => 'Sitemap',
+            'landing_coverage' => 'Посадочные',
+            'broken_links' => 'Битые',
+            'from_pages' => 'Страницы',
+        ];
+
+        return $map[$stage] ?? ('Этап ' . $stage);
     }
 
     public function statusCssClass(): string

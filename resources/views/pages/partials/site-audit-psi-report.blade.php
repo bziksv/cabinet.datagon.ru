@@ -10,6 +10,15 @@
     $strategyHint = SiteAuditPsiMetrics::strategyHintRu($code ?? 'psi_mobile');
     $psiGoogleBase = 'https://pagespeed.web.dev/analysis?url=';
     $showActions = !empty($canNote) || !empty($canIgnore);
+    $psiMobileUrl = !empty($crawl)
+        ? route('pages.site-audit.report.show', [$crawl->id, 'psi_mobile'])
+        : null;
+    $psiDesktopUrl = !empty($crawl)
+        ? route('pages.site-audit.report.show', [$crawl->id, 'psi_desktop'])
+        : null;
+    $psiCountSource = is_array($sideCounts ?? null) ? $sideCounts : (is_array($counts ?? null) ? $counts : []);
+    $psiMobileCount = (int) ($psiCountSource['psi_mobile'] ?? 0);
+    $psiDesktopCount = (int) ($psiCountSource['psi_desktop'] ?? 0);
 @endphp
 
 @if($psiRows->isEmpty())
@@ -29,10 +38,33 @@
                     <span class="cabinet-sa-psi-ring__lbl">балл</span>
                 </div>
                 <div class="cabinet-sa-psi-hero__meta">
-                    <div class="cabinet-sa-psi-device {{ $isDesktop ? 'is-desktop' : 'is-mobile' }}">
-                        {{ $isDesktop ? 'Компьютер' : 'Телефон' }}
-                        <span class="cabinet-sa-psi-device__eng">{{ $isDesktop ? 'desktop' : 'mobile' }}</span>
-                    </div>
+                    @if($psiMobileUrl && $psiDesktopUrl)
+                        <div class="cabinet-sa-psi-switch" role="tablist" aria-label="Устройство замера">
+                            <a class="cabinet-sa-psi-switch__btn {{ ! $isDesktop ? 'is-active' : '' }}"
+                               href="{{ $psiMobileUrl }}"
+                               role="tab"
+                               aria-selected="{{ ! $isDesktop ? 'true' : 'false' }}">
+                                Телефон
+                                @if($psiMobileCount > 0)
+                                    <span class="cabinet-sa-psi-switch__n">{{ $psiMobileCount }}</span>
+                                @endif
+                            </a>
+                            <a class="cabinet-sa-psi-switch__btn {{ $isDesktop ? 'is-active' : '' }}"
+                               href="{{ $psiDesktopUrl }}"
+                               role="tab"
+                               aria-selected="{{ $isDesktop ? 'true' : 'false' }}">
+                                Компьютер
+                                @if($psiDesktopCount > 0)
+                                    <span class="cabinet-sa-psi-switch__n">{{ $psiDesktopCount }}</span>
+                                @endif
+                            </a>
+                        </div>
+                    @else
+                        <div class="cabinet-sa-psi-device {{ $isDesktop ? 'is-desktop' : 'is-mobile' }}">
+                            {{ $isDesktop ? 'Компьютер' : 'Телефон' }}
+                            <span class="cabinet-sa-psi-device__eng">{{ $isDesktop ? 'desktop' : 'mobile' }}</span>
+                        </div>
+                    @endif
                     <div class="cabinet-sa-psi-hero__title">
                         Средняя скорость · {{ $strategyLabel }}
                     </div>
@@ -61,9 +93,15 @@
                 <div class="cabinet-sa-psi-legend__row"><span class="cabinet-sa-psi-dot cabinet-sa-psi-dot--poor"></span> красный — плохо, чинить первым</div>
                 <div class="cabinet-sa-psi-legend__note">
                     @if($isDesktop)
-                        Это отчёт для компьютера. Мобильный — в соседнем пункте дерева «Мобильные устройства (PSI)».
+                        Сейчас открыт компьютер.
+                        @if($psiMobileUrl)
+                            <a href="{{ $psiMobileUrl }}">Перейти к телефону →</a>
+                        @endif
                     @else
-                        Это отчёт для телефона. Компьютерный — в «Компьютеры (PSI)».
+                        Сейчас открыт телефон.
+                        @if($psiDesktopUrl)
+                            <a href="{{ $psiDesktopUrl }}">Перейти к компьютеру →</a>
+                        @endif
                     @endif
                 </div>
             </div>

@@ -3,8 +3,8 @@
 namespace App;
 
 use App\Support\HomeUserSites;
+use App\Support\SchemaMemo;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Schema;
 
 class YandexMetrikaDomainCounter extends Model
 {
@@ -24,11 +24,7 @@ class YandexMetrikaDomainCounter extends Model
 
     public static function tableReady(): bool
     {
-        try {
-            return Schema::hasTable('yandex_metrika_domain_counters');
-        } catch (\Throwable $e) {
-            return false;
-        }
+        return SchemaMemo::hasTable('yandex_metrika_domain_counters');
     }
 
     /**

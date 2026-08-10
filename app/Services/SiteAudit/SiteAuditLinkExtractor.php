@@ -45,11 +45,25 @@ class SiteAuditLinkExtractor
             }
         }
 
-        if (preg_match_all('/<a\b([^>]*)>/i', $html, $anchors)) {
-            foreach ($anchors[1] as $attrs) {
+        if (preg_match_all('/<a\b([^>]*)>/i', $html, $anchors, PREG_OFFSET_CAPTURE)) {
+            foreach ($anchors[1] as $i => $attrMatch) {
+                $attrs = $attrMatch[0];
+                $openFull = $anchors[0][$i][0];
+                $openPos = (int) $anchors[0][$i][1];
+                $context = $this->anchorContext($html, $openFull, $openPos);
+
                 if (! preg_match('/\bhref\s*=\s*("([^"]*)"|\'([^\']*)\'|([^\s>]+))/i', $attrs, $hm)) {
+                    // <a name="..."> / <a id="..."> — якорь-закладка, не «плохая ссылка».
+                    if (preg_match('/\b(name|id)\s*=/i', $attrs)) {
+                        continue;
+                    }
                     if (count($badLinks) < 15) {
-                        $badLinks[] = ['href' => null, 'reason' => 'missing_href'];
+                        $badLinks[] = [
+                            'href' => null,
+                            'reason' => 'missing_href',
+                            'text' => $context['text'],
+                            'snippet' => $context['snippet'],
+                        ];
                     }
                     continue;
                 }
@@ -63,6 +77,8 @@ class SiteAuditLinkExtractor
                         $badLinks[] = [
                             'href' => mb_substr($href, 0, 200),
                             'reason' => $badReason,
+                            'text' => $context['text'],
+                            'snippet' => $context['snippet'],
                         ];
                     }
                     continue;
@@ -235,6 +251,39 @@ class SiteAuditLinkExtractor
         }
 
         return $html;
+    }
+
+    /**
+     * Текст и короткий HTML-фрагмент якоря для отчёта «какая ссылка».
+     *
+     * @return array{text:string,snippet:string}
+     */
+    private function anchorContext(string $html, string $openTag, int $openPos): array
+    {
+        $rest = substr($html, $openPos + strlen($openTag), 500);
+        $inner = '';
+        if (is_string($rest) && preg_match('/^(.*?)<\/a>/is', $rest, $m)) {
+            $inner = $m[1];
+            $snippet = $openTag . $inner . '</a>';
+        } else {
+            $snippet = $openTag;
+        }
+
+        $text = trim(html_entity_decode(strip_tags($inner), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $text = preg_replace('/\s+/u', ' ', $text) ?: '';
+        if (mb_strlen($text) > 80) {
+            $text = mb_substr($text, 0, 79) . '…';
+        }
+
+        $snippet = preg_replace('/\s+/u', ' ', $snippet) ?: $snippet;
+        if (mb_strlen($snippet) > 160) {
+            $snippet = mb_substr($snippet, 0, 159) . '…';
+        }
+
+        return [
+            'text' => $text,
+            'snippet' => $snippet,
+        ];
     }
 
     /**

@@ -8,9 +8,11 @@
     @slot('tools')
         <a href="{{ route('pages.site-audit') }}" class="btn btn-sm btn-outline-secondary">← К проектам</a>
         <a href="{{ route('pages.site-audit.crawl.show', $crawl->id) }}" class="btn btn-sm btn-outline-secondary">Сводка проверки</a>
-        <a href="{{ route('pages.site-audit.report.csv', [$crawl->id, $code]) }}{{ !empty($filterParams) ? ('?' . http_build_query($filterParams)) : '' }}" class="btn btn-sm btn-outline-primary">CSV</a>
-        <a href="{{ route('pages.site-audit.report.xlsx', [$crawl->id, $code]) }}{{ !empty($filterParams) ? ('?' . http_build_query($filterParams)) : '' }}" class="btn btn-sm btn-outline-success">XLSX</a>
-        <button type="button" class="btn btn-sm btn-outline-secondary cabinet-sa-print-btn" onclick="window.print()">Печать</button>
+        @if(empty($isExternalModule))
+            <a href="{{ route('pages.site-audit.report.csv', [$crawl->id, $code]) }}{{ !empty($filterParams) ? ('?' . http_build_query($filterParams)) : '' }}" class="btn btn-sm btn-outline-primary">CSV</a>
+            <a href="{{ route('pages.site-audit.report.xlsx', [$crawl->id, $code]) }}{{ !empty($filterParams) ? ('?' . http_build_query($filterParams)) : '' }}" class="btn btn-sm btn-outline-success">XLSX</a>
+            <button type="button" class="btn btn-sm btn-outline-secondary cabinet-sa-print-btn" onclick="window.print()">Печать</button>
+        @endif
     @endslot
 
     <div class="cabinet-sa-page" id="sa-report-root"
@@ -38,15 +40,21 @@
         <div class="mb-2 text-secondary small d-flex flex-wrap align-items-center" style="gap:8px">
             <span>
                 {{ optional($project)->domain }} ·
-                приоритет: <strong>{{ \App\Services\SiteAudit\SiteAuditFindingPresenter::severityLabel($meta['severity'] ?? '') }}</strong>
-                · находок: <strong>{{ $total }}</strong>
-                @if(!empty($filtersActive))
-                    <span class="text-primary">(с фильтром)</span>
-                @endif
-                @if(!empty($codeWideIgnored))
-                    <span class="badge text-bg-secondary">группа в игноре</span>
+                @if(!empty($isExternalModule))
+                    <span class="badge text-bg-light border">отдельный модуль</span>
+                    — не счётчик ошибок этой проверки
+                @else
+                    приоритет: <strong>{{ \App\Services\SiteAudit\SiteAuditFindingPresenter::severityLabel($meta['severity'] ?? '') }}</strong>
+                    · находок: <strong>{{ $total }}</strong>
+                    @if(!empty($filtersActive))
+                        <span class="text-primary">(с фильтром)</span>
+                    @endif
+                    @if(!empty($codeWideIgnored))
+                        <span class="badge text-bg-secondary">группа в игноре</span>
+                    @endif
                 @endif
             </span>
+            @if(empty($isExternalModule))
             <span class="ms-auto d-flex flex-wrap" style="gap:6px">
                 @if(!empty($showIgnored))
                     <a class="btn btn-sm btn-outline-secondary" href="{{ request()->fullUrlWithQuery(['ignored' => null, 'page' => 1]) }}"
@@ -84,6 +92,7 @@
                     @endif
                 @endif
             </span>
+            @endif
         </div>
 
         @php $activeGroup = $activeGroup ?? 'all'; @endphp

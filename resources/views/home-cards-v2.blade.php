@@ -8,18 +8,196 @@
 @endsection
 
 @section('content')
-    <div class="cabinet-home-page cabinet-home-cards-v2-page">
+    <div class="cabinet-home-page cabinet-home-cards-v2-page"
+         data-sites-fragment-url="{{ route('home.sites.fragment') }}"
+         data-module-counts-url="{{ route('home.module-counts') }}"
+         data-seo-checklist-due-url="{{ route('home.seo-checklist-due') }}"
+         data-module-counts-deferred="{{ !empty($moduleCountsDeferred) ? '1' : '0' }}">
         @include('home.partials.hero', ['summary' => $summary])
         @include('home.partials.stats', ['summary' => $summary])
-        @include('home.partials.seo-checklist-due', ['seoChecklistDue' => $seoChecklistDue ?? null])
-        @include('home-cards-v2.partials.sites', ['userSites' => $userSites ?? []])
-        @include('home-cards-v2.partials.modules', ['modules' => $modules])
+        <div id="cabinet-home-sc-due-slot">
+            @if(empty($seoChecklistDue['deferred']))
+                @include('home.partials.seo-checklist-due', ['seoChecklistDue' => $seoChecklistDue ?? null])
+            @else
+                <div class="cabinet-home-sc-due-skel alert alert-light border mb-3 d-none" data-sc-due-loading role="status">
+                    <span class="spinner-border spinner-border-sm text-secondary me-2" aria-hidden="true"></span>
+                    <span class="text-secondary small">{{ __('Loading checklist deadlines') }}</span>
+                </div>
+            @endif
+        </div>
+        <div id="cabinet-home-sites-slot">
+            @if(!empty($userSites['deferred']))
+                <section class="cabinet-home-sites mb-4" id="cabinet-home-sites" aria-busy="true">
+                    <div class="cabinet-home-sites-empty text-center text-secondary py-4 px-3">
+                        <span class="spinner-border spinner-border-sm text-secondary me-2" role="status" aria-hidden="true"></span>
+                        {{ __('Loading sites table') }}
+                    </div>
+                </section>
+            @else
+                @include('home-cards-v2.partials.sites', ['userSites' => $userSites ?? []])
+            @endif
+        </div>
+        @include('home-cards-v2.partials.modules', [
+            'modules' => $modules,
+            'moduleCountsDeferred' => !empty($moduleCountsDeferred),
+        ])
     </div>
 @endsection
 
 @section('js')
     <script>
-        (function () {
+        (async function () {
+            var pageRoot = document.querySelector('.cabinet-home-cards-v2-page');
+
+            function fetchText(url) {
+                return fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'text/html',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                }).then(function (res) {
+                    if (!res.ok) {
+                        throw new Error('http');
+                    }
+                    return res.text();
+                });
+            }
+
+            function loadModuleCounts() {
+                if (!pageRoot || pageRoot.getAttribute('data-module-counts-deferred') !== '1') {
+                    return Promise.resolve();
+                }
+                var url = pageRoot.getAttribute('data-module-counts-url');
+                if (!url) {
+                    return Promise.resolve();
+                }
+                return fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                })
+                    .then(function (res) { return res.json(); })
+                    .then(function (data) {
+                        if (!data || !data.ok || !data.counts) {
+                            return;
+                        }
+                        var openLabel = @json(__('Open'));
+                        var startLabel = @json(__('Open and start'));
+                        Object.keys(data.counts).forEach(function (key) {
+                            var row = data.counts[key];
+                            var col = document.querySelector('[data-module-key="' + key + '"]');
+                            if (!col) {
+                                return;
+                            }
+                            var card = col.querySelector('.cabinet-home-cards-v2-card');
+                            var meta = col.querySelector('[data-module-meta]');
+                            var open = col.querySelector('[data-module-open]');
+                            if (!meta) {
+                                return;
+                            }
+                            var count = Number(row.count) || 0;
+                            var skel = meta.querySelector('[data-module-count-skel]');
+                            if (skel) {
+                                skel.remove();
+                            }
+                            if (count < 1) {
+                                if (card) {
+                                    card.classList.add('is-empty');
+                                }
+                                var empty = document.createElement('div');
+                                empty.className = 'cabinet-home-cards-v2-empty';
+                                empty.setAttribute('role', 'status');
+                                empty.innerHTML = '<i class="bi bi-info-circle" aria-hidden="true"></i><span></span>';
+                                empty.querySelector('span').textContent = row.empty_label || '';
+                                meta.insertBefore(empty, open || null);
+                                if (open) {
+                                    open.childNodes[0].textContent = startLabel + ' ';
+                                }
+                            } else {
+                                if (card) {
+                                    card.classList.remove('is-empty');
+                                }
+                                var countEl = document.createElement('div');
+                                countEl.className = 'cabinet-home-cards-v2-count';
+                                countEl.innerHTML = '<span class="cabinet-home-cards-v2-count__num"></span>' +
+                                    '<span class="cabinet-home-cards-v2-count__label"></span>';
+                                countEl.querySelector('.cabinet-home-cards-v2-count__num').textContent = String(count);
+                                countEl.querySelector('.cabinet-home-cards-v2-count__label').textContent = row.count_label || '';
+                                meta.insertBefore(countEl, open || null);
+                                if (open) {
+                                    open.childNodes[0].textContent = openLabel + ' ';
+                                }
+                            }
+                        });
+                        document.querySelectorAll('[data-module-count-skel]').forEach(function (el) {
+                            var muted = document.createElement('div');
+                            muted.className = 'cabinet-home-cards-v2-count cabinet-home-cards-v2-count--muted';
+                            muted.innerHTML = '<span class="cabinet-home-cards-v2-count__label">' +
+                                @json(__('Utility tool')) + '</span>';
+                            el.replaceWith(muted);
+                        });
+                    })
+                    .catch(function () {
+                        document.querySelectorAll('[data-module-count-skel]').forEach(function (el) {
+                            el.innerHTML = '<span class="cabinet-home-cards-v2-count__label">' +
+                                @json(__('Utility tool')) + '</span>';
+                        });
+                    });
+            }
+
+            function loadSeoChecklistDue() {
+                if (!pageRoot) {
+                    return Promise.resolve();
+                }
+                var url = pageRoot.getAttribute('data-seo-checklist-due-url');
+                var slot = document.getElementById('cabinet-home-sc-due-slot');
+                if (!url || !slot || !slot.querySelector('[data-sc-due-loading]')) {
+                    return Promise.resolve();
+                }
+                var loading = slot.querySelector('[data-sc-due-loading]');
+                if (loading) {
+                    loading.classList.remove('d-none');
+                }
+                return fetchText(url)
+                    .then(function (html) {
+                        slot.innerHTML = html;
+                    })
+                    .catch(function () {
+                        slot.innerHTML = '';
+                    });
+            }
+
+            function loadSitesFragment() {
+                var slot = document.getElementById('cabinet-home-sites-slot');
+                if (!pageRoot || !slot) {
+                    return Promise.resolve();
+                }
+                var url = pageRoot.getAttribute('data-sites-fragment-url');
+                var stub = slot.querySelector('#cabinet-home-sites[aria-busy="true"]');
+                if (!url || !stub) {
+                    return Promise.resolve();
+                }
+                return fetchText(url)
+                    .then(function (html) {
+                        slot.innerHTML = html;
+                    })
+                    .catch(function () {
+                        slot.innerHTML = '<div class="alert alert-warning mb-4">' +
+                            @json(__('Could not load sites table')) +
+                            '</div>';
+                    });
+            }
+
+            // Параллельно: counts + due; сайты ждём до инициализации таблицы
+            var countsPromise = loadModuleCounts();
+            var duePromise = loadSeoChecklistDue();
+            await loadSitesFragment();
+
             var moduleInput = document.getElementById('cabinet-home-module-search');
             if (moduleInput) {
                 var cards = document.querySelectorAll('[data-cabinet-module-title]');
@@ -753,6 +931,160 @@
                 }
                 setTimeout(tick, 50);
                 setTimeout(tick, 300);
+            })();
+
+            // Посещаемость Метрики — фоном, чтобы не блокировать отрисовку главной
+            (function loadSitesVisits() {
+                var root = document.getElementById('cabinet-home-sites');
+                if (!root || root.getAttribute('data-visits-deferred') !== '1') {
+                    return;
+                }
+                var url = root.getAttribute('data-visits-url');
+                if (!url) {
+                    return;
+                }
+
+                var rows = root.querySelectorAll('tr[data-cabinet-site-domain][data-metrika-synced="1"]');
+                if (!rows.length) {
+                    var metaEmpty = root.querySelector('[data-sites-visits-meta]');
+                    if (metaEmpty) {
+                        metaEmpty.classList.add('d-none');
+                    }
+                    return;
+                }
+
+                var domains = [];
+                var seen = {};
+                rows.forEach(function (row) {
+                    var d = row.getAttribute('data-cabinet-site-domain') || '';
+                    if (d && !seen[d]) {
+                        seen[d] = true;
+                        domains.push(d);
+                    }
+                });
+
+                var fieldMap = {
+                    visits_today: 'today',
+                    visits_yesterday: 'yesterday',
+                    visits_sum7: 'sum_7',
+                    visits_avg7: 'avg_7',
+                    visits_sum30: 'sum_30',
+                    visits_avg30: 'avg_30',
+                };
+
+                function formatVisits(value) {
+                    if (value === null || value === undefined || value === '') {
+                        return null;
+                    }
+                    var n = Math.round(Number(value));
+                    if (!isFinite(n)) {
+                        return null;
+                    }
+                    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+                }
+
+                function fillRow(row, summary) {
+                    Object.keys(fieldMap).forEach(function (colKey) {
+                        var apiKey = fieldMap[colKey];
+                        var raw = summary && Object.prototype.hasOwnProperty.call(summary, apiKey)
+                            ? summary[apiKey]
+                            : null;
+                        var formatted = formatVisits(raw);
+                        row.setAttribute('data-sort-' + colKey, formatted === null ? '' : String(Math.round(Number(raw))));
+                        var cell = row.querySelector('td[data-visit-key="' + colKey + '"]');
+                        if (!cell) {
+                            return;
+                        }
+                        if (formatted === null) {
+                            cell.innerHTML = '<span class="text-secondary">—</span>';
+                        } else {
+                            cell.textContent = formatted;
+                        }
+                    });
+                }
+
+                function setMeta(meta) {
+                    var metaEl = root.querySelector('[data-sites-visits-meta]');
+                    if (!metaEl) {
+                        return;
+                    }
+                    var loadingEl = metaEl.querySelector('[data-sites-visits-loading]');
+                    var readyEl = metaEl.querySelector('[data-sites-visits-ready]');
+                    if (loadingEl) {
+                        loadingEl.classList.add('d-none');
+                    }
+                    if (!meta || !meta.as_of_human) {
+                        metaEl.classList.add('d-none');
+                        return;
+                    }
+                    metaEl.classList.remove('d-none');
+                    metaEl.removeAttribute('data-loading');
+                    var html = '<i class="bi bi-graph-up-arrow me-1" aria-hidden="true"></i>' +
+                        @json(__('Metrika visits as of', ['time' => ':time'])).replace(':time', meta.as_of_human);
+                    if (meta.next_today_human) {
+                        html += ' <span class="text-body-secondary">· ' +
+                            @json(__('Metrika visits next today', ['time' => ':time'])).replace(':time', meta.next_today_human) +
+                            '</span>';
+                    }
+                    if (readyEl) {
+                        readyEl.classList.remove('d-none');
+                        readyEl.innerHTML = html;
+                    } else {
+                        metaEl.innerHTML = html;
+                    }
+                }
+
+                function clearSkeletons() {
+                    root.querySelectorAll('.cabinet-home-sites-visit-skel').forEach(function (el) {
+                        var cell = el.closest('td');
+                        if (cell) {
+                            cell.innerHTML = '<span class="text-secondary">—</span>';
+                        }
+                    });
+                }
+
+                var qs = domains.map(function (d) {
+                    return 'domains[]=' + encodeURIComponent(d);
+                }).join('&');
+
+                fetch(url + (url.indexOf('?') >= 0 ? '&' : '?') + qs, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                })
+                    .then(function (res) {
+                        return res.json().then(function (data) {
+                            return { ok: res.ok && data && data.ok, data: data };
+                        });
+                    })
+                    .then(function (result) {
+                        if (!result.ok) {
+                            throw new Error('visits');
+                        }
+                        var byDomain = (result.data && result.data.by_domain) || {};
+                        rows.forEach(function (row) {
+                            var domain = row.getAttribute('data-cabinet-site-domain') || '';
+                            fillRow(row, byDomain[domain] || null);
+                        });
+                        setMeta(result.data && result.data.meta);
+                        if (typeof window.__cabinetHomeSitesFloatUpdate === 'function') {
+                            window.__cabinetHomeSitesFloatUpdate();
+                        }
+                    })
+                    .catch(function () {
+                        clearSkeletons();
+                        var metaEl = root.querySelector('[data-sites-visits-meta]');
+                        if (metaEl) {
+                            metaEl.classList.remove('d-none');
+                            metaEl.removeAttribute('data-loading');
+                            metaEl.innerHTML = '<span class="text-secondary">' +
+                                @json(__('Metrika visits unavailable')) +
+                                '</span>';
+                        }
+                    });
             })();
 
             document.querySelectorAll('.cabinet-home-cards-v2-open').forEach(function (link) {

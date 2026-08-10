@@ -2,11 +2,11 @@
 
 namespace App\SeoChecklist;
 
+use App\Support\SchemaMemo;
 use App\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\Schema;
 
 class SeoChecklistTeam extends Model
 {
@@ -18,11 +18,7 @@ class SeoChecklistTeam extends Model
 
     public static function tableReady(): bool
     {
-        try {
-            return Schema::hasTable('seo_checklist_teams');
-        } catch (\Throwable $e) {
-            return false;
-        }
+        return SchemaMemo::hasTable('seo_checklist_teams');
     }
 
     public function members(): HasMany

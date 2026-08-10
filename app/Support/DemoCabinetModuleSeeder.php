@@ -15,7 +15,6 @@ use App\PasswordsGenerator;
 use App\Project;
 use App\ProjectDescription;
 use App\ProjectTracking;
-use App\Services\SiteAudit\SiteAuditUrlNormalizer;
 use App\SiteAuditCrawl;
 use App\SiteAuditCrawlStat;
 use App\SiteAuditFinding;
@@ -767,246 +766,108 @@ HTML;
             return 'skip';
         }
 
-        if (SiteAuditProject::query()->where('user_id', $userId)->exists()) {
-            $this->out('site-audit: уже есть');
+        $existing = SiteAuditProject::query()
+            ->where('user_id', $userId)
+            ->where('domain', \App\Support\SiteAuditDemoFixture::DOMAIN)
+            ->first();
 
-            return 'skip';
+        if ($existing) {
+            $ver = (int) data_get($existing->settings_json, 'demo_version', 0);
+            if ($ver >= \App\Support\SiteAuditDemoFixture::DEMO_VERSION) {
+                $crawlId = SiteAuditCrawl::query()
+                    ->where('project_id', $existing->id)
+                    ->orderByDesc('id')
+                    ->value('id');
+                $this->out('site-audit: уже есть (crawl #' . $crawlId . ', v' . $ver . ')');
+
+                return 'skip';
+            }
+            // Старая скудная фикстура — пересоздаём.
+            $this->purgeSiteAuditDomain($userId, \App\Support\SiteAuditDemoFixture::DOMAIN);
         }
 
-        $domain = 'demo-shop.titlo.ru';
-        $base = 'https://' . $domain;
-        $now = Carbon::now();
-
+        $data = \App\Support\SiteAuditDemoFixture::build($userId);
         $project = SiteAuditProject::query()->create([
             'user_id' => $userId,
-            'domain' => $domain,
-            'name' => 'Демо: аудит сайта',
-            'settings_json' => [
-                'demo' => true,
-                'note' => 'Фикстура для витрины demo-cabinet',
-            ],
+            'domain' => $data['project']['domain'],
+            'name' => $data['project']['name'],
+            'settings_json' => json_decode($data['project']['settings_json'], true),
         ]);
 
-        $pagesSpec = [
-            [
-                'path' => '/',
-                'title' => 'Демо-магазин мебели — главная',
-                'description' => 'Купить диван с доставкой по Москве. Каталог и акции.',
-                'h1' => 'Мебель для дома',
-                'status' => 200,
-                'words' => 420,
-                'findings' => [
-                    ['code' => 'missing_hsts', 'severity' => 'warning'],
-                    ['code' => 'missing_csp', 'severity' => 'info'],
-                ],
-            ],
-            [
-                'path' => '/catalog/',
-                'title' => 'Каталог диванов',
-                'description' => 'Каталог диванов',
-                'h1' => 'Каталог',
-                'status' => 200,
-                'words' => 80,
-                'findings' => [
-                    ['code' => 'thin_content', 'severity' => 'warning', 'meta' => ['word_count' => 80]],
-                    ['code' => 'title_equals_description', 'severity' => 'warning'],
-                    ['code' => 'missing_referrer_policy', 'severity' => 'info'],
-                ],
-            ],
-            [
-                'path' => '/catalog/divan-alfa/',
-                'title' => 'Диван Альфа — купить',
-                'description' => 'Угловой диван Альфа с доставкой. Рассрочка 0%.',
-                'h1' => 'Диван Альфа',
-                'status' => 200,
-                'words' => 310,
-                'findings' => [
-                    ['code' => 'images_without_alt', 'severity' => 'warning', 'meta' => ['count' => 2]],
-                ],
-            ],
-            [
-                'path' => '/old-promo/',
-                'title' => 'Акция 2020',
-                'description' => '',
-                'h1' => '',
-                'status' => 404,
-                'words' => 0,
-                'findings' => [
-                    ['code' => 'http_4xx', 'severity' => 'critical', 'meta' => ['status' => 404]],
-                    ['code' => 'empty_title', 'severity' => 'critical'],
-                ],
-            ],
-            [
-                'path' => '/contacts/',
-                'title' => 'Контакты',
-                'description' => 'Адрес шоурума и телефон демо-магазина.',
-                'h1' => 'Контакты',
-                'status' => 200,
-                'words' => 150,
-                'findings' => [
-                    ['code' => 'page_has_broken_links', 'severity' => 'warning', 'meta' => ['count' => 1]],
-                ],
-            ],
-        ];
+        SiteAuditCrawl::query()
+            ->where('share_token', \App\Support\SiteAuditDemoFixture::SHARE_TOKEN)
+            ->update(['share_token' => null]);
 
-        $buckets = ['critical' => 0, 'other' => 0, 'warning' => 0, 'info' => 0];
-        $counts = [];
-        $pageRows = [];
-
-        foreach ($pagesSpec as $i => $spec) {
-            $url = $base . $spec['path'];
-            $hash = SiteAuditUrlNormalizer::hash($url);
-            $title = (string) $spec['title'];
-            $desc = (string) $spec['description'];
-            $pageRows[] = [
-                'url' => $url,
-                'url_hash' => $hash,
-                'final_url' => $url,
-                'status_code' => (int) $spec['status'],
-                'redirect_chain' => null,
-                'size_bytes' => 12000 + $i * 500,
-                'content_type' => 'text/html; charset=utf-8',
-                'title' => $title !== '' ? $title : null,
-                'title_hash' => $title !== '' ? hash('sha256', mb_strtolower($title)) : null,
-                'description' => $desc !== '' ? $desc : null,
-                'description_hash' => $desc !== '' ? hash('sha256', mb_strtolower($desc)) : null,
-                'h1' => $spec['h1'] !== '' ? $spec['h1'] : null,
-                'h1_count' => $spec['h1'] !== '' ? 1 : 0,
-                'h2_count' => 2,
-                'canonical' => $url,
-                'robots_meta' => null,
-                'noindex' => false,
-                'word_count' => (int) $spec['words'],
-                'text_len' => (int) $spec['words'] * 6,
-                'content_hash' => hash('sha256', $url . '|demo'),
-                'simhash' => null,
-                'out_links_json' => [$base . '/catalog/', $base . '/contacts/'],
-                'click_depth' => $i,
-                'img_count' => 3,
-                'img_without_alt' => $spec['path'] === '/catalog/divan-alfa/' ? 2 : 0,
-                'unique_img_src_count' => 2,
-                'strong_count' => 1,
-                'em_count' => 0,
-                'charset' => 'utf-8',
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
-
-            foreach ($spec['findings'] as $f) {
-                $sev = (string) $f['severity'];
-                if (isset($buckets[$sev])) {
-                    $buckets[$sev]++;
-                }
-                $code = (string) $f['code'];
-                $counts[$code] = ($counts[$code] ?? 0) + 1;
-            }
-        }
-
-        // дубль title для демо duplicate_title
-        $dupTitle = 'Демо-магазин мебели — главная';
-        $dupUrl = $base . '/home-copy/';
-        $dupHash = SiteAuditUrlNormalizer::hash($dupUrl);
-        $pageRows[] = [
-            'url' => $dupUrl,
-            'url_hash' => $dupHash,
-            'final_url' => $dupUrl,
-            'status_code' => 200,
-            'redirect_chain' => null,
-            'size_bytes' => 11000,
-            'content_type' => 'text/html; charset=utf-8',
-            'title' => $dupTitle,
-            'title_hash' => hash('sha256', mb_strtolower($dupTitle)),
-            'description' => 'Копия главной для демо дубля TITLE.',
-            'description_hash' => hash('sha256', 'home-copy-desc'),
-            'h1' => 'Копия главной',
-            'h1_count' => 1,
-            'h2_count' => 1,
-            'canonical' => $base . '/',
-            'robots_meta' => null,
-            'noindex' => false,
-            'word_count' => 200,
-            'text_len' => 1200,
-            'content_hash' => hash('sha256', 'home-copy'),
-            'simhash' => null,
-            'out_links_json' => [$base . '/'],
-            'click_depth' => 1,
-            'img_count' => 1,
-            'img_without_alt' => 0,
-            'unique_img_src_count' => 1,
-            'strong_count' => 0,
-            'em_count' => 0,
-            'charset' => 'utf-8',
-            'created_at' => $now,
-            'updated_at' => $now,
-        ];
-        $buckets['critical'] += 2;
-        $counts['duplicate_title'] = 2;
-
-        $shareToken = 'demo-site-audit-showcase';
-        $crawl = SiteAuditCrawl::query()->create([
+        $crawlPayload = $data['crawl'];
+        unset($crawlPayload['user_id']);
+        $crawl = SiteAuditCrawl::query()->create(array_merge($crawlPayload, [
             'project_id' => $project->id,
             'user_id' => $userId,
-            'status' => SiteAuditCrawl::STATUS_DONE,
-            'pages_total' => count($pageRows),
-            'pages_fetched' => count($pageRows),
-            'pages_limit' => 500,
-            'buckets_json' => $buckets,
-            'counts_json' => $counts,
-            'progress_json' => [
-                'demo' => true,
-                'robots' => ['ok' => true],
-                'sitemap' => ['found' => true, 'url_count' => 12],
-            ],
-            'error' => null,
+            'buckets_json' => json_decode($crawlPayload['buckets_json'], true),
+            'counts_json' => json_decode($crawlPayload['counts_json'], true),
+            'progress_json' => json_decode($crawlPayload['progress_json'], true),
             'save_html' => false,
-            'share_token' => $shareToken,
-            'share_enabled_at' => $now,
-            'started_at' => $now->copy()->subMinutes(8),
-            'finished_at' => $now->copy()->subMinutes(1),
-        ]);
+        ]));
 
-        foreach ($pageRows as $row) {
+        foreach ($data['pages'] as $row) {
             $row['crawl_id'] = $crawl->id;
+            $row['out_links_json'] = json_decode((string) $row['out_links_json'], true);
             SiteAuditPage::query()->create($row);
         }
 
-        foreach ($pagesSpec as $spec) {
-            $url = $base . $spec['path'];
-            $hash = SiteAuditUrlNormalizer::hash($url);
-            foreach ($spec['findings'] as $f) {
-                SiteAuditFinding::query()->create([
-                    'crawl_id' => $crawl->id,
-                    'code' => $f['code'],
-                    'severity' => $f['severity'],
-                    'url' => $url,
-                    'url_hash' => $hash,
-                    'meta_json' => $f['meta'] ?? null,
-                ]);
-            }
-        }
-
-        foreach ([$base . '/', $dupUrl] as $u) {
+        foreach ($data['findings'] as $f) {
             SiteAuditFinding::query()->create([
                 'crawl_id' => $crawl->id,
-                'code' => 'duplicate_title',
-                'severity' => 'critical',
-                'url' => $u,
-                'url_hash' => SiteAuditUrlNormalizer::hash($u),
-                'meta_json' => ['group_size' => 2, 'title' => $dupTitle],
+                'code' => $f['code'],
+                'severity' => $f['severity'],
+                'url' => $f['url'],
+                'url_hash' => $f['url_hash'],
+                'meta_json' => $f['meta_json'] !== null ? json_decode($f['meta_json'], true) : null,
             ]);
         }
 
-        foreach ($buckets as $bucket => $value) {
+        foreach ($data['stats'] as $s) {
             SiteAuditCrawlStat::query()->create([
                 'crawl_id' => $crawl->id,
-                'bucket' => $bucket,
-                'value' => $value,
+                'bucket' => $s['bucket'],
+                'value' => $s['value'],
             ]);
         }
 
-        $this->out('site-audit: OK (crawl #' . $crawl->id . ', share ' . $shareToken . ')');
+        $sum = $data['summary'];
+        $this->out(
+            'site-audit: OK (crawl #' . $crawl->id
+            . ', pages ' . $sum['pages']
+            . ', findings ' . $sum['findings']
+            . ', codes ' . $sum['codes']
+            . ', share ' . \App\Support\SiteAuditDemoFixture::SHARE_TOKEN . ')'
+        );
 
         return 'ok';
+    }
+
+    private function purgeSiteAuditDomain(int $userId, string $domain): void
+    {
+        if (! Schema::hasTable('site_audit_projects')) {
+            return;
+        }
+
+        $projectIds = SiteAuditProject::query()
+            ->where('user_id', $userId)
+            ->where('domain', $domain)
+            ->pluck('id');
+        if ($projectIds->isEmpty()) {
+            return;
+        }
+
+        $crawlIds = SiteAuditCrawl::query()->whereIn('project_id', $projectIds)->pluck('id');
+        if ($crawlIds->isNotEmpty()) {
+            SiteAuditFinding::query()->whereIn('crawl_id', $crawlIds)->delete();
+            SiteAuditPage::query()->whereIn('crawl_id', $crawlIds)->delete();
+            SiteAuditCrawlStat::query()->whereIn('crawl_id', $crawlIds)->delete();
+            SiteAuditCrawl::query()->whereIn('id', $crawlIds)->delete();
+        }
+        SiteAuditProject::query()->whereIn('id', $projectIds)->delete();
     }
 
     private function purgeSiteAudit(int $userId): void

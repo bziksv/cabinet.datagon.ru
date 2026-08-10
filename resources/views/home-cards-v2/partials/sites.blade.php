@@ -17,6 +17,7 @@
         }
     }
     $visitsMeta = $sitesPayload['visits_meta'] ?? null;
+    $visitsDeferred = !empty($sitesPayload['visits_deferred']);
     $columnPrefs = $sitesPayload['columns'] ?? \App\HomeUserSitesPreference::defaultColumns();
     $hasAnySites = $sitesTotal > 0 || $archivedTotal > 0 || $hiddenTotal > 0
         || count($sites) > 0 || count($archivedSites) > 0 || count($hiddenSites) > 0;
@@ -36,6 +37,8 @@
          data-hide-url="{{ route('home.sites.hide') }}"
          data-restore-url="{{ route('home.sites.restore') }}"
          data-columns-url="{{ route('home.sites.columns') }}"
+         data-visits-url="{{ route('home.sites.visits') }}"
+         data-visits-deferred="{{ $visitsDeferred ? '1' : '0' }}"
          data-columns='@json($columnPrefs)'
          data-metrika-connect-url="{{ route('yandex-metrika.connect') }}"
          data-metrika-status-url="{{ route('yandex-metrika.status') }}"
@@ -80,15 +83,23 @@
             </div>
         @else
             <div class="cabinet-home-sites-toolbar mb-3">
-                @if(is_array($visitsMeta) && !empty($visitsMeta['as_of_human']))
-                    <div class="cabinet-home-sites-visits-meta small text-secondary w-100 mb-2">
+                <div class="cabinet-home-sites-visits-meta small text-secondary w-100 mb-2{{ $visitsDeferred ? '' : ((is_array($visitsMeta) && !empty($visitsMeta['as_of_human'])) ? '' : ' d-none') }}"
+                     data-sites-visits-meta
+                     @if($visitsDeferred) data-loading="1"@endif>
+                    @if($visitsDeferred)
+                        <span class="cabinet-home-sites-visits-loading" data-sites-visits-loading>
+                            <span class="spinner-border spinner-border-sm text-secondary me-1" role="status" aria-hidden="true"></span>
+                            {{ __('Metrika visits loading') }}
+                        </span>
+                        <span class="d-none" data-sites-visits-ready></span>
+                    @elseif(is_array($visitsMeta) && !empty($visitsMeta['as_of_human']))
                         <i class="bi bi-graph-up-arrow me-1" aria-hidden="true"></i>
                         {{ __('Metrika visits as of', ['time' => $visitsMeta['as_of_human']]) }}
                         @if(!empty($visitsMeta['next_today_human']))
                             <span class="text-body-secondary">· {{ __('Metrika visits next today', ['time' => $visitsMeta['next_today_human']]) }}</span>
                         @endif
-                    </div>
-                @endif
+                    @endif
+                </div>
                 <div class="cabinet-home-sites-legend small text-secondary">
                     <button type="button"
                             class="cabinet-home-sites-legend__item cabinet-home-sites-legend__filter"
@@ -361,8 +372,11 @@
                                                     $colVisible = !empty($columnPrefs[$visitCell['key']]);
                                                 @endphp
                                                 <td class="cabinet-home-sites-col-visits text-end text-nowrap{{ $colVisible ? '' : ' is-col-hidden' }}"
-                                                    data-col="{{ $visitCell['key'] }}">
-                                                    @if($visitValue === null)
+                                                    data-col="{{ $visitCell['key'] }}"
+                                                    data-visit-key="{{ $visitCell['key'] }}">
+                                                    @if($visitValue === null && $visitsDeferred && $metrikaSynced)
+                                                        <span class="cabinet-home-sites-visit-skel" aria-hidden="true"></span>
+                                                    @elseif($visitValue === null)
                                                         <span class="text-secondary">—</span>
                                                     @else
                                                         {{ number_format((int) round((float) $visitValue), 0, ',', ' ') }}

@@ -42,6 +42,57 @@ class SiteAuditFindingPresenter
             return self::duplicateUrlVariantsHtml($meta, $url);
         }
 
+        if ($code === 'page_has_bad_links') {
+            return self::badLinksDetailsHtml($meta);
+        }
+
+        if ($code === 'serp_title_mismatch') {
+            return self::serpTitleMismatchHtml($meta);
+        }
+
+        if ($code === 'lost_file') {
+            return self::lostFileDetailsHtml($meta);
+        }
+
+        if ($code === 'broken_internal_link') {
+            return self::brokenInternalLinkDetailsHtml($meta);
+        }
+
+        if (in_array($code, ['redirect', 'redirect_chain_long', 'redirect_loop'], true)) {
+            return self::redirectDetailsHtml($meta, $code);
+        }
+
+        if (in_array($code, [
+            'canonical_foreign',
+            'canonical_not_self',
+            'pages_with_canonical',
+            'similar_pages',
+            'landing_url_changed',
+            'landing_plagiarism_suspect',
+            'landing_plagiarism_external',
+            'mixed_content',
+            'insecure_form',
+            'external_assets',
+            'broken_image',
+            'www_both_available',
+            'http_https_both_available',
+            'page_has_broken_links',
+            'duplicate_links',
+            'keyword_cannibalization',
+            'ad_cannibalization',
+            'http_4xx',
+            'http_5xx',
+            'robots_txt_error',
+        ], true)) {
+            // URL в деталях — кликабельно и без обрезки (metaLine оставляем для экспорта/CSV).
+            $plain = self::metaLine($code, $meta, $url);
+            if ($plain === '' || $plain === '—') {
+                return null;
+            }
+
+            return self::linkifyUrlsInText($plain);
+        }
+
         if ($code !== 'html_critical_errors') {
             return null;
         }
@@ -53,11 +104,11 @@ class SiteAuditFindingPresenter
         }
 
         $parts = [];
+        $hints = [];
         if ($n > 0) {
             $parts[] = '<span class="cabinet-sa-html-err__count">ошибок: ' . $n . '</span>';
         }
 
-        $hints = [];
         foreach (array_slice($samples, 0, 5) as $sample) {
             if (! is_array($sample)) {
                 continue;
@@ -75,11 +126,13 @@ class SiteAuditFindingPresenter
             $lineBit = $line !== null
                 ? ' <span class="text-muted">стр. ' . $line . '</span>'
                 : '';
-            $parts[] = '<a class="cabinet-sa-html-err__msg" href="' . $href
-                . '" target="_blank" rel="noopener noreferrer" title="Искать в Google">'
-                . $label . '</a>' . $lineBit;
-
             $hint = SiteAuditFindingHelp::htmlErrorHint($msg);
+            $titleAttr = $hint !== null
+                ? e($hint)
+                : 'Искать в Google';
+            $parts[] = '<a class="cabinet-sa-html-err__msg" href="' . $href
+                . '" target="_blank" rel="noopener noreferrer" title="' . $titleAttr . '">'
+                . $label . '</a>' . $lineBit;
             if ($hint !== null && ! in_array($hint, $hints, true)) {
                 $hints[] = $hint;
             }
@@ -89,7 +142,8 @@ class SiteAuditFindingPresenter
             return null;
         }
 
-        $html = '<div class="cabinet-sa-html-err">' . implode(' · ', $parts);
+        $html = '<div class="cabinet-sa-html-err">'
+            . '<div class="cabinet-sa-html-err__line">' . implode(' · ', $parts) . '</div>';
         foreach (array_slice($hints, 0, 2) as $hint) {
             $html .= '<div class="cabinet-sa-html-err__tip">' . e($hint) . '</div>';
         }
@@ -663,31 +717,45 @@ class SiteAuditFindingPresenter
                 return $n ? ('битых: ' . $n . $sample) : '—';
 
             case 'broken_internal_link':
-                $bits = [];
+                // URL источника — в колонке «Откуда», здесь только статус ответа.
                 if (isset($meta['status'])) {
-                    $bits[] = 'HTTP ' . (int) $meta['status'];
-                }
-                $refN = (int) ($meta['referrer_count'] ?? 0);
-                if ($refN > 1) {
-                    $bits[] = 'с ' . $refN . ' стр.';
-                } elseif (! empty($meta['from'])) {
-                    $bits[] = 'с: ' . self::clip((string) $meta['from'], 50);
+                    $bits = ['HTTP ' . (int) $meta['status']];
+                    $refN = (int) ($meta['referrer_count'] ?? 0);
+                    if ($refN > 1) {
+                        $bits[] = 'ссылок: ' . $refN;
+                    }
+
+                    return implode(' · ', $bits);
                 }
 
-                return $bits ? implode(' · ', $bits) : 'битая ссылка';
+                return 'битая ссылка';
 
             case 'page_has_bad_links':
                 $n = (int) ($meta['count'] ?? 0);
-                $reason = ! empty($meta['samples'][0]['reason'])
-                    ? (string) $meta['samples'][0]['reason']
-                    : '';
-                $href = ! empty($meta['samples'][0]['href'])
-                    ? self::clip((string) $meta['samples'][0]['href'], 40)
-                    : '';
+                $sample = is_array($meta['samples'][0] ?? null) ? $meta['samples'][0] : [];
+                $bits = [];
+                if ($n > 0) {
+                    $bits[] = 'плохих: ' . $n;
+                }
+                $reason = self::badLinkReasonLabel((string) ($sample['reason'] ?? ''));
+                if ($reason !== '') {
+                    $bits[] = $reason;
+                }
+                $href = trim((string) ($sample['href'] ?? ''));
+                if ($href !== '') {
+                    $bits[] = self::clip($href, 50);
+                }
+                $text = trim((string) ($sample['text'] ?? ''));
+                if ($text !== '') {
+                    $bits[] = '«' . self::clip($text, 40) . '»';
+                } elseif ($href === '' && ($sample['reason'] ?? '') === 'missing_href') {
+                    $snip = trim((string) ($sample['snippet'] ?? ''));
+                    if ($snip !== '') {
+                        $bits[] = self::clip($snip, 55);
+                    }
+                }
 
-                return $n
-                    ? ('плохих: ' . $n . ($reason !== '' ? ' · ' . $reason : '') . ($href !== '' ? ' · ' . $href : ''))
-                    : 'плохие ссылки';
+                return $bits ? implode(' · ', $bits) : 'плохие ссылки';
 
             case 'html_critical_errors':
                 $n = (int) ($meta['count'] ?? 0);
@@ -1007,13 +1075,14 @@ class SiteAuditFindingPresenter
             case 'serp_title_mismatch':
                 $bits = [];
                 if (! empty($meta['engine'])) {
-                    $bits[] = (string) $meta['engine'];
+                    $eng = (string) $meta['engine'];
+                    $bits[] = $eng === 'yandex' ? 'Яндекс' : ($eng === 'google' ? 'Google' : $eng);
                 }
                 if (! empty($meta['page_title'])) {
-                    $bits[] = 'стр: ' . self::clip((string) $meta['page_title'], 35);
+                    $bits[] = 'на сайте: ' . self::clip((string) $meta['page_title'], 90);
                 }
                 if (! empty($meta['serp_title'])) {
-                    $bits[] = 'выдача: ' . self::clip((string) $meta['serp_title'], 35);
+                    $bits[] = 'в выдаче: ' . self::clip((string) $meta['serp_title'], 90);
                 }
 
                 return $bits ? implode(' · ', $bits) : 'title ≠ выдача';
@@ -1166,14 +1235,294 @@ class SiteAuditFindingPresenter
         }
     }
 
+    /**
+     * Список плохих ссылок на странице: href / текст / фрагмент тега.
+     *
+     * @param array<string,mixed> $meta
+     */
+    private static function badLinksDetailsHtml(array $meta): ?string
+    {
+        $samples = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+        if ($samples === []) {
+            return null;
+        }
+
+        $n = (int) ($meta['count'] ?? count($samples));
+        $parts = [];
+        if ($n > 0) {
+            $parts[] = '<div class="mb-1"><strong>плохих: ' . $n . '</strong></div>';
+        }
+        $parts[] = '<ul class="mb-0 ps-3">';
+        foreach (array_slice($samples, 0, 10) as $sample) {
+            if (! is_array($sample)) {
+                continue;
+            }
+            $reason = self::badLinkReasonLabel((string) ($sample['reason'] ?? ''));
+            $href = trim((string) ($sample['href'] ?? ''));
+            $text = trim((string) ($sample['text'] ?? ''));
+            $snippet = trim((string) ($sample['snippet'] ?? ''));
+
+            $line = [];
+            if ($reason !== '') {
+                $line[] = e($reason);
+            }
+            if ($href !== '') {
+                $line[] = 'href=' . self::urlLinkHtml($href);
+            }
+            if ($text !== '') {
+                $line[] = 'текст «' . e(self::clip($text, 60)) . '»';
+            }
+            if ($snippet !== '' && ($href === '' || $text === '')) {
+                $line[] = '<code class="small">' . e(self::clip($snippet, 100)) . '</code>';
+            }
+            if ($line === []) {
+                $line[] = 'плохая ссылка';
+            }
+            $parts[] = '<li>' . implode(' · ', $line) . '</li>';
+        }
+        $parts[] = '</ul>';
+
+        return implode('', $parts);
+    }
+
+    /**
+     * Сравнение title по всем ПС: совпала / расхождение видно сразу.
+     *
+     * @param array<string,mixed> $meta
+     */
+    private static function serpTitleMismatchHtml(array $meta): ?string
+    {
+        $pageTitle = trim((string) ($meta['page_title'] ?? ''));
+        $engines = isset($meta['engines']) && is_array($meta['engines']) ? $meta['engines'] : null;
+
+        // Старые находки без engines — одна ПС как раньше.
+        if ($engines === null || $engines === []) {
+            $serpTitle = trim((string) ($meta['serp_title'] ?? ''));
+            if ($pageTitle === '' && $serpTitle === '') {
+                return null;
+            }
+            $engine = (string) ($meta['engine'] ?? '');
+            $engines = [
+                $engine !== '' ? $engine : 'ps' => [
+                    'indexed' => true,
+                    'title' => $serpTitle !== '' ? $serpTitle : null,
+                    'snippet' => $meta['snippet'] ?? null,
+                    'title_mismatch' => true,
+                    'title_match' => false,
+                ],
+            ];
+        }
+
+        $order = ['yandex', 'google'];
+        $keys = array_values(array_unique(array_merge($order, array_keys($engines))));
+
+        $html = '<div class="cabinet-sa-serp-diff">';
+        if ($pageTitle !== '') {
+            $html .= '<div class="cabinet-sa-serp-diff__page">'
+                . '<div class="cabinet-sa-serp-diff__label">TITLE на сайте</div>'
+                . '<div class="cabinet-sa-serp-diff__text">' . e($pageTitle) . '</div>'
+                . '</div>';
+        }
+
+        $html .= '<div class="cabinet-sa-serp-diff__engines">';
+        foreach ($keys as $engine) {
+            if (! isset($engines[$engine]) || ! is_array($engines[$engine])) {
+                continue;
+            }
+            $block = $engines[$engine];
+            $engineLabel = $engine === 'yandex' ? 'Яндекс'
+                : ($engine === 'google' ? 'Google' : $engine);
+            $serpTitle = trim((string) ($block['title'] ?? ''));
+            $snippet = trim((string) ($block['snippet'] ?? ''));
+            $mismatch = ! empty($block['title_mismatch']);
+            $match = ! empty($block['title_match']);
+            $indexed = ! empty($block['indexed']);
+            $error = trim((string) ($block['error'] ?? ''));
+
+            $statusClass = 'cabinet-sa-serp-diff__engine-card';
+            $statusBadge = '';
+            if ($error !== '') {
+                $statusClass .= ' is-error';
+                $statusBadge = '<span class="cabinet-sa-serp-diff__status is-error">ошибка</span>';
+            } elseif (! $indexed) {
+                $statusClass .= ' is-miss';
+                $statusBadge = '<span class="cabinet-sa-serp-diff__status is-miss">нет в выдаче</span>';
+            } elseif ($match) {
+                $statusClass .= ' is-ok';
+                $statusBadge = '<span class="cabinet-sa-serp-diff__status is-ok">совпал</span>';
+            } elseif ($mismatch) {
+                $statusClass .= ' is-bad';
+                $statusBadge = '<span class="cabinet-sa-serp-diff__status is-bad">≠ TITLE</span>';
+            }
+
+            $html .= '<div class="' . $statusClass . '">';
+            $html .= '<div class="cabinet-sa-serp-diff__engine-head">'
+                . '<span class="cabinet-sa-serp-diff__engine">' . e($engineLabel) . '</span>'
+                . $statusBadge
+                . '</div>';
+            if ($serpTitle !== '') {
+                $html .= '<div class="cabinet-sa-serp-diff__label">В выдаче</div>'
+                    . '<div class="cabinet-sa-serp-diff__text">' . e($serpTitle) . '</div>';
+            } elseif ($error !== '') {
+                $html .= '<div class="cabinet-sa-serp-diff__text cabinet-sa-serp-diff__text--muted">'
+                    . e(self::clip($error, 120)) . '</div>';
+            } elseif (! $indexed) {
+                $html .= '<div class="cabinet-sa-serp-diff__text cabinet-sa-serp-diff__text--muted">не найден</div>';
+            }
+            if ($snippet !== '') {
+                $html .= '<div class="cabinet-sa-serp-diff__snippet-inline">'
+                    . '<div class="cabinet-sa-serp-diff__label">Сниппет</div>'
+                    . '<div class="cabinet-sa-serp-diff__text cabinet-sa-serp-diff__text--muted">'
+                    . e($snippet) . '</div></div>';
+            }
+            $html .= '</div>';
+        }
+        $html .= '</div></div>';
+
+        return $html;
+    }
+
+    private static function badLinkReasonLabel(string $reason): string
+    {
+        $map = [
+            'missing_href' => 'нет href',
+            'empty_or_hash' => 'пустой href / #',
+            'javascript' => 'javascript:',
+            'whitespace' => 'пробел в href',
+        ];
+
+        return $map[$reason] ?? ($reason !== '' ? $reason : '');
+    }
+
+    private static function lostFileDetailsHtml(array $meta): string
+    {
+        $asset = trim((string) ($meta['asset'] ?? ''));
+        $st = isset($meta['status']) ? ('HTTP ' . (int) $meta['status']) : 'unreachable';
+        $pill = self::httpStatusPillHtml(isset($meta['status']) ? (int) $meta['status'] : null, $st);
+        if ($asset === '') {
+            return $pill;
+        }
+
+        return '<div class="cabinet-sa-details-stack">'
+            . $pill
+            . '<div class="cabinet-sa-details-stack__url">' . self::urlLinkHtml($asset) . '</div>'
+            . '</div>';
+    }
+
+    /**
+     * @param array<string,mixed> $meta
+     */
+    private static function brokenInternalLinkDetailsHtml(array $meta): string
+    {
+        $status = isset($meta['status']) ? (int) $meta['status'] : 0;
+        $parts = [];
+        if ($status > 0) {
+            $parts[] = self::httpStatusPillHtml($status, 'HTTP ' . $status);
+        } else {
+            $parts[] = '<span class="cabinet-sa-status-pill">битая ссылка</span>';
+        }
+        $refN = (int) ($meta['referrer_count'] ?? 0);
+        if ($refN > 1) {
+            $parts[] = '<span class="text-secondary small">на ' . $refN . ' стр.</span>';
+        }
+
+        return '<div class="cabinet-sa-details-stack">' . implode(' ', $parts) . '</div>';
+    }
+
+    private static function httpStatusPillHtml(?int $status, string $fallbackLabel): string
+    {
+        $cls = 'cabinet-sa-status-pill';
+        if ($status !== null && $status >= 500) {
+            $cls .= ' cabinet-sa-status-pill--5xx';
+        } elseif ($status !== null && $status >= 400) {
+            $cls .= ' cabinet-sa-status-pill--4xx';
+        }
+
+        return '<span class="' . $cls . '">' . e($fallbackLabel) . '</span>';
+    }
+
+    /**
+     * @param array<string,mixed> $meta
+     */
+    private static function redirectDetailsHtml(array $meta, string $code): string
+    {
+        $plain = self::metaLine($code, $meta, null);
+
+        return self::linkifyUrlsInText($plain !== '' ? $plain : '—');
+    }
+
+    /**
+     * Полный URL как ссылка (без обрезки).
+     */
+    public static function urlLinkHtml(string $url): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return '';
+        }
+        if (! preg_match('#^https?://#i', $url)) {
+            return '<span class="cabinet-sa-url-break">' . e($url) . '</span>';
+        }
+
+        return '<a class="cabinet-sa-url-break" href="' . e($url) . '" target="_blank" rel="noopener noreferrer">'
+            . e($url) . '</a>';
+    }
+
+    /**
+     * Экранирует текст и делает http(s) URL кликабельными (целиком, без …).
+     */
+    public static function linkifyUrlsInText(string $text): string
+    {
+        $text = trim($text);
+        if ($text === '') {
+            return '';
+        }
+
+        $parts = preg_split('#(https?://[^\s←→·]+)#iu', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+        if ($parts === false || $parts === []) {
+            return e($text);
+        }
+
+        $html = '';
+        foreach ($parts as $part) {
+            if ($part === '') {
+                continue;
+            }
+            // хвостовая пунктуация у URL
+            if (preg_match('#^(https?://\S+?)([.,;:)\]]+)?$#iu', $part, $m)) {
+                $html .= self::urlLinkHtml($m[1]);
+                if (! empty($m[2])) {
+                    $html .= e($m[2]);
+                }
+            } else {
+                $html .= e($part);
+            }
+        }
+
+        return '<span class="cabinet-sa-details-block">' . $html . '</span>';
+    }
+
     private static function clip(string $text, int $len): string
     {
         $text = trim(preg_replace('/\s+/u', ' ', $text));
+        if ($text === '' || self::isUrlLike($text)) {
+            return $text;
+        }
         if (mb_strlen($text) <= $len) {
             return $text;
         }
 
-        return mb_substr($text, 0, $len - 1) . '…';
+        return mb_substr($text, 0, max(1, $len - 1)) . '…';
+    }
+
+    /** URL / путь — никогда не режем в деталях (иначе «…» и нельзя скопировать). */
+    private static function isUrlLike(string $text): bool
+    {
+        if (preg_match('#^https?://#i', $text)) {
+            return true;
+        }
+
+        return (bool) preg_match('#^/[^\s]{2,}$#', $text);
     }
 
     private static function formatBytes(int $bytes): string

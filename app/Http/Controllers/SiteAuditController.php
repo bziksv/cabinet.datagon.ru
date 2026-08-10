@@ -415,19 +415,24 @@ class SiteAuditController extends Controller
             abort(404);
         }
 
-        // Deep-link в другой модуль (конкуренты и т.п.) — не таблица findings.
-        if (! empty($meta['external'])) {
+        // Внешний модуль: не редиректим — сначала объясняем, зачем он, и даём кнопку перехода.
+        $isExternalModule = ! empty($meta['external']);
+        $externalHref = null;
+        if ($isExternalModule) {
             $routeName = $meta['route'] ?? null;
             abort_unless(is_string($routeName) && $routeName !== '', 404);
-
-            return redirect()->route($routeName, $meta['route_params'] ?? []);
+            try {
+                $externalHref = route($routeName, $meta['route_params'] ?? []);
+            } catch (\Throwable $e) {
+                abort(404);
+            }
         }
 
         $page = max(1, (int) $request->input('page', 1));
         $perPage = 50;
-        $filterFields = SiteAuditReportFilter::fieldsForCode($code);
-        $filterValues = SiteAuditReportFilter::valuesFromRequest($request, $code);
-        $groupable = SiteAuditDuplicateGrouper::isGroupable($code);
+        $filterFields = $isExternalModule ? [] : SiteAuditReportFilter::fieldsForCode($code);
+        $filterValues = $isExternalModule ? [] : SiteAuditReportFilter::valuesFromRequest($request, $code);
+        $groupable = ! $isExternalModule && SiteAuditDuplicateGrouper::isGroupable($code);
         $viewMode = $request->input('view', $groupable ? 'groups' : 'list');
         if (! in_array($viewMode, ['groups', 'list'], true) || ! $groupable) {
             $viewMode = $groupable ? 'groups' : 'list';
@@ -440,16 +445,25 @@ class SiteAuditController extends Controller
         $projectId = (int) $crawl->project_id;
         $ignoredMap = [];
         $notesMap = [];
-        $codeWideIgnored = SiteAuditIgnore::query()
-            ->where('project_id', $projectId)
-            ->where('code', $code)
-            ->where('url_hash', '')
-            ->exists();
+        $codeWideIgnored = false;
+        if (! $isExternalModule) {
+            $codeWideIgnored = SiteAuditIgnore::query()
+                ->where('project_id', $projectId)
+                ->where('code', $code)
+                ->where('url_hash', '')
+                ->exists();
+        }
 
         $groups = [];
         $groupTotal = 0;
+        $htmlSitewide = null;
+        $rows = collect();
+        $total = 0;
+        $pages = 1;
 
-        if (($meta['source'] ?? '') === 'pages_canonical') {
+        if ($isExternalModule) {
+            // пустой отчёт — тело заменит карточка модуля
+        } elseif (($meta['source'] ?? '') === 'pages_canonical') {
             $query = SiteAuditPage::query()
                 ->where('crawl_id', $crawl->id)
                 ->whereNotNull('canonical')
@@ -484,14 +498,19 @@ class SiteAuditController extends Controller
 
             $total = (clone $query)->count();
 
-            // Groups тянут все findings в память — на больших отчётах уходим в list.
-            if ($viewMode === 'groups' && $total > 400) {
+            // Groups тянут findings в память — на больших отчётах уходим в list.
+            // Для HTML-паттернов лимит выше: сквозные шаблоны как раз на сотнях URL.
+            $groupsMax = SiteAuditDuplicateGrouper::isHtmlErrors($code) ? 2500 : 400;
+            if ($viewMode === 'groups' && $total > $groupsMax) {
                 $viewMode = 'list';
             }
+
+            $allGroupsForSummary = [];
 
             if ($viewMode === 'groups') {
                 $allRows = $query->get();
                 $allGroups = SiteAuditDuplicateGrouper::group($allRows, $code);
+                $allGroupsForSummary = $allGroups;
                 $groupTotal = count($allGroups);
                 $perPage = 20;
                 $pages = max(1, (int) ceil(max(1, $groupTotal) / $perPage));
@@ -507,6 +526,15 @@ class SiteAuditController extends Controller
                 $pages = max(1, (int) ceil($total / $perPage));
                 $ignoredMap = $ignoreSvc->ignoredMapForFindings($projectId, $rows);
                 $notesMap = $noteSvc->mapForFindings($projectId, $rows);
+
+                // В списке страниц всё равно ловим доминантный HTML-паттерн (сквозной шаблон).
+                if (SiteAuditDuplicateGrouper::isHtmlErrors($code) && $total >= 3 && $total <= $groupsMax) {
+                    $allGroupsForSummary = SiteAuditDuplicateGrouper::group((clone $query)->get(), $code);
+                }
+            }
+
+            if (SiteAuditDuplicateGrouper::isHtmlErrors($code) && $allGroupsForSummary !== []) {
+                $htmlSitewide = SiteAuditDuplicateGrouper::sitewideSummary($allGroupsForSummary, $total);
             }
         }
 
@@ -634,6 +662,8 @@ class SiteAuditController extends Controller
             'groupable' => $groupable,
             'viewMode' => $viewMode,
             'groupTotal' => $groupTotal,
+            'htmlSitewide' => $htmlSitewide,
+            'isHtmlErrorReport' => SiteAuditDuplicateGrouper::isHtmlErrors($code),
             'total' => $total,
             'page' => $page,
             'perPage' => $perPage,
@@ -669,9 +699,61 @@ class SiteAuditController extends Controller
             'activeGroup' => $activeGroup,
             'itemGroup' => $itemGroup,
             'showReferrers' => $showReferrers,
-            'canIgnore' => ! DemoCabinet::isCurrentUser() && ($meta['source'] ?? '') !== 'pages_canonical',
-            'canNote' => ! DemoCabinet::isCurrentUser() && ($meta['source'] ?? '') !== 'pages_canonical',
+            'isExternalModule' => $isExternalModule,
+            'externalHref' => $externalHref,
+            'externalRelated' => $isExternalModule
+                ? $this->externalModuleRelated($crawl, $code, $meta, $sideCounts)
+                : [],
+            'canIgnore' => ! $isExternalModule
+                && ! DemoCabinet::isCurrentUser()
+                && ($meta['source'] ?? '') !== 'pages_canonical',
+            'canNote' => ! $isExternalModule
+                && ! DemoCabinet::isCurrentUser()
+                && ($meta['source'] ?? '') !== 'pages_canonical',
         ]);
+    }
+
+    /**
+     * Связанные отчёты аудита для внешнего модуля (lite-перекрытие).
+     *
+     * @return list<array{code:string,title:string,count:int,href:string}>
+     */
+    private function externalModuleRelated(
+        SiteAuditCrawl $crawl,
+        string $code,
+        array $meta,
+        array $sideCounts
+    ): array {
+        $related = $meta['related_codes'] ?? [];
+        if (! is_array($related) || $related === []) {
+            return [];
+        }
+
+        $catalog = config('site_audit.findings', []);
+        $out = [];
+        foreach ($related as $relCode) {
+            $relCode = (string) $relCode;
+            if ($relCode === '' || ! isset($catalog[$relCode])) {
+                continue;
+            }
+            $relMeta = $catalog[$relCode];
+            $count = 0;
+            if (! empty($relMeta['virtual']) && is_array($relMeta['codes'] ?? null)) {
+                foreach ($relMeta['codes'] as $child) {
+                    $count += (int) ($sideCounts[(string) $child] ?? 0);
+                }
+            } else {
+                $count = (int) ($sideCounts[$relCode] ?? 0);
+            }
+            $out[] = [
+                'code' => $relCode,
+                'title' => (string) ($relMeta['title'] ?? $relCode),
+                'count' => $count,
+                'href' => route('pages.site-audit.report.show', [$crawl->id, $relCode]),
+            ];
+        }
+
+        return $out;
     }
 
     /**
@@ -1941,16 +2023,30 @@ class SiteAuditController extends Controller
     private function countsForCrawlDisplay(SiteAuditCrawl $crawl): array
     {
         $stored = is_array($crawl->counts_json) ? $crawl->counts_json : [];
-        if ($crawl->isFinished() && $stored !== []) {
-            return $stored;
-        }
-
-        return SiteAuditFinding::query()
+        $live = SiteAuditFinding::query()
             ->where('crawl_id', $crawl->id)
             ->selectRaw('code, count(*) as c')
             ->groupBy('code')
             ->pluck('c', 'code')
             ->all();
+
+        // После точечных проб counts_json может отставать — для probe-кодов берём live.
+        $probeCodes = [];
+        foreach (SiteAuditProbeStatus::catalog() as $meta) {
+            foreach ($meta['codes'] as $code) {
+                $probeCodes[$code] = true;
+            }
+        }
+
+        if ($crawl->isFinished() && $stored !== []) {
+            foreach ($probeCodes as $code => $_) {
+                $stored[$code] = (int) ($live[$code] ?? 0);
+            }
+
+            return $stored;
+        }
+
+        return $live;
     }
 
     private function bucketsFromTree(array $tree): array

@@ -94,7 +94,6 @@ class SiteAuditAggregator
         'index_count_mismatch',
         'serp_snippets',
         'serp_title_mismatch',
-        'serp_not_indexed',
         'serp_snippet_source',
         'serp_snippet_cannibalization',
         'psi_mobile',

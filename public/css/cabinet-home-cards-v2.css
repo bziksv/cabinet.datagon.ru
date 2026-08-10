@@ -561,6 +561,22 @@ body.modal-open .cabinet-home-sites-float-head {
     flex: 1 0 100%;
 }
 
+.cabinet-home-cards-v2-page .cabinet-home-sites-visit-skel {
+    display: inline-block;
+    width: 2.75rem;
+    height: 0.7rem;
+    border-radius: 0.25rem;
+    background: linear-gradient(90deg, #e9ecef 0%, #f8f9fa 50%, #e9ecef 100%);
+    background-size: 200% 100%;
+    animation: cabinet-home-visit-skel 1.1s ease-in-out infinite;
+    vertical-align: middle;
+}
+
+@keyframes cabinet-home-visit-skel {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}
+
 .cabinet-home-cards-v2-page .cabinet-home-sites-toolbar__controls {
     display: flex;
     flex-wrap: nowrap;

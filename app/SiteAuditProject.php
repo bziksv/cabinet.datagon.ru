@@ -46,12 +46,8 @@ class SiteAuditProject extends Model
 
     public static function teamColumnReady(): bool
     {
-        try {
-            return Schema::hasTable('site_audit_projects')
-                && Schema::hasColumn('site_audit_projects', 'team_id');
-        } catch (\Throwable $e) {
-            return false;
-        }
+        return \App\Support\SchemaMemo::hasTable('site_audit_projects')
+            && \App\Support\SchemaMemo::hasColumn('site_audit_projects', 'team_id');
     }
 
     /**
@@ -59,7 +55,7 @@ class SiteAuditProject extends Model
      */
     public static function teamIdsForMember(int $userId): array
     {
-        if ($userId < 1 || ! Schema::hasTable('seo_checklist_team_members')) {
+        if ($userId < 1 || ! \App\Support\SchemaMemo::hasTable('seo_checklist_team_members')) {
             return [];
         }
 

@@ -3,8 +3,8 @@
 namespace App;
 
 use App\Support\HomeUserSites;
+use App\Support\SchemaMemo;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Schema;
 
 class HomeUserSitesPreference extends Model
 {
@@ -25,11 +25,7 @@ class HomeUserSitesPreference extends Model
 
     public static function tableReady(): bool
     {
-        try {
-            return Schema::hasTable('home_user_sites_preferences');
-        } catch (\Throwable $e) {
-            return false;
-        }
+        return SchemaMemo::hasTable('home_user_sites_preferences');
     }
 
     /**

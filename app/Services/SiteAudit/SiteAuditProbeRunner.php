@@ -45,7 +45,7 @@ class SiteAuditProbeRunner
             return [
                 'ok' => false,
                 'message' => $meta['title'] . ': снова пропущена ('
-                    . SiteAuditProbeStatus::reasonLabel($status['reason'] ?? null) . ')',
+                    . SiteAuditProbeStatus::reasonLabel($status['reason'] ?? null, $probeId) . ')',
             ];
         }
 

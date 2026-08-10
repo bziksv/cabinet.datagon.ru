@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * PageSpeed Insights v5 (mobile/desktop) для сэмпла посадочных.
- * По умолчанию выкл.: SITE_AUDIT_PSI=1 (+ опционально SITE_AUDIT_PSI_API_KEY).
+ * По умолчанию вкл. при аудите (до psi_max_urls). Выкл.: SITE_AUDIT_PSI=0.
+ * Опционально SITE_AUDIT_PSI_API_KEY для лимитов Google.
  */
 class SiteAuditPsiProbe
 {
@@ -127,6 +128,21 @@ class SiteAuditPsiProbe
             'warn_below' => $warnBelow,
             'rows' => $rows,
         ];
+        // Все запросы сдохли (часто 429 без ключа) — не маскируем под «готово, 0 находок».
+        if ($errors > 0 && count($rows) > 0) {
+            $ok = 0;
+            foreach ($rows as $row) {
+                foreach (($row['strategies'] ?? []) as $s) {
+                    if (empty($s['error']) && isset($s['score'])) {
+                        $ok++;
+                    }
+                }
+            }
+            if ($ok === 0) {
+                $progress['psi']['skipped'] = true;
+                $progress['psi']['reason'] = 'api_quota';
+            }
+        }
         $crawl->progress_json = $progress;
         $crawl->save();
     }

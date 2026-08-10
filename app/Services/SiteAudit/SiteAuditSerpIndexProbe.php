@@ -18,12 +18,6 @@ class SiteAuditSerpIndexProbe
 {
     public function run(SiteAuditCrawl $crawl, bool $force = false): void
     {
-        SiteAuditFinding::query()
-            ->where('crawl_id', $crawl->id)
-            ->where('code', 'index_count_mismatch')
-            ->delete();
-        $this->deleteUrlMissingFindings($crawl->id);
-
         $pagesTotal = (int) ($crawl->pages_total ?: 0);
         $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
         $prevDeep = is_array($progress['serp_index']['deep'] ?? null)
@@ -41,6 +35,7 @@ class SiteAuditSerpIndexProbe
             || $wmReady;
 
         if (! $enabled) {
+            // Не трогаем уже собранные findings — иначе список URL пропадает при «disabled».
             $this->saveProgress($crawl, [
                 'skipped' => true,
                 'reason' => 'disabled',
@@ -76,6 +71,12 @@ class SiteAuditSerpIndexProbe
         $rootUrl = 'https://' . preg_replace('#^https?://#i', '', rtrim($domain, '/')) . '/';
 
         if (! $wmReady) {
+            SiteAuditFinding::query()
+                ->where('crawl_id', $crawl->id)
+                ->where('code', 'index_count_mismatch')
+                ->delete();
+            $this->deleteUrlMissingFindings($crawl->id);
+
             $this->saveProgress($crawl, [
                 'skipped' => true,
                 'reason' => 'no_webmaster',
@@ -104,6 +105,13 @@ class SiteAuditSerpIndexProbe
         $result = $this->compareViaWebmaster($crawl, $domain);
         if ($result === null || empty($result['ok'])) {
             $msg = is_array($result) ? (string) ($result['message'] ?? 'ошибка Вебмастера') : 'Вебмастер недоступен';
+
+            SiteAuditFinding::query()
+                ->where('crawl_id', $crawl->id)
+                ->where('code', 'index_count_mismatch')
+                ->delete();
+            $this->deleteUrlMissingFindings($crawl->id);
+
             $this->saveProgress($crawl, [
                 'skipped' => true,
                 'reason' => 'webmaster_error',
@@ -480,12 +488,12 @@ class SiteAuditSerpIndexProbe
         }
     }
 
-    /** Старый code до объединения в index_count_mismatch — подчистка при пересверке. */
+    /** Устаревшие code индексации — подчистка при пересверке Вебмастером. */
     private function deleteUrlMissingFindings(int $crawlId): void
     {
         SiteAuditFinding::query()
             ->where('crawl_id', $crawlId)
-            ->where('code', 'index_url_missing')
+            ->whereIn('code', ['index_url_missing', 'serp_not_indexed'])
             ->delete();
     }
 

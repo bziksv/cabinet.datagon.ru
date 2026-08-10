@@ -3,6 +3,7 @@
 namespace App\Services\SiteAudit;
 
 use App\SiteAuditCrawl;
+use App\SiteAuditFinding;
 
 /**
  * Опциональные пробы (PSI / SERP…): отличить «0 находок» от «проверку не запускали».
@@ -25,7 +26,6 @@ class SiteAuditProbeStatus
                 'codes' => [
                     'serp_snippets',
                     'serp_title_mismatch',
-                    'serp_not_indexed',
                     'serp_snippet_source',
                 ],
                 'title' => 'Сниппеты Яндекс / Google',
@@ -87,7 +87,20 @@ class SiteAuditProbeStatus
             : null;
         $enabled = (bool) config($meta['config_key'], false);
         $reason = is_array($block) ? (string) ($block['reason'] ?? '') : '';
+        $deep = is_array($block['deep'] ?? null) ? $block['deep'] : null;
+        $hasDeepResult = is_array($deep) && (
+            isset($deep['serp_count'])
+            || ($deep['source'] ?? '') === 'webmaster'
+            || ($deep['mode'] ?? '') === 'webmaster_list'
+            || isset($deep['matched'])
+        );
 
+        $findingCount = (int) SiteAuditFinding::query()
+            ->where('crawl_id', $crawl->id)
+            ->whereIn('code', $meta['codes'])
+            ->count();
+
+        // Явный skip (выкл. / квота API / нет URL) — важнее «есть rows в progress».
         if (is_array($block) && ! empty($block['skipped'])) {
             return [
                 'probe' => $probeId,
@@ -99,14 +112,16 @@ class SiteAuditProbeStatus
             ];
         }
 
-        if (is_array($block) && (
-            ! empty($block['ran'])
+        // Есть findings или сохранённый результат — это «готово», не «не было».
+        if ($findingCount > 0 || (is_array($block) && (
+            $hasDeepResult
+            || ! empty($block['ran'])
             || ! empty($block['ok'])
             || isset($block['urls'])
             || isset($block['checked'])
             || isset($block['rows'])
             || isset($block['engines'])
-        )) {
+        ))) {
             return [
                 'probe' => $probeId,
                 'title' => $meta['title'],
@@ -139,12 +154,20 @@ class SiteAuditProbeStatus
         ];
     }
 
-    public static function reasonLabel(?string $reason): string
+    public static function reasonLabel(?string $reason, ?string $probeId = null): string
     {
+        $reason = (string) $reason;
+
+        // Старые краулы: PSI был выкл. по умолчанию — в progress остался skipped/disabled.
+        if ($reason === 'disabled' && $probeId === 'psi' && (bool) config('site_audit.psi_enabled', true)) {
+            return 'не запускалась в этой проверке (раньше PSI был выкл.; новые аудиты гоняют сами)';
+        }
+
         $map = [
-            'disabled' => 'отключена на сервере (по умолчанию выкл.)',
+            'disabled' => 'отключена в настройках сервера',
             'no_urls' => 'не нашлось URL для проверки',
             'no_key' => 'нет API-ключа',
+            'api_quota' => 'Google PageSpeed отклонил все запросы (дневной лимит API без ключа или квота исчерпана)',
             'error' => 'ошибка при запуске',
             'no_pages' => 'нет страниц в проверке',
             'no_domain' => 'нет домена проекта',
@@ -152,8 +175,6 @@ class SiteAuditProbeStatus
             'webmaster_error' => 'ошибка API Яндекс.Вебмастера',
             'exception' => 'ошибка выполнения',
         ];
-
-        $reason = (string) $reason;
 
         return $map[$reason] ?? ($reason !== '' ? $reason : 'не запускалась');
     }

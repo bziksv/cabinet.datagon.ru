@@ -149,7 +149,7 @@
                     </thead>
                     <tbody v-if="filteredItems.length">
                         <tr v-for="row in filteredItems" :key="row.id">
-                            <td class="cabinet-ic-url-cell align-top" v-html="renderUrlCell(row.url)"></td>
+                            <td class="cabinet-ic-url-cell align-top" v-html="renderUrlCell(row)"></td>
                             <td class="cabinet-ic-engine-cell align-top" v-html="renderEngineCell(row.yandex)"></td>
                             <td class="cabinet-ic-engine-cell align-top" v-html="renderEngineCell(row.google)"></td>
                         </tr>
@@ -182,7 +182,7 @@
                     </thead>
                     <tbody>
                         <tr v-for="row in savedHistories" :key="'h-' + row.id">
-                            <td class="cabinet-ic-url-cell align-top" v-html="renderUrlCell(row.url)"></td>
+                            <td class="cabinet-ic-url-cell align-top" v-html="renderUrlCell(row)"></td>
                             <td class="cabinet-ic-engine-cell align-top" v-html="renderEngineCell(row.yandex)"></td>
                             <td class="cabinet-ic-engine-cell align-top" v-html="renderEngineCell(row.google)"></td>
                             <td class="small text-secondary text-nowrap align-top">{{ row.created_at }}</td>
@@ -576,6 +576,8 @@ export default {
                     this.items.push({
                         id: index,
                         url: result.url || url,
+                        page_title: result.page_title || null,
+                        page_title_error: result.page_title_error || null,
                         yandex: result.yandex,
                         google: result.google,
                     });
@@ -585,6 +587,8 @@ export default {
                                 id: data.history.id,
                                 url: data.history.url || result.url || url,
                                 created_at: data.history.created_at || "",
+                                page_title: result.page_title || null,
+                                page_title_error: result.page_title_error || null,
                                 yandex: result.yandex,
                                 google: result.google,
                             },
@@ -612,17 +616,33 @@ export default {
                 });
         },
 
-        renderUrlCell(url) {
-            const raw = String(url || "").trim();
+        renderUrlCell(rowOrUrl) {
+            const row =
+                typeof rowOrUrl === "object" && rowOrUrl !== null
+                    ? rowOrUrl
+                    : { url: rowOrUrl };
+            const raw = String(row.url || "").trim();
             if (!raw) {
                 return '<span class="text-muted">—</span>';
             }
             const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
             const soft = _.escape(raw).replace(/([:/?&=#_.-])/g, "$1<wbr>");
-            return (
+            let html =
                 `<a class="cabinet-ic-url-link" href="${_.escape(href)}" ` +
-                `target="_blank" rel="noopener noreferrer" title="${_.escape(raw)}">${soft}</a>`
-            );
+                `target="_blank" rel="noopener noreferrer" title="${_.escape(raw)}">${soft}</a>`;
+            const pageTitle = String(row.page_title || "").trim();
+            if (pageTitle) {
+                html +=
+                    `<div class="cabinet-ic-page-title mt-2">` +
+                    `<div class="cabinet-ic-page-title__label">TITLE на сайте</div>` +
+                    `<div class="cabinet-ic-page-title__text">${_.escape(pageTitle)}</div>` +
+                    `</div>`;
+            } else if (row.page_title_error) {
+                html += `<div class="small text-secondary mt-2">${_.escape(
+                    String(row.page_title_error)
+                )}</div>`;
+            }
+            return html;
         },
 
         renderEngineCell(engine) {
@@ -637,9 +657,20 @@ export default {
                 return badge;
             }
             const parts = [badge];
+            if (engine.title_mismatch) {
+                parts.push(
+                    ` <span class="badge text-bg-warning">TITLE ≠ выдача</span>`
+                );
+            } else if (engine.title_match) {
+                parts.push(
+                    ` <span class="badge text-bg-light border">TITLE совпал</span>`
+                );
+            }
             if (engine.title) {
                 parts.push(
-                    `<div class="small fw-semibold mt-1">${_.escape(engine.title)}</div>`
+                    `<div class="small fw-semibold mt-1"><span class="text-secondary fw-normal">В выдаче:</span> ${_.escape(
+                        engine.title
+                    )}</div>`
                 );
             }
             if (engine.snippet) {
@@ -685,6 +716,8 @@ export default {
             this.items = items.map((row, index) => ({
                 id: index,
                 url: row.url || "",
+                page_title: row.page_title != null ? row.page_title : null,
+                page_title_error: row.page_title_error != null ? row.page_title_error : null,
                 yandex: row.yandex != null ? row.yandex : null,
                 google: row.google != null ? row.google : null,
             }));

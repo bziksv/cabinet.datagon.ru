@@ -182,6 +182,10 @@ class SiteAuditRedirectChain
     private static function clip(string $text, int $len): string
     {
         $text = trim($text);
+        // URL в цепочке редиректов не обрезаем
+        if ($text === '' || preg_match('#^https?://#i', $text) || preg_match('#^/[^\s]{2,}$#', $text)) {
+            return $text;
+        }
         if ($len < 8 || mb_strlen($text) <= $len) {
             return $text;
         }

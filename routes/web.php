@@ -105,6 +105,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/home/sites/hide', 'HomeController@hideUserSite')->name('home.sites.hide');
     Route::post('/home/sites/restore', 'HomeController@restoreUserSite')->name('home.sites.restore');
     Route::post('/home/sites/columns', 'HomeController@saveSitesColumns')->name('home.sites.columns');
+    Route::get('/home/sites/visits', 'HomeController@sitesVisits')->name('home.sites.visits');
+    Route::get('/home/sites/fragment', 'HomeController@sitesFragment')->name('home.sites.fragment');
+    Route::get('/home/module-counts', 'HomeController@moduleCounts')->name('home.module-counts');
+    Route::get('/home/seo-checklist-due', 'HomeController@seoChecklistDueFragment')->name('home.seo-checklist-due');
 
     Route::get('/yandex-metrika/connect', 'YandexMetrikaController@connect')->name('yandex-metrika.connect');
     Route::get('/yandex-metrika/callback', 'YandexMetrikaController@callback')->name('yandex-metrika.callback');

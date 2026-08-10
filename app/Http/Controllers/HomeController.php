@@ -22,7 +22,9 @@ class HomeController extends Controller
             return redirect('/login');
         }
 
-        return view('home-cards-v2', $this->dashboardViewData(true, true));
+        // Тяжёлые куски (матрица сайтов, count'ы модулей, due, Метрика) — фоном:
+        // локально БД часто удалённая, десятки последовательных запросов = секунды TTFB.
+        return view('home-cards-v2', $this->dashboardViewData(false, false));
     }
 
     /** @deprecated Старые макеты главной — редирект на основную. */
@@ -55,7 +57,7 @@ class HomeController extends Controller
             'modules' => $modules,
             'featuredModules' => array_slice($modules, 0, 2),
             'listModules' => array_slice($modules, 2),
-            'seoChecklistDue' => $this->seoChecklistDueData(),
+            'seoChecklistDue' => ['count' => 0, 'overdue' => 0, 'soon' => 0, 'items' => collect(), 'deferred' => true],
             'userSites' => [
                 'sites' => [],
                 'archived' => [],
@@ -66,14 +68,117 @@ class HomeController extends Controller
                 'shown' => 0,
                 'catalog' => [],
                 'modules_total' => 0,
+                'deferred' => true,
+                'visits_deferred' => true,
             ],
+            'moduleCountsDeferred' => ! $withItemCounts,
         ];
 
         if ($withUserSites) {
-            $data['userSites'] = HomeUserSites::forCurrentUser();
+            // Визиты Метрики — отдельным AJAX: API может висеть десятки секунд.
+            $data['userSites'] = HomeUserSites::forCurrentUser(false);
+            $data['userSites']['deferred'] = false;
+        }
+
+        if ($withItemCounts) {
+            $data['moduleCountsDeferred'] = false;
         }
 
         return $data;
+    }
+
+    /**
+     * HTML-фрагмент таблицы сайтов (без визитов Метрики).
+     */
+    public function sitesFragment(): \Illuminate\Http\Response
+    {
+        if (! Auth::check()) {
+            abort(401);
+        }
+
+        $userSites = HomeUserSites::forCurrentUser(false);
+        $userSites['deferred'] = false;
+        $html = view('home-cards-v2.partials.sites', ['userSites' => $userSites])->render();
+
+        return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
+    }
+
+    /**
+     * Счётчики проектов/сохранений на карточках модулей.
+     */
+    public function moduleCounts(): JsonResponse
+    {
+        $userId = (int) Auth::id();
+        if ($userId < 1) {
+            return response()->json(['ok' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $counts = HomeModuleItemCounts::countsForUser($userId);
+        $labels = [
+            'projects' => [
+                'empty' => __('No projects yet'),
+                'choice' => 'home.cards_v2.projects',
+            ],
+            'saved' => [
+                'empty' => __('No saved items yet'),
+                'choice' => 'home.cards_v2.saved_items',
+            ],
+        ];
+
+        $out = [];
+        foreach ($counts as $key => $row) {
+            $kind = (string) ($row['kind'] ?? 'projects');
+            $count = (int) ($row['count'] ?? 0);
+            $pack = $labels[$kind] ?? $labels['projects'];
+            $out[$key] = [
+                'count' => $count,
+                'kind' => $kind,
+                'empty_label' => $pack['empty'],
+                'count_label' => trans_choice($pack['choice'], $count),
+            ];
+        }
+
+        return response()->json(['ok' => true, 'counts' => $out]);
+    }
+
+    /**
+     * Блок дедлайнов чеклиста.
+     */
+    public function seoChecklistDueFragment(): \Illuminate\Http\Response
+    {
+        if (! Auth::check()) {
+            abort(401);
+        }
+
+        $html = view('home.partials.seo-checklist-due', [
+            'seoChecklistDue' => $this->seoChecklistDueData(),
+        ])->render();
+
+        return response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']);
+    }
+
+    /**
+     * Фоновая догрузка посещаемости Яндекс.Метрики для таблицы сайтов на главной.
+     */
+    public function sitesVisits(Request $request): JsonResponse
+    {
+        $userId = (int) Auth::id();
+        if ($userId < 1) {
+            return response()->json(['ok' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $domains = $request->input('domains');
+        if (! is_array($domains)) {
+            $domains = null;
+        }
+
+        $loaded = HomeUserSites::visitsForUser($userId, $domains);
+
+        return response()->json([
+            'ok' => true,
+            'by_domain' => $loaded['by_domain'],
+            'meta' => $loaded['meta'],
+        ]);
     }
 
     /**
@@ -121,6 +226,8 @@ class HomeController extends Controller
             return response()->json(['ok' => false, 'message' => __('Invalid domain')], 422);
         }
 
+        HomeUserSites::forgetSitesCache($userId);
+
         return response()->json([
             'ok' => true,
             'domain' => $domain,
@@ -162,6 +269,8 @@ class HomeController extends Controller
         if ($domain === null) {
             return response()->json(['ok' => false, 'message' => __('Invalid domain')], 422);
         }
+
+        HomeUserSites::forgetSitesCache($userId);
 
         return response()->json([
             'ok' => true,

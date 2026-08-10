@@ -98,22 +98,22 @@ return [
     'serp_index_deep_sample' => (int) env('SITE_AUDIT_SERP_INDEX_DEEP', 20), // legacy
     'serp_index_deep_engine' => env('SITE_AUDIT_SERP_INDEX_DEEP_ENGINE', 'yandex'),
 
-    // Сниппеты ПС для посадочных/сэмпла (XML, дорого). Local: выкл., prod: SITE_AUDIT_SERP_SNIPPETS=1
-    'serp_snippets_enabled' => (bool) env('SITE_AUDIT_SERP_SNIPPETS', false),
+    // Сниппеты ПС: посадочные + сэмпл (XML). По умолчанию вкл. — снимать при аудите; выкл.: SITE_AUDIT_SERP_SNIPPETS=0
+    'serp_snippets_enabled' => (bool) env('SITE_AUDIT_SERP_SNIPPETS', true),
     'serp_snippets_engines' => ['yandex', 'google'],
     'serp_snippets_max_urls' => (int) env('SITE_AUDIT_SERP_SNIPPETS_MAX', 12),
     // Каннибализация по живым сниппетам (по умолчанию тот же gate, что SERP-сниппеты)
     'serp_cannibalization_enabled' => (bool) env(
         'SITE_AUDIT_SERP_CANNIBALIZATION',
-        env('SITE_AUDIT_SERP_SNIPPETS', false)
+        env('SITE_AUDIT_SERP_SNIPPETS', true)
     ),
     'serp_cannibalization_max_queries' => (int) env('SITE_AUDIT_SERP_CANNIBAL_MAX', 20),
     'serp_cannibalization_depth' => (int) env('SITE_AUDIT_SERP_CANNIBAL_DEPTH', 20),
     'serp_cannibalization_engines' => ['yandex'],
     'serp_cannibalization_yandex_lr' => env('SITE_AUDIT_SERP_CANNIBAL_LR', '213'),
 
-    // PSI (PageSpeed Insights v5). Дорого по времени — выкл. по умолчанию.
-    'psi_enabled' => (bool) env('SITE_AUDIT_PSI', false),
+    // PSI (PageSpeed Insights v5). Выборка до psi_max_urls; mobile+desktop. Вкл. по умолчанию.
+    'psi_enabled' => (bool) env('SITE_AUDIT_PSI', true),
     'psi_api_key' => env('SITE_AUDIT_PSI_API_KEY', ''),
     'psi_max_urls' => (int) env('SITE_AUDIT_PSI_MAX_URLS', 20),
     'psi_strategies' => ['mobile', 'desktop'],
@@ -266,7 +266,6 @@ return [
             'index_count_mismatch',
             'serp_snippets',
             'serp_title_mismatch',
-            'serp_not_indexed',
         'serp_snippet_source',
         'serp_snippet_cannibalization',
         'probable_affiliate',
@@ -768,7 +767,7 @@ return [
             'phase' => 'C',
             'severity' => 'other',
             'title' => 'Критические ошибки HTML',
-            'description' => 'Сэмпл критичных ошибок разметки (libxml ERROR/FATAL + эвристики). Не полный W3C-validator.',
+            'description' => 'Сэмпл критичных ошибок разметки. Одинаковая ошибка на многих URL = почти всегда сквозной шаблон (шапка/подвал). Смотрите вид «По ошибкам».',
             'group' => 'tech',
         ],
         'lost_file' => [
@@ -873,7 +872,7 @@ return [
             'phase' => 'D',
             'severity' => 'info',
             'title' => 'Нет блока доставки',
-            'description' => 'Коммерческая страница без упоминания доставки / самовывоза.',
+            'description' => 'Коммерческая страница без слов про доставку/самовывоз в тексте (lite-эвристика).',
             'group' => 'seo',
         ],
         'commercial_missing_payment' => [
@@ -939,14 +938,14 @@ return [
             'phase' => 'C',
             'severity' => 'info',
             'title' => 'Мобильные устройства (PSI)',
-            'description' => 'PageSpeed Insights (strategy=mobile): Performance score и Core Web Vitals.',
+            'description' => 'PageSpeed Insights mobile: до 20 URL выборки при аудите, score и CWV.',
             'group' => 'tech',
         ],
         'psi_desktop' => [
             'phase' => 'C',
             'severity' => 'info',
             'title' => 'Компьютеры (PSI)',
-            'description' => 'PageSpeed Insights (strategy=desktop): Performance score и Core Web Vitals.',
+            'description' => 'PageSpeed Insights desktop: до 20 URL выборки при аудите, score и CWV.',
             'group' => 'tech',
         ],
         'deep_pages' => [
@@ -972,22 +971,23 @@ return [
             'phase' => 'B',
             'severity' => 'info',
             'title' => 'Сниппеты Яндекс / Google',
-            'description' => 'Title и текст сниппета из выдачи ПС для посадочных (и сэмпла страниц краула).',
+            'description' => 'Выборка (посадочные страницы и несколько страниц из обхода): title/snippet Яндекс и Google. Снимается при аудите.',
             'group' => 'seo',
         ],
         'serp_title_mismatch' => [
             'phase' => 'B',
             'severity' => 'warning',
             'title' => 'TITLE страницы ≠ TITLE в выдаче',
-            'description' => 'Заголовок в HTML заметно отличается от title в сниппете Яндекс/Google.',
+            'description' => 'Только расхождения по выборке: Яндекс и Google проверяются оба; совпавшая ПС в таблицу не попадает. Типичный rewrite бренда — не ошибка.',
             'group' => 'seo',
         ],
         'serp_not_indexed' => [
             'phase' => 'B',
             'severity' => 'warning',
-            'title' => 'URL не найден в выдаче ПС',
-            'description' => 'Посадочная / страница сэмпла не обнаружена в выдаче Яндекс или Google (site:/url).',
+            'title' => 'URL не найден в выдаче ПС (устарело)',
+            'description' => 'Устарело: дублировало сверку Вебмастера. Индекс смотрите в «Страницы на сайте не в индексе поисковых».',
             'group' => 'seo',
+            'deprecated' => true,
         ],
         'serp_snippet_source' => [
             'phase' => 'C',
@@ -1022,53 +1022,71 @@ return [
             'description' => 'URL похож на страницу пагинации или facet-фильтра (?page=, /page/N, filter=…).',
         ],
         /*
-         * Deep-link в существующий модуль (не finding краула).
-         * В дереве SEO → «Анализ конкурентов»; detector/HTML не нужны.
+         * Внешний модуль Titlo: в дереве аудита — страница-объяснение + CTA,
+         * не мгновенный редирект и не finding краула.
          */
         'site_competitors' => [
             'phase' => 'D',
             'severity' => 'info',
             'title' => 'Конкуренты сайта',
-            'description' => 'Сводный анализ конкурентов по запросам — отдельный модуль Titlo (не дублируем краул).',
+            'description' => 'Сравнение с ТОП по запросам — отдельный модуль; аудит сайт не сравнивает с выдачей.',
             'group' => 'seo',
             'external' => true,
             'route' => 'competitor.analysis',
+            'external_cta' => 'Открыть анализ конкурентов',
+            'related_codes' => [],
         ],
         'site_index_check' => [
             'phase' => 'D',
             'severity' => 'info',
-            'title' => 'Проверка индексации (модуль)',
-            'description' => 'Сниппеты и проверка индекса URL — отдельный модуль «Проверка индексации» (не дублируем краул).',
+            'title' => 'Проверка индексации',
+            'description' => 'Свои списки URL и живые сниппеты — модуль; в аудите уже lite SERP/индекс по проверке.',
             'group' => 'seo',
             'external' => true,
             'route' => 'pages.index-check',
+            'external_cta' => 'Открыть проверку индексации',
+            'related_codes' => [
+                'index_count_mismatch',
+                'serp_snippets',
+                'serp_title_mismatch',
+            ],
         ],
         'site_meta_tags' => [
             'phase' => 'D',
             'severity' => 'info',
-            'title' => 'Мониторинг мета-тегов (модуль)',
-            'description' => 'История и сравнение META — отдельный модуль Titlo; в аудите уже virtual seo_meta_errors.',
+            'title' => 'Мониторинг мета-тегов',
+            'description' => 'История META во времени — модуль; в аудите snapshot ошибок по этой проверке.',
             'group' => 'seo',
             'external' => true,
             'route' => 'meta-tags.index',
+            'external_cta' => 'Открыть мониторинг мета-тегов',
+            'related_codes' => ['seo_meta_errors'],
         ],
         'site_esenin' => [
             'phase' => 'D',
             'severity' => 'info',
-            'title' => 'Есенин / проверка текста (модуль)',
-            'description' => 'Полный текстовый разбор — модуль «Есенин»; в аудите lite тошнота/переспам/n-граммы.',
+            'title' => 'Есенин / проверка текста',
+            'description' => 'Глубокий разбор текста — модуль; в аудите lite тошнота и n-граммы по HTML проверки.',
             'group' => 'seo',
             'external' => true,
             'route' => 'pages.esenin-text-check',
+            'external_cta' => 'Открыть Есенин',
+            'related_codes' => [
+                'text_nausea',
+                'text_bigram_spam',
+                'text_trigram_spam',
+            ],
         ],
         'site_http_headers' => [
             'phase' => 'D',
             'severity' => 'info',
-            'title' => 'HTTP-заголовки (модуль)',
-            'description' => 'Ручная проверка заголовков URL — модуль «HTTP-заголовки»; в аудите уже security pack по краулу.',
+            'title' => 'HTTP-заголовки',
+            'description' => 'Точечная проверка заголовков URL — модуль; в аудите security pack по всему краулу.',
             'group' => 'tech',
             'external' => true,
             'route' => 'pages.headers',
+            'external_cta' => 'Открыть HTTP-заголовки',
+            'related_codes' => ['security_headers'],
         ],
         'security_headers' => [
             'phase' => 'B',
@@ -1144,7 +1162,7 @@ return [
             'phase' => 'C',
             'severity' => 'info',
             'title' => 'Нет Cross-Origin-Embedder-Policy',
-            'description' => 'Ответ не задаёт COEP (нужен вместе с COOP для crossOriginIsolated).',
+            'description' => 'Нет COEP на HTTPS 200. Нужен с COOP для isolation; для обычного сайта часто не обязателен.',
             'group' => 'tech',
         ],
         'missing_corp' => [

@@ -8,6 +8,30 @@
     background: #f8fafc;
 }
 
+.cabinet-ic-page-title {
+    padding: 0.45rem 0.55rem;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+}
+
+.cabinet-ic-page-title__label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 0.15rem;
+}
+
+.cabinet-ic-page-title__text {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0f172a;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
 .cabinet-ic-lead__icon {
     display: inline-flex;
     align-items: center;

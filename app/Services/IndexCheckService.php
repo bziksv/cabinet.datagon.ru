@@ -32,6 +32,8 @@ class IndexCheckService
 
         $result = [
             'url' => $normalized,
+            'page_title' => null,
+            'page_title_error' => null,
             'yandex' => null,
             'google' => null,
         ];
@@ -42,6 +44,23 @@ class IndexCheckService
 
         if ($checkGoogle) {
             $result['google'] = self::probeEngine($normalized, 'google', (string) ($options['google_lr'] ?? config('cabinet-index-check.default_google_lr', '213')), $unifyWww);
+        }
+
+        $pageMeta = self::fetchPageTitle($normalized);
+        $result['page_title'] = $pageMeta['title'];
+        $result['page_title_error'] = $pageMeta['error'];
+        $pageTitle = is_string($pageMeta['title']) ? $pageMeta['title'] : '';
+
+        foreach (['yandex', 'google'] as $engineKey) {
+            if (! is_array($result[$engineKey] ?? null)) {
+                continue;
+            }
+            $serpTitle = isset($result[$engineKey]['title']) ? (string) $result[$engineKey]['title'] : '';
+            $indexed = ! empty($result[$engineKey]['indexed']);
+            $mismatch = $indexed && $pageTitle !== '' && $serpTitle !== '' && self::titlesDiffer($pageTitle, $serpTitle);
+            $result[$engineKey]['title_mismatch'] = $mismatch;
+            $result[$engineKey]['title_match'] = $indexed && $pageTitle !== '' && $serpTitle !== '' && ! $mismatch;
+            $result[$engineKey]['page_title'] = $pageTitle !== '' ? $pageTitle : null;
         }
 
         return $result;
@@ -648,5 +667,101 @@ class IndexCheckService
         }
 
         return $cost;
+    }
+
+    /**
+     * TITLE страницы (живой HTTP), для сверки с выдачей.
+     *
+     * @return array{title: ?string, error: ?string}
+     */
+    public static function fetchPageTitle(string $url): array
+    {
+        $html = null;
+        $error = null;
+        try {
+            if (function_exists('curl_init')) {
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_MAXREDIRS => 5,
+                    CURLOPT_CONNECTTIMEOUT => 8,
+                    CURLOPT_TIMEOUT => 12,
+                    CURLOPT_USERAGENT => 'Mozilla/5.0 (compatible; TitloIndexCheck/1.0)',
+                    CURLOPT_SSL_VERIFYPEER => true,
+                    CURLOPT_SSL_VERIFYHOST => 2,
+                ]);
+                $html = curl_exec($ch);
+                if ($html === false) {
+                    $error = curl_error($ch) ?: 'Не удалось скачать страницу';
+                    $html = null;
+                }
+                $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+                if ($html !== null && ($code < 200 || $code >= 400)) {
+                    $error = 'HTTP ' . $code;
+                    // всё равно пробуем вытащить title из тела
+                }
+            } else {
+                $ctx = stream_context_create([
+                    'http' => [
+                        'timeout' => 12,
+                        'header' => "User-Agent: Mozilla/5.0 (compatible; TitloIndexCheck/1.0)\r\n",
+                    ],
+                ]);
+                $html = @file_get_contents($url, false, $ctx);
+                if ($html === false) {
+                    $html = null;
+                    $error = 'Не удалось скачать страницу';
+                }
+            }
+        } catch (\Throwable $e) {
+            return ['title' => null, 'error' => $e->getMessage()];
+        }
+
+        if (! is_string($html) || $html === '') {
+            return ['title' => null, 'error' => $error ?: 'Пустой ответ страницы'];
+        }
+
+        $title = null;
+        if (preg_match('/<title\b[^>]*>(.*?)<\/title>/is', $html, $m)) {
+            $title = html_entity_decode(trim(strip_tags($m[1])), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $title = preg_replace('/\s+/u', ' ', $title) ?: $title;
+            if (mb_strlen($title) > 300) {
+                $title = mb_substr($title, 0, 299) . '…';
+            }
+        }
+
+        if ($title === null || $title === '') {
+            return ['title' => null, 'error' => $error ?: 'TITLE на странице не найден'];
+        }
+
+        return ['title' => $title, 'error' => null];
+    }
+
+    public static function titlesDiffer(string $pageTitle, string $serpTitle): bool
+    {
+        $a = self::normTitle($pageTitle);
+        $b = self::normTitle($serpTitle);
+        if ($a === '' || $b === '') {
+            return false;
+        }
+        if ($a === $b) {
+            return false;
+        }
+        if (mb_strlen($a) < 12 || mb_strlen($b) < 12) {
+            return true;
+        }
+        similar_text($a, $b, $pct);
+
+        return $pct < 72.0;
+    }
+
+    private static function normTitle(string $t): string
+    {
+        $t = mb_strtolower(trim($t));
+        $t = preg_replace('/\s+/u', ' ', $t) ?: $t;
+
+        return $t;
     }
 }

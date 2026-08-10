@@ -41,8 +41,8 @@
             snippet-label="{{ __('Index check snippet label') }}"
             history-title="{{ __('Index check history title') }}"
             history-empty="{{ __('Index check history empty') }}"
-            yes-label="{{ __('Yes') }}"
-            no-label="{{ __('No') }}"
+            yes-label="В индексе — да"
+            no-label="В индексе — нет"
             err-label="{{ __('Error') }}"
             cost-hint="{{ __('Index check cost hint', ['cost' => $costPerEngine]) }}"
             confirm-title="{{ __('Index check confirm title') }}"
@@ -65,12 +65,16 @@
             @php
                 $demoIndex = \App\Support\DemoCabinet::isCurrentUser() ? \App\Support\DemoCabinet::indexCheckShowcase() : null;
                 $historyPayload = collect($histories ?? [])->map(function ($row) {
+                    $result = is_array($row->result) ? $row->result : [];
+
                     return [
                         'id' => $row->id,
                         'url' => $row->url,
                         'created_at' => optional($row->created_at)->format('d.m.Y H:i'),
-                        'yandex' => is_array($row->result) ? ($row->result['yandex'] ?? null) : null,
-                        'google' => is_array($row->result) ? ($row->result['google'] ?? null) : null,
+                        'page_title' => $result['page_title'] ?? null,
+                        'page_title_error' => $result['page_title_error'] ?? null,
+                        'yandex' => $result['yandex'] ?? null,
+                        'google' => $result['google'] ?? null,
                     ];
                 })->values();
             @endphp

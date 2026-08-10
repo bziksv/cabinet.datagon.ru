@@ -20,7 +20,7 @@ use App\SiteAuditProject;
 use App\SiteTypesHistory;
 use App\TextUniquenessHistory;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 /**
@@ -59,6 +59,29 @@ class HomeModuleItemCounts
      * @return array<string, array{count:int, kind:string}>
      */
     public static function countsForUser(int $userId): array
+    {
+        if ($userId < 1) {
+            return [];
+        }
+
+        $cached = Cache::remember('home.module_counts.v1.' . $userId, 180, static function () use ($userId) {
+            return self::computeCountsForUser($userId);
+        });
+
+        return is_array($cached) ? $cached : self::computeCountsForUser($userId);
+    }
+
+    public static function forgetCountsCache(int $userId): void
+    {
+        if ($userId > 0) {
+            Cache::forget('home.module_counts.v1.' . $userId);
+        }
+    }
+
+    /**
+     * @return array<string, array{count:int, kind:string}>
+     */
+    private static function computeCountsForUser(int $userId): array
     {
         if ($userId < 1) {
             return [];
@@ -129,7 +152,7 @@ class HomeModuleItemCounts
         });
 
         $add('reports', 'projects', static function () use ($userId) {
-            if (!Schema::hasTable('seo_report_projects')) {
+            if (!SchemaMemo::hasTable('seo_report_projects')) {
                 return 0;
             }
 
@@ -144,7 +167,7 @@ class HomeModuleItemCounts
         });
 
         $add('esenin-text-check', 'saved', static function () use ($userId) {
-            if (!Schema::hasTable('esenin_text_check_sessions')) {
+            if (!SchemaMemo::hasTable('esenin_text_check_sessions')) {
                 return 0;
             }
 

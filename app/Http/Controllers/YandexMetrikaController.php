@@ -130,6 +130,8 @@ class YandexMetrikaController extends Controller
             return response()->json($result, 422);
         }
 
+        HomeUserSites::forgetSitesCache($userId);
+
         return response()->json($result);
     }
 
@@ -138,6 +140,8 @@ class YandexMetrikaController extends Controller
         $userId = (int) Auth::id();
         $domain = (string) $request->input('domain', '');
         $ok = $this->metrika->unbindCounter($userId, $domain);
+
+        HomeUserSites::forgetSitesCache($userId);
 
         return response()->json([
             'ok' => $ok,

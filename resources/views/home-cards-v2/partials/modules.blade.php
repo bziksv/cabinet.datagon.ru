@@ -40,6 +40,8 @@
             <div class="row g-3" id="cabinet-home-modules-grid">
                 @foreach($modules as $module)
                     @php
+                        $moduleKey = \App\Support\HomeModuleItemCounts::pathKey((string) ($module['link'] ?? ''));
+                        $countsDeferred = !empty($moduleCountsDeferred) && $moduleKey !== null;
                         $itemsCount = array_key_exists('items_count', $module) ? $module['items_count'] : null;
                         $itemsKind = $module['items_kind'] ?? null;
                         $hasItemsMeta = $itemsCount !== null;
@@ -47,7 +49,8 @@
                     @endphp
                     <div class="col-12 col-sm-6 col-lg-4 col-xl-3 d-flex"
                          data-cabinet-module-title="{{ $module['title'] }}"
-                         data-project-id="{{ $module['id'] }}">
+                         data-project-id="{{ $module['id'] }}"
+                         @if($moduleKey) data-module-key="{{ $moduleKey }}" @endif>
                         <article class="cabinet-home-cards-v2-card flex-fill {{ $isEmpty ? 'is-empty' : '' }}"
                                  style="--cabinet-module-accent: {{ $module['color'] }};">
                             <div class="cabinet-home-cards-v2-card__glow" aria-hidden="true"></div>
@@ -75,8 +78,20 @@
                                     </p>
                                 @endif
 
-                                <div class="cabinet-home-cards-v2-card__meta mt-auto">
-                                    @if($hasItemsMeta)
+                                <div class="cabinet-home-cards-v2-card__meta mt-auto" data-module-meta>
+                                    @if($countsDeferred)
+                                        <div class="cabinet-home-cards-v2-count cabinet-home-cards-v2-count--muted" data-module-count-skel>
+                                            <span class="cabinet-home-sites-visit-skel" aria-hidden="true"></span>
+                                        </div>
+                                        <a href="{{ $module['link'] }}"
+                                           class="cabinet-home-cards-v2-open"
+                                           data-track="open_module_cards_v2"
+                                           data-module-open
+                                           @if($module['external']) target="_blank" rel="noopener noreferrer" @endif>
+                                            {{ __('Open') }}
+                                            <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                                        </a>
+                                    @elseif($hasItemsMeta)
                                         @if($isEmpty)
                                             <div class="cabinet-home-cards-v2-empty" role="status">
                                                 <i class="bi bi-info-circle" aria-hidden="true"></i>
@@ -100,11 +115,6 @@
                                                 </span>
                                             </div>
                                         @endif
-                                    @else
-                                        <div class="cabinet-home-cards-v2-count cabinet-home-cards-v2-count--muted">
-                                            <span class="cabinet-home-cards-v2-count__label">{{ __('Utility tool') }}</span>
-                                        </div>
-                                    @endif
 
                                     <a href="{{ $module['link'] }}"
                                        class="cabinet-home-cards-v2-open"
@@ -117,6 +127,19 @@
                                         @endif
                                         <i class="bi bi-arrow-right" aria-hidden="true"></i>
                                     </a>
+                                    @else
+                                        <div class="cabinet-home-cards-v2-count cabinet-home-cards-v2-count--muted">
+                                            <span class="cabinet-home-cards-v2-count__label">{{ __('Utility tool') }}</span>
+                                        </div>
+
+                                    <a href="{{ $module['link'] }}"
+                                       class="cabinet-home-cards-v2-open"
+                                       data-track="open_module_cards_v2"
+                                       @if($module['external']) target="_blank" rel="noopener noreferrer" @endif>
+                                        {{ __('Open') }}
+                                        <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                                    </a>
+                                    @endif
                                 </div>
                             </div>
                         </article>

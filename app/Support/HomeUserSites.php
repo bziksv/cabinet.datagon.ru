@@ -20,7 +20,7 @@ use App\SeoReports\SeoReportProject;
 use App\Services\YandexMetrika\YandexMetrikaService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 /**
@@ -158,19 +158,92 @@ class HomeUserSites
     /**
      * @return array{sites: array<int, array<string, mixed>>, total: int, shown: int, catalog: array<int, array<string, mixed>>}
      */
-    public static function forCurrentUser(): array
+    public static function forCurrentUser(bool $withVisits = true): array
     {
         if (!Auth::check()) {
             return self::emptyPayload();
         }
 
-        return self::forUser((int) Auth::id());
+        return self::forUser((int) Auth::id(), $withVisits);
+    }
+
+    /**
+     * Посещаемость Метрики для доменов (для фоновой догрузки на главной).
+     *
+     * @param list<string>|null $domains null — все домены с привязкой счётчика
+     * @return array{by_domain: array<string, array<string, mixed>>, meta: ?array<string, mixed>}
+     */
+    public static function visitsForUser(int $userId, ?array $domains = null): array
+    {
+        if ($userId < 1) {
+            return ['by_domain' => [], 'meta' => null];
+        }
+
+        if ($domains === null) {
+            $domains = [];
+            YandexMetrikaDomainCounter::forUser($userId)->each(static function ($row) use (&$domains): void {
+                $domain = self::normalizeDomain((string) ($row->domain ?? ''));
+                if ($domain !== '') {
+                    $domains[] = $domain;
+                }
+            });
+            $domains = array_values(array_unique($domains));
+        } else {
+            $normalized = [];
+            foreach ($domains as $raw) {
+                $domain = self::normalizeDomain((string) $raw);
+                if ($domain !== '') {
+                    $normalized[] = $domain;
+                }
+            }
+            $domains = array_values(array_unique($normalized));
+        }
+
+        $sites = [];
+        foreach ($domains as $domain) {
+            $sites[] = ['domain' => $domain];
+        }
+
+        return self::loadPilotVisits($userId, $sites);
     }
 
     /**
      * @return array{sites: array<int, array<string, mixed>>, archived: array<int, array<string, mixed>>, total: int, archived_total: int, shown: int, catalog: array<int, array<string, mixed>>, modules_total: int}
      */
-    public static function forUser(int $userId): array
+    public static function forUser(int $userId, bool $withVisits = true): array
+    {
+        if ($userId < 1) {
+            return self::emptyPayload();
+        }
+
+        // Без визитов — кэш на пару минут (главная бьёт сюда фоном; remote DB дорогая).
+        if (! $withVisits) {
+            $cached = Cache::remember(self::sitesCacheKey($userId), 180, static function () use ($userId) {
+                return self::buildForUser($userId, false);
+            });
+
+            return is_array($cached) ? $cached : self::buildForUser($userId, false);
+        }
+
+        return self::buildForUser($userId, true);
+    }
+
+    public static function forgetSitesCache(int $userId): void
+    {
+        if ($userId > 0) {
+            Cache::forget(self::sitesCacheKey($userId));
+        }
+    }
+
+    private static function sitesCacheKey(int $userId): string
+    {
+        return 'home.user_sites.v2.' . $userId;
+    }
+
+    /**
+     * @return array{sites: array<int, array<string, mixed>>, archived: array<int, array<string, mixed>>, total: int, archived_total: int, shown: int, catalog: array<int, array<string, mixed>>, modules_total: int}
+     */
+    private static function buildForUser(int $userId, bool $withVisits = true): array
     {
         $catalog = self::moduleCatalog();
         if ($userId < 1) {
@@ -296,10 +369,14 @@ class HomeUserSites
         $archived = self::hydrateSitesMatrix($archivedRaw, $catalog, $modulesTotal);
         $hidden = self::hydrateSitesMatrix($hiddenRaw, $catalog, $modulesTotal);
 
-        $visitsLoaded = self::loadPilotVisits($userId, array_merge($active, $archived, $hidden));
-        $active = self::attachVisits($active, $visitsLoaded['by_domain']);
-        $archived = self::attachVisits($archived, $visitsLoaded['by_domain']);
-        $hidden = self::attachVisits($hidden, $visitsLoaded['by_domain']);
+        $visitsMeta = null;
+        if ($withVisits) {
+            $visitsLoaded = self::loadPilotVisits($userId, array_merge($active, $archived, $hidden));
+            $active = self::attachVisits($active, $visitsLoaded['by_domain']);
+            $archived = self::attachVisits($archived, $visitsLoaded['by_domain']);
+            $hidden = self::attachVisits($hidden, $visitsLoaded['by_domain']);
+            $visitsMeta = $visitsLoaded['meta'];
+        }
 
         return [
             'sites' => $active,
@@ -311,7 +388,8 @@ class HomeUserSites
             'shown' => count($active),
             'catalog' => $catalog,
             'modules_total' => $modulesTotal,
-            'visits_meta' => $visitsLoaded['meta'],
+            'visits_meta' => $visitsMeta,
+            'visits_deferred' => ! $withVisits,
             'columns' => HomeUserSitesPreference::columnsForUser($userId),
         ];
     }
@@ -335,6 +413,7 @@ class HomeUserSites
             'catalog' => $catalog,
             'modules_total' => self::countModuleColumns($catalog),
             'visits_meta' => null,
+            'visits_deferred' => false,
             'columns' => HomeUserSitesPreference::columnsForUser(Auth::check() ? (int) Auth::id() : 0),
         ];
     }
@@ -576,7 +655,7 @@ class HomeUserSites
      */
     private static function collectSeoReports(int $userId, callable $add): void
     {
-        if ($userId < 1 || !Schema::hasTable('seo_report_projects')) {
+        if ($userId < 1 || !SchemaMemo::hasTable('seo_report_projects')) {
             return;
         }
 
@@ -589,7 +668,7 @@ class HomeUserSites
                 if ($teamIds !== [] && SeoReportProject::teamColumnReady()) {
                     $q->orWhereIn('team_id', $teamIds);
                 }
-                if (Schema::hasTable('seo_report_project_user')) {
+                if (SchemaMemo::hasTable('seo_report_project_user')) {
                     $q->orWhereIn('id', function ($sub) use ($userId) {
                         $sub->select('seo_report_project_id')
                             ->from('seo_report_project_user')
@@ -800,7 +879,7 @@ class HomeUserSites
      */
     private static function collectEsenin(int $userId, callable $add): void
     {
-        if (!Schema::hasTable('esenin_text_check_sessions')) {
+        if (!SchemaMemo::hasTable('esenin_text_check_sessions')) {
             return;
         }
 

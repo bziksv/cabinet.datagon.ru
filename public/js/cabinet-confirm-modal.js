@@ -142,23 +142,48 @@
         if (!form || form.tagName !== 'FORM') {
             return;
         }
-        var msg = form.getAttribute('data-cabinet-confirm');
-        if (!msg) {
-            return;
-        }
         if (form.getAttribute('data-cabinet-confirm-passed') === '1') {
             return;
         }
+
+        var submitter = e.submitter || null;
+        var msg = form.getAttribute('data-cabinet-confirm')
+            || (submitter && submitter.getAttribute('data-cabinet-confirm'))
+            || '';
+        if (!msg) {
+            return;
+        }
+
         e.preventDefault();
         e.stopImmediatePropagation();
 
+        var title = form.getAttribute('data-cabinet-confirm-title')
+            || (submitter && submitter.getAttribute('data-cabinet-confirm-title'))
+            || 'Подтвердите действие';
+        var okLabel = form.getAttribute('data-cabinet-confirm-ok')
+            || (submitter && submitter.getAttribute('data-cabinet-confirm-ok'))
+            || 'Подтвердить';
+        var cancelLabel = form.getAttribute('data-cabinet-confirm-cancel')
+            || (submitter && submitter.getAttribute('data-cabinet-confirm-cancel'))
+            || 'Отмена';
+        var danger = form.getAttribute('data-cabinet-confirm-danger') === '1'
+            || (submitter && submitter.getAttribute('data-cabinet-confirm-danger') === '1');
+
         show({
-            title: form.getAttribute('data-cabinet-confirm-title') || 'Подтвердите действие',
+            title: title,
             text: msg,
-            okLabel: form.getAttribute('data-cabinet-confirm-ok') || 'Подтвердить',
-            cancelLabel: form.getAttribute('data-cabinet-confirm-cancel') || 'Отмена',
-            danger: form.getAttribute('data-cabinet-confirm-danger') === '1',
+            okLabel: okLabel,
+            cancelLabel: cancelLabel,
+            danger: danger,
             onConfirm: function () {
+                // Пока уходит POST — не даём жать повторно.
+                if (submitter) {
+                    submitter.disabled = true;
+                    if (!submitter.getAttribute('data-original-label')) {
+                        submitter.setAttribute('data-original-label', submitter.textContent || '');
+                    }
+                    submitter.textContent = 'Запуск…';
+                }
                 submitForm(form);
             }
         });

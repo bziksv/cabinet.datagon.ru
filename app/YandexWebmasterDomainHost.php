@@ -3,8 +3,8 @@
 namespace App;
 
 use App\Support\HomeUserSites;
+use App\Support\SchemaMemo;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Schema;
 
 class YandexWebmasterDomainHost extends Model
 {
@@ -24,11 +24,7 @@ class YandexWebmasterDomainHost extends Model
 
     public static function tableReady(): bool
     {
-        try {
-            return Schema::hasTable('yandex_webmaster_domain_hosts');
-        } catch (\Throwable $e) {
-            return false;
-        }
+        return SchemaMemo::hasTable('yandex_webmaster_domain_hosts');
     }
 
     /**

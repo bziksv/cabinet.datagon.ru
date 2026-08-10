@@ -120,12 +120,17 @@ final class SiteAuditPsiMetrics
 
     public static function bandLabel(string $band): string
     {
-        return match ($band) {
-            'good' => 'Хорошо',
-            'needs-improvement' => 'Улучшить',
-            'poor' => 'Плохо',
-            default => '—',
-        };
+        if ($band === 'good') {
+            return 'Хорошо';
+        }
+        if ($band === 'needs-improvement') {
+            return 'Улучшить';
+        }
+        if ($band === 'poor') {
+            return 'Плохо';
+        }
+
+        return '—';
     }
 
     public static function formatMs(?float $ms): string
@@ -178,12 +183,15 @@ final class SiteAuditPsiMetrics
         foreach (['accessibility', 'best_practices', 'seo'] as $cat) {
             $key = $cat . '_pct';
             if (isset($meta[$key])) {
-                $label = match ($cat) {
-                    'accessibility' => 'A11y',
-                    'best_practices' => 'BP',
-                    'seo' => 'SEO',
-                    default => $cat,
-                };
+                if ($cat === 'accessibility') {
+                    $label = 'A11y';
+                } elseif ($cat === 'best_practices') {
+                    $label = 'BP';
+                } elseif ($cat === 'seo') {
+                    $label = 'SEO';
+                } else {
+                    $label = $cat;
+                }
                 $parts[] = $label . ' ' . (int) $meta[$key];
             }
         }

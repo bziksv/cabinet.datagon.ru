@@ -28,8 +28,8 @@
                            id="sa-f-{{ $field['key'] }}"
                            name="{{ $field['param'] }}"
                            value="{{ $filterValues[$field['key']] ?? '' }}"
-                           placeholder="Найти в списке… например /catalog или 404"
-                           title="Фильтр по этой колонке: оставит только строки, где есть ваш текст"
+                           placeholder="Найти в списке…"
+                           title="Фильтр по этой колонке: оставит только строки, где есть ваш текст. Например /catalog или 404"
                            autocomplete="off">
                 @endif
             </div>

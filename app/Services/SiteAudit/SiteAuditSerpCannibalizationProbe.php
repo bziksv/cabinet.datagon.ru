@@ -17,14 +17,14 @@ class SiteAuditSerpCannibalizationProbe
 {
     public const CODE = 'serp_snippet_cannibalization';
 
-    public function run(SiteAuditCrawl $crawl): void
+    public function run(SiteAuditCrawl $crawl, bool $force = false): void
     {
         SiteAuditFinding::query()
             ->where('crawl_id', $crawl->id)
             ->where('code', self::CODE)
             ->delete();
 
-        $enabled = (bool) config(
+        $enabled = $force || (bool) config(
             'site_audit.serp_cannibalization_enabled',
             config('site_audit.serp_snippets_enabled', false)
         );

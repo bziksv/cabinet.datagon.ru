@@ -92,6 +92,7 @@ class SiteAuditAggregator
         'landing_query_mismatch',
         'site_availability',
         'index_count_mismatch',
+        'index_url_missing',
         'serp_snippets',
         'serp_title_mismatch',
         'serp_not_indexed',
@@ -750,7 +751,7 @@ class SiteAuditAggregator
         $pagesStored = count($crawledSet);
         $emitted = 0;
         foreach ($sitemapUrls as $u) {
-            // Уже есть в крауле (любой статус) — не считаем «не в крауле»
+            // Уже есть в проверке (любой статус) — не считаем «не в проверке»
             if (isset($crawledSet[$u])) {
                 continue;
             }
@@ -1316,7 +1317,7 @@ class SiteAuditAggregator
     {
         $pages = SiteAuditPage::query()
             ->where('crawl_id', $crawlId)
-            ->get(['id', 'url', 'url_hash']);
+            ->get(['id', 'url', 'url_hash', 'status_code', 'final_url', 'redirect_chain']);
 
         $groups = [];
         foreach ($pages as $page) {
@@ -1332,10 +1333,22 @@ class SiteAuditAggregator
             if (count($group) < 2) {
                 continue;
             }
+
+            // 301/302 на соседний вариант — нормальная склейка, не дубль контента.
+            $live = [];
+            foreach ($group as $page) {
+                if (! $this->pageRedirectedAway($page)) {
+                    $live[] = $page;
+                }
+            }
+            if (count($live) < 2) {
+                continue;
+            }
+
             $variants = array_map(static function ($p) {
                 return $p->url;
-            }, $group);
-            foreach ($group as $page) {
+            }, $live);
+            foreach ($live as $page) {
                 SiteAuditFinding::query()->create([
                     'crawl_id' => $crawlId,
                     'code' => 'duplicate_url_variants',
@@ -1350,6 +1363,34 @@ class SiteAuditAggregator
                 ]);
             }
         }
+    }
+
+    /**
+     * URL ушёл редиректом на другой адрес (склейка slash/www/http) — не «живой» дубль.
+     */
+    private function pageRedirectedAway($page): bool
+    {
+        $url = trim((string) ($page->url ?? ''));
+        if ($url === '') {
+            return false;
+        }
+
+        $chain = $page->redirect_chain ?? null;
+        if (is_string($chain)) {
+            $decoded = json_decode($chain, true);
+            $chain = is_array($decoded) ? $decoded : null;
+        }
+        if (is_array($chain) && $chain !== []) {
+            return true;
+        }
+
+        $final = trim((string) ($page->final_url ?? ''));
+        if ($final === '' || $final === $url) {
+            return false;
+        }
+
+        // final после follow redirect отличается от запрошенного URL.
+        return true;
     }
 
     /**

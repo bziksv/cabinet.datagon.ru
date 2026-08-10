@@ -15,7 +15,7 @@
     </p>
 
     @if($crawl->status !== 'done')
-        <div class="alert alert-light border">Доступно после завершения краула.</div>
+        <div class="alert alert-light border">Доступно после завершения проверки.</div>
     @else
         <div id="sa-relevance-body">
             @if($relevanceRowsLazy)

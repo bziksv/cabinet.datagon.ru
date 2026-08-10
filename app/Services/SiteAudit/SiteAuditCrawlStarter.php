@@ -25,10 +25,10 @@ class SiteAuditCrawlStarter
             || (bool) config('site_audit.bypass_limits', false);
 
         if (! $bypassLimits && ! SiteAuditLimits::canStartCrawl($user)) {
-            throw new RuntimeException('Исчерпан месячный лимит краулов аудита сайта');
+            throw new RuntimeException('Исчерпан месячный лимит проверок аудита сайта');
         }
 
-        // Активный краул у пользователя больше не блокирует запуск:
+        // Активный проверка у пользователя больше не блокирует запуск:
         // новый уходит в queued_wait и стартует, когда слот/предыдущий освободятся.
         // (Раньше одиночный домен падал с ошибкой, пакет из 2+ — нет. Путаница.)
 
@@ -99,7 +99,7 @@ class SiteAuditCrawlStarter
                     'virtual_robots' => $settings['virtual_robots'] ?? '',
                     'unify_www' => true,
                     'force_https' => true,
-                    'strip_trailing_slash' => true,
+                    'strip_trailing_slash' => false,
                     'check_broken_links' => true,
                     'pages_only' => ! empty($settings['pages_only']),
                     'extra_hosts' => $settings['extra_hosts'] ?? [],

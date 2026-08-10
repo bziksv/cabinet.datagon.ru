@@ -16,7 +16,7 @@
 
     <div class="card shadow-sm">
         <div class="card-header py-2">
-            <h1 class="card-title h5 mb-0">{{ $meta['title'] ?? $code }} · краул #{{ $crawl->id }}</h1>
+            <h1 class="card-title h5 mb-0">{{ $meta['title'] ?? $code }} · проверка #{{ $crawl->id }}</h1>
         </div>
         <div class="card-body cabinet-sa-page p-3">
             <div class="mb-2 text-muted small">
@@ -54,7 +54,18 @@
                             </td>
                             <td>{{ \App\Services\SiteAudit\SiteAuditFindingPresenter::severityLabel($row->severity) }}</td>
                             <td class="small">
-                                {{ \App\Services\SiteAudit\SiteAuditFindingPresenter::metaLine($row->code ?? $code, $row->meta_json, $row->url) }}
+                                @php
+                                    $detailsHtml = \App\Services\SiteAudit\SiteAuditFindingPresenter::metaDetailsHtml(
+                                        $row->code ?? $code,
+                                        $row->meta_json,
+                                        $row->url
+                                    );
+                                @endphp
+                                @if($detailsHtml !== null)
+                                    {!! $detailsHtml !!}
+                                @else
+                                    {{ \App\Services\SiteAudit\SiteAuditFindingPresenter::metaLine($row->code ?? $code, $row->meta_json, $row->url) }}
+                                @endif
                             </td>
                         </tr>
                     @empty

@@ -1,4 +1,4 @@
-{{-- Цепочка: Аудит · проекты → сайт → краул → (отчёт|сравнение) --}}
+{{-- Цепочка: Аудит · проекты → сайт → проверка → (отчёт|сравнение) --}}
 @php
     $crawl = $crawl ?? null;
     $project = $project ?? optional($crawl)->project;
@@ -21,9 +21,9 @@
     @if($crawl)
         <span class="cabinet-sa-crumbs__sep" aria-hidden="true">/</span>
         @if($level === 'crawl')
-            <span class="cabinet-sa-crumbs__current" aria-current="page">Краул #{{ $crawl->id }}</span>
+            <span class="cabinet-sa-crumbs__current" aria-current="page">Проверка #{{ $crawl->id }}</span>
         @else
-            <a href="{{ $crawlUrl }}">Краул #{{ $crawl->id }}</a>
+            <a href="{{ $crawlUrl }}">Проверка #{{ $crawl->id }}</a>
         @endif
     @endif
     @if($level === 'report' && $reportTitle !== '')

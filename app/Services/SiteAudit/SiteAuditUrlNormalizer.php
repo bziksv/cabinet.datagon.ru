@@ -154,7 +154,7 @@ class SiteAuditUrlNormalizer
             'strip_www' => empty($settings['unify_www']) && ! empty($settings['strip_www']),
             'strip_trailing_slash' => array_key_exists('strip_trailing_slash', $settings)
                 ? (bool) $settings['strip_trailing_slash']
-                : true,
+                : false,
             'allowed_hosts' => $hasExtra ? $allowed : [],
         ];
     }

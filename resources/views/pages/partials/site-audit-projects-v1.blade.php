@@ -32,7 +32,7 @@
                                     <div class="fw-semibold text-body text-truncate">{{ $project->domain }}</div>
                                     <div class="small text-secondary">
                                         @if($last)
-                                            последний краул
+                                            последний проверка
                                             <a href="{{ route('pages.site-audit.crawl.show', $last->id) }}">#{{ $last->id }}</a>
                                             · {{ $last->statusLabelRu() }}
                                             · {{ $last->pages_fetched }}/{{ $last->pages_total }}
@@ -56,7 +56,7 @@
                                         @endif
                                     @if($isProjectOwner)
                                     <form method="POST" action="{{ route('pages.site-audit.project.destroy', $project->id) }}" class="d-inline"
-                                          data-cabinet-confirm="Удалить проект {{ e($project->domain) }} и все краулы?"
+                                          data-cabinet-confirm="Удалить проект {{ e($project->domain) }} и все проверки?"
                                           data-cabinet-confirm-title="Удаление проекта"
                                           data-cabinet-confirm-ok="Удалить"
                                           data-cabinet-confirm-danger="1">
@@ -110,7 +110,7 @@
                                                        name="enabled" value="1" {{ $sch && $sch->enabled ? 'checked' : '' }}>
                                                 <label class="form-check-label fw-medium" for="sa-sch-{{ $project->id }}">Авторасписание</label>
                                             </div>
-                                            @include('pages.partials.site-audit-tip', ['tip' => "Автозапуск аудита в выбранный день и час (МСК).\nЛимит слотов: Free 0 / Optimal 2 / Ultimate 5 / Maximum 10.\nЧасы 11–14 недоступны (пик).\nСписывает краул из месячного лимита."])
+                                            @include('pages.partials.site-audit-tip', ['tip' => "Автозапуск аудита в выбранный день и час (МСК).\nЛимит слотов: Free 0 / Optimal 2 / Ultimate 5 / Maximum 10.\nЧасы 11–14 недоступны (пик).\nСписывает проверка из месячного лимита."])
                                         </div>
                                         @if($sch && $sch->enabled && $sch->next_run_at)
                                             <span class="badge text-bg-primary">
@@ -204,7 +204,7 @@
                     @empty
                         <div class="card-body">
                             <div class="alert alert-light border text-center py-4 mb-0 text-secondary">
-                                Проектов пока нет — запустите первый краул.
+                                Проектов пока нет — запустите первую проверку.
                             </div>
                         </div>
                     @endforelse

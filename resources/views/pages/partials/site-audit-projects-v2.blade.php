@@ -79,7 +79,7 @@
                     @endif
                     @if($isProjectOwner)
                         <form method="POST" action="{{ route('pages.site-audit.project.destroy', $project->id) }}" class="d-inline"
-                              data-cabinet-confirm="Удалить проект {{ e($project->domain) }} и все краулы?"
+                              data-cabinet-confirm="Удалить проект {{ e($project->domain) }} и все проверки?"
                               data-cabinet-confirm-title="Удаление проекта"
                               data-cabinet-confirm-ok="Удалить"
                               data-cabinet-confirm-danger="1">
@@ -228,7 +228,7 @@
         </article>
     @empty
         <div class="cabinet-sa-sites__empty">
-            Сайтов пока нет — запустите первый краул слева.
+            Сайтов пока нет — запустите первую проверку слева.
         </div>
     @endforelse
 </section>

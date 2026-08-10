@@ -9,15 +9,18 @@
         $itemHref = route('pages.site-audit.report.show', [$crawl->id, $item['code']]);
     }
     $isActive = !$isExternal && (($activeCode ?? '') === ($item['code'] ?? ''));
+    $probe = is_array($item['probe'] ?? null) ? $item['probe'] : null;
+    $probeSkipped = !$isExternal && is_array($probe) && ($probe['status'] ?? '') === 'skipped';
 @endphp
-<a class="cabinet-sa-tree__item {{ $isActive ? 'is-active' : '' }} {{ $item['count'] || $isExternal ? '' : 'is-empty' }}{{ $isExternal ? ' cabinet-sa-tree__item--external' : '' }}"
+<a class="cabinet-sa-tree__item {{ $isActive ? 'is-active' : '' }} {{ ($item['count'] || $isExternal || $probeSkipped) ? '' : 'is-empty' }}{{ $isExternal ? ' cabinet-sa-tree__item--external' : '' }}{{ $probeSkipped ? ' cabinet-sa-tree__item--skipped' : '' }}"
    href="{{ $itemHref }}"
    @if($isExternal) target="_blank" rel="noopener" @endif
    data-title="{{ $item['title'] }}"
    data-severity="{{ $sev }}"
    data-count="{{ (int) $item['count'] }}"
    @if($isExternal) data-external="1" @endif
-   title="{{ $isExternal ? 'Откроется в новой вкладке — отдельный модуль Titlo' : '' }}">
+   @if($probeSkipped) data-probe-skipped="1" @endif
+   title="{{ $isExternal ? 'Откроется в новой вкладке — отдельный модуль Titlo' : ($probeSkipped ? ('Не запускалась: ' . \App\Services\SiteAudit\SiteAuditProbeStatus::reasonLabel($probe['reason'] ?? null)) : '') }}">
     <span>
         {{ $item['title'] }}
         @if($isExternal)
@@ -30,6 +33,8 @@
     </span>
     @if($isExternal)
         <span class="cabinet-sa-badge cabinet-sa-badge--zero" title="Модуль Titlo">модуль</span>
+    @elseif($probeSkipped)
+        <span class="cabinet-sa-badge cabinet-sa-badge--skipped" title="Проверка не запускалась — откройте и нажмите «Запустить»">не было</span>
     @else
         <span class="cabinet-sa-badge cabinet-sa-badge--{{ $item['count'] > 0 ? $sev : 'zero' }}">{{ $item['count'] }}</span>
     @endif

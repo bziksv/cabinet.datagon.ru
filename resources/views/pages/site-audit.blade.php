@@ -386,9 +386,9 @@
                                     cont.action = '{{ url('site-audit/crawl') }}/' + j.id + '/continue';
                                     cont.className = 'd-inline';
                                     cont.setAttribute('data-cabinet-confirm',
-                                        'Возобновить краул #' + j.id + ' с ' + (j.pages_fetched || 0) +
+                                        'Возобновить проверку #' + j.id + ' с ' + (j.pages_fetched || 0) +
                                         ' URL? Уже скачанные страницы сохранятся.');
-                                    cont.setAttribute('data-cabinet-confirm-title', 'Возобновить краул');
+                                    cont.setAttribute('data-cabinet-confirm-title', 'Возобновить проверку');
                                     cont.setAttribute('data-cabinet-confirm-ok', 'Возобновить');
                                     cont.innerHTML =
                                         '<input type="hidden" name="_token" value="' + token + '">' +
@@ -400,8 +400,8 @@
                                 repeat.action = '{{ url('site-audit/crawl') }}/' + j.id + '/repeat';
                                 repeat.className = 'd-inline';
                                 repeat.setAttribute('data-cabinet-confirm',
-                                    'Повторить краул для ' + domain + ' с теми же настройками? Начнётся новый краул с нуля.');
-                                repeat.setAttribute('data-cabinet-confirm-title', 'Новый краул');
+                                    'Повторить проверку для ' + domain + ' с теми же настройками? Начнётся новая проверка с нуля.');
+                                repeat.setAttribute('data-cabinet-confirm-title', 'Новая проверка');
                                 repeat.setAttribute('data-cabinet-confirm-ok', 'Повторить');
                                 repeat.innerHTML =
                                     '<input type="hidden" name="_token" value="' + token + '">' +
@@ -412,8 +412,8 @@
                                 del.method = 'POST';
                                 del.action = '{{ url('site-audit/crawl') }}/' + j.id;
                                 del.className = 'd-inline';
-                                del.setAttribute('data-cabinet-confirm', 'Удалить краул #' + j.id + '?');
-                                del.setAttribute('data-cabinet-confirm-title', 'Удаление краула');
+                                del.setAttribute('data-cabinet-confirm', 'Удалить проверку #' + j.id + '?');
+                                del.setAttribute('data-cabinet-confirm-title', 'Удаление проверки');
                                 del.setAttribute('data-cabinet-confirm-ok', 'Удалить');
                                 del.setAttribute('data-cabinet-confirm-danger', '1');
                                 del.innerHTML =
@@ -513,7 +513,7 @@
                             concurrency: concurrency,
                             unify_www: true,
                             force_https: true,
-                            strip_trailing_slash: true,
+                            strip_trailing_slash: false,
                             check_broken_links: true
                         };
                         var limitEl = document.getElementById('sa-limit');

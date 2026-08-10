@@ -1,4 +1,4 @@
-{{-- Архив отчётов проекта (Labrika: выбор прошлого краула) --}}
+{{-- Архив отчётов проекта (Labrika: выбор прошлой проверки) --}}
 @php
     $archiveList = $archiveCrawls ?? collect();
 @endphp
@@ -18,7 +18,7 @@
                         <table class="table table-sm table-hover mb-0">
                             <thead class="thead-light">
                             <tr>
-                                <th>Краул</th>
+                                <th>Проверка</th>
                                 <th>Дата</th>
                                 <th>Статус</th>
                                 <th>Страниц</th>
@@ -59,7 +59,7 @@
                                         @if(! $isCurrent && $crawl->status === 'done' && $a->status === 'done')
                                             <a class="btn btn-sm btn-outline-info"
                                                href="{{ route('pages.site-audit.crawl.diff', ['id' => $crawl->id, 'with' => $a->id]) }}"
-                                               title="Сравнить с текущим краулом">Сравнить</a>
+                                               title="Сравнить с текущим проверкой">Сравнить</a>
                                         @endif
                                     </td>
                                 </tr>
@@ -69,7 +69,7 @@
                     </div>
                 </div>
                 <div class="modal-footer justify-content-between">
-                    <span class="small text-muted">Хранится до {{ (int) config('site_audit.history_keep_per_project', 200) }} краулов на проект</span>
+                    <span class="small text-muted">Хранится до {{ (int) config('site_audit.history_keep_per_project', 200) }} проверок на проект</span>
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Закрыть</button>
                 </div>
             </div>

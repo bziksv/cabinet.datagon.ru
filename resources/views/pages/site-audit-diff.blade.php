@@ -8,7 +8,7 @@
     @slot('tools')
         <a href="{{ route('pages.site-audit') }}" class="btn btn-sm btn-outline-secondary">← К проектам</a>
         <a href="{{ route('pages.site-audit.crawl.show', $crawl->id) }}" class="btn btn-sm btn-outline-secondary">Сводка #{{ $crawl->id }}</a>
-        <a href="{{ route('pages.site-audit.crawl.show', $baseline->id) }}" class="btn btn-sm btn-outline-secondary">Краул #{{ $baseline->id }}</a>
+        <a href="{{ route('pages.site-audit.crawl.show', $baseline->id) }}" class="btn btn-sm btn-outline-secondary">Проверка #{{ $baseline->id }}</a>
     @endslot
 
     <div class="cabinet-sa-page">
@@ -77,7 +77,7 @@
                 </thead>
                 <tbody>
                 <tr>
-                    <td>URL в крауле</td>
+                    <td>URL в проверке</td>
                     <td class="text-right">{{ $diff['baseline']['pages_total'] }}</td>
                     <td class="text-right">{{ $diff['current']['pages_total'] }}</td>
                     <td class="text-right">

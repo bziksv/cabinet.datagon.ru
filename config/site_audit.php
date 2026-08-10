@@ -84,11 +84,19 @@ return [
     'landing_findings_max' => (int) env('SITE_AUDIT_LANDING_FINDINGS_MAX', 300),
     // Доступность: доля unreachable+5xx среди страниц краула
     'availability_fail_rate' => (float) env('SITE_AUDIT_AVAILABILITY_FAIL_RATE', 0.10),
-    // Индекс ПС vs pages_total (XML site: found). Local: выкл., prod: SITE_AUDIT_SERP_INDEX=1
+    // Индекс ПС vs краул — только Яндекс.Вебмастер (GSC позже). XML site: не используем.
     'serp_index_enabled' => (bool) env('SITE_AUDIT_SERP_INDEX', false),
-    'serp_index_engines' => ['yandex', 'google'],
+    'serp_index_engines' => ['yandex'],
     'serp_index_ratio_low' => (float) env('SITE_AUDIT_SERP_INDEX_RATIO_LOW', 0.5),
     'serp_index_ratio_high' => (float) env('SITE_AUDIT_SERP_INDEX_RATIO_HIGH', 3.0),
+    'serp_index_prefer_webmaster' => (bool) env('SITE_AUDIT_SERP_INDEX_WEBMASTER', true),
+    'serp_index_webmaster_max' => (int) env('SITE_AUDIT_SERP_INDEX_WM_MAX', 50000),
+    'serp_index_xml_fallback' => (bool) env('SITE_AUDIT_SERP_INDEX_XML_FALLBACK', false),
+    // Сколько URL «нет в индексе» писать отдельными findings (полный список в отчёте)
+    'serp_index_url_findings_max' => (int) env('SITE_AUDIT_SERP_INDEX_URL_MAX', 5000),
+    'serp_index_list_max' => (int) env('SITE_AUDIT_SERP_INDEX_LIST_MAX', 200),
+    'serp_index_deep_sample' => (int) env('SITE_AUDIT_SERP_INDEX_DEEP', 20), // legacy
+    'serp_index_deep_engine' => env('SITE_AUDIT_SERP_INDEX_DEEP_ENGINE', 'yandex'),
 
     // Сниппеты ПС для посадочных/сэмпла (XML, дорого). Local: выкл., prod: SITE_AUDIT_SERP_SNIPPETS=1
     'serp_snippets_enabled' => (bool) env('SITE_AUDIT_SERP_SNIPPETS', false),
@@ -255,10 +263,11 @@ return [
         'broken_internal_link',
         'deep_pages',
         'site_availability',
-        'index_count_mismatch',
-        'serp_snippets',
-        'serp_title_mismatch',
-        'serp_not_indexed',
+            'index_count_mismatch',
+            'index_url_missing',
+            'serp_snippets',
+            'serp_title_mismatch',
+            'serp_not_indexed',
         'serp_snippet_source',
         'serp_snippet_cannibalization',
         'probable_affiliate',
@@ -957,7 +966,15 @@ return [
             'phase' => 'B',
             'severity' => 'warning',
             'title' => 'Индекс ПС ≠ страниц сайта',
-            'description' => 'Число документов site:host в Яндекс/Google сильно расходится с числом страниц, найденных краулом.',
+            'description' => 'Сводка сверки списка «в поиске» Яндекс.Вебмастера с краулом.',
+            'group' => 'seo',
+        ],
+        'index_url_missing' => [
+            'phase' => 'B',
+            'severity' => 'warning',
+            'title' => 'URL краула нет в индексе ПС',
+            'description' => 'Страница найдена краулом (не robots, не noindex), но отсутствует в списке «в поиске» Вебмастера / GSC.',
+            'group' => 'seo',
         ],
         'serp_snippets' => [
             'phase' => 'B',

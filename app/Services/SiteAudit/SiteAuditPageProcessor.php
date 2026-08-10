@@ -39,6 +39,8 @@ class SiteAuditPageProcessor
 
         $urlHash = SiteAuditUrlNormalizer::hash($url);
         $result = $this->fetcher->fetch($url);
+        $result = $this->recoverTrailingSlash($url, $result);
+        $urlHash = SiteAuditUrlNormalizer::hash($url);
         $bodyPath = isset($result['body_path']) ? (string) $result['body_path'] : null;
 
         try {
@@ -64,6 +66,7 @@ class SiteAuditPageProcessor
         ?array $discovery = null
     ): array {
         $this->ensureFetcher($crawlId, $crawlSettings);
+        $result = $this->recoverTrailingSlash($url, $result);
         $urlHash = SiteAuditUrlNormalizer::hash($url);
         $bodyPath = isset($result['body_path']) ? (string) $result['body_path'] : null;
 
@@ -149,17 +152,22 @@ class SiteAuditPageProcessor
 
     private static function discoveredColumnsReady(): bool
     {
-        if (self::$discoveredColumnsReady !== null) {
-            return self::$discoveredColumnsReady;
+        // Кэшируем только успех: иначе воркер, стартовавший до migrate, навсегда
+        // пишет страницы без discovered_* до queue:restart.
+        if (self::$discoveredColumnsReady === true) {
+            return true;
         }
         try {
-            self::$discoveredColumnsReady = Schema::hasColumn('site_audit_pages', 'discovered_via')
+            $ready = Schema::hasColumn('site_audit_pages', 'discovered_via')
                 && Schema::hasColumn('site_audit_pages', 'discovered_from');
-        } catch (\Throwable $e) {
-            self::$discoveredColumnsReady = false;
-        }
+            if ($ready) {
+                self::$discoveredColumnsReady = true;
+            }
 
-        return self::$discoveredColumnsReady;
+            return $ready;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     private function ensureFetcher(int $crawlId, array $crawlSettings): void
@@ -176,6 +184,54 @@ class SiteAuditPageProcessor
             $this->fetcher = SiteAuditFetcher::fromCrawlSettings($crawlSettings, $crawlId);
             $this->fetcherKey = $key;
         }
+    }
+
+    /**
+     * Bitrix и часть CMS отдают 200 только со слэшем, а без — 404.
+     * Если запрос без «/» дал 4xx — один повтор со слэшем; при успехе сохраняем URL как в sitemap.
+     *
+     * @param  array<string, mixed>  $result
+     * @return array<string, mixed>
+     */
+    private function recoverTrailingSlash(string &$url, array $result): array
+    {
+        $code = (int) ($result['status_code'] ?? 0);
+        if ($code < 400 || $code >= 500) {
+            return $result;
+        }
+
+        $parts = parse_url($url);
+        if ($parts === false || empty($parts['host'])) {
+            return $result;
+        }
+        $path = (string) ($parts['path'] ?? '');
+        if ($path === '' || $path === '/' || substr($path, -1) === '/') {
+            return $result;
+        }
+        // файлы с расширением не трогаем
+        if (preg_match('/\.[a-z0-9]{2,5}$/i', $path)) {
+            return $result;
+        }
+
+        $slashUrl = $parts['scheme'] . '://' . $parts['host']
+            . (isset($parts['port']) ? ':' . $parts['port'] : '')
+            . $path . '/'
+            . (isset($parts['query']) ? '?' . $parts['query'] : '');
+
+        $retry = $this->fetcher->fetch($slashUrl);
+        $retryCode = (int) ($retry['status_code'] ?? 0);
+        if (! empty($retry['ok']) && $retryCode >= 200 && $retryCode < 400) {
+            SiteAuditBodyTemp::release($result['body_path'] ?? null);
+            $url = $slashUrl;
+            $retry['recovered_trailing_slash'] = true;
+            $retry['requested_without_slash'] = true;
+
+            return $retry;
+        }
+
+        SiteAuditBodyTemp::release($retry['body_path'] ?? null);
+
+        return $result;
     }
 
     /**
@@ -273,7 +329,17 @@ class SiteAuditPageProcessor
         } else {
             $code = (int) $result['status_code'];
             if ($code >= 400 && $code < 500) {
-                $findings[] = $this->finding('http_4xx', $url, $urlHash, ['status' => $code]);
+                $meta4 = ['status' => $code];
+                $p = parse_url($url);
+                $path = is_array($p) ? (string) ($p['path'] ?? '') : '';
+                if ($path !== '' && $path !== '/' && substr($path, -1) !== '/' && is_array($p) && ! empty($p['host'])) {
+                    $meta4['slash_hint'] = true;
+                    $meta4['slash_url'] = ($p['scheme'] ?? 'https') . '://' . $p['host']
+                        . (isset($p['port']) ? ':' . $p['port'] : '')
+                        . $path . '/'
+                        . (isset($p['query']) ? '?' . $p['query'] : '');
+                }
+                $findings[] = $this->finding('http_4xx', $url, $urlHash, $meta4);
             } elseif ($code >= 500) {
                 $findings[] = $this->finding('http_5xx', $url, $urlHash, ['status' => $code]);
             }
@@ -664,6 +730,7 @@ class SiteAuditPageProcessor
                 'landing_url_changed',
                 'site_availability',
                 'index_count_mismatch',
+                'index_url_missing',
                 'serp_snippets',
                 'serp_title_mismatch',
                 'serp_not_indexed',

@@ -17,6 +17,9 @@ use App\Services\SiteAudit\SiteAuditRelevanceBridge;
 use App\Services\SiteAudit\SiteAuditExternalPlagiarismRunner;
 use App\Services\SiteAudit\SiteAuditGlobalCap;
 use App\Services\SiteAudit\SiteAuditLinkReferrers;
+use App\Services\SiteAudit\SiteAuditProbeRunner;
+use App\Services\SiteAudit\SiteAuditProbeStatus;
+use App\Services\SiteAudit\SiteAuditSerpIndexProbe;
 use App\Services\SiteAudit\SiteAuditUserAgentSession;
 use App\Services\SeoChecklist\SeoChecklistService;
 use App\SiteAuditCrawl;
@@ -233,9 +236,9 @@ class SiteAuditController extends Controller
         $counts = (new SiteAuditIgnoreService())->applyToCounts($counts, $crawl);
         $counts = (new SiteAuditFindingNoteService())->applyFixedToCounts($counts, $crawl);
 
-        $tree = $this->buildReportTree($counts, 'tech');
-        $treeSeo = $this->buildReportTree($counts, 'seo');
-        $treeAll = $this->buildReportTree($counts, null);
+        $tree = $this->buildReportTree($counts, 'tech', $crawl);
+        $treeSeo = $this->buildReportTree($counts, 'seo', $crawl);
+        $treeAll = $this->buildReportTree($counts, null, $crawl);
         $bucketsTech = $this->bucketsFromTree($tree);
         $bucketsSeo = $this->bucketsFromTree($treeSeo);
         $bucketsAll = $this->bucketsFromTree($treeAll);
@@ -353,7 +356,7 @@ class SiteAuditController extends Controller
         $crawl = $this->ownedCrawl($id);
         $this->assertCrawlOwner($crawl);
         if ($crawl->status !== SiteAuditCrawl::STATUS_DONE) {
-            return response()->json(['error' => 'status', 'message' => 'Только для готового краула'], 422);
+            return response()->json(['error' => 'status', 'message' => 'Только для готовой проверки'], 422);
         }
 
         $urls = $request->input('urls', []);
@@ -522,9 +525,9 @@ class SiteAuditController extends Controller
         $sideCounts = $ignoreSvc->applyToCounts($sideCounts, $crawl);
         $sideCounts = $noteSvc->applyFixedToCounts($sideCounts, $crawl);
 
-        $tree = $this->buildReportTree($sideCounts, 'tech');
-        $treeSeo = $this->buildReportTree($sideCounts, 'seo');
-        $treeAll = $this->buildReportTree($sideCounts, null);
+        $tree = $this->buildReportTree($sideCounts, 'tech', $crawl);
+        $treeSeo = $this->buildReportTree($sideCounts, 'seo', $crawl);
+        $treeAll = $this->buildReportTree($sideCounts, null, $crawl);
         $buckets = $this->bucketsFromTree($tree);
         $bucketsSeo = $this->bucketsFromTree($treeSeo);
         $bucketsAll = $this->bucketsFromTree($treeAll);
@@ -539,23 +542,19 @@ class SiteAuditController extends Controller
             $targetUrls = $rows->pluck('url')->filter()->unique()->values()->all();
             $refMap = SiteAuditLinkReferrers::forCrawl((int) $crawl->id, $targetUrls);
             $pageOrigins = SiteAuditLinkReferrers::pageDiscoveryMap((int) $crawl->id, $targetUrls);
-            $rows = $rows->map(function ($row) use ($refMap, $pageOrigins) {
+            $originFallback = SiteAuditLinkReferrers::originMeta($crawl, $targetUrls);
+            $sitemapHref = SiteAuditLinkReferrers::sitemapViewUrl($crawl);
+            $rows = $rows->map(function ($row) use ($refMap, $pageOrigins, $originFallback, $sitemapHref, $code) {
                 $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
                 $url = (string) $row->url;
 
-                // Жёсткий источник постановки в очередь (новый краул пишет в meta/page).
+                // Источник постановки в очередь (discovered_* на странице) или страница со ссылкой.
                 $via = trim((string) ($meta['discovered_via'] ?? ''));
                 $from = trim((string) ($meta['discovered_from'] ?? ''));
                 if ($via === '' && isset($pageOrigins[$url])) {
                     $via = (string) ($pageOrigins[$url]['via'] ?? '');
                     $from = (string) ($pageOrigins[$url]['from'] ?? '');
                 }
-                $source = SiteAuditLinkReferrers::formatDiscoverySource($via, $from !== '' ? $from : null);
-                $meta['origin_label'] = $source['label'];
-                $meta['origin_hint'] = '';
-                $meta['discovered_via'] = $via;
-                $meta['discovered_from'] = $from !== '' ? $from : null;
-                $meta['from_sitemap'] = $via === 'sitemap';
 
                 $refs = $refMap[$url] ?? [];
                 $slashAlt = SiteAuditLinkReferrers::slashVariantPublic($url);
@@ -567,11 +566,52 @@ class SiteAuditController extends Controller
                     }
                 }
                 if (! empty($meta['from'])) {
-                    $metaFrom = (string) $meta['from'];
+                    $metaFrom = trim((string) $meta['from']);
                     if ($metaFrom !== '' && ! in_array($metaFrom, $refs, true)) {
                         array_unshift($refs, $metaFrom);
                     }
                 }
+
+                // Битая ссылка / HEAD-цель: самой страницы в крауле нет — «откуда» = кто ссылается.
+                if ($via === '' && $refs !== []) {
+                    $via = 'link';
+                    $from = (string) $refs[0];
+                }
+
+                $source = SiteAuditLinkReferrers::formatDiscoverySource($via, $from !== '' ? $from : null);
+                $meta['origin_label'] = $source['label'];
+                $meta['origin_hint'] = '';
+                // Нет discovered_* (старый воркер / HEAD-only) — эвристика sitemap/посев.
+                if ($meta['origin_label'] === '' && $via === '' && isset($originFallback[$url])) {
+                    $fb = $originFallback[$url];
+                    $meta['origin_label'] = (string) ($fb['label'] ?? '');
+                    $meta['from_sitemap'] = ! empty($fb['from_sitemap']);
+                    if (! empty($fb['from_sitemap']) && $sitemapHref) {
+                        $meta['sitemap_href'] = $sitemapHref;
+                    }
+                }
+                $meta['discovered_via'] = $via;
+                $meta['discovered_from'] = $from !== '' ? $from : null;
+                $meta['from_sitemap'] = $via === 'sitemap' || ! empty($meta['from_sitemap']);
+                if ($via === 'sitemap') {
+                    $meta['sitemap_href'] = $source['from'] ?: $sitemapHref;
+                }
+
+                // Старые проверки срезали слэш: в sitemap URL/, а в отчёте без / и 404.
+                if (($row->code ?? '') === 'http_4xx' || ($code ?? '') === 'http_4xx') {
+                    $path = (string) (parse_url($url, PHP_URL_PATH) ?: '');
+                    if ($path !== '' && $path !== '/' && substr($path, -1) !== '/') {
+                        $slashAltHint = SiteAuditLinkReferrers::slashVariantPublic($url);
+                        if ($slashAltHint) {
+                            $meta['slash_hint'] = true;
+                            $meta['slash_url'] = $slashAltHint;
+                            if ($via === 'sitemap' || ! empty($meta['from_sitemap'])) {
+                                $meta['false_404_slash'] = true;
+                            }
+                        }
+                    }
+                }
+
                 // via=link — страница-источник всегда первая в списке
                 if ($via === 'link' && $from !== '' && ! in_array($from, $refs, true)) {
                     array_unshift($refs, $from);
@@ -608,6 +648,15 @@ class SiteAuditController extends Controller
             'showIgnored' => $showIgnored,
             'showFixed' => $showFixed,
             'ignoredMap' => $ignoredMap,
+            'probeStatus' => SiteAuditProbeStatus::forCode($crawl, $code),
+            'serpIndexDeep' => in_array($code, ['index_count_mismatch', 'index_url_missing'], true)
+                ? (is_array($crawl->progress_json['serp_index']['deep'] ?? null)
+                    ? $crawl->progress_json['serp_index']['deep']
+                    : null)
+                : null,
+            'serpIndexWebmaster' => in_array($code, ['index_count_mismatch', 'index_url_missing'], true)
+                ? (new SiteAuditSerpIndexProbe())->webmasterStatusPayload($crawl)
+                : null,
             'notesMap' => $notesMap,
             'codeWideIgnored' => $codeWideIgnored,
             'sideCounts' => $sideCounts,
@@ -623,6 +672,49 @@ class SiteAuditController extends Controller
             'canIgnore' => ! DemoCabinet::isCurrentUser() && ($meta['source'] ?? '') !== 'pages_canonical',
             'canNote' => ! DemoCabinet::isCurrentUser() && ($meta['source'] ?? '') !== 'pages_canonical',
         ]);
+    }
+
+    /**
+     * Точечный запуск опциональной пробы (PSI / SERP…) по уже скачанной проверке.
+     */
+    public function runProbe(Request $request, int $id)
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            if ($request->expectsJson()) {
+                return response()->json(['error' => 'demo'], 403);
+            }
+            abort(403);
+        }
+
+        $crawl = $this->ownedCrawl($id);
+        $this->assertCrawlOwner($crawl);
+        if ($crawl->status !== SiteAuditCrawl::STATUS_DONE
+            && $crawl->status !== SiteAuditCrawl::STATUS_AGGREGATING) {
+            return redirect()
+                ->back(302, [], route('pages.site-audit.crawl.show', $crawl->id))
+                ->with('status', 'Сначала дождитесь завершения проверки');
+        }
+
+        $probe = trim((string) $request->input('probe', ''));
+        if ($probe === '' || ! isset(SiteAuditProbeStatus::catalog()[$probe])) {
+            return redirect()->back()->with('status', 'Неизвестная проверка');
+        }
+
+        $mode = trim((string) $request->input('mode', ''));
+        $engine = trim((string) $request->input('engine', ''));
+        $result = (new SiteAuditProbeRunner())->run(
+            $crawl,
+            $probe,
+            true,
+            $mode,
+            $engine !== '' ? $engine : null
+        );
+        $code = trim((string) $request->input('code', ''));
+        $back = $code !== ''
+            ? route('pages.site-audit.report.show', [$crawl->id, $code])
+            : route('pages.site-audit.crawl.show', $crawl->id);
+
+        return redirect($back)->with('status', $result['message'] ?? 'Готово');
     }
 
     public function cancelCrawl(Request $request, int $id)
@@ -648,7 +740,7 @@ class SiteAuditController extends Controller
 
             return redirect()
                 ->back(302, [], route('pages.site-audit') . '#sa-history')
-                ->with('status', 'Краул уже завершён');
+                ->with('status', 'Проверка уже завершена');
         }
 
         $crawl->status = SiteAuditCrawl::STATUS_CANCELLED;
@@ -674,7 +766,7 @@ class SiteAuditController extends Controller
 
         return redirect()
             ->back(302, [], route('pages.site-audit') . '#sa-history')
-            ->with('status', 'Краул остановлен');
+            ->with('status', 'Проверка остановлена');
     }
 
     public function destroyCrawl(Request $request, int $id)
@@ -692,7 +784,7 @@ class SiteAuditController extends Controller
             if ($request->expectsJson()) {
                 return response()->json([
                     'error' => 'active',
-                    'message' => 'Нельзя удалить незавершённый краул — сначала остановите',
+                    'message' => 'Нельзя удалить незавершённую проверку — сначала остановите',
                 ], 422);
             }
 
@@ -738,7 +830,7 @@ class SiteAuditController extends Controller
         if ($active) {
             return redirect()
                 ->route('pages.site-audit')
-                ->with('status', 'Сначала дождитесь завершения активного краула');
+                ->with('status', 'Сначала дождитесь завершения активной проверки');
         }
 
         $pruner = new SiteAuditPruner();
@@ -839,7 +931,7 @@ class SiteAuditController extends Controller
         $crawl = $this->ownedCrawl($id);
         $this->assertCrawlOwner($crawl);
         if ($crawl->status !== SiteAuditCrawl::STATUS_DONE) {
-            return response()->json(['error' => 'status', 'message' => 'Шаринг только для готового краула'], 422);
+            return response()->json(['error' => 'status', 'message' => 'Шаринг только для готовой проверки'], 422);
         }
 
         $wantWhite = $request->boolean('white_label');
@@ -928,7 +1020,7 @@ class SiteAuditController extends Controller
         $crawl = $this->ownedCrawl($id);
         $this->assertCrawlOwner($crawl);
         if ($crawl->status !== SiteAuditCrawl::STATUS_DONE) {
-            return response()->json(['error' => 'status', 'message' => 'План только для готового краула'], 422);
+            return response()->json(['error' => 'status', 'message' => 'План только для готовой проверки'], 422);
         }
 
         $withAi = $request->boolean('ai');
@@ -1123,7 +1215,7 @@ class SiteAuditController extends Controller
         if ($started === []) {
             return response()->json([
                 'error' => 'limit',
-                'message' => $errors[0] ?? 'Не удалось запустить краул',
+                'message' => $errors[0] ?? 'Не удалось запустить проверку',
             ], 422);
         }
 
@@ -1133,15 +1225,15 @@ class SiteAuditController extends Controller
         if ($pagesOnly) {
             $msg = $n === 1
                 ? ($waiting
-                    ? 'Проверка страниц поставлена в очередь — сейчас идёт другой краул.'
+                    ? 'Проверка страниц поставлена в очередь — сейчас идёт другая проверка.'
                     : 'Запущена проверка только указанных страниц.')
-                : "Запущено {$n} краула(ов) только по страницам (разные домены → разные проекты).";
+                : "Запущено проверок: {$n} только по страницам (разные домены → разные проекты).";
         } else {
             $msg = $n === 1
                 ? ($waiting
-                    ? 'Краул в очереди — дождётся окончания текущего (или свободного слота на сервере).'
-                    : 'Краул запущен. Прогресс — в истории краулов.')
-                : "Запущено краулов: {$n}. Прогресс — в истории краулов.";
+                    ? 'Проверка в очереди — дождётся окончания текущего (или свободного слота на сервере).'
+                    : 'Проверка запущена. Прогресс — в истории проверок.')
+                : "Запущено проверок: {$n}. Прогресс — в истории проверок.";
         }
         if ($waiting) {
             $block = SiteAuditGlobalCap::blockingActiveSummary((int) $user->id, (int) $first['crawl_id']);
@@ -1196,7 +1288,7 @@ class SiteAuditController extends Controller
     }
 
     /**
-     * Продолжить failed/cancelled краул с сохранённой очередью (тот же id).
+     * Продолжить failed/cancelled проверка с сохранённой очередью (тот же id).
      */
     public function continueCrawl(Request $request, int $id)
     {
@@ -1239,11 +1331,11 @@ class SiteAuditController extends Controller
 
         return redirect(
             route('pages.site-audit') . '?highlight=' . $crawl->id . '#sa-history'
-        )->with('status', 'Краул #' . $crawl->id . ' продолжен с ' . (int) $crawl->pages_fetched . ' URL');
+        )->with('status', 'Проверка #' . $crawl->id . ' продолжен с ' . (int) $crawl->pages_fetched . ' URL');
     }
 
     /**
-     * Повторный краул проекта с настройками исходного (скорость, exclude, seed, лимит).
+     * Повторная проверка проекта с настройками исходного (скорость, exclude, seed, лимит).
      */
     public function repeatCrawl(Request $request, int $id)
     {
@@ -1259,12 +1351,12 @@ class SiteAuditController extends Controller
         $project = $source->project;
         if (! $project || ! $project->domain) {
             if ($request->expectsJson()) {
-                return response()->json(['error' => 'project', 'message' => 'У краула нет проекта'], 422);
+                return response()->json(['error' => 'project', 'message' => 'У проверки нет проекта'], 422);
             }
 
             return redirect()
                 ->route('pages.site-audit')
-                ->with('status', 'У краула нет проекта');
+                ->with('status', 'У проверки нет проекта');
         }
 
         $settings = array_merge(
@@ -1306,13 +1398,13 @@ class SiteAuditController extends Controller
                 'finished' => $crawl->isFinished(),
                 'status_url' => route('pages.site-audit.crawl.status', $crawl->id),
                 'redirect' => route('pages.site-audit'),
-                'message' => 'Повтор запущен. Прогресс — в истории краулов.',
+                'message' => 'Повтор запущен. Прогресс — в истории проверок.',
             ]);
         }
 
         return redirect(
             route('pages.site-audit') . '?highlight=' . $crawl->id . '#sa-history'
-        )->with('status', 'Повторный краул #' . $crawl->id . ' запущен');
+        )->with('status', 'Повторная проверка #' . $crawl->id . ' запущенаа');
     }
 
     public function crawlStatus(int $id): JsonResponse
@@ -1485,7 +1577,7 @@ class SiteAuditController extends Controller
             ->limit(20)
             ->get(['id', 'pages_total', 'finished_at', 'created_at', 'buckets_json']);
 
-        abort_unless($candidates->isNotEmpty(), 404, 'Нет другого завершённого краула для сравнения');
+        abort_unless($candidates->isNotEmpty(), 404, 'Нет другой завершённой проверки для сравнения');
 
         if ($withId < 1) {
             $baseline = $candidates->first();
@@ -1547,7 +1639,7 @@ class SiteAuditController extends Controller
 
         return redirect()
             ->route('pages.site-audit.report.show', [$crawl->id, $code])
-            ->with('status', 'Находка добавлена в игнор (для следующих краулов тоже)');
+            ->with('status', 'Находка добавлена в игнор (для следующих проверок тоже)');
     }
 
     public function restoreIgnore(Request $request, int $id)
@@ -1752,7 +1844,7 @@ class SiteAuditController extends Controller
      * @param array|object $counts
      * @param string|null $group tech|seo|null(=all)
      */
-    private function buildReportTree($counts, ?string $group = null): array
+    private function buildReportTree($counts, ?string $group = null, ?SiteAuditCrawl $crawl = null): array
     {
         $counts = (array) $counts;
         $catalog = config('site_audit.findings', []);
@@ -1808,6 +1900,11 @@ class SiteAuditController extends Controller
                 continue;
             }
 
+            $probe = null;
+            if (! $isExternal && $crawl !== null) {
+                $probe = SiteAuditProbeStatus::forCode($crawl, $code);
+            }
+
             $bySeverity[$severity][] = [
                 'code' => $code,
                 'title' => $meta['title'] ?? $code,
@@ -1817,6 +1914,7 @@ class SiteAuditController extends Controller
                 'group' => $itemGroup,
                 'external' => $isExternal,
                 'href' => $href,
+                'probe' => $probe,
             ];
         }
 
@@ -1835,7 +1933,7 @@ class SiteAuditController extends Controller
     }
 
     /**
-     * Счётчики по кодам: после агрегации — counts_json, во время краула — live из findings.
+     * Счётчики по кодам: после агрегации — counts_json, во время проверки — live из findings.
      * Иначе на отчётах нули, хотя строки findings уже есть.
      *
      * @return array<string,int>

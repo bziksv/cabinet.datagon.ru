@@ -85,6 +85,86 @@ class IndexCheckService
         return $out;
     }
 
+    /**
+     * Пакетный список URL из выдачи site:{host} (пагинация XML).
+     *
+     * @return array{
+     *   query: string,
+     *   urls: list<string>,
+     *   count: int,
+     *   found: ?int,
+     *   truncated: bool,
+     *   error: ?string
+     * }
+     */
+    public static function siteIndexedUrls(string $hostOrUrl, string $engine = 'google', int $maxUrls = 200): array
+    {
+        $bare = self::bareHostFromInput($hostOrUrl);
+        $engine = Str::lower($engine);
+        if ($bare === '' || ! in_array($engine, ['yandex', 'google'], true)) {
+            return [
+                'query' => '',
+                'urls' => [],
+                'count' => 0,
+                'found' => null,
+                'truncated' => false,
+                'error' => 'Некорректный домен или ПС',
+            ];
+        }
+
+        $query = 'site:' . $bare;
+        $maxUrls = max(10, min(500, $maxUrls));
+        $lr = $engine === 'google'
+            ? (string) config('cabinet-index-check.default_google_lr', '213')
+            : (string) config('cabinet-index-check.default_yandex_lr', '213');
+
+        $hadError = false;
+        $found = self::fetchFoundCount($engine, $lr, $query, $hadError);
+
+        try {
+            $raw = SimplifiedXmlFacade::fetchSerpUrls($lr, $query, $engine, $maxUrls);
+        } catch (\Throwable $e) {
+            return [
+                'query' => $query,
+                'urls' => [],
+                'count' => 0,
+                'found' => $found,
+                'truncated' => false,
+                'error' => $e->getMessage() ?: 'Ошибка запроса к поисковой системе',
+            ];
+        }
+
+        $urls = [];
+        $seen = [];
+        foreach ($raw as $url) {
+            $url = trim((string) $url);
+            if ($url === '' || ! self::urlBelongsToHost($url, $bare, true)) {
+                continue;
+            }
+            $key = Str::lower($url);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $urls[] = $url;
+            if (count($urls) >= $maxUrls) {
+                break;
+            }
+        }
+
+        $truncated = count($urls) >= $maxUrls
+            || ($found !== null && $found > count($urls));
+
+        return [
+            'query' => $query,
+            'urls' => $urls,
+            'count' => count($urls),
+            'found' => $found,
+            'truncated' => $truncated,
+            'error' => ($urls === [] && $hadError) ? 'Ошибка запроса к поисковой системе' : null,
+        ];
+    }
+
     private static function bareHostFromInput(string $hostOrUrl): string
     {
         $raw = trim($hostOrUrl);

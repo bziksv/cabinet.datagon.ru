@@ -438,9 +438,9 @@ class YandexWebmasterService
      *
      * @return array{ok:bool,samples?:list<array<string,mixed>>,count?:int,message?:string}
      */
-    public function getSearchUrlEventSamples(int $userId, string $hostId, int $limit = 500, int $offset = 0): array
+    public function getSearchUrlEventSamples(int $userId, string $hostId, int $limit = 100, int $offset = 0): array
     {
-        $limit = max(1, min(1000, $limit));
+        $limit = max(1, min(100, $limit));
         $offset = max(0, $offset);
         $payload = $this->apiGet($userId, $hostId, 'search-urls/events/samples', [
             'limit' => $limit,
@@ -476,10 +476,161 @@ class YandexWebmasterService
     }
 
     /**
+     * Актуальная оценка числа страниц в поиске (search-urls/in-search/history).
+     *
+     * @return array{ok:bool,count?:?int,date?:?string,message?:string}
+     */
+    public function getInSearchCount(int $userId, string $hostId): array
+    {
+        $payload = $this->apiGet($userId, $hostId, 'search-urls/in-search/history');
+        if (!$payload['ok']) {
+            return $payload;
+        }
+        $history = is_array($payload['body']['history'] ?? null) ? $payload['body']['history'] : [];
+        if ($history === []) {
+            return ['ok' => true, 'count' => null, 'date' => null];
+        }
+
+        $last = end($history);
+        if (! is_array($last)) {
+            return ['ok' => true, 'count' => null, 'date' => null];
+        }
+
+        return [
+            'ok' => true,
+            'count' => isset($last['value']) ? (int) $last['value'] : null,
+            'date' => isset($last['date']) ? (string) $last['date'] : null,
+        ];
+    }
+
+    /**
+     * Одна страница примеров URL в поиске (limit API: 1–100).
+     *
+     * @return array{ok:bool,samples?:list<array{url:string,title:string,last_access:?string}>,count?:int,message?:string}
+     */
+    public function getInSearchSamplesPage(int $userId, string $hostId, int $limit = 100, int $offset = 0): array
+    {
+        $limit = max(1, min(100, $limit));
+        $offset = max(0, $offset);
+        $payload = $this->apiGet($userId, $hostId, 'search-urls/in-search/samples', [
+            'limit' => $limit,
+            'offset' => $offset,
+        ], 45);
+        if (!$payload['ok']) {
+            return $payload;
+        }
+        $body = $payload['body'];
+        $rows = is_array($body['samples'] ?? null) ? $body['samples'] : [];
+        $samples = [];
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $url = trim((string) ($row['url'] ?? ''));
+            if ($url === '') {
+                continue;
+            }
+            $samples[] = [
+                'url' => $url,
+                'title' => (string) ($row['title'] ?? ''),
+                'last_access' => isset($row['last_access']) ? (string) $row['last_access'] : null,
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'count' => (int) ($body['count'] ?? count($samples)),
+            'samples' => $samples,
+        ];
+    }
+
+    /**
+     * Пакетный список URL в поиске (до maxUrls, API отдаёт ≤50 000 примеров).
+     *
+     * @return array{
+     *   ok:bool,
+     *   urls?:list<string>,
+     *   count?:int,
+     *   total_available?:?int,
+     *   truncated?:bool,
+     *   pages_fetched?:int,
+     *   message?:string
+     * }
+     */
+    public function collectInSearchUrls(int $userId, string $hostId, int $maxUrls = 50000): array
+    {
+        $maxUrls = max(100, min(50000, $maxUrls));
+        $pageSize = 100;
+        $urls = [];
+        $seen = [];
+        $totalAvailable = null;
+        $pagesFetched = 0;
+        $offset = 0;
+
+        while (count($urls) < $maxUrls) {
+            $page = $this->getInSearchSamplesPage($userId, $hostId, $pageSize, $offset);
+            if (!$page['ok']) {
+                if ($urls === []) {
+                    return $page;
+                }
+                break;
+            }
+
+            $pagesFetched++;
+            if ($totalAvailable === null && isset($page['count'])) {
+                $totalAvailable = (int) $page['count'];
+            }
+
+            $chunk = is_array($page['samples'] ?? null) ? $page['samples'] : [];
+            if ($chunk === []) {
+                break;
+            }
+
+            foreach ($chunk as $row) {
+                $url = trim((string) ($row['url'] ?? ''));
+                if ($url === '') {
+                    continue;
+                }
+                $key = strtolower($url);
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $urls[] = $url;
+                if (count($urls) >= $maxUrls) {
+                    break 2;
+                }
+            }
+
+            if (count($chunk) < $pageSize) {
+                break;
+            }
+            if ($totalAvailable !== null && ($offset + count($chunk)) >= $totalAvailable) {
+                break;
+            }
+
+            $offset += $pageSize;
+            usleep(50000);
+        }
+
+        $truncated = count($urls) >= $maxUrls
+            || ($totalAvailable !== null && $totalAvailable > count($urls));
+
+        return [
+            'ok' => true,
+            'urls' => $urls,
+            'count' => count($urls),
+            'total_available' => $totalAvailable,
+            'truncated' => $truncated,
+            'pages_fetched' => $pagesFetched,
+        ];
+    }
+
+    /**
      * @param array<string,scalar> $query
      * @return array{ok:bool,body?:array<string,mixed>,message?:string}
      */
-    private function apiGet(int $userId, string $hostId, string $path, array $query = []): array
+    private function apiGet(int $userId, string $hostId, string $path, array $query = [], ?int $timeout = null): array
     {
         $hostId = trim($hostId);
         if ($hostId === '') {
@@ -493,7 +644,7 @@ class YandexWebmasterService
         }
 
         try {
-            $client = $this->httpClient();
+            $client = $this->httpClient($timeout);
             $response = $client->get('v4/user/' . $yandexUserId . '/hosts/' . rawurlencode($hostId) . '/' . ltrim($path, '/'), [
                 'headers' => [
                     'Authorization' => 'OAuth ' . $accessToken,
@@ -535,11 +686,13 @@ class YandexWebmasterService
         ];
     }
 
-    private function httpClient(): Client
+    private function httpClient(?int $timeout = null): Client
     {
         return new Client([
             'base_uri' => rtrim((string) config('cabinet-yandex-webmaster.api_base'), '/') . '/',
-            'timeout' => (int) config('cabinet-yandex-webmaster.timeout', 20),
+            'timeout' => $timeout !== null
+                ? max(5, $timeout)
+                : (int) config('cabinet-yandex-webmaster.timeout', 20),
             'http_errors' => true,
         ]);
     }

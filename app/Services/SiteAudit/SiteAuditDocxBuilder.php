@@ -6,7 +6,7 @@ use App\SiteAuditCrawl;
 use ZipArchive;
 
 /**
- * Минимальный DOCX (OOXML) без PhpWord — сводка краула.
+ * Минимальный DOCX (OOXML) без PhpWord — сводка проверки.
  */
 class SiteAuditDocxBuilder
 {
@@ -48,7 +48,7 @@ class SiteAuditDocxBuilder
         $paras = [];
         $paras[] = $this->p('Аудит сайта — сводка', true, 28);
         $paras[] = $this->p('Домен: ' . $domain);
-        $paras[] = $this->p('Краул #' . $crawl->id . ' · ' . $crawl->statusLabelRu());
+        $paras[] = $this->p('Проверка #' . $crawl->id . ' · ' . $crawl->statusLabelRu());
         $paras[] = $this->p(
             'URL: ' . (int) $crawl->pages_fetched . ' / ' . (int) $crawl->pages_total
             . ' (лимит ' . number_format((int) $crawl->pages_limit, 0, '', ' ') . ')'

@@ -1,5 +1,5 @@
 @component('component.card', [
-    'title' => 'Аудит сайта · краул #' . $crawl->id,
+    'title' => 'Аудит сайта · проверка #' . $crawl->id,
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('css/cabinet-site-audit.css') }}?v={{ @filemtime(public_path('css/cabinet-site-audit.css')) ?: time() }}">
@@ -38,8 +38,8 @@
         @endif
         @if(!empty($canManageCrawl) && ! $crawl->isFinished())
             <form method="POST" action="{{ route('pages.site-audit.crawl.cancel', $crawl->id) }}" class="d-inline"
-                  data-cabinet-confirm="Остановить краул #{{ $crawl->id }}? Уже скачанные страницы останутся, дальше сканировать не будет."
-                  data-cabinet-confirm-title="Остановка краула"
+                  data-cabinet-confirm="Остановить проверку #{{ $crawl->id }}? Уже скачанные страницы останутся, дальше сканировать не будет."
+                  data-cabinet-confirm-title="Остановка проверки"
                   data-cabinet-confirm-ok="Остановить"
                   data-cabinet-confirm-danger="1">
                 @csrf
@@ -52,23 +52,23 @@
             @endphp
             @if($canResumeCrawl)
                 <form method="POST" action="{{ route('pages.site-audit.crawl.continue', $crawl->id) }}" class="d-inline"
-                      data-cabinet-confirm="Продолжить краул #{{ $crawl->id }} с {{ number_format((int) $crawl->pages_fetched, 0, '', ' ') }} URL? Уже скачанные страницы сохранятся."
-                      data-cabinet-confirm-title="Продолжить краул"
+                      data-cabinet-confirm="Продолжить проверку #{{ $crawl->id }} с {{ number_format((int) $crawl->pages_fetched, 0, '', ' ') }} URL? Уже скачанные страницы сохранятся."
+                      data-cabinet-confirm-title="Продолжить проверку"
                       data-cabinet-confirm-ok="Продолжить">
                     @csrf
                     <button type="submit" class="btn btn-sm btn-primary">Продолжить сканирование</button>
                 </form>
             @endif
             <form method="POST" action="{{ route('pages.site-audit.crawl.repeat', $crawl->id) }}" class="d-inline"
-                  data-cabinet-confirm="Повторить краул для {{ e(optional($project)->domain ?? 'проекта') }} с теми же настройками? Начнётся новый краул с нуля."
-                  data-cabinet-confirm-title="Новый краул"
+                  data-cabinet-confirm="Повторить проверку для {{ e(optional($project)->domain ?? 'проекта') }} с теми же настройками? Начнётся новая проверка с нуля."
+                  data-cabinet-confirm-title="Новая проверка"
                   data-cabinet-confirm-ok="Повторить">
                 @csrf
                 <button type="submit" class="btn btn-sm btn-outline-secondary">Повторить</button>
             </form>
             <form method="POST" action="{{ route('pages.site-audit.crawl.destroy', $crawl->id) }}" class="d-inline"
-                  data-cabinet-confirm="Удалить краул #{{ $crawl->id }} и все его findings?"
-                  data-cabinet-confirm-title="Удаление краула"
+                  data-cabinet-confirm="Удалить проверку #{{ $crawl->id }} и все её findings?"
+                  data-cabinet-confirm-title="Удаление проверки"
                   data-cabinet-confirm-ok="Удалить"
                   data-cabinet-confirm-danger="1">
                 @csrf
@@ -94,7 +94,7 @@
             <div>
                     <div class="h5 mb-1">{{ optional($project)->domain ?? '—' }}</div>
                 <div class="small text-muted">
-                    Краул #{{ $crawl->id }}
+                    Проверка #{{ $crawl->id }}
                     @if(optional($project)->team)
                         · команда {{ $project->team->title }}
                     @endif
@@ -214,7 +214,7 @@
             @if(!empty($historyRows) && count($historyRows) > 1)
                 <li class="nav-item">
                     <a class="nav-link" id="sa-tab-dynamics" data-bs-toggle="tab" href="#sa-pane-dynamics" role="tab"
-                       title="Как менялось число ошибок от краула к краулу">Динамика</a>
+                       title="Как менялось число ошибок от проверки к проверке">Динамика</a>
                 </li>
             @endif
         </ul>
@@ -338,12 +338,12 @@
 
             @if(!empty($historyRows) && count($historyRows) > 1)
                 <div class="tab-pane fade" id="sa-pane-dynamics" role="tabpanel">
-                    <h6 class="mb-2">Динамика тех. аудита по краулам</h6>
+                    <h6 class="mb-2">Динамика тех. аудита по проверкам</h6>
                     <div class="cabinet-sa-table-wrap mb-4">
                         <table class="table table-sm mb-0">
                             <thead class="thead-light">
                             <tr>
-                                <th>Краул</th>
+                                <th>Проверка</th>
                                 <th>Дата</th>
                                 <th>Страниц</th>
                                 @foreach($bucketLabels as $label)
@@ -373,12 +373,12 @@
                         </table>
                     </div>
 
-                    <h6 class="mb-2">Динамика SEO по краулам</h6>
+                    <h6 class="mb-2">Динамика SEO по проверкам</h6>
                     <div class="cabinet-sa-table-wrap">
                         <table class="table table-sm mb-0">
                             <thead class="thead-light">
                             <tr>
-                                <th>Краул</th>
+                                <th>Проверка</th>
                                 <th>Дата</th>
                                 <th>Страниц</th>
                                 @foreach($bucketLabels as $label)

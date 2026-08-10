@@ -7,8 +7,8 @@ use App\SiteAuditFinding;
 use App\SiteAuditPage;
 
 /**
- * Обратный индекс: целевой URL → страницы краула, у которых он в out_links.
- * Плюс происхождение URL из sitemap (краул ходит не только по ссылкам).
+ * Обратный индекс: целевой URL → страницы проверки, у которых он в out_links.
+ * Плюс происхождение URL из sitemap (проверка ходит не только по ссылкам).
  */
 class SiteAuditLinkReferrers
 {
@@ -21,7 +21,7 @@ class SiteAuditLinkReferrers
     private const TARGETED_SQL_LIMIT = 600;
 
     /**
-     * @param string[]|null $targetUrls если задано — только эти цели (SQL LIKE, без полной выгрузки краула)
+     * @param string[]|null $targetUrls если задано — только эти цели (SQL LIKE, без полной выгрузки проверки)
      * @return array<string, list<string>> targetUrl => [referrerUrl, ...]
      */
     public static function forCrawl(int $crawlId, ?array $targetUrls = null): array
@@ -73,7 +73,7 @@ class SiteAuditLinkReferrers
         $pagesFetched = (int) (SiteAuditCrawl::query()->whereKey($crawlId)->value('pages_fetched') ?? 0);
 
         if ($lookup !== null && $pagesFetched > 0 && $pagesFetched <= 12000) {
-            // Точечный поиск на умеренных краулах: SQL LIKE по URL, без полной выгрузки.
+            // Точечный поиск на умеренных проверких: SQL LIKE по URL, без полной выгрузки.
             // На 40k+ это слишком тяжело, а out_links всё равно часто обрезаны (лимит 150).
             $needles = array_keys($lookup);
             $query = SiteAuditPage::query()
@@ -128,7 +128,7 @@ class SiteAuditLinkReferrers
                     return true;
                 });
         }
-        // else: крупный краул + точечные цели — referrer'ы из out_links не сканируем
+        // else: крупный проверка + точечные цели — referrer'ы из out_links не сканируем
         // (память/таймаут). Источник покажет originMeta (sitemap seed и т.п.).
 
         // Дополняем из findings «битая внутренняя ссылка» (meta.from).
@@ -157,7 +157,7 @@ class SiteAuditLinkReferrers
     }
 
     /**
-     * URL из sitemap текущего краула (с учётом trailing slash / canonical key).
+     * URL из sitemap текущей проверки (с учётом trailing slash / canonical key).
      *
      * @param string[] $targetUrls
      * @return array<string, bool> targetUrl => true если есть в sitemap
@@ -189,7 +189,7 @@ class SiteAuditLinkReferrers
             if ($key) {
                 $byKey[$key] = true;
             }
-            // sitemap часто со слэшем, краул — без (strip_trailing_slash)
+            // sitemap часто со слэшем, проверка — без (strip_trailing_slash)
             $alt = self::slashVariant($su);
             if ($alt !== null) {
                 $byExact[$alt] = true;
@@ -242,7 +242,7 @@ class SiteAuditLinkReferrers
     }
 
     /**
-     * Источник постановки URL в очередь с страниц краула.
+     * Источник постановки URL в очередь с страниц проверки.
      *
      * @param string[] $targetUrls
      * @return array<string, array{via:string,from:?string}>
@@ -297,7 +297,9 @@ class SiteAuditLinkReferrers
         $via = trim($via);
         $from = $from !== null ? trim($from) : '';
         if ($via === 'sitemap') {
-            return ['label' => 'sitemap.xml', 'via' => $via, 'from' => null];
+            $href = ($from !== '' && preg_match('#^https?://#i', $from)) ? $from : null;
+
+            return ['label' => 'sitemap.xml', 'via' => $via, 'from' => $href];
         }
         if ($via === 'seed') {
             return ['label' => 'посев (список URL)', 'via' => $via, 'from' => null];
@@ -312,11 +314,11 @@ class SiteAuditLinkReferrers
             return ['label' => 'внутренняя ссылка', 'via' => $via, 'from' => null];
         }
 
-        return ['label' => 'не записано — перезапустите краул', 'via' => '', 'from' => null];
+        return ['label' => '', 'via' => '', 'from' => null];
     }
 
     /**
-     * Откуда URL попал в краул, если HTML-referrer'ов нет (старые краулы без discovered_*).
+     * Откуда URL попал в проверка, если HTML-referrer'ов нет (старые проверки без discovered_*).
      *
      * @param string[] $targetUrls
      * @return array<string, array{label:string,hint:string,from_sitemap:bool,from_seed:bool,from_home:bool,orphan:bool}>
@@ -413,7 +415,7 @@ class SiteAuditLinkReferrers
                 $label = 'из sitemap.xml';
                 $hint = $fromSitemap
                     ? ('Этот URL есть в карте сайта. Исправьте запись в sitemap на финальный адрес без редиректа.' . $slashTip)
-                    : ('В крауле подхватили '
+                    : ('В проверке подхватили '
                         . number_format($sitemapSeedCount, 0, '', ' ')
                         . ' URL из sitemap — таких адресов нет среди сохранённых HTML-ссылок меню. Проверьте sitemap.xml и старые ссылки на этот URL.'
                         . $slashTip);
@@ -427,13 +429,13 @@ class SiteAuditLinkReferrers
                 $label = 'главная сайта';
                 $hint = 'Стартовый URL проекта. Настройте редирект/canonical на канонический адрес главной.';
             } elseif ($sitemapSeeded) {
-                // HTML-ссылку не нашли, но sitemap в крауле был — не вводим «по внутренним ссылкам».
+                // HTML-ссылку не нашли, но sitemap в проверке был — не вводим «по внутренним ссылкам».
                 $label = 'скорее всего sitemap.xml';
                 $hint = 'Среди сохранённых ссылок со страниц этого URL нет. Обычно такие адреса приходят из карты сайта или закладок. Проверьте sitemap и поиск по сайту на этот URL.'
                     . $slashTip;
             } else {
                 $label = 'страницу со ссылкой не нашли';
-                $hint = 'В сохранённых HTML-ссылках краула этого URL нет. Ищите в sitemap.xml, во внешних ссылках и через поиск по коду/сайту.'
+                $hint = 'В сохранённых HTML-ссылках проверки этого URL нет. Ищите в sitemap.xml, во внешних ссылках и через поиск по коду/сайту.'
                     . $slashTip;
             }
 
@@ -479,6 +481,42 @@ class SiteAuditLinkReferrers
     public static function slashVariantPublic(string $url): ?string
     {
         return self::slashVariant($url);
+    }
+
+    /**
+     * URL карты сайта для клика в колонке «Откуда» (из источников проверки или /sitemap.xml домена).
+     */
+    public static function sitemapViewUrl(SiteAuditCrawl $crawl): ?string
+    {
+        $sources = is_array($crawl->progress_json['sitemap']['sources'] ?? null)
+            ? $crawl->progress_json['sitemap']['sources']
+            : [];
+        $fallback = null;
+        foreach ($sources as $src) {
+            if (! is_array($src)) {
+                continue;
+            }
+            $url = trim((string) ($src['url'] ?? ''));
+            if ($url === '' || ! preg_match('#^https?://#i', $url)) {
+                continue;
+            }
+            if (! empty($src['ok'])) {
+                return $url;
+            }
+            if ($fallback === null) {
+                $fallback = $url;
+            }
+        }
+        if ($fallback !== null) {
+            return $fallback;
+        }
+
+        $domain = trim((string) optional($crawl->project)->domain);
+        if ($domain === '') {
+            return null;
+        }
+
+        return 'https://' . $domain . '/sitemap.xml';
     }
 
     /**

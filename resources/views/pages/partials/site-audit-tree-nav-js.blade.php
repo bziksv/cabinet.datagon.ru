@@ -42,10 +42,11 @@
             var sev = item.getAttribute('data-severity') || '';
             var count = parseInt(item.getAttribute('data-count') || '0', 10) || 0;
             var isExternal = item.getAttribute('data-external') === '1';
+            var probeSkipped = item.getAttribute('data-probe-skipped') === '1';
             var ok = matchTitle(title, q);
             if (ok && preset === 'hot') ok = count > 0;
             if (ok && preset !== 'all' && preset !== 'hot') {
-                ok = sev === preset && (count > 0 || isExternal);
+                ok = sev === preset && (count > 0 || isExternal || probeSkipped);
             }
             item.classList.toggle('is-tree-hidden', !ok);
             item.hidden = !ok;

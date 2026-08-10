@@ -140,7 +140,7 @@
 		},
 		{
 			id: 'domains',
-			title: 'Новый краул',
+			title: 'Новая проверка',
 			text: 'Сюда вводите домен (или несколько — с новой строки). Это старт проверки.',
 			find: function () {
 				return firstVisible(['[data-sa-tour="domains"]', '#sa-domain', '[data-sa-tour="new-crawl"]']);
@@ -163,7 +163,7 @@
 		{
 			id: 'projects',
 			title: 'Ваши сайты',
-			text: 'Список проектов после первого краула: отчёт, команда, авторасписание.',
+			text: 'Список проектов после первой проверки: отчёт, команда, авторасписание.',
 			find: function () {
 				return firstVisible([
 					'[data-sa-tour="projects"]',
@@ -177,7 +177,7 @@
 		{
 			id: 'schedule',
 			title: 'Авторасписание',
-			text: 'В настройках сайта — день, час (МСК) и параметры краула. Пик 11–14 недоступен.',
+			text: 'В настройках сайта — день, час (МСК) и параметры проверки. Пик 11–14 недоступен.',
 			find: function () {
 				openScheduleForTour();
 				return firstVisible([
@@ -192,7 +192,7 @@
 		},
 		{
 			id: 'history',
-			title: 'История краулов',
+			title: 'История проверок',
 			text: 'Прошлые прогоны: статус, прогресс, проблемы. Поиск по домену справа.',
 			find: function () {
 				return firstVisible(['[data-sa-tour="history"]', '#sa-history', '.cabinet-sa-history']);

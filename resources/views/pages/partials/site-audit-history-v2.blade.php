@@ -201,8 +201,8 @@
                             @if($isCrawlOwner && ! $finished)
                                 <form method="POST" action="{{ route('pages.site-audit.crawl.cancel', $c->id) }}" class="d-inline"
                                       data-sa-cancel-crawl
-                                      data-cabinet-confirm="Остановить краул #{{ $c->id }}?"
-                                      data-cabinet-confirm-title="Остановка краула"
+                                      data-cabinet-confirm="Остановить проверку #{{ $c->id }}?"
+                                      data-cabinet-confirm-title="Остановка проверки"
                                       data-cabinet-confirm-ok="Остановить"
                                       data-cabinet-confirm-danger="1">
                                     @csrf
@@ -215,23 +215,23 @@
                                 @endphp
                                 @if($canResume)
                                     <form method="POST" action="{{ route('pages.site-audit.crawl.continue', $c->id) }}" class="d-inline"
-                                          data-cabinet-confirm="Возобновить краул #{{ $c->id }}?"
-                                          data-cabinet-confirm-title="Возобновить краул"
+                                          data-cabinet-confirm="Возобновить проверку #{{ $c->id }}?"
+                                          data-cabinet-confirm-title="Возобновить проверку"
                                           data-cabinet-confirm-ok="Возобновить">
                                         @csrf
                                         <button type="submit" class="btn btn-sm btn-outline-primary">Возобновить</button>
                                     </form>
                                 @endif
                                 <form method="POST" action="{{ route('pages.site-audit.crawl.repeat', $c->id) }}" class="d-inline"
-                                      data-cabinet-confirm="Повторить краул для {{ e($domain) }}?"
-                                      data-cabinet-confirm-title="Новый краул"
+                                      data-cabinet-confirm="Повторить проверку для {{ e($domain) }}?"
+                                      data-cabinet-confirm-title="Новая проверка"
                                       data-cabinet-confirm-ok="Повторить">
                                     @csrf
                                     <button type="submit" class="btn btn-sm btn-outline-secondary" title="Повторить">↻</button>
                                 </form>
                                 <form method="POST" action="{{ route('pages.site-audit.crawl.destroy', $c->id) }}" class="d-inline"
-                                      data-cabinet-confirm="Удалить краул #{{ $c->id }}?"
-                                      data-cabinet-confirm-title="Удаление краула"
+                                      data-cabinet-confirm="Удалить проверку #{{ $c->id }}?"
+                                      data-cabinet-confirm-title="Удаление проверки"
                                       data-cabinet-confirm-ok="Удалить"
                                       data-cabinet-confirm-danger="1">
                                     @csrf

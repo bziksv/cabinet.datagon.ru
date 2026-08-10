@@ -29,6 +29,169 @@ class SiteAuditFindingPresenter
         return $map[$severity] ?? $severity;
     }
 
+    /**
+     * Богатая ячейка «Детали» (HTML). null → рисовать обычный metaLine.
+     */
+    public static function metaDetailsHtml(string $code, $meta, ?string $url = null): ?string
+    {
+        if (! is_array($meta) || ! $meta) {
+            return null;
+        }
+
+        if ($code === 'duplicate_url_variants') {
+            return self::duplicateUrlVariantsHtml($meta, $url);
+        }
+
+        if ($code !== 'html_critical_errors') {
+            return null;
+        }
+
+        $n = (int) ($meta['count'] ?? 0);
+        $samples = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+        if ($samples === []) {
+            return null;
+        }
+
+        $parts = [];
+        if ($n > 0) {
+            $parts[] = '<span class="cabinet-sa-html-err__count">ошибок: ' . $n . '</span>';
+        }
+
+        $hints = [];
+        foreach (array_slice($samples, 0, 5) as $sample) {
+            if (! is_array($sample)) {
+                continue;
+            }
+            $msg = trim((string) ($sample['message'] ?? ''));
+            if ($msg === '') {
+                continue;
+            }
+            $line = isset($sample['line']) && (int) $sample['line'] > 0
+                ? (int) $sample['line']
+                : null;
+            $label = e(self::clip($msg, 90));
+            $q = 'html libxml "' . $msg . '"';
+            $href = e(self::googleSearchUrl($q));
+            $lineBit = $line !== null
+                ? ' <span class="text-muted">стр. ' . $line . '</span>'
+                : '';
+            $parts[] = '<a class="cabinet-sa-html-err__msg" href="' . $href
+                . '" target="_blank" rel="noopener noreferrer" title="Искать в Google">'
+                . $label . '</a>' . $lineBit;
+
+            $hint = SiteAuditFindingHelp::htmlErrorHint($msg);
+            if ($hint !== null && ! in_array($hint, $hints, true)) {
+                $hints[] = $hint;
+            }
+        }
+
+        if (count($parts) <= ($n > 0 ? 1 : 0)) {
+            return null;
+        }
+
+        $html = '<div class="cabinet-sa-html-err">' . implode(' · ', $parts);
+        foreach (array_slice($hints, 0, 2) as $hint) {
+            $html .= '<div class="cabinet-sa-html-err__tip">' . e($hint) . '</div>';
+        }
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function duplicateUrlVariantsHtml(array $meta, ?string $rowUrl = null): ?string
+    {
+        $variants = [];
+        if (isset($meta['variants']) && is_array($meta['variants'])) {
+            foreach ($meta['variants'] as $v) {
+                $v = trim((string) $v);
+                if ($v !== '' && ! in_array($v, $variants, true)) {
+                    $variants[] = $v;
+                }
+            }
+        }
+        // В «Деталях» только другие адреса — текущий уже в колонке URL.
+        $others = $variants;
+        if ($rowUrl !== null && $rowUrl !== '') {
+            $others = array_values(array_filter($variants, static function ($v) use ($rowUrl) {
+                return $v !== $rowUrl;
+            }));
+        }
+        if ($others === []) {
+            return null;
+        }
+
+        $diff = self::describeUrlVariantDiff($variants);
+        $html = '<div class="cabinet-sa-url-variants">';
+        $html .= '<div class="cabinet-sa-url-variants__head">';
+        $html .= count($others) === 1 ? 'также:' : ('также (' . count($others) . '):');
+        if ($diff !== '') {
+            $html .= ' <span class="cabinet-sa-url-variants__diff">' . e($diff) . '</span>';
+        }
+        $html .= '</div><ul class="cabinet-sa-url-variants__list">';
+        foreach ($others as $v) {
+            $html .= '<li><a href="' . e($v) . '" target="_blank" rel="noopener noreferrer">'
+                . e($v) . '</a></li>';
+        }
+        $html .= '</ul></div>';
+
+        return $html;
+    }
+
+    /**
+     * @param  string[]  $variants
+     */
+    private static function describeUrlVariantDiff(array $variants): string
+    {
+        if (count($variants) < 2) {
+            return '';
+        }
+        $bits = [];
+        $schemes = [];
+        $hosts = [];
+        $slash = [];
+        foreach ($variants as $v) {
+            $p = parse_url($v);
+            if (! is_array($p)) {
+                continue;
+            }
+            $schemes[strtolower((string) ($p['scheme'] ?? ''))] = true;
+            $hosts[strtolower((string) ($p['host'] ?? ''))] = true;
+            $path = (string) ($p['path'] ?? '/');
+            $slash[$path !== '/' && substr($path, -1) === '/' ? 'со /' : 'без /'] = true;
+        }
+        if (count($schemes) > 1) {
+            $bits[] = 'http ↔ https';
+        }
+        if (count($hosts) > 1) {
+            $www = false;
+            $apex = false;
+            foreach (array_keys($hosts) as $h) {
+                if (strpos($h, 'www.') === 0) {
+                    $www = true;
+                } else {
+                    $apex = true;
+                }
+            }
+            $bits[] = ($www && $apex) ? 'www ↔ без www' : 'разный хост';
+        }
+        if (count($slash) > 1) {
+            $bits[] = 'со слэшем ↔ без';
+        }
+        if ($bits === []) {
+            $bits[] = 'разный путь/query';
+        }
+
+        return implode(', ', $bits);
+    }
+
+    public static function googleSearchUrl(string $query): string
+    {
+        return 'https://www.google.com/search?q=' . rawurlencode($query);
+    }
+
     public static function metaLine(string $code, $meta, ?string $url = null): string
     {
         if (! is_array($meta) || ! $meta) {
@@ -259,7 +422,13 @@ class SiteAuditFindingPresenter
                     $first = ! empty($meta['referrers'][0]) ? self::clip((string) $meta['referrers'][0], 45) : '';
                     $bits[] = 'ссылаются: ' . $refN . ($first !== '' ? ' · ' . $first : '');
                 } elseif (array_key_exists('referrer_count', $meta)) {
-                    $bits[] = 'ссылок с страниц краула нет';
+                    $bits[] = 'ссылок с страниц проверки нет';
+                }
+                if (! empty($meta['slash_hint']) || ! empty($meta['false_404_slash'])) {
+                    $slashUrl = trim((string) ($meta['slash_url'] ?? ''));
+                    $bits[] = $slashUrl !== ''
+                        ? ('в sitemap часто со слэшем: ' . self::clip($slashUrl, 60))
+                        : 'возможен ложный 404: страница жива со слэшем в конце';
                 }
 
                 return $bits ? implode(' · ', $bits) : '—';
@@ -273,7 +442,7 @@ class SiteAuditFindingPresenter
                 if ($refN > 0) {
                     $bits[] = 'ссылаются: ' . $refN;
                 } elseif (array_key_exists('referrer_count', $meta)) {
-                    $bits[] = 'ссылок с страниц краула нет';
+                    $bits[] = 'ссылок с страниц проверки нет';
                 }
 
                 return $bits ? implode(' · ', $bits) : '—';
@@ -347,24 +516,24 @@ class SiteAuditFindingPresenter
             case 'sitemap_not_crawled':
                 $reason = (string) ($meta['reason'] ?? '');
                 if ($reason === 'crawl_save_gap') {
-                    return 'сбой сохранения страниц в крауле';
+                    return 'сбой сохранения страниц в проверке';
                 }
                 if ($reason === 'likely_robots_or_not_queued') {
                     return 'не в очереди (robots / фильтр)';
                 }
                 if ($reason === 'pages_limit' || isset($meta['pages_limit'])) {
-                    return 'лимит краула: ' . number_format((int) ($meta['pages_limit'] ?? 0), 0, '', ' ');
+                    return 'лимит проверки: ' . number_format((int) ($meta['pages_limit'] ?? 0), 0, '', ' ');
                 }
 
-                return 'не в крауле';
+                return 'не в проверке';
 
             case 'landing_not_in_sitemap':
                 return 'посадочная · нет в sitemap';
 
             case 'landing_not_crawled':
                 return isset($meta['pages_limit'])
-                    ? ('посадочная · не в крауле · лимит ' . number_format((int) $meta['pages_limit'], 0, '', ' '))
-                    : 'посадочная · не в крауле';
+                    ? ('посадочная · не в проверке · лимит ' . number_format((int) $meta['pages_limit'], 0, '', ' '))
+                    : 'посадочная · не в проверке';
 
             case 'landing_url_changed':
                 $q = trim((string) ($meta['query'] ?? ''));
@@ -456,13 +625,18 @@ class SiteAuditFindingPresenter
                 return $bits ? implode(' · ', $bits) : 'soft 404';
 
             case 'orphan_pages':
-                return 'нет входящих ссылок в крауле';
+                return 'нет входящих ссылок в проверке';
 
             case 'duplicate_url_variants':
-                $n = (int) ($meta['count'] ?? 0);
-                $sample = ! empty($meta['variants'][0]) ? ' · ' . self::clip((string) $meta['variants'][0], 50) : '';
+                $n = (int) ($meta['count'] ?? count($meta['variants'] ?? []));
+                $variants = isset($meta['variants']) && is_array($meta['variants']) ? $meta['variants'] : [];
+                if ($variants) {
+                    return 'вариантов: ' . $n . ' · ' . implode(' | ', array_map(function ($v) {
+                        return (string) $v;
+                    }, $variants));
+                }
 
-                return $n ? ('вариантов: ' . $n . $sample) : 'дубль URL';
+                return $n ? ('вариантов: ' . $n) : 'дубль URL';
 
             case 'www_both_available':
                 $bits = [];
@@ -711,21 +885,78 @@ class SiteAuditFindingPresenter
 
             case 'index_count_mismatch':
                 $engine = (string) ($meta['engine'] ?? '');
-                $indexed = isset($meta['indexed']) ? (int) $meta['indexed'] : null;
-                $pages = isset($meta['pages_total']) ? (int) $meta['pages_total'] : null;
-                $ratio = isset($meta['ratio']) ? round((float) $meta['ratio'], 2) : null;
                 $bits = [];
                 if ($engine !== '') {
                     $bits[] = $engine;
                 }
+                $source = (string) ($meta['source'] ?? '');
+                if ($source === 'webmaster') {
+                    $bits[] = 'Вебмастер';
+                } elseif ($source === 'xml_site') {
+                    $bits[] = 'устаревший источник';
+                }
+                if (! empty($meta['needs_webmaster']) && empty($meta['deep'])) {
+                    $bits[] = 'нужен Вебмастер';
+                }
+                if (! empty($meta['deep']) && (($meta['mode'] ?? '') === 'site_list'
+                    || ($meta['mode'] ?? '') === 'webmaster_list'
+                    || isset($meta['serp_count']))) {
+                    $matched = (int) ($meta['matched'] ?? 0);
+                    $crawlN = (int) ($meta['crawl_count'] ?? $meta['pages_total'] ?? 0);
+                    $serpN = (int) ($meta['serp_count'] ?? 0);
+                    $bits[] = 'список ' . $serpN . ' URL';
+                    $bits[] = 'совпало ' . $matched . '/' . max(1, $crawlN);
+                    $miss = (int) ($meta['missing_in_index'] ?? 0);
+                    $extra = (int) ($meta['extra_in_index'] ?? 0);
+                    if ($miss > 0) {
+                        $bits[] = 'нет в индексе: ' . $miss;
+                    }
+                    if ($extra > 0) {
+                        $bits[] = 'лишние в индексе: ' . $extra;
+                    }
+                    if (! empty($meta['truncated'])) {
+                        $bits[] = 'список обрезан';
+                    }
+
+                    return $bits ? implode(' · ', $bits) : 'сверка индекса';
+                }
+                if (! empty($meta['deep'])) {
+                    $si = (int) ($meta['sample_indexed'] ?? 0);
+                    $sm = (int) ($meta['sample_missing'] ?? 0);
+                    $sample = (int) ($meta['sample'] ?? ($si + $sm));
+                    $bits[] = 'выборка ' . $si . '/' . max(1, $sample) . ' в индексе';
+                    if (isset($meta['estimate'])) {
+                        $bits[] = 'оценка ~' . (int) $meta['estimate']
+                            . (isset($meta['pages_total']) ? (' из ' . (int) $meta['pages_total']) : '');
+                    }
+
+                    return $bits ? implode(' · ', $bits) : 'выборка индекса';
+                }
+                $indexed = isset($meta['indexed']) ? (int) $meta['indexed'] : null;
+                $pages = isset($meta['pages_total']) ? (int) $meta['pages_total'] : null;
+                $ratio = isset($meta['ratio']) ? round((float) $meta['ratio'], 2) : null;
+                if (! empty($meta['ok_count']) && $indexed !== null && $pages !== null) {
+                    $bits[] = 'в поиске ' . $indexed . ' · проверка ' . $pages;
+
+                    return $bits ? implode(' · ', $bits) : 'индекс ≈ проверка';
+                }
+                if (! empty($meta['capped'])) {
+                    $bits[] = 'потолок site: ~' . ($indexed ?? 100);
+                    if ($pages !== null) {
+                        $bits[] = 'проверка ' . $pages;
+                    }
+                    $bits[] = 'нужна сверка списка';
+
+                    return $bits ? implode(' · ', $bits) : 'оценка site: ограничена';
+                }
                 if ($indexed !== null && $pages !== null) {
-                    $bits[] = 'индекс ' . $indexed . ' vs краул ' . $pages;
+                    $bits[] = 'индекс ' . $indexed . ' vs проверка ' . $pages;
                 }
                 if ($ratio !== null) {
                     $bits[] = '×' . $ratio;
                 }
 
-                return $bits ? implode(' · ', $bits) : 'расхождение индекса и краула';
+                return $bits ? implode(' · ', $bits) : 'расхождение индекса и проверки';
 
             case 'serp_snippets':
                 $bits = [];
@@ -771,6 +1002,20 @@ class SiteAuditFindingPresenter
                 return ! empty($meta['engine'])
                     ? ('нет в индексе: ' . (string) $meta['engine'])
                     : 'нет в индексе ПС';
+
+            case 'index_url_missing':
+                $bits = [];
+                $engine = (string) ($meta['engine'] ?? 'yandex');
+                $bits[] = $engine === 'yandex' ? 'Яндекс' : $engine;
+                if (($meta['source'] ?? '') === 'webmaster') {
+                    $bits[] = 'Вебмастер';
+                }
+                $bits[] = 'нет в поиске';
+                if (! empty($meta['list_truncated'])) {
+                    $bits[] = 'список ПС мог быть неполным';
+                }
+
+                return implode(' · ', $bits);
 
             case 'serp_snippet_source':
                 $bits = [];
@@ -844,6 +1089,15 @@ class SiteAuditFindingPresenter
 
                 return $bits ? implode(' · ', $bits) : 'пагинация/фильтр';
 
+            case 'empty_title':
+                return 'title пустой';
+
+            case 'empty_description':
+                return 'description пустой';
+
+            case 'canonical_empty':
+                return 'canonical отсутствует';
+
             case 'missing_hsts':
                 return 'нет Strict-Transport-Security';
 
@@ -866,7 +1120,28 @@ class SiteAuditFindingPresenter
                 return isset($meta['count']) ? ('H1: ' . (int) $meta['count']) : '—';
 
             default:
-                return self::clip(json_encode($meta, JSON_UNESCAPED_UNICODE), 120);
+                // discovered_* пишется в meta для колонки «Откуда», в «Детали» не показываем сырой JSON.
+                $clean = $meta;
+                foreach ([
+                    'discovered_via',
+                    'discovered_from',
+                    'origin_label',
+                    'origin_hint',
+                    'from_sitemap',
+                    'sitemap_href',
+                    'referrers',
+                    'referrer_count',
+                    'slash_hint',
+                    'slash_url',
+                    'false_404_slash',
+                ] as $drop) {
+                    unset($clean[$drop]);
+                }
+                if ($clean === []) {
+                    return '—';
+                }
+
+                return self::clip(json_encode($clean, JSON_UNESCAPED_UNICODE), 120);
         }
     }
 

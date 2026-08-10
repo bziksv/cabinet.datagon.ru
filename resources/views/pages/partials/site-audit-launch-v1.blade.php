@@ -16,7 +16,7 @@
                     <span class="cabinet-sa-mode-card__badge cabinet-sa-mode-card__badge--pro">Для Профи</span>
                     <span class="cabinet-sa-mode-card__icon" aria-hidden="true"><i class="bi bi-sliders"></i></span>
                     <span class="cabinet-sa-mode-card__title">Расширенный</span>
-                    <span class="cabinet-sa-mode-card__text">Потоки, robots, список URL, авторасписание и тонкая настройка краула.</span>
+                    <span class="cabinet-sa-mode-card__text">Потоки, robots, список URL, авторасписание и тонкая настройка проверки.</span>
                     <span class="cabinet-sa-mode-card__cta">Выбрать расширенный →</span>
                 </button>
             </div>
@@ -60,14 +60,14 @@
                         <div class="card-body">
                             <h2 class="cabinet-sa-step-title h6 mb-3" data-sa-pro>
                                 <span class="cabinet-sa-step-badge">1</span>
-                                Новый краул
+                                Новая проверка
                             </h2>
 
                             <div class="mb-3 cabinet-sa-field" data-sa-tour="domains">
                                 <label class="form-label fw-medium" for="sa-domain">
                                     <span class="cabinet-sa-label-lite">Сайт</span>
                                     <span class="cabinet-sa-label-pro">Домены</span>
-                                    @include('pages.partials.site-audit-tip', ['tip' => "Один или несколько сайтов — каждый домен с новой строки.\nМожно без https://: titlo.ru\nИли целиком URL: https://titlo.ru/ — возьмём только хост.\nДля каждого домена создаётся свой проект и краул (лимит — по тарифу). Доп. URL и исключения применяются ко всем."])
+                                    @include('pages.partials.site-audit-tip', ['tip' => "Один или несколько сайтов — каждый домен с новой строки.\nМожно без https://: titlo.ru\nИли целиком URL: https://titlo.ru/ — возьмём только хост.\nДля каждого домена создаётся свой проект и проверка (лимит — по тарифу). Доп. URL и исключения применяются ко всем."])
                                 </label>
                                 <textarea class="form-control cabinet-sa-domain-input" id="sa-domain" rows="3" placeholder="example.com" data-placeholder-lite="сайт.ru" data-placeholder-pro="example.com&#10;shop.example.com&#10;https://another.ru/" autocomplete="off"></textarea>
                                 <div class="form-text cabinet-sa-domain-hint-lite">Можно без https:// — например kawe.su</div>
@@ -76,7 +76,7 @@
                         <div class="mb-3 cabinet-sa-field" data-sa-pro>
                             <label class="form-label fw-medium" for="sa-extra-hosts">
                                 Доп. хосты в одном project <span class="text-secondary fw-normal">(опционально)</span>
-                                @include('pages.partials.site-audit-tip', ['tip' => "Только если выше указан один основной домен.\nПоддомены (shop.example.com, blog.example.com) войдут в тот же краул как внутренние.\nНесколько доменов в поле «Домены» — по-прежнему отдельные проекты."])
+                                @include('pages.partials.site-audit-tip', ['tip' => "Только если выше указан один основной домен.\nПоддомены (shop.example.com, blog.example.com) войдут в тот же проверка как внутренние.\nНесколько доменов в поле «Домены» — по-прежнему отдельные проекты."])
                             </label>
                             <textarea class="form-control" id="sa-extra-hosts" rows="2" placeholder="shop.example.com&#10;blog.example.com" autocomplete="off"></textarea>
                         </div>
@@ -84,7 +84,7 @@
                         <div class="mb-3 cabinet-sa-field" data-sa-pro>
                             <label class="form-label fw-medium" for="sa-seeds">
                                 Страницы / доп. URL <span class="text-secondary fw-normal">(опционально)</span>
-                                @include('pages.partials.site-audit-tip', ['tip' => "По одному URL на строку, лучше с https://.\nБез галочки ниже — это доп. семена: сайт обходится как обычно (sitemap + ссылки), эти URL точно попадут в очередь.\nС галочкой «только эти страницы» — сканируются исключительно перечисленные URL: без sitemap, без главной «насильно» и без дообхода по ссылкам.\nURL с разных доменов автоматически разбиваются на отдельные проекты/краулы.\nМожно не заполнять «Домены», если галочка включена — домен возьмём из URL."])
+                                @include('pages.partials.site-audit-tip', ['tip' => "По одному URL на строку, лучше с https://.\nБез галочки ниже — это доп. семена: сайт обходится как обычно (sitemap + ссылки), эти URL точно попадут в очередь.\nС галочкой «только эти страницы» — сканируются исключительно перечисленные URL: без sitemap, без главной «насильно» и без дообхода по ссылкам.\nURL с разных доменов автоматически разбиваются на отдельные проекты/проверки.\nМожно не заполнять «Домены», если галочка включена — домен возьмём из URL."])
                             </label>
                             <textarea class="form-control" id="sa-seeds" rows="3" placeholder="https://example.com/page&#10;https://other.ru/about"></textarea>
                             <div class="form-check mt-2 mb-0">
@@ -99,7 +99,7 @@
                         <div class="mb-3 cabinet-sa-field" data-sa-pro>
                             <label class="form-label fw-medium" for="sa-robots">
                                 Виртуальный robots.txt <span class="text-secondary fw-normal">(опционально)</span>
-                                @include('pages.partials.site-audit-tip', ['tip' => "По умолчанию краул читает живой /robots.txt сайта и не ходит по Disallow (корень оставляем для диагностики).\nЕсли вставить сюда свой robots.txt — он подменит файл на сайте: теми же правилами режем обход и пишем findings.\nУдобно закрыть /cart, /admin, utm без отдельного списка исключений.\nПример:\nUser-agent: *\nDisallow: /cart\nDisallow: /admin\nAllow: /"])
+                                @include('pages.partials.site-audit-tip', ['tip' => "По умолчанию проверка читает живой /robots.txt сайта и не ходит по Disallow (корень оставляем для диагностики).\nЕсли вставить сюда свой robots.txt — он подменит файл на сайте: теми же правилами режем обход и пишем findings.\nУдобно закрыть /cart, /admin, utm без отдельного списка исключений.\nПример:\nUser-agent: *\nDisallow: /cart\nDisallow: /admin\nAllow: /"])
                             </label>
                             <textarea class="form-control font-monospace" id="sa-robots" rows="5"
                                       placeholder="User-agent: *&#10;Disallow: /cart&#10;Disallow: /admin&#10;Allow: /"></textarea>
@@ -142,7 +142,7 @@
                         <div class="mb-3 cabinet-sa-field">
                             <label class="form-label fw-medium" for="sa-limit">
                                 Лимит URL
-                                @include('pages.partials.site-audit-tip', ['tip' => "Сколько страниц сканировать в этом крауле.\nНе выше лимита тарифа (сейчас {{ number_format((int) ($pagesLimit ?? 100), 0, '', ' ') }}).\nМожно поставить меньше, чтобы быстрее прогнать важные разделы."])
+                                @include('pages.partials.site-audit-tip', ['tip' => "Сколько страниц сканировать в этой проверке.\nНе выше лимита тарифа (сейчас {{ number_format((int) ($pagesLimit ?? 100), 0, '', ' ') }}).\nМожно поставить меньше, чтобы быстрее прогнать важные разделы."])
                             </label>
                             <input type="text" class="form-control sa-num-space" id="sa-limit"
                                    inputmode="numeric" autocomplete="off"

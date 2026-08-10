@@ -1,6 +1,6 @@
 @extends('layouts.public-module')
 
-@section('title', 'Аудит сайта · ' . (optional($project)->domain ?? 'краул'))
+@section('title', 'Аудит сайта · ' . (optional($project)->domain ?? 'проверка'))
 
 @section('css')
     <link rel="stylesheet" href="{{ asset('css/cabinet-site-audit.css') }}?v={{ @filemtime(public_path('css/cabinet-site-audit.css')) ?: time() }}">
@@ -21,7 +21,7 @@
     <div class="card shadow-sm">
         <div class="card-header py-2 d-flex flex-wrap align-items-center gap-2">
             <h1 class="card-title h5 mb-0">Аудит сайта · {{ optional($project)->domain }}</h1>
-            <span class="badge text-bg-secondary">краул #{{ $crawl->id }}</span>
+            <span class="badge text-bg-secondary">проверка #{{ $crawl->id }}</span>
             <a href="{{ route('site-audit.public.share.xlsx', $token) }}" class="btn btn-sm btn-outline-success ms-2">XLSX</a>
             <a href="{{ route('site-audit.public.share.docx', $token) }}" class="btn btn-sm btn-outline-secondary">DOCX</a>
             <button type="button" class="btn btn-sm btn-outline-secondary cabinet-sa-print-btn" onclick="window.print()">Печать</button>

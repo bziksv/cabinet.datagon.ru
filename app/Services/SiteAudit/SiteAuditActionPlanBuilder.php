@@ -176,7 +176,7 @@ class SiteAuditActionPlanBuilder
         $lines[] = '# План работ по аудиту сайта'
             . ($domain !== '' ? (' · ' . $domain) : '');
         $lines[] = '';
-        $lines[] = 'Краул #' . (int) ($plan['crawl_id'] ?? 0)
+        $lines[] = 'Проверка #' . (int) ($plan['crawl_id'] ?? 0)
             . ' · ' . (string) ($plan['generated_at'] ?? '');
         $lines[] = '';
 

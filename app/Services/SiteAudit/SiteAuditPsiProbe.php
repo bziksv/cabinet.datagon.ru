@@ -31,7 +31,7 @@ class SiteAuditPsiProbe
         ]);
     }
 
-    public function run(SiteAuditCrawl $crawl): void
+    public function run(SiteAuditCrawl $crawl, bool $force = false): void
     {
         SiteAuditFinding::query()
             ->where('crawl_id', $crawl->id)
@@ -39,7 +39,7 @@ class SiteAuditPsiProbe
             ->delete();
 
         $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
-        $enabled = (bool) config('site_audit.psi_enabled', false);
+        $enabled = $force || (bool) config('site_audit.psi_enabled', false);
 
         if (! $enabled) {
             $progress['psi'] = ['skipped' => true, 'reason' => 'disabled'];

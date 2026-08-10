@@ -21,14 +21,14 @@ class SiteAuditSerpSnippetsProbe
         'serp_snippet_source',
     ];
 
-    public function run(SiteAuditCrawl $crawl): void
+    public function run(SiteAuditCrawl $crawl, bool $force = false): void
     {
         SiteAuditFinding::query()
             ->where('crawl_id', $crawl->id)
             ->whereIn('code', self::CODES)
             ->delete();
 
-        $enabled = (bool) config('site_audit.serp_snippets_enabled', false);
+        $enabled = $force || (bool) config('site_audit.serp_snippets_enabled', false);
         $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
 
         if (! $enabled) {

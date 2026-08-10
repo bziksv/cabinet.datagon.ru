@@ -809,7 +809,9 @@ class SimplifiedXmlFacade extends XmlFacade
     }
 
     /**
-     * SERP URLs. Google: ≤10 URL/страница → page=0..ceil(depth/10)-1.
+     * SERP URLs пакетно по страницам.
+     * Google: ≤10 URL/страница → page=0..N.
+     * Yandex: до 100 URL/страница → page=0..N.
      *
      * @return list<string>
      */
@@ -817,38 +819,43 @@ class SimplifiedXmlFacade extends XmlFacade
     {
         $engine = strtolower($searchEngine) === 'google' ? 'google' : 'yandex';
         $depth = max(1, $depth);
-        $xml = new self($region, $engine === 'google' ? 10 : max(10, $depth));
+        $pageSize = $engine === 'google' ? 10 : min(100, max(10, $depth));
+        $pages = (int) max(1, (int) ceil($depth / $pageSize));
+        $xml = new self($region, $pageSize);
         $xml->setQuery($query);
-
-        if ($engine !== 'google') {
-            $xml->setPage('0');
-            $sites = $xml->getXMLResponse('yandex');
-
-            return is_array($sites) ? array_values($sites) : [];
-        }
-
-        $pages = (int) max(1, (int) ceil($depth / 10));
         $urls = [];
+        $seen = [];
 
         for ($page = 0; $page < $pages; $page++) {
-            $xml->setCount(10);
+            $xml->setCount($pageSize);
             $xml->setPage((string) $page);
-            $chunk = $xml->getXMLResponse('google');
+            $chunk = $xml->getXMLResponse($engine);
             $chunk = is_array($chunk) ? array_values($chunk) : [];
 
+            $added = 0;
             foreach ($chunk as $url) {
+                $url = is_string($url) ? trim($url) : '';
+                if ($url === '') {
+                    continue;
+                }
+                $key = Str::lower($url);
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
                 $urls[] = $url;
+                $added++;
                 if (count($urls) >= $depth) {
                     break 2;
                 }
             }
 
-            if (count($chunk) < 10) {
+            if ($added === 0 || count($chunk) < $pageSize) {
                 break;
             }
 
             if ($page + 1 < $pages) {
-                usleep(120000);
+                usleep($engine === 'google' ? 120000 : 80000);
             }
         }
 

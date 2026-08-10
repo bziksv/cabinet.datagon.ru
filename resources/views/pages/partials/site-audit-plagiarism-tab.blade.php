@@ -21,7 +21,7 @@
      data-csrf="{{ csrf_token() }}">
     <h5 class="mb-2">Антиплагиат (внешний)</h5>
     <p class="text-secondary small mb-3">
-        Не входит в каждый краул: выбираете URL → проверка уникальности текста через поиск фрагментов (модуль «Уникальность текста»).
+        Не входит в каждый проверка: выбираете URL → проверка уникальности текста через поиск фрагментов (модуль «Уникальность текста»).
         Внутренние дубли посадочных — отчёт «Плагиат lite» в SEO.
         Порог замечания: уникальность &lt; {{ rtrim(rtrim(number_format($plagiarismWarnBelow, 1, '.', ''), '0'), '.') }}%.
         Макс. {{ $plagiarismMaxUrls }} URL за запуск.
@@ -34,7 +34,7 @@
     </p>
 
     @if($crawl->status !== 'done')
-        <div class="alert alert-light border">Доступно после завершения краула.</div>
+        <div class="alert alert-light border">Доступно после завершения проверки.</div>
     @else
         <div id="sa-plag-candidates-wrap">
             @if($plagiarismCandidatesLazy)

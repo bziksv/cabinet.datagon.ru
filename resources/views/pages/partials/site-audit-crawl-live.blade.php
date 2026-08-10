@@ -1,4 +1,4 @@
-{{-- Живой прогресс краула. Ожидает: $crawl --}}
+{{-- Живой прогресс проверки. Ожидает: $crawl --}}
 @php
     $stClass = $crawl->statusCssClass();
     $fetchedN = (int) $crawl->pages_fetched;

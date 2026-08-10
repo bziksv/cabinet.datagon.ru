@@ -50,7 +50,7 @@
                             <div class="cabinet-sa-launch__head">
                                 <h2 class="cabinet-sa-launch__title h5 mb-0">
                                     <span class="cabinet-sa-label-lite">Проверка сайта</span>
-                                    <span class="cabinet-sa-label-pro">Новый краул</span>
+                                    <span class="cabinet-sa-label-pro">Новая проверка</span>
                                 </h2>
                                 <button type="button" class="btn btn-link btn-sm px-0 cabinet-sa-tour-start" id="sa-tour-start" data-sa-pro>
                                     Как это работает?
@@ -61,7 +61,7 @@
                                 <label class="form-label fw-medium" for="sa-domain">
                                     <span class="cabinet-sa-label-lite">Сайт</span>
                                     <span class="cabinet-sa-label-pro">Домен(ы)</span>
-                                    @include('pages.partials.site-audit-tip', ['tip' => "Один или несколько сайтов — каждый домен с новой строки.\nМожно без https://: titlo.ru\nИли целиком URL: https://titlo.ru/ — возьмём только хост.\nДля каждого домена создаётся свой проект и краул (лимит — по тарифу). Доп. URL и исключения применяются ко всем."])
+                                    @include('pages.partials.site-audit-tip', ['tip' => "Один или несколько сайтов — каждый домен с новой строки.\nМожно без https://: titlo.ru\nИли целиком URL: https://titlo.ru/ — возьмём только хост.\nДля каждого домена создаётся свой проект и проверка (лимит — по тарифу). Доп. URL и исключения применяются ко всем."])
                                 </label>
                                 <textarea class="form-control cabinet-sa-domain-input" id="sa-domain" rows="3" placeholder="example.com" data-placeholder-lite="сайт.ru" data-placeholder-pro="example.com&#10;shop.example.com&#10;https://another.ru/" autocomplete="off"></textarea>
                                 <div class="form-text cabinet-sa-domain-hint-lite">Можно без https://</div>
@@ -80,14 +80,14 @@
                                     <div class="mb-3 cabinet-sa-field">
                                         <label class="form-label fw-medium" for="sa-extra-hosts">
                                             Поддомены в том же проекте
-                                            @include('pages.partials.site-audit-tip', ['tip' => "Только если выше указан один основной домен.\nПоддомены (shop.example.com, blog.example.com) войдут в тот же краул как внутренние.\nНесколько доменов в поле «Домены» — по-прежнему отдельные проекты."])
+                                            @include('pages.partials.site-audit-tip', ['tip' => "Только если выше указан один основной домен.\nПоддомены (shop.example.com, blog.example.com) войдут в тот же проверка как внутренние.\nНесколько доменов в поле «Домены» — по-прежнему отдельные проекты."])
                                         </label>
                                         <textarea class="form-control" id="sa-extra-hosts" rows="2" placeholder="shop.example.com&#10;blog.example.com" autocomplete="off"></textarea>
                                     </div>
                                     <div class="mb-0 cabinet-sa-field">
                                         <label class="form-label fw-medium" for="sa-seeds">
                                             Список URL
-                                            @include('pages.partials.site-audit-tip', ['tip' => "По одному URL на строку, лучше с https://.\nБез галочки ниже — это доп. семена: сайт обходится как обычно (sitemap + ссылки), эти URL точно попадут в очередь.\nС галочкой «только эти страницы» — сканируются исключительно перечисленные URL: без sitemap, без главной «насильно» и без дообхода по ссылкам.\nURL с разных доменов автоматически разбиваются на отдельные проекты/краулы.\nМожно не заполнять «Домены», если галочка включена — домен возьмём из URL."])
+                                            @include('pages.partials.site-audit-tip', ['tip' => "По одному URL на строку, лучше с https://.\nБез галочки ниже — это доп. семена: сайт обходится как обычно (sitemap + ссылки), эти URL точно попадут в очередь.\nС галочкой «только эти страницы» — сканируются исключительно перечисленные URL: без sitemap, без главной «насильно» и без дообхода по ссылкам.\nURL с разных доменов автоматически разбиваются на отдельные проекты/проверки.\nМожно не заполнять «Домены», если галочка включена — домен возьмём из URL."])
                                         </label>
                                         <textarea class="form-control" id="sa-seeds" rows="3" placeholder="https://example.com/page&#10;https://other.ru/about"></textarea>
                                         <div class="form-check mt-2 mb-0">
@@ -165,7 +165,7 @@
                                         <div class="col-12 cabinet-sa-field mb-0">
                                             <label class="form-label fw-medium" for="sa-limit">
                                                 Лимит страниц
-                                                @include('pages.partials.site-audit-tip', ['tip' => "Сколько страниц сканировать в этом крауле.\nНе выше лимита тарифа (сейчас {{ number_format((int) ($pagesLimit ?? 100), 0, '', ' ') }}).\nМожно поставить меньше, чтобы быстрее прогнать важные разделы."])
+                                                @include('pages.partials.site-audit-tip', ['tip' => "Сколько страниц сканировать в этой проверке.\nНе выше лимита тарифа (сейчас {{ number_format((int) ($pagesLimit ?? 100), 0, '', ' ') }}).\nМожно поставить меньше, чтобы быстрее прогнать важные разделы."])
                                             </label>
                                             <input type="text" class="form-control sa-num-space" id="sa-limit"
                                                    inputmode="numeric" autocomplete="off"

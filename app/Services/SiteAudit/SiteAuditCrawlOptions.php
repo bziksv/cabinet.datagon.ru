@@ -29,7 +29,7 @@ class SiteAuditCrawlOptions
             // URL-нормализация всегда включена (не опция UI).
             'unify_www' => true,
             'force_https' => true,
-            'strip_trailing_slash' => true,
+            'strip_trailing_slash' => false,
             // Битые ссылки всегда проверяем (не опция UI).
             'check_broken_links' => true,
             // Только seed-URL: без sitemap и без дообхода по ссылкам.

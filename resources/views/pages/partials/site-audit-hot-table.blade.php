@@ -78,5 +78,5 @@
 @elseif(($crawl->status ?? '') === 'done')
     <div class="alert alert-success mb-0">Находок в этой сводке нет.</div>
 @else
-    <div class="alert alert-info mb-0">Краул ещё выполняется — сводка обновится по завершении.</div>
+    <div class="alert alert-info mb-0">Проверка ещё выполняется — сводка обновится по завершении.</div>
 @endif

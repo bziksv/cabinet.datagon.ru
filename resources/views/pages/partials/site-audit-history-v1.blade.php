@@ -1,7 +1,7 @@
         <section class="card border shadow-sm cabinet-sa-panel mt-3" id="sa-history" data-sa-tour="history">
             <div class="card-header py-2 px-3">
                 <div class="d-flex flex-wrap align-items-center gap-2 justify-content-between">
-                    <h2 class="h6 mb-0 fw-semibold">История краулов</h2>
+                    <h2 class="h6 mb-0 fw-semibold">История проверок</h2>
                     <form method="GET" action="{{ route('pages.site-audit') }}#sa-history" class="d-flex align-items-center gap-2 ms-auto" id="sa-history-search">
                         <label class="visually-hidden" for="sa-history-domain">Поиск по домену</label>
                         <input type="search" class="form-control form-control-sm" id="sa-history-domain" name="domain"
@@ -199,8 +199,8 @@
                                         @if($isCrawlOwner && ! $finished)
                                             <form method="POST" action="{{ route('pages.site-audit.crawl.cancel', $c->id) }}" class="d-inline"
                                                   data-sa-cancel-crawl
-                                                  data-cabinet-confirm="Остановить краул #{{ $c->id }}? Уже скачанные страницы останутся."
-                                                  data-cabinet-confirm-title="Остановка краула"
+                                                  data-cabinet-confirm="Остановить проверку #{{ $c->id }}? Уже скачанные страницы останутся."
+                                                  data-cabinet-confirm-title="Остановка проверки"
                                                   data-cabinet-confirm-ok="Остановить"
                                                   data-cabinet-confirm-danger="1">
                                                 @csrf
@@ -213,23 +213,23 @@
                                             @endphp
                                             @if($canResume)
                                                 <form method="POST" action="{{ route('pages.site-audit.crawl.continue', $c->id) }}" class="d-inline"
-                                                      data-cabinet-confirm="Продолжить краул #{{ $c->id }} с {{ number_format((int) $c->pages_fetched, 0, '', ' ') }} URL? Уже скачанные страницы сохранятся."
-                                                      data-cabinet-confirm-title="Продолжить краул"
+                                                      data-cabinet-confirm="Продолжить проверку #{{ $c->id }} с {{ number_format((int) $c->pages_fetched, 0, '', ' ') }} URL? Уже скачанные страницы сохранятся."
+                                                      data-cabinet-confirm-title="Продолжить проверку"
                                                       data-cabinet-confirm-ok="Продолжить">
                                                     @csrf
                                                     <button type="submit" class="btn btn-sm btn-outline-primary">Продолжить</button>
                                                 </form>
                                             @endif
                                             <form method="POST" action="{{ route('pages.site-audit.crawl.repeat', $c->id) }}" class="d-inline"
-                                                  data-cabinet-confirm="Повторить краул для {{ e(optional($c->project)->domain ?? 'проекта') }} с теми же настройками? Начнётся новый краул с нуля."
-                                                  data-cabinet-confirm-title="Новый краул"
+                                                  data-cabinet-confirm="Повторить проверку для {{ e(optional($c->project)->domain ?? 'проекта') }} с теми же настройками? Начнётся новая проверка с нуля."
+                                                  data-cabinet-confirm-title="Новая проверка"
                                                   data-cabinet-confirm-ok="Повторить">
                                                 @csrf
                                                 <button type="submit" class="btn btn-sm btn-outline-secondary">Повторить</button>
                                             </form>
                                             <form method="POST" action="{{ route('pages.site-audit.crawl.destroy', $c->id) }}" class="d-inline"
-                                                  data-cabinet-confirm="Удалить краул #{{ $c->id }}?"
-                                                  data-cabinet-confirm-title="Удаление краула"
+                                                  data-cabinet-confirm="Удалить проверку #{{ $c->id }}?"
+                                                  data-cabinet-confirm-title="Удаление проверки"
                                                   data-cabinet-confirm-ok="Удалить"
                                                   data-cabinet-confirm-danger="1">
                                                 @csrf
@@ -252,7 +252,7 @@
                             {{ $crawls->firstItem() }}–{{ $crawls->lastItem() }}
                             из {{ number_format($crawls->total(), 0, '', ' ') }}
                         </div>
-                        <nav title="Страницы истории краулов">
+                        <nav title="Страницы истории проверок">
                             {{ $crawls->links('pagination::bootstrap-4') }}
                         </nav>
                     </div>

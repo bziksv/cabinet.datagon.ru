@@ -118,7 +118,7 @@ class SiteAuditCrawl extends Model
 
     /**
      * Оценка окончания по текущей скорости (started_at → pages_fetched).
-     * null если ещё рано считать или краул завершён.
+     * null если ещё рано считать или проверка завершён.
      */
     public function estimateFinishedAt(): ?\Carbon\Carbon
     {
@@ -217,7 +217,7 @@ class SiteAuditCrawl extends Model
     }
 
     /**
-     * Битый UTF-8 (часто из monitoring.query) ломал aggregate → краул зависал в «Агрегация».
+     * Битый UTF-8 (часто из monitoring.query) ломал aggregate → проверка зависал в «Агрегация».
      */
     public function setProgressJsonAttribute($value): void
     {

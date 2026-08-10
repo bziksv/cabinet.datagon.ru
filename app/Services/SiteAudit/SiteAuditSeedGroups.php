@@ -30,7 +30,7 @@ class SiteAuditSeedGroups
             $opts = SiteAuditUrlNormalizer::optionsFromSettings([
                 'unify_www' => true,
                 'force_https' => true,
-                'strip_trailing_slash' => true,
+                'strip_trailing_slash' => false,
             ], $domain);
             $norm = SiteAuditUrlNormalizer::normalize($raw, $domain, $opts);
             if (! $norm) {

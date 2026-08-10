@@ -1,5 +1,5 @@
 @component('component.card', [
-    'title' => ($meta['title'] ?? $code) . ' · краул #' . $crawl->id,
+    'title' => ($meta['title'] ?? $code) . ' · проверка #' . $crawl->id,
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('css/cabinet-site-audit.css') }}?v={{ @filemtime(public_path('css/cabinet-site-audit.css')) ?: time() }}">
@@ -7,7 +7,7 @@
 
     @slot('tools')
         <a href="{{ route('pages.site-audit') }}" class="btn btn-sm btn-outline-secondary">← К проектам</a>
-        <a href="{{ route('pages.site-audit.crawl.show', $crawl->id) }}" class="btn btn-sm btn-outline-secondary">Сводка краула</a>
+        <a href="{{ route('pages.site-audit.crawl.show', $crawl->id) }}" class="btn btn-sm btn-outline-secondary">Сводка проверки</a>
         <a href="{{ route('pages.site-audit.report.csv', [$crawl->id, $code]) }}{{ !empty($filterParams) ? ('?' . http_build_query($filterParams)) : '' }}" class="btn btn-sm btn-outline-primary">CSV</a>
         <a href="{{ route('pages.site-audit.report.xlsx', [$crawl->id, $code]) }}{{ !empty($filterParams) ? ('?' . http_build_query($filterParams)) : '' }}" class="btn btn-sm btn-outline-success">XLSX</a>
         <button type="button" class="btn btn-sm btn-outline-secondary cabinet-sa-print-btn" onclick="window.print()">Печать</button>
@@ -101,7 +101,7 @@
                 <a class="nav-link {{ $activeGroup === 'seo' ? 'active' : '' }}" id="sa-tab-seo" data-bs-toggle="tab" href="#sa-pane-seo" role="tab"
                    title="SEO: title, описание, H1, дубли, посадочные, контент">SEO-аудит</a>
             </li>
-            {{-- Те же разделы, что на сводке краула: ведут на /crawl#… (контент там, не дублируем тяжёлую загрузку). --}}
+            {{-- Те же разделы, что на сводке проверки: ведут на /crawl#… (контент там, не дублируем тяжёлую загрузку). --}}
             <li class="nav-item">
                 <a class="nav-link" href="{{ route('pages.site-audit.crawl.show', $crawl->id) }}#sa-pane-plagiarism"
                    title="Выборочная проверка уникальности текста vs интернет">Антиплагиат</a>

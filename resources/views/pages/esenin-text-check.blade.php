@@ -84,8 +84,18 @@
                             class="btn btn-primary"
                             data-esenin-submit
                             data-label-default="{{ __('Esenin text check submit') }}"
-                            data-label-recheck="{{ __('Esenin text check recheck') }}">{{ __('Esenin text check submit') }}</button>
+                            data-label-recheck="{{ __('Esenin text check recheck') }}"
+                            data-label-loading="{{ __('Esenin text check loading') }}">{{ __('Esenin text check submit') }}</button>
                 </div>
+            </div>
+            <div class="cabinet-esenin-check-status"
+                 data-esenin-check-status
+                 role="status"
+                 aria-live="polite"
+                 data-label-loading="{{ __('Esenin text check loading') }}"
+                 data-label-wait="{{ __('Esenin text check loading wait') }}">
+                <span class="cabinet-esenin-spinner cabinet-esenin-check-status__spinner" aria-hidden="true"></span>
+                <div class="cabinet-esenin-check-status__text" data-esenin-check-status-text></div>
             </div>
         </div>
 

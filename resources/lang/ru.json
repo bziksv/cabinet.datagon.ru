@@ -1468,6 +1468,8 @@
     "Esenin text check hints title": "Подсказки",
     "Esenin text check lead hint": "Локальный анализ SEO-текста по критериям «Баден-Баден»: повторы, стилистика, запросы, водность, удобочитаемость. Поддерживается HTML-разметка. 1 проверка = 1 лимит.",
     "Esenin text check lead title": "Оценка риска «Баден-Баден» для SEO-текстов",
+    "Esenin text check loading": "Проверяем…",
+    "Esenin text check loading wait": "Ещё считаем — обычно до минуты, не закрывайте страницу.",
     "Esenin text check limit exhausted": "Лимит проверок «Есенин» исчерпан",
     "Esenin text check mode label": "Режим проверки",
     "Esenin text check my tasks": "Мои задания",

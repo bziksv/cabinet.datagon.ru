@@ -31,7 +31,8 @@ final class EseninExternalAnalyzer
             'ok' => (bool) ($lt['ok'] ?? false),
             'error' => $lt['error'] ?? null,
             'matches' => count($lt['marks'] ?? []),
-            'available' => LanguageToolClient::isAvailable(),
+            // Не дергать /v2/languages на каждый check — только факт ответа check().
+            'available' => (bool) ($lt['ok'] ?? false) || (($lt['error'] ?? null) !== 'disabled'),
         ];
         if (! empty($lt['marks'])) {
             $extraMarks = array_merge($extraMarks, $lt['marks']);
@@ -57,18 +58,8 @@ final class EseninExternalAnalyzer
         if (! empty($turgenev['ok']) && is_array($turgenev['data'] ?? null)) {
             $learning = EseninStyleLearning::recordComparison($localResult, $turgenev['data']);
             $localResult = self::blendTurgenevScores($localResult, $turgenev['data']);
+            // HTML-отчёты — только в очередь: синхронный fetch держал кнопку «Проверяем» на десятки секунд.
             self::queueReportLearning($turgenev['data']);
-
-            $learningCfg = EseninTextCheckSettingsRegistry::learningConfig();
-            $reportBlocks = is_array($learningCfg['report_blocks'] ?? null)
-                ? $learningCfg['report_blocks']
-                : ['style', 'readability'];
-            if (! empty($learningCfg['report_fetch_enabled'])) {
-                $reportMarks = TurgenevReportParser::marksFromTurgenevData($plain, $turgenev['data'], $reportBlocks);
-                if ($reportMarks !== []) {
-                    $extraMarks = array_merge($extraMarks, $reportMarks);
-                }
-            }
         }
         $providers['learning'] = $learning;
 

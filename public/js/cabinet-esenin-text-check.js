@@ -107,7 +107,13 @@
     var syncToVisualTimer = null;
     var submitLabelDefault = labelFromAttr(submitBtn, 'data-label-default', 'Проверить');
     var submitLabelRecheck = labelFromAttr(submitBtn, 'data-label-recheck', 'Проверить снова');
+    var submitLabelLoading = labelFromAttr(submitBtn, 'data-label-loading', 'Проверяем…');
     var checkInFlight = 0;
+    var checkStatusEl = root.querySelector('[data-esenin-check-status]');
+    var checkStatusTextEl = root.querySelector('[data-esenin-check-status-text]');
+    var checkStatusTimer = null;
+    var checkStatusWaitLabel = labelFromAttr(checkStatusEl, 'data-label-wait', 'Ещё считаем — обычно до минуты, не закрывайте страницу.');
+    var checkStatusLoadingLabel = labelFromAttr(checkStatusEl, 'data-label-loading', submitLabelLoading);
 
     function debounce(fn, ms) {
         var timer;
@@ -206,6 +212,20 @@
         updateSubmitButtonLabel();
     }
 
+    function clearCheckStatusTimer() {
+        if (checkStatusTimer !== null) {
+            clearTimeout(checkStatusTimer);
+            checkStatusTimer = null;
+        }
+    }
+
+    function setCheckStatusText(html) {
+        if (!checkStatusTextEl) {
+            return;
+        }
+        checkStatusTextEl.innerHTML = html;
+    }
+
     function updateSubmitButtonLabel() {
         if (!submitBtn || checkInFlight > 0) {
             return;
@@ -221,12 +241,27 @@
         if (loading) {
             checkInFlight += 1;
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Проверяем…';
+            submitBtn.innerHTML =
+                '<span class="cabinet-esenin-spinner me-1" role="status" aria-hidden="true"></span>' +
+                escapeHtml(submitLabelLoading);
+            setCheckStatusText('<strong>' + escapeHtml(checkStatusLoadingLabel) + '</strong>');
+            clearCheckStatusTimer();
+            checkStatusTimer = setTimeout(function () {
+                checkStatusTimer = null;
+                if (checkInFlight > 0) {
+                    setCheckStatusText(
+                        '<strong>' + escapeHtml(checkStatusLoadingLabel) + '</strong><br>' +
+                        '<span class="text-secondary">' + escapeHtml(checkStatusWaitLabel) + '</span>'
+                    );
+                }
+            }, 8000);
             return;
         }
 
         checkInFlight = Math.max(0, checkInFlight - 1);
         if (checkInFlight === 0) {
+            clearCheckStatusTimer();
+            setCheckStatusText('');
             submitBtn.disabled = false;
             updateSubmitButtonLabel();
         }

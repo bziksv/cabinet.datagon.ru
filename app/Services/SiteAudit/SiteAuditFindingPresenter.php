@@ -913,23 +913,7 @@ class SiteAuditFindingPresenter
 
             case 'psi_mobile':
             case 'psi_desktop':
-                $bits = [];
-                if (isset($meta['score_pct'])) {
-                    $bits[] = 'Perf ' . (int) $meta['score_pct'];
-                } elseif (isset($meta['score'])) {
-                    $bits[] = 'Perf ' . (int) round(((float) $meta['score']) * 100);
-                }
-                if (isset($meta['lcp_ms'])) {
-                    $bits[] = 'LCP ' . round(((float) $meta['lcp_ms']) / 1000, 1) . 's';
-                }
-                if (isset($meta['cls'])) {
-                    $bits[] = 'CLS ' . round((float) $meta['cls'], 3);
-                }
-                if (isset($meta['tbt_ms'])) {
-                    $bits[] = 'TBT ' . (int) round((float) $meta['tbt_ms']) . 'ms';
-                }
-
-                return $bits ? implode(' · ', $bits) : 'PSI';
+                return \App\Services\SiteAudit\SiteAuditPsiMetrics::compactLine(is_array($meta) ? $meta : []);
 
             case 'deep_pages':
                 return isset($meta['depth'])

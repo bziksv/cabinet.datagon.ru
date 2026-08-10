@@ -341,8 +341,8 @@ class SiteAuditAggregator
                 (new SiteAuditSerpCannibalizationProbe())->run($crawl);
                 break;
             case 'psi':
-                (new SiteAuditPsiProbe())->run($crawl);
-                break;
+                // Куски по дедлайну тика — иначе 20×2 PSI валят job по timeout.
+                return (new SiteAuditPsiProbe())->run($crawl, false, $deadline);
             case 'finalize':
                 $this->finalizeAggregate($crawl, $state);
                 $state['stage'] = 'done';

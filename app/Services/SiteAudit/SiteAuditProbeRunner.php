@@ -21,7 +21,11 @@ class SiteAuditProbeRunner
         $mode = trim($mode);
         switch ($probeId) {
             case 'psi':
-                (new SiteAuditPsiProbe())->run($crawl, $force);
+                // Ручной запуск: крутим тики до конца (force), без дедлайна агрегации.
+                $probe = new SiteAuditPsiProbe();
+                while ($probe->run($crawl, $force, null)) {
+                    $crawl->refresh();
+                }
                 break;
             case 'serp_snippets':
                 (new SiteAuditSerpSnippetsProbe())->run($crawl, $force);

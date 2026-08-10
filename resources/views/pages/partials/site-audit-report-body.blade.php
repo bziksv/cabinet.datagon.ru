@@ -280,6 +280,12 @@
     </div>
 @else
     @php
+        $isPsiReport = in_array($code ?? '', ['psi_mobile', 'psi_desktop'], true);
+    @endphp
+    @if($isPsiReport)
+        @include('pages.partials.site-audit-psi-report')
+    @else
+    @php
         $colspan = 2; // URL + Детали
         if (!empty($showReferrers)) { $colspan++; }
         if (!empty($canIgnore) || !empty($canNote)) { $colspan++; }
@@ -555,6 +561,7 @@
             </tbody>
         </table>
     </div>
+    @endif {{-- /isPsiReport --}}
 @endif
 
 @include('pages.partials.site-audit-pager', [

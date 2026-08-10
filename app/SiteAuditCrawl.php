@@ -92,16 +92,31 @@ class SiteAuditCrawl extends Model
             self::STATUS_AGGREGATING => 'Агрегация',
             self::STATUS_DONE => 'Готово',
             self::STATUS_FAILED => 'Ошибка',
-            self::STATUS_QUEUED_WAIT => 'В очереди (ждёт слот)',
+            self::STATUS_QUEUED_WAIT => 'Ждёт слот',
             self::STATUS_CANCELLED => 'Остановлен',
         ];
 
         return $map[$status] ?? (string) $status;
     }
 
+    /** Полная подпись статуса для title/tooltip. */
+    public static function statusLabelFull(?string $status): string
+    {
+        if ($status === self::STATUS_QUEUED_WAIT) {
+            return 'В очереди — ждёт свободный слот (лимит одновременных проверок)';
+        }
+
+        return self::statusLabel($status);
+    }
+
     public function statusLabelRu(): string
     {
         return self::statusLabel($this->status);
+    }
+
+    public function statusLabelFullRu(): string
+    {
+        return self::statusLabelFull($this->status);
     }
 
     public function statusCssClass(): string

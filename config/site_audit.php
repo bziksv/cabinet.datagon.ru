@@ -119,6 +119,8 @@ return [
     'psi_strategies' => ['mobile', 'desktop'],
     'psi_score_warn' => (float) env('SITE_AUDIT_PSI_SCORE_WARN', 0.5),
     'psi_timeout' => (int) env('SITE_AUDIT_PSI_TIMEOUT', 90),
+    // Сколько URL мерять за один тик агрегации (каждый URL = mobile+desktop).
+    'psi_urls_per_tick' => (int) env('SITE_AUDIT_PSI_URLS_PER_TICK', 2),
 
     // Content risk lite (keyword classifiers + word repeats). Cheap — on by default.
     'content_risk_enabled' => (bool) env('SITE_AUDIT_CONTENT_RISK', true),
@@ -938,14 +940,14 @@ return [
             'phase' => 'C',
             'severity' => 'info',
             'title' => 'Мобильные устройства (PSI)',
-            'description' => 'PageSpeed Insights mobile: до 20 URL выборки при аудите, score и CWV.',
+            'description' => 'PageSpeed Insights mobile: до 20 URL, Performance/A11y/BP/SEO, CWV, opportunities.',
             'group' => 'tech',
         ],
         'psi_desktop' => [
             'phase' => 'C',
             'severity' => 'info',
             'title' => 'Компьютеры (PSI)',
-            'description' => 'PageSpeed Insights desktop: до 20 URL выборки при аудите, score и CWV.',
+            'description' => 'PageSpeed Insights desktop: до 20 URL, Performance/A11y/BP/SEO, CWV, opportunities.',
             'group' => 'tech',
         ],
         'deep_pages' => [

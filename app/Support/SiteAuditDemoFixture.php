@@ -468,9 +468,47 @@ class SiteAuditDemoFixture
                 ];
             case 'psi_mobile':
             case 'psi_desktop':
+                $pct = [96, 70, 92, 48, 88, 61][$j % 6];
+                $lcp = [320, 2300, 1400, 4100, 900, 2800][$j % 6];
+                $cls = [0.05, 0.307, 0.11, 0.28, 0.08, 0.19][$j % 6];
+                $tbt = [45, 0, 120, 650, 80, 310][$j % 6];
+
                 return [
-                    'score' => 35 + ($j % 40),
                     'strategy' => $code === 'psi_mobile' ? 'mobile' : 'desktop',
+                    'score' => $pct / 100,
+                    'score_pct' => $pct,
+                    'lcp_ms' => $lcp,
+                    'cls' => $cls,
+                    'tbt_ms' => $tbt,
+                    'fcp_ms' => (int) round($lcp * 0.55),
+                    'si_ms' => (int) round($lcp * 1.2),
+                    'tti_ms' => (int) round($lcp * 1.8),
+                    'ttfb_ms' => 120 + ($j % 5) * 40,
+                    'accessibility_pct' => 88 + ($j % 10),
+                    'best_practices_pct' => 75 + ($j % 20),
+                    'seo_pct' => 90 + ($j % 8),
+                    'opportunities' => [
+                        [
+                            'id' => 'unused-javascript',
+                            'title' => 'Reduce unused JavaScript',
+                            'savings_ms' => 400 + $j * 40,
+                            'savings_bytes' => 120000 + $j * 8000,
+                            'display' => 'Est savings of ' . (0.4 + $j * 0.05) . ' s',
+                        ],
+                        [
+                            'id' => 'uses-responsive-images',
+                            'title' => 'Properly size images',
+                            'savings_ms' => 200 + $j * 20,
+                            'savings_bytes' => 80000,
+                            'display' => null,
+                        ],
+                    ],
+                    'diagnostics' => [
+                        ['id' => 'dom-size', 'title' => 'Avoid an excessive DOM size', 'display' => '1,200 elements'],
+                        ['id' => 'bootup-time', 'title' => 'Reduce JavaScript execution time', 'display' => '1.8 s'],
+                    ],
+                    'rich' => true,
+                    'psi_version' => '12.x-demo',
                 ];
             case 'landing_plagiarism_suspect':
                 return [

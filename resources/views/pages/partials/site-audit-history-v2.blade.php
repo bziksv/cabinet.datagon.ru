@@ -42,15 +42,15 @@
             <thead>
             <tr>
                 <th class="cabinet-sa-ht-crawl">Проверка</th>
-                <th>Команда</th>
+                <th class="cabinet-sa-ht-team-col">Команда</th>
                 <th class="cabinet-sa-ht-status">Статус</th>
                 <th class="cabinet-sa-ht-progress">Прогресс</th>
                 <th class="cabinet-sa-ht-when">Начало</th>
                 <th class="cabinet-sa-ht-when">Конец</th>
-                <th class="cabinet-sa-ht-num is-critical" title="Грубые ошибки">Гр.</th>
-                <th class="cabinet-sa-ht-num is-other" title="Прочие ошибки">Пр.</th>
-                <th class="cabinet-sa-ht-num is-warning" title="Предупреждения">Прд.</th>
-                <th class="cabinet-sa-ht-num is-info" title="Информация">Инф.</th>
+                <th class="cabinet-sa-ht-num is-critical" title="Грубые ошибки — чинить первыми">Грубые</th>
+                <th class="cabinet-sa-ht-num is-other" title="Прочие ошибки">Прочие</th>
+                <th class="cabinet-sa-ht-num is-warning" title="Предупреждения">Пред.</th>
+                <th class="cabinet-sa-ht-num is-info" title="Информация">Инфо</th>
                 <th></th>
             </tr>
             </thead>
@@ -158,13 +158,15 @@
                                 </select>
                             </form>
                         @elseif($teamTitle)
-                            <span class="cabinet-sa-ht-team__name" title="{{ $teamTitle }}">{{ \Illuminate\Support\Str::limit($teamTitle, 22) }}</span>
+                            <span class="cabinet-sa-ht-team__name" title="{{ $teamTitle }}">{{ $teamTitle }}</span>
                         @else
                             <span class="text-secondary">—</span>
                         @endif
                     </td>
                     <td class="cabinet-sa-ht-status">
-                        <span class="cabinet-sa-status cabinet-sa-status--{{ $stClass }}" data-sa-status>
+                        <span class="cabinet-sa-status cabinet-sa-status--{{ $stClass }}"
+                              data-sa-status
+                              title="{{ $c->statusLabelFullRu() }}">
                             {{ $c->statusLabelRu() }}
                         </span>
                     </td>
@@ -191,10 +193,10 @@
                             @endif
                         @endif
                     </td>
-                    <td class="cabinet-sa-ht-num is-critical" data-sa-bucket="critical">{{ number_format($crit, 0, '', ' ') }}</td>
-                    <td class="cabinet-sa-ht-num is-other" data-sa-bucket="other">{{ number_format($other, 0, '', ' ') }}</td>
-                    <td class="cabinet-sa-ht-num is-warning" data-sa-bucket="warning">{{ number_format($warn, 0, '', ' ') }}</td>
-                    <td class="cabinet-sa-ht-num is-info" data-sa-bucket="info">{{ number_format($info, 0, '', ' ') }}</td>
+                    <td class="cabinet-sa-ht-num {{ $crit > 0 ? 'is-critical' : 'is-zero' }}" data-sa-bucket="critical" title="Грубые: {{ $crit }}">{{ number_format($crit, 0, '', ' ') }}</td>
+                    <td class="cabinet-sa-ht-num {{ $other > 0 ? 'is-other' : 'is-zero' }}" data-sa-bucket="other" title="Прочие: {{ $other }}">{{ number_format($other, 0, '', ' ') }}</td>
+                    <td class="cabinet-sa-ht-num {{ $warn > 0 ? 'is-warning' : 'is-zero' }}" data-sa-bucket="warning" title="Предупреждения: {{ $warn }}">{{ number_format($warn, 0, '', ' ') }}</td>
+                    <td class="cabinet-sa-ht-num {{ $info > 0 ? 'is-info' : 'is-zero' }}" data-sa-bucket="info" title="Инфо: {{ $info }}">{{ number_format($info, 0, '', ' ') }}</td>
                     <td class="cabinet-sa-ht-actions">
                         <span class="cabinet-sa-row-actions">
                             <a class="btn btn-sm btn-primary" href="{{ route('pages.site-audit.crawl.show', $c->id) }}">Сводка</a>

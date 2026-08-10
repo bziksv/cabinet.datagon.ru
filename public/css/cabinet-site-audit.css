@@ -3835,3 +3835,70 @@ html.sa-tour-active body {
   .cabinet-sa-psi-hero { padding: 1rem; }
   .cabinet-sa-psi-card__links { margin-left: 0; width: 100%; }
 }
+
+.cabinet-sa-psi-device {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  margin-bottom: 0.45rem;
+  border: 1px solid transparent;
+}
+.cabinet-sa-psi-device.is-mobile {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #7dd3fc;
+}
+.cabinet-sa-psi-device.is-desktop {
+  background: rgba(167, 139, 250, 0.16);
+  border-color: rgba(167, 139, 250, 0.4);
+  color: #c4b5fd;
+}
+.cabinet-sa-psi-device__eng {
+  font-weight: 600;
+  opacity: 0.7;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.cabinet-sa-psi-legend__title {
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-bottom: 0.15rem;
+}
+.cabinet-sa-psi-card__device {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.2rem;
+}
+.cabinet-sa-psi-card__device span {
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #94a3b8;
+}
+.cabinet-sa-psi-metric__name {
+  display: block;
+  font-size: 0.65rem;
+  color: #64748b;
+  line-height: 1.2;
+  margin-top: 0.05rem;
+}
+.cabinet-sa-psi-metric__lim {
+  display: block;
+  font-weight: 500;
+  color: #94a3b8;
+  font-size: 0.6rem;
+}
+.cabinet-sa-psi-details__intro {
+  margin: 0.15rem 0 0.35rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}

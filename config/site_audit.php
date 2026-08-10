@@ -940,14 +940,14 @@ return [
             'phase' => 'C',
             'severity' => 'info',
             'title' => 'Мобильные устройства (PSI)',
-            'description' => 'PageSpeed Insights mobile: до 20 URL, Performance/A11y/BP/SEO, CWV, opportunities.',
+            'description' => 'Скорость «как на телефоне»: до 20 URL, балл, метрики, рекомендации Google PSI.',
             'group' => 'tech',
         ],
         'psi_desktop' => [
             'phase' => 'C',
             'severity' => 'info',
             'title' => 'Компьютеры (PSI)',
-            'description' => 'PageSpeed Insights desktop: до 20 URL, Performance/A11y/BP/SEO, CWV, opportunities.',
+            'description' => 'Скорость «как на компьютере»: до 20 URL, балл, метрики, рекомендации Google PSI.',
             'group' => 'tech',
         ],
         'deep_pages' => [

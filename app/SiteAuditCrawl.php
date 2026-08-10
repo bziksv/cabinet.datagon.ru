@@ -199,6 +199,7 @@ class SiteAuditCrawl extends Model
 
         $fetched = (int) $this->pages_fetched;
         $total = (int) $this->pages_total;
+        // После 100% страниц идёт агрегация (PSI и т.д.) — скорость скана для ETA уже не подходит.
         if ($fetched < 15 || $total <= $fetched) {
             return null;
         }

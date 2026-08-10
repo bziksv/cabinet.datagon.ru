@@ -187,9 +187,11 @@
                         @else
                             @php $eta = $c->estimateFinishedAtFormatted(); @endphp
                             @if($eta)
-                                <span class="text-muted" title="Оценка конца">~{{ $eta }}</span>
+                                <span class="text-muted" title="Оценка конца по скорости сканирования">~{{ $eta }}</span>
+                            @elseif($c->status === 'aggregating')
+                                <span class="text-muted" title="Конец появится после «Готово». Сейчас финальный этап (агрегация / PageSpeed).">идёт…</span>
                             @else
-                                <span class="text-muted">идёт…</span>
+                                <span class="text-muted" title="Слишком рано для оценки">идёт…</span>
                             @endif
                         @endif
                     </td>

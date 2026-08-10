@@ -374,8 +374,11 @@
                             finishedEl.removeAttribute('title');
                         } else if (j.eta_at) {
                             finishedEl.innerHTML = '<span class="text-muted" title="Оценка по текущей скорости">~' + j.eta_at + '</span>';
+                        } else if ((j.status || '') === 'aggregating') {
+                            // Скан уже 100%, идёт финальный этап (PSI и т.п.) — даты конца ещё нет.
+                            finishedEl.innerHTML = '<span class="text-muted" title="Конец появится после «Готово». Сейчас финальный этап (агрегация / PageSpeed).">идёт…</span>';
                         } else {
-                            finishedEl.innerHTML = '<span class="text-muted" title="Слишком рано для оценки">~…</span>';
+                            finishedEl.innerHTML = '<span class="text-muted" title="Слишком рано для оценки">идёт…</span>';
                         }
                     }
                     if (j.finished) {

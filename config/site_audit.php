@@ -637,7 +637,7 @@ return [
             'phase' => 'B',
             'severity' => 'info',
             'title' => 'Страницы с frame/iframe',
-            'description' => 'На странице есть frame или iframe.',
+            'description' => 'В HTML есть frame/iframe — важный контент лучше в основной разметке, виджеты — осознанно.',
         ],
         'mixed_content' => [
             'phase' => 'B',

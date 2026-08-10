@@ -677,6 +677,63 @@
         window.alert(message);
     }
 
+    function isCkEditorReady() {
+        return !!(ckEditor && (!ckEditor.status || ckEditor.status === 'ready'));
+    }
+
+    function safeCkGetData() {
+        if (!ckEditor) {
+            return '';
+        }
+        try {
+            return ckEditor.getData() || '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function safeCkSetData(html) {
+        if (!ckEditor) {
+            return;
+        }
+        try {
+            ckEditor.setData(html || '');
+        } catch (e) {
+            /* iframe мог отвалиться после переноса DOM */
+        }
+    }
+
+    function safeCkResize(width, height) {
+        if (!isCkEditorReady() || typeof ckEditor.resize !== 'function') {
+            return;
+        }
+        try {
+            ckEditor.resize(width, height);
+        } catch (e) {
+            /* ignore broken frame */
+        }
+    }
+
+    function destroyCkEditor() {
+        var instance = ckEditor
+            || (window.CKEDITOR && window.CKEDITOR.instances
+                ? window.CKEDITOR.instances['cabinet-esenin-text']
+                : null);
+        ckEditor = null;
+        if (!instance) {
+            return;
+        }
+        try {
+            instance.destroy(false);
+        } catch (e) {
+            try {
+                instance.destroy(true);
+            } catch (e2) {
+                /* ignore */
+            }
+        }
+    }
+
     function readCodeMirrorValue(cm, fallbackEl) {
         if (cm) {
             return cm.getValue();
@@ -716,7 +773,7 @@
             return;
         }
         cancelSyncToVisual();
-        var html = ckEditor.getData();
+        var html = safeCkGetData();
         writeCodeMirrorValue(codeMirrorSplit, htmlSourceEl, html);
         writeCodeMirrorValue(codeMirrorFull, htmlSourceFullEl, html);
         syncPlainFromEditors();
@@ -730,7 +787,7 @@
         var html = readCodeMirrorValue(sourceCm, fallbackEl);
         syncingFromSource = true;
         if (ckEditor) {
-            ckEditor.setData(html);
+            safeCkSetData(html);
         }
         if (sourceCm === codeMirrorSplit) {
             writeCodeMirrorValue(codeMirrorFull, htmlSourceFullEl, html);
@@ -771,7 +828,7 @@
             return readCodeMirrorValue(codeMirrorFull, htmlSourceFullEl);
         }
 
-        var ckHtml = ckEditor ? ckEditor.getData() : '';
+        var ckHtml = safeCkGetData();
         var splitHtml = readCodeMirrorValue(codeMirrorSplit, htmlSourceEl);
         if (!isEditorHtmlEmpty(ckHtml)) {
             return ckHtml;
@@ -780,7 +837,7 @@
             return splitHtml;
         }
 
-        if (ckEditor) {
+        if (ckHtml) {
             return ckHtml;
         }
 
@@ -808,9 +865,9 @@
         syncingEditors = true;
         html = html || '';
 
-        if (ckEditor && ckEditor.getData() !== html) {
+        if (ckEditor && safeCkGetData() !== html) {
             syncingFromSource = true;
-            ckEditor.setData(html);
+            safeCkSetData(html);
             syncingFromSource = false;
         }
 
@@ -934,9 +991,7 @@
     function refreshCodeMirrors() {
         refreshCodeMirror(codeMirrorSplit, 280);
         refreshCodeMirror(codeMirrorFull, 360);
-        if (ckEditor && typeof ckEditor.resize === 'function') {
-            ckEditor.resize('100%', activeEditorView === 'split' ? 320 : 360);
-        }
+        safeCkResize('100%', activeEditorView === 'split' ? 320 : 360);
     }
 
     function initSplitLayout(split) {
@@ -974,6 +1029,12 @@
                 /* ignore */
             }
         }
+
+        if (wrap.getAttribute('data-esenin-layout-bound') === '1') {
+            applyLayout(saved);
+            return;
+        }
+        wrap.setAttribute('data-esenin-layout-bound', '1');
 
         applyLayout(saved);
 
@@ -1155,6 +1216,100 @@
         });
     }
 
+    function mountCkEditor(initialHtml) {
+        if (!textEl
+            || typeof window.jQuery === 'undefined'
+            || !window.jQuery.fn.ckeditor
+            || typeof window.CKEDITOR === 'undefined') {
+            return;
+        }
+
+        destroyCkEditor();
+
+        if (initialHtml !== undefined && initialHtml !== null) {
+            textEl.value = initialHtml;
+        }
+
+        window.jQuery(textEl).ckeditor({
+            language: 'ru',
+            height: 320,
+            toolbar: [
+                { name: 'basicstyles', items: ['Bold', 'Italic', 'Underline', 'Strike'] },
+                { name: 'paragraph', items: ['NumberedList', 'BulletedList', '-', 'Outdent', 'Indent'] },
+                { name: 'links', items: ['Link', 'Unlink'] },
+                { name: 'insert', items: ['Table', 'HorizontalRule'] },
+                { name: 'styles', items: ['Format'] },
+            ],
+        });
+
+        ckEditor = window.CKEDITOR.instances['cabinet-esenin-text'];
+        if (!ckEditor) {
+            return;
+        }
+
+        ckEditor.on('instanceReady', function () {
+            if (initialHtml !== undefined && initialHtml !== null) {
+                syncingFromSource = true;
+                safeCkSetData(initialHtml);
+                syncingFromSource = false;
+            } else {
+                syncAllEditorsFromHtml(safeCkGetData());
+            }
+            var split = editorRoot.querySelector('[data-esenin-split-editor]');
+            if (split) {
+                initSplitLayout(split);
+            }
+            refreshCodeMirrors();
+        });
+
+        ckEditor.on('change', syncFromCkEditor);
+
+        ckEditor.on('paste', function () {
+            setTimeout(syncFromCkEditor, 0);
+        });
+
+        ckEditor.on('contentDom', function () {
+            var editable = ckEditor.editable();
+            if (!editable) {
+                return;
+            }
+
+            editable.attachListener(editable, 'keydown', function (evt) {
+                var domEvent = evt.data.$;
+                var key = evt.data.getKey();
+                var isSelectAll = (domEvent.ctrlKey || domEvent.metaKey) && (key === 65 || domEvent.keyCode === 65);
+                var isDelete = key === 8 || key === 46;
+
+                if (isSelectAll) {
+                    evt.stop();
+                    cancelSyncToVisual();
+                    try {
+                        ckEditor.execCommand('selectAll');
+                    } catch (e) {
+                        /* ignore */
+                    }
+                    return false;
+                }
+
+                if (isDelete) {
+                    cancelSyncToVisual();
+                }
+            }, null, null, 1);
+
+            editable.attachListener(editable, 'keyup', function (evt) {
+                var key = evt.data.getKey();
+                if (key === 8 || key === 46) {
+                    if (isEditorHtmlEmpty(safeCkGetData())) {
+                        syncingFromSource = true;
+                        safeCkSetData('');
+                        syncingFromSource = false;
+                    }
+                    syncFromCkEditor();
+                }
+            }, null, null, 999);
+        });
+    }
+
     function initEditor() {
         initEditorKeyboardGuard();
 
@@ -1165,75 +1320,7 @@
         codeMirrorSplit = initCodeMirror(htmlSourceEl);
         codeMirrorFull = initCodeMirror(htmlSourceFullEl);
 
-        if (typeof window.jQuery !== 'undefined' && window.jQuery.fn.ckeditor && typeof window.CKEDITOR !== 'undefined') {
-            window.jQuery(textEl).ckeditor({
-                language: 'ru',
-                height: 320,
-                toolbar: [
-                    { name: 'basicstyles', items: ['Bold', 'Italic', 'Underline', 'Strike'] },
-                    { name: 'paragraph', items: ['NumberedList', 'BulletedList', '-', 'Outdent', 'Indent'] },
-                    { name: 'links', items: ['Link', 'Unlink'] },
-                    { name: 'insert', items: ['Table', 'HorizontalRule'] },
-                    { name: 'styles', items: ['Format'] },
-                ],
-            });
-
-            ckEditor = window.CKEDITOR.instances['cabinet-esenin-text'];
-
-            if (ckEditor) {
-                ckEditor.on('instanceReady', function () {
-                    syncAllEditorsFromHtml(ckEditor.getData());
-                    var split = editorRoot.querySelector('[data-esenin-split-editor]');
-                    if (split) {
-                        initSplitLayout(split);
-                    }
-                    refreshCodeMirrors();
-                });
-
-                ckEditor.on('change', syncFromCkEditor);
-
-                ckEditor.on('paste', function () {
-                    setTimeout(syncFromCkEditor, 0);
-                });
-
-                ckEditor.on('contentDom', function () {
-                    var editable = ckEditor.editable();
-                    if (!editable) {
-                        return;
-                    }
-
-                    editable.attachListener(editable, 'keydown', function (evt) {
-                        var domEvent = evt.data.$;
-                        var key = evt.data.getKey();
-                        var isSelectAll = (domEvent.ctrlKey || domEvent.metaKey) && (key === 65 || domEvent.keyCode === 65);
-                        var isDelete = key === 8 || key === 46;
-
-                        if (isSelectAll) {
-                            evt.stop();
-                            cancelSyncToVisual();
-                            ckEditor.execCommand('selectAll');
-                            return false;
-                        }
-
-                        if (isDelete) {
-                            cancelSyncToVisual();
-                        }
-                    }, null, null, 1);
-
-                    editable.attachListener(editable, 'keyup', function (evt) {
-                        var key = evt.data.getKey();
-                        if (key === 8 || key === 46) {
-                            if (isEditorHtmlEmpty(ckEditor.getData())) {
-                                syncingFromSource = true;
-                                ckEditor.setData('');
-                                syncingFromSource = false;
-                            }
-                            syncFromCkEditor();
-                        }
-                    }, null, null, 999);
-                });
-            }
-        }
+        mountCkEditor(null);
 
         if (codeMirrorSplit) {
             codeMirrorSplit.on('change', function () {
@@ -1303,7 +1390,7 @@
         });
 
         initCopyButton(editorRoot.querySelector('[data-esenin-copy-html]'), function () {
-            return readCodeMirrorValue(codeMirrorSplit, htmlSourceEl) || (ckEditor ? ckEditor.getData() : '');
+            return readCodeMirrorValue(codeMirrorSplit, htmlSourceEl) || safeCkGetData();
         });
         initCopyButton(editorRoot.querySelector('[data-esenin-copy-html-full]'), function () {
             return readCodeMirrorValue(codeMirrorFull, htmlSourceFullEl);
@@ -1558,11 +1645,9 @@
 
     function refreshEditorLayout() {
         refreshCodeMirrors();
-        if (ckEditor && typeof ckEditor.resize === 'function') {
-            setTimeout(function () {
-                ckEditor.resize('100%', 280);
-            }, 60);
-        }
+        setTimeout(function () {
+            safeCkResize('100%', 280);
+        }, 60);
     }
 
     function relocateEditor(toResults) {
@@ -1587,6 +1672,9 @@
             return;
         }
 
+        // CKEditor iframe ломается при appendChild — уничтожаем и монтируем заново.
+        var htmlBeforeMove = readCodeMirrorValue(codeMirrorSplit, htmlSourceEl) || safeCkGetData();
+        destroyCkEditor();
         targetHost.appendChild(editorRoot);
 
         if (editorHostResults) {
@@ -1596,7 +1684,8 @@
             inputWrap.classList.toggle('cabinet-esenin-input--has-results', !!toResults);
         }
 
-        refreshEditorLayout();
+        mountCkEditor(htmlBeforeMove);
+        refreshCodeMirrors();
     }
 
     function updateCkeditorFloatVisibility() {
@@ -1845,16 +1934,26 @@
                 } catch (e) {
                     /* ignore */
                 }
-            } else if (xhr && xhr.message) {
+            } else if (xhr && xhr.message && !/frameElement|CKEDITOR|Cannot read prop/i.test(String(xhr.message))) {
                 message = xhr.message;
             }
             showError(message);
         }
 
+        function applyCheckResponse(data) {
+            try {
+                handleResponse(data);
+            } catch (e) {
+                if (window.console && typeof window.console.error === 'function') {
+                    window.console.error(e);
+                }
+            }
+        }
+
         if (typeof window.axios !== 'undefined') {
             postJson('/esenin-text-check?ajax=1', payload)
                 .then(function (data) {
-                    handleResponse(data);
+                    applyCheckResponse(data);
                 })
                 .catch(function (error) {
                     handleFailure(error && error.response ? error.response : error);
@@ -1869,7 +1968,7 @@
                 method: 'POST',
                 data: payload,
                 dataType: 'json'
-            }).done(handleResponse).fail(handleFailure).always(finishRequest);
+            }).done(applyCheckResponse).fail(handleFailure).always(finishRequest);
             return;
         }
 

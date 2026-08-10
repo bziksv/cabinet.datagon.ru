@@ -188,8 +188,10 @@ class SiteAuditCrawl extends Model
     }
 
     /**
-     * Оценка окончания по текущей скорости (started_at → pages_fetched).
-     * null если ещё рано считать или проверка завершён.
+     * Оценка окончания:
+     * — во время скана: по скорости обхода страниц;
+     * — в агрегации (в т.ч. PSI): по оставшимся URL PageSpeed и финалу.
+     * null если ещё рано считать или проверка завершена.
      */
     public function estimateFinishedAt(): ?\Carbon\Carbon
     {
@@ -199,7 +201,13 @@ class SiteAuditCrawl extends Model
 
         $fetched = (int) $this->pages_fetched;
         $total = (int) $this->pages_total;
-        // После 100% страниц идёт агрегация (PSI и т.д.) — скорость скана для ETA уже не подходит.
+        $pagesDone = $total > 0 && $fetched >= $total;
+
+        // Скан закончен / идёт агрегация — ETA по PSI и хвосту этапов, не по страницам.
+        if ($this->status === self::STATUS_AGGREGATING || $pagesDone) {
+            return $this->estimateAggregateFinishedAt();
+        }
+
         if ($fetched < 15 || $total <= $fetched) {
             return null;
         }
@@ -216,7 +224,6 @@ class SiteAuditCrawl extends Model
         }
 
         $secondsLeft = (int) ceil(($total - $fetched) / $rate);
-        // защита от абсурда (больше ~14 суток)
         if ($secondsLeft > 14 * 24 * 3600) {
             return null;
         }
@@ -224,11 +231,77 @@ class SiteAuditCrawl extends Model
         return now()->addSeconds($secondsLeft);
     }
 
+    /**
+     * Ориентир конца агрегации (особенно долгий PSI: ~1 URL × mobile+desktop).
+     */
+    public function estimateAggregateFinishedAt(): ?\Carbon\Carbon
+    {
+        $progress = is_array($this->progress_json) ? $this->progress_json : [];
+        $agg = is_array($progress['aggregate'] ?? null) ? $progress['aggregate'] : [];
+        $stage = (string) ($agg['stage'] ?? '');
+        $psi = is_array($progress['psi'] ?? null) ? $progress['psi'] : [];
+
+        $seconds = 0;
+        $psiDone = ! empty($psi['done']) || ! empty($psi['skipped']);
+        $secPerPsiUrl = max(30, (int) config('site_audit.psi_eta_seconds_per_url', 55));
+
+        if (! $psiDone) {
+            $sampled = (int) ($psi['sampled'] ?? 0);
+            $cursor = (int) ($psi['cursor'] ?? 0);
+            if ($sampled < 1) {
+                $sampled = max(1, (int) config('site_audit.psi_max_urls', 20));
+                // этап PSI ещё не стартовал — считаем полный прогон
+                if ($stage !== '' && $stage !== 'psi' && $stage !== 'finalize') {
+                    // до PSI ещё есть этапы — грубый запас
+                    $seconds += 90;
+                }
+            }
+            $left = max(0, $sampled - $cursor);
+            if ($stage === 'psi' || $stage === '' || $stage === 'finalize' || $sampled > 0) {
+                $seconds += $left * $secPerPsiUrl;
+            }
+        }
+
+        if ($stage === 'finalize') {
+            $seconds = max($seconds, 20);
+        } else {
+            $seconds += 25; // финализация / хвост
+        }
+
+        if ($seconds < 15) {
+            $seconds = 20;
+        }
+        if ($seconds > 14 * 24 * 3600) {
+            return null;
+        }
+
+        return now()->addSeconds($seconds);
+    }
+
     public function estimateFinishedAtFormatted(): ?string
     {
         $at = $this->estimateFinishedAt();
 
         return $at ? $at->format('d.m H:i') : null;
+    }
+
+    /** Подсказка к ~времени в колонке «Конец». */
+    public function estimateFinishedAtTitle(): string
+    {
+        if ($this->status === self::STATUS_AGGREGATING
+            || ((int) $this->pages_total > 0 && (int) $this->pages_fetched >= (int) $this->pages_total)
+        ) {
+            $detail = $this->aggregateStageLabel();
+            $base = 'Ориентир конца: идёт финальный этап';
+            if ($detail !== null) {
+                $base .= ' («' . $detail . '»)';
+            }
+            $base .= '. Точная дата появится в «Готово».';
+
+            return $base;
+        }
+
+        return 'Оценка конца по текущей скорости сканирования';
     }
 
     public function isShared(): bool

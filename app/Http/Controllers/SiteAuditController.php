@@ -1520,6 +1520,7 @@ class SiteAuditController extends Controller
             'started_at' => optional($crawl->started_at)->format('d.m H:i'),
             'finished_at' => optional($crawl->finished_at)->format('d.m H:i'),
             'eta_at' => $crawl->estimateFinishedAtFormatted(),
+            'eta_title' => $crawl->estimateFinishedAtTitle(),
         ]);
     }
 

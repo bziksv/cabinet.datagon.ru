@@ -121,6 +121,8 @@ return [
     'psi_timeout' => (int) env('SITE_AUDIT_PSI_TIMEOUT', 75),
     // 1 URL/тик: rich PSI (4 категории × mobile/desktop) иначе тик легко вылезает за budget.
     'psi_urls_per_tick' => (int) env('SITE_AUDIT_PSI_URLS_PER_TICK', 1),
+    // Ориентир ETA в истории: секунд на 1 URL (mobile+desktop) на этапе PSI.
+    'psi_eta_seconds_per_url' => (int) env('SITE_AUDIT_PSI_ETA_SEC_PER_URL', 55),
 
     // Content risk lite (keyword classifiers + word repeats). Cheap — on by default.
     'content_risk_enabled' => (bool) env('SITE_AUDIT_CONTENT_RISK', true),

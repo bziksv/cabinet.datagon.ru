@@ -1158,8 +1158,8 @@ return [
         'missing_coop' => [
             'phase' => 'C',
             'severity' => 'info',
+            'description' => 'Нет COOP — вкладка слабее изолирована от window.opener; проверьте перед same-origin (OAuth/попапы).',
             'title' => 'Нет Cross-Origin-Opener-Policy',
-            'description' => 'Ответ не задаёт COOP (изоляция browsing context / Spectre-класс атак).',
             'group' => 'tech',
         ],
         'missing_coep' => [

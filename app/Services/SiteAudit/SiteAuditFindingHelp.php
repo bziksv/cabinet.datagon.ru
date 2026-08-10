@@ -404,9 +404,9 @@ class SiteAuditFindingHelp
                 'fix' => 'Задайте Permissions-Policy на веб-сервере/CDN под нужные фичи.',
             ],
             'missing_coop' => [
-                'what' => 'Ответ не содержит Cross-Origin-Opener-Policy.',
-                'why' => 'Без COOP вкладка слабее изолирована от window.opener / cross-origin атак (Spectre-класс).',
-                'fix' => 'Начните с Cross-Origin-Opener-Policy: same-origin (проверьте попапы/OAuth).',
+                'what' => 'В HTTP-ответе нет заголовка Cross-Origin-Opener-Policy (COOP). Это правило для браузера: как ваша вкладка связана с окном, которое её открыло (window.opener), и можно ли считать контекст «изолированным». Без COOP страница по умолчанию остаётся в общей группе с opener’ом с другого сайта — так устроены многие попапы и редиректы логина.',
+                'why' => 'Чужой сайт, открывший вашу страницу в popup/новой вкладке, через window.opener может взаимодействовать с вашим контекстом сильнее, чем хотелось бы. Вместе с атаками побочных каналов (класс Spectre) это ослабляет изоляцию вкладки. Для обычного SEO-сайта без SharedArrayBuffer / жёсткой изоляции отсутствие COOP — скорее пункт чеклиста безопасности, не прямой фактор ранжирования. Вместе с COEP заголовок нужен, если включаете crossOriginIsolated.',
+                'fix' => 'Если нет сложных попапов и OAuth «через окно» — можно поставить Cross-Origin-Opener-Policy: same-origin на HTML-ответы (nginx: add_header Cross-Origin-Opener-Policy "same-origin" always;). Если логин/оплата открывается popup’ом и ждёт postMessage/opener — сначала проверьте сценарии: same-origin может оборвать связь с opener; иногда ставят same-origin-allow-popups. Не включайте «вслепую» на всём CDN, пока не прогнали вход через соцсети и платёжные виджеты. Проверка: DevTools → Network → Response Headers. Для SEO-витрины без изоляции API часто достаточно осознанно принять риск или внедрить COOP после теста на стейдже.',
             ],
             'missing_coep' => [
                 'what' => 'В HTTP-ответе нет заголовка Cross-Origin-Embedder-Policy (COEP). Аудит смотрит только факт наличия на HTTPS 200, не значение.',

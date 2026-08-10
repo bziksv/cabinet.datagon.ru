@@ -1131,7 +1131,7 @@ return [
             'phase' => 'B',
             'severity' => 'info',
             'title' => 'Нет X-Content-Type-Options',
-            'description' => 'Ответ не задаёт X-Content-Type-Options: nosniff.',
+            'description' => 'Нет заголовка X-Content-Type-Options: nosniff — браузер может угадать MIME-тип файла.',
             'group' => 'tech',
         ],
         'missing_csp' => [

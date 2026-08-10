@@ -384,9 +384,9 @@ class SiteAuditFindingHelp
                 'fix' => 'Добавьте X-Frame-Options: SAMEORIGIN (или DENY) либо CSP frame-ancestors.',
             ],
             'missing_x_content_type_options' => [
-                'what' => 'Нет X-Content-Type-Options: nosniff.',
-                'why' => 'Браузер может угадать MIME и исполнить файл не как задумано.',
-                'fix' => 'Добавьте X-Content-Type-Options: nosniff на все ответы.',
+                'what' => 'Сервер не отдаёт заголовок X-Content-Type-Options: nosniff. Это короткая инструкция браузеру: «не угадывай тип файла сам — верь Content-Type, который прислал сайт». Без nosniff браузер может решить, что скачанный кусок (картинка, JSON, «текст») на самом деле скрипт или HTML, и обработать его иначе, чем задумал сервер.',
+                'why' => 'Так открывается классическая дыра MIME-sniffing: злоумышленник подсовывает файл с «невинным» типом (например image/jpeg или text/plain), а браузер распознаёт внутри JavaScript/HTML и исполняет его в контексте вашего домена. Это усиливает XSS и атаки через загрузку файлов пользователями. Для SEO это не прямой фактор ранжирования, но сигнал безопасности и гигиены ответа; в чеклистах и пентестах отсутствие nosniff почти всегда отмечают.',
+                'fix' => 'На веб-сервере, CDN или в приложении добавьте заголовок на все ответы (HTML, статику, API): X-Content-Type-Options: nosniff. Пример nginx: add_header X-Content-Type-Options "nosniff" always; в Apache — Header always set X-Content-Type-Options "nosniff". После выката проверьте в DevTools → Network → Response Headers на главной и на паре внутренних URL. Других значений у этого заголовка по сути нет — нужен именно nosniff.',
             ],
             'missing_csp' => [
                 'what' => 'Ответ не содержит Content-Security-Policy.',

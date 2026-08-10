@@ -3489,7 +3489,7 @@ html.sa-tour-active body {
   display: flex;
   flex-wrap: wrap;
   gap: 1.25rem 2rem;
-  align-items: stretch;
+  align-items: center;
   justify-content: space-between;
   margin: 0 0 1.25rem;
   padding: 1.1rem 1.25rem;
@@ -3502,10 +3502,16 @@ html.sa-tour-active body {
 }
 .cabinet-sa-psi-hero__score {
   display: flex;
-  gap: 1rem;
+  gap: 1.1rem;
   align-items: center;
   min-width: min(100%, 420px);
   flex: 1 1 420px;
+}
+.cabinet-sa-psi-hero__meta {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
 }
 .cabinet-sa-psi-hero__title {
   font-size: 1.05rem;
@@ -3579,8 +3585,10 @@ html.sa-tour-active body {
   width: 5.25rem;
   height: 5.25rem;
   border-radius: 50%;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   position: relative;
   background:
     conic-gradient(
@@ -3615,7 +3623,7 @@ html.sa-tour-active body {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #94a3b8;
-  margin-top: -0.15rem;
+  margin-top: 0.05rem;
 }
 .cabinet-sa-psi-ring--sm {
   width: 3.6rem;

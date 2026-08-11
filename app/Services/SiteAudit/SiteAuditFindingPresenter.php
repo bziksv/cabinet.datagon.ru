@@ -50,6 +50,10 @@ class SiteAuditFindingPresenter
             return self::serpTitleMismatchHtml($meta);
         }
 
+        if ($code === 'serp_snippet_source') {
+            return self::serpSnippetSourceHtml($meta);
+        }
+
         if ($code === 'lost_file') {
             return self::lostFileDetailsHtml($meta);
         }
@@ -1092,18 +1096,7 @@ class SiteAuditFindingPresenter
                 return implode(' · ', $bits);
 
             case 'serp_snippet_source':
-                $bits = [];
-                if (! empty($meta['engine'])) {
-                    $bits[] = (string) $meta['engine'];
-                }
-                if (! empty($meta['title_source'])) {
-                    $bits[] = 'title←' . (string) $meta['title_source'];
-                }
-                if (! empty($meta['snippet_source'])) {
-                    $bits[] = 'snippet←' . (string) $meta['snippet_source'];
-                }
-
-                return $bits ? implode(' · ', $bits) : 'источник сниппета';
+                return self::serpSnippetSourcePlain($meta);
 
             case 'probable_affiliate':
                 $n = (int) ($meta['count'] ?? 0);
@@ -1267,6 +1260,114 @@ class SiteAuditFindingPresenter
         $parts[] = '</ul>';
 
         return implode('', $parts);
+    }
+
+    /**
+     * Откуда ПС, похоже, взяла заголовок/текст в выдаче (эвристика).
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private static function serpSnippetSourcePlain(array $meta): string
+    {
+        $engine = self::serpEngineLabelRu((string) ($meta['engine'] ?? ''));
+        $titleSrc = self::serpFieldSourceLabelRu((string) ($meta['title_source'] ?? ''));
+        $snipSrc = self::serpFieldSourceLabelRu((string) ($meta['snippet_source'] ?? ''));
+        $parts = [];
+        if ($engine !== '') {
+            $parts[] = $engine;
+        }
+        if ($titleSrc !== '') {
+            $parts[] = 'заголовок в выдаче ≈ ' . $titleSrc;
+        }
+        if ($snipSrc !== '') {
+            $parts[] = 'текст сниппета ≈ ' . $snipSrc;
+        }
+
+        return $parts !== [] ? implode('; ', $parts) : 'источник сниппета';
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function serpSnippetSourceHtml(array $meta): ?string
+    {
+        $engine = self::serpEngineLabelRu((string) ($meta['engine'] ?? ''));
+        $titleKey = (string) ($meta['title_source'] ?? '');
+        $snipKey = (string) ($meta['snippet_source'] ?? '');
+        if ($engine === '' && $titleKey === '' && $snipKey === '') {
+            return null;
+        }
+
+        $titleLine = self::serpSnippetSourceExplain('Заголовок', $titleKey);
+        $snipLine = self::serpSnippetSourceExplain('Описание (сниппет)', $snipKey);
+
+        $html = '<div class="cabinet-sa-serp-src">';
+        if ($engine !== '') {
+            $html .= '<div class="cabinet-sa-serp-src__engine">' . e($engine) . '</div>';
+        }
+        if ($titleLine !== '') {
+            $html .= '<div class="cabinet-sa-serp-src__row">' . e($titleLine) . '</div>';
+        }
+        if ($snipLine !== '') {
+            $html .= '<div class="cabinet-sa-serp-src__row">' . e($snipLine) . '</div>';
+        }
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    private static function serpSnippetSourceExplain(string $what, string $sourceKey): string
+    {
+        $sourceKey = strtolower(trim($sourceKey));
+        if ($sourceKey === '') {
+            return '';
+        }
+        if ($sourceKey === 'title') {
+            return $what . ' в выдаче совпал с тегом TITLE на сайте';
+        }
+        if ($sourceKey === 'h1') {
+            return $what . ' в выдаче совпал с H1 на сайте (не с TITLE)';
+        }
+        if ($sourceKey === 'description') {
+            return $what . ' в выдаче совпал с meta description';
+        }
+        if ($sourceKey === 'unknown') {
+            return $what . ' в выдаче не совпал с TITLE / H1 / description — скорее из текста страницы или переписан ПС';
+        }
+
+        return $what . ' ≈ ' . $sourceKey;
+    }
+
+    private static function serpEngineLabelRu(string $engine): string
+    {
+        $e = strtolower(trim($engine));
+        if ($e === 'yandex') {
+            return 'Яндекс';
+        }
+        if ($e === 'google') {
+            return 'Google';
+        }
+
+        return $engine;
+    }
+
+    private static function serpFieldSourceLabelRu(string $source): string
+    {
+        $s = strtolower(trim($source));
+        if ($s === 'title') {
+            return 'тег TITLE';
+        }
+        if ($s === 'h1') {
+            return 'H1';
+        }
+        if ($s === 'description') {
+            return 'meta description';
+        }
+        if ($s === 'unknown') {
+            return 'не TITLE/H1/description (текст страницы или перепис ПС)';
+        }
+
+        return $source;
     }
 
     /**

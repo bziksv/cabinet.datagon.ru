@@ -3953,3 +3953,17 @@ html.sa-tour-active body {
   text-decoration: none;
 }
 .cabinet-sa-psi-legend__note a:hover { text-decoration: underline; }
+
+.cabinet-sa-serp-src {
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: #334155;
+}
+.cabinet-sa-serp-src__engine {
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0.2rem;
+}
+.cabinet-sa-serp-src__row + .cabinet-sa-serp-src__row {
+  margin-top: 0.15rem;
+}

@@ -997,7 +997,7 @@ return [
             'phase' => 'C',
             'severity' => 'info',
             'title' => 'Подсветка источника сниппета',
-            'description' => 'Откуда ПС, похоже, взяла title/текст сниппета: title, h1 или description страницы.',
+            'description' => 'Откуда в выдаче, похоже, взяли заголовок и текст: TITLE, H1, description или «неизвестно».',
             'group' => 'seo',
         ],
         'probable_affiliate' => [

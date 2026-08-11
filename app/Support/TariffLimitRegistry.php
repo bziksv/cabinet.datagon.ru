@@ -171,7 +171,7 @@ class TariffLimitRegistry
             [
                 'code' => 'SiteAuditCrawls',
                 'module' => 'Аудит сайта (проверок/мес)',
-                'hint' => 'Запусков аудита в месяц. Free 1 / Optimal 4 / Ultimate 8 / Maximum 12.',
+                'hint' => 'Запусков аудита в месяц. Free 2 / Optimal 20 / Ultimate 50 / Maximum 100.',
                 'enforcement' => self::ENFORCEMENT_STRICT,
             ],
             [
@@ -189,7 +189,7 @@ class TariffLimitRegistry
             [
                 'code' => 'SiteAuditSchedules',
                 'module' => 'Аудит сайта (авторасписаний)',
-                'hint' => 'Проектов на автозапуске. Free 0 / Optimal 2 / Ultimate 5 / Maximum 10.',
+                'hint' => 'Проектов на автозапуске (= лимит проектов). Free 1 / Optimal 20 / Ultimate 50 / Maximum 100.',
                 'enforcement' => self::ENFORCEMENT_STRICT,
             ],
             [

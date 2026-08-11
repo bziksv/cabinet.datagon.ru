@@ -458,7 +458,9 @@ class SiteAuditPageProcessor
                 }
 
                 $contacts = is_array($parsed['contacts'] ?? null) ? $parsed['contacts'] : [];
-                if (! empty($contacts['commercial']) && (int) ($pageData['word_count'] ?? 0) >= 40) {
+                $isCommercial = ! empty($contacts['commercial']);
+                $isProduct = ! empty($contacts['product_offer']);
+                if ($isCommercial && (int) ($pageData['word_count'] ?? 0) >= 40) {
                     // Телефон обязателен. Адрес сам по себе не валим, если телефон уже есть
                     // (часто в шапке; адрес — в JSON-LD / на /kontakty/).
                     $missing = [];
@@ -484,11 +486,14 @@ class SiteAuditPageProcessor
                         }
                         $findings[] = $this->finding('commercial_missing_contacts', $url, $urlHash, $meta);
                     }
-                    if (empty($contacts['has_price'])) {
-                        $findings[] = $this->finding('commercial_missing_price', $url, $urlHash);
-                    }
                     if (empty($contacts['has_cta'])) {
                         $findings[] = $this->finding('commercial_missing_cta', $url, $urlHash);
+                    }
+                }
+                // Цена / наличие / оплата / наличие / отзывы — только товарная витрина, не блог и не услуги.
+                if ($isProduct && (int) ($pageData['word_count'] ?? 0) >= 40) {
+                    if (empty($contacts['has_price'])) {
+                        $findings[] = $this->finding('commercial_missing_price', $url, $urlHash);
                     }
                     if (empty($contacts['has_delivery'])) {
                         $findings[] = $this->finding('commercial_missing_delivery', $url, $urlHash);

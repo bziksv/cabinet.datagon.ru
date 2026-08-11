@@ -244,32 +244,96 @@ class SiteAuditContacts
     }
 
     /**
+     * Страница-витрина услуг/лидов: телефон, CTA уместны; «наличие на складе» — нет.
+     *
      * @param array{title?:?string,h1?:?string} $parsed
      */
     public static function looksCommercial(string $url, array $parsed, string $text): bool
     {
-        $path = (string) (parse_url($url, PHP_URL_PATH) ?: '');
-        // Блог / новости сами по себе не «витрина» — телефон в шапке не требуем как для карточки товара.
-        if (preg_match('#/(blog|blogs|news|article|articles|post|posts)(/|$)#iu', $path)) {
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?: '/');
+        if (self::isEditorialPath($path)) {
             return false;
         }
-        if (preg_match('#/(catalog|katalog|product|tovar|shop|magazin|cart|korzina|order|zakaz|price|ceny|uslugi|usluga|uslug)#iu', $path)) {
+        if (self::isProductPath($path) || self::isServicePath($path)) {
             return true;
         }
 
-        $blob = mb_strtolower(
-            trim((string) ($parsed['title'] ?? '') . ' ' . (string) ($parsed['h1'] ?? '') . ' ' . mb_substr($text, 0, 2000))
-        );
-        $markers = [
-            'купить', 'цена', 'цены', 'заказать', 'доставка', 'корзин', '₽', 'руб.',
-            'в наличии', 'скидк', 'рассрочк', 'оформить заказ',
-        ];
-        foreach ($markers as $w) {
+        $blob = self::commercialBlob($parsed, $text);
+        foreach (['купить', 'цена', 'цены', 'заказать', 'доставка', 'корзин', '₽', 'руб.', 'в наличии', 'скидк', 'рассрочк', 'оформить заказ'] as $w) {
             if (mb_strpos($blob, $w) !== false) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Карточка/каталог товара (e-commerce): цена, наличие, доставка, оплата, отзывы.
+     * Услуги агентства, главная, «о компании» сюда не входят.
+     *
+     * @param array{title?:?string,h1?:?string} $parsed
+     */
+    public static function looksProductOffer(string $url, array $parsed, string $text): bool
+    {
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?: '/');
+        if (self::isEditorialPath($path) || self::isServicePath($path)) {
+            return false;
+        }
+        if (self::isProductPath($path)) {
+            return true;
+        }
+
+        // Главная / короткие лендинги без товарного URL — не требуем «в наличии».
+        if ($path === '/' || $path === '' || preg_match('#^/(index\.(php|html?)|home)/?$#iu', $path)) {
+            return false;
+        }
+
+        $blob = self::commercialBlob($parsed, $text);
+        $productMarkers = 0;
+        foreach (['в корзину', 'добавить в корзину', 'купить сейчас', 'артикул', 'sku', 'в наличии', 'нет в наличии', 'остаток', 'характеристик'] as $w) {
+            if (mb_strpos($blob, $w) !== false) {
+                $productMarkers++;
+            }
+        }
+        if ((bool) preg_match('/\d[\d\s]{0,10}\s*(₽|руб\.?)\b/u', $blob)) {
+            $productMarkers++;
+        }
+
+        return $productMarkers >= 2;
+    }
+
+    private static function isEditorialPath(string $path): bool
+    {
+        return (bool) preg_match(
+            '#/(blog|blogs|news|novosti|article|articles|post|posts|statya|stati|wiki|docs|dokumenty|privacy|politika|cookie|oferta|soglashenie)(/|$)#iu',
+            $path
+        );
+    }
+
+    private static function isProductPath(string $path): bool
+    {
+        return (bool) preg_match(
+            '#/(catalog|katalog|category|categories|product|products|tovar|tovary|shop|magazin|cart|korzina|basket|checkout|order|zakaz|price|ceny)(/|$)#iu',
+            $path
+        );
+    }
+
+    private static function isServicePath(string $path): bool
+    {
+        return (bool) preg_match(
+            '#/(uslugi|usluga|uslug|services?|service|tarif|tarify|pricing|audit|seo|kontekst|reklama|razrabotka)(/|$)#iu',
+            $path
+        );
+    }
+
+    /**
+     * @param array{title?:?string,h1?:?string} $parsed
+     */
+    private static function commercialBlob(array $parsed, string $text): string
+    {
+        return mb_strtolower(
+            trim((string) ($parsed['title'] ?? '') . ' ' . (string) ($parsed['h1'] ?? '') . ' ' . mb_substr($text, 0, 2000))
+        );
     }
 }

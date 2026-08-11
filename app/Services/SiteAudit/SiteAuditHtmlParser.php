@@ -53,10 +53,12 @@ class SiteAuditHtmlParser
             ];
         $contacts = SiteAuditContacts::detect($text, $html);
         $signals = SiteAuditContacts::detectSignals($text);
-        $looksCommercial = SiteAuditContacts::looksCommercial($finalUrl, [
+        $pageMeta = [
             'title' => $title,
             'h1' => $h1s[0] ?? null,
-        ], $text);
+        ];
+        $looksCommercial = SiteAuditContacts::looksCommercial($finalUrl, $pageMeta, $text);
+        $looksProduct = SiteAuditContacts::looksProductOffer($finalUrl, $pageMeta, $text);
 
         $imgCount = preg_match_all('/<img\b/i', $html) ?: 0;
         $imgWithoutAlt = 0;
@@ -176,7 +178,10 @@ class SiteAuditHtmlParser
             'html_error_count' => count($htmlErrors),
             'html_error_samples' => $htmlErrors,
             'content_risk' => $contentRisk,
-            'contacts' => $contacts + $signals + ['commercial' => $looksCommercial],
+            'contacts' => $contacts + $signals + [
+                'commercial' => $looksCommercial,
+                'product_offer' => $looksProduct,
+            ],
             'simhash' => SiteAuditSimhash::fromText($text),
             'final_url' => $finalUrl,
         ];

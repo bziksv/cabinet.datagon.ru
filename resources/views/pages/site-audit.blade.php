@@ -282,6 +282,18 @@
 
                 function updateRow(row, j) {
                     if (!row || !j) return;
+                    if (j.queue_hint) {
+                        try {
+                            if (!window.__saQueueHintAt || (Date.now() - window.__saQueueHintAt) > 20000) {
+                                window.__saQueueHintAt = Date.now();
+                                if (window.toastr) {
+                                    toastr.warning(j.queue_hint);
+                                } else {
+                                    console.warn(j.queue_hint);
+                                }
+                            }
+                        } catch (e) {}
+                    }
                     var statusEl = row.querySelector('[data-sa-status]');
                     if (statusEl) {
                         statusEl.textContent = j.status_label || j.status;

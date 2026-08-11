@@ -15,14 +15,15 @@
         Зелёный «0» здесь не значит «всё ок»: отчёт пустой, потому что пробу ещё не гоняли.
         @if(($probeStatus['probe'] ?? '') === 'serp_snippets')
             <div class="mt-1 mb-0">
-                Сниппеты — <strong>выборка</strong> (посадочные страницы и несколько страниц из обхода), Яндекс и Google.
+                Сниппеты — общий набор до <strong>{{ (int) config('site_audit.serp_snippets_max_urls', 30) }}</strong> URL
+                (посадочные и добор из обхода), Яндекс и Google; один съём на адрес.
                 В «TITLE ≠ выдаче» попадают только расхождения: совпавшая ПС в таблицу не пишется.
                 Нормально снимать <strong>при аудите</strong> (вкл. по умолчанию) или кнопкой ниже.
             </div>
         @endif
         @if(($probeStatus['probe'] ?? '') === 'psi')
             @php
-                $psiMaxCta = (int) config('site_audit.psi_max_urls', 20);
+                $psiMaxCta = (int) config('site_audit.psi_max_urls', 30);
                 $psiReason = (string) ($probeStatus['reason'] ?? '');
             @endphp
             <div class="mt-1 mb-0">
@@ -41,7 +42,7 @@
         @if(!empty($probeStatus['can_run']) && empty($isPublic))
             @php
                 $probeConfirm = ($probeStatus['probe'] ?? '') === 'psi'
-                    ? 'Запустить PageSpeed по этой проверке? До ' . (int) config('site_audit.psi_max_urls', 20) . ' страниц × телефон и компьютер, может занять 10–30+ минут.'
+                    ? 'Запустить PageSpeed по этой проверке? До ' . (int) config('site_audit.psi_max_urls', 30) . ' страниц × телефон и компьютер, может занять 10–30+ минут.'
                     : 'Запустить «' . ($probeStatus['title'] ?? 'проверку') . '» по этой проверке? Может занять 1–3 минуты и потратить API/XML-бюджет.';
             @endphp
             <form method="POST" action="{{ route('pages.site-audit.probe.run', $crawl->id) }}" class="d-inline-block mt-2"

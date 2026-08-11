@@ -107,7 +107,6 @@
         // Сохранения проверок уникальности — в UI анализа текста
         'TextAnalyzer' => 'TextUniquenessHistory',
         'IndexCheck' => 'IndexCheckHistory',
-        'SiteAudit' => 'SiteAuditCrawls',
     ];
 
     $featureRows = [];
@@ -134,9 +133,6 @@
                 continue;
             }
             if ($code === 'IndexCheckHistory' || ($indexCheckHistoryName && $name === $indexCheckHistoryName)) {
-                continue;
-            }
-            if ($code === 'SiteAuditCrawls') {
                 continue;
             }
             $historyCode = $dualLimitCodes[$code] ?? null;

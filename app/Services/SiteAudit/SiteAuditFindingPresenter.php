@@ -78,6 +78,10 @@ class SiteAuditFindingPresenter
             return self::serpTitleMismatchHtml($meta);
         }
 
+        if ($code === 'serp_snippets') {
+            return self::serpSnippetsDetailsHtml($meta);
+        }
+
         if ($code === 'serp_snippet_source') {
             return self::serpSnippetSourceHtml($meta);
         }
@@ -1504,28 +1508,45 @@ class SiteAuditFindingPresenter
             case 'serp_snippets':
                 $bits = [];
                 if (! empty($meta['page_title'])) {
-                    $bits[] = 'title: ' . self::clip((string) $meta['page_title'], 40);
+                    $bits[] = 'на сайте: ' . self::clip((string) $meta['page_title'], 40);
                 }
-                foreach ((array) ($meta['engines'] ?? []) as $eng => $block) {
+                $engines = isset($meta['engines']) && is_array($meta['engines']) ? $meta['engines'] : null;
+                // Старое демо: {engine, snippet} без engines.
+                if (($engines === null || $engines === []) && (! empty($meta['engine']) || ! empty($meta['snippet']))) {
+                    $eng = (string) ($meta['engine'] ?? 'yandex');
+                    $engines = [
+                        $eng => [
+                            'indexed' => true,
+                            'title' => $meta['serp_title'] ?? $meta['title'] ?? null,
+                            'snippet' => $meta['snippet'] ?? null,
+                        ],
+                    ];
+                }
+                foreach ((array) $engines as $eng => $block) {
                     if (! is_array($block)) {
                         continue;
                     }
-                    $label = $eng === 'yandex' ? 'Я' : ($eng === 'google' ? 'G' : (string) $eng);
+                    $label = $eng === 'yandex' ? 'Яндекс' : ($eng === 'google' ? 'Google' : (string) $eng);
                     if (! empty($block['error'])) {
                         $bits[] = $label . ': ошибка';
                         continue;
                     }
-                    if (empty($block['indexed'])) {
-                        $bits[] = $label . ': нет в индексе';
+                    if (array_key_exists('indexed', $block) && empty($block['indexed'])) {
+                        $bits[] = $label . ': нет в поиске';
                         continue;
                     }
-                    $snip = ! empty($block['snippet'])
-                        ? self::clip((string) $block['snippet'], 60)
-                        : (! empty($block['title']) ? self::clip((string) $block['title'], 40) : 'есть');
-                    $bits[] = $label . ': ' . $snip;
+                    $title = trim((string) ($block['title'] ?? ''));
+                    $snip = trim((string) ($block['snippet'] ?? ''));
+                    if ($title !== '') {
+                        $bits[] = $label . ': ' . self::clip($title, 50);
+                    } elseif ($snip !== '') {
+                        $bits[] = $label . ': ' . self::clip($snip, 60);
+                    } else {
+                        $bits[] = $label . ': есть в поиске';
+                    }
                 }
 
-                return $bits ? implode(' · ', $bits) : 'сниппет ПС';
+                return $bits ? implode(' · ', $bits) : 'как в поиске';
 
             case 'serp_title_mismatch':
                 $bits = [];
@@ -1996,6 +2017,106 @@ class SiteAuditFindingPresenter
         }
 
         return $source;
+    }
+
+    /**
+     * Как страница выглядит в поиске: карточки Яндекс / Google.
+     *
+     * @param array<string,mixed> $meta
+     */
+    private static function serpSnippetsDetailsHtml(array $meta): ?string
+    {
+        $pageTitle = trim((string) ($meta['page_title'] ?? ''));
+        $engines = isset($meta['engines']) && is_array($meta['engines']) ? $meta['engines'] : [];
+
+        // Старое демо / урезанный meta: один engine + snippet.
+        if ($engines === [] && (! empty($meta['engine']) || ! empty($meta['snippet']) || ! empty($meta['serp_title']))) {
+            $eng = (string) ($meta['engine'] ?? 'yandex');
+            if ($eng === '') {
+                $eng = 'yandex';
+            }
+            $engines = [
+                $eng => [
+                    'indexed' => true,
+                    'title' => $meta['serp_title'] ?? $meta['title'] ?? null,
+                    'snippet' => $meta['snippet'] ?? null,
+                ],
+            ];
+        }
+
+        if ($engines === [] && $pageTitle === '') {
+            return null;
+        }
+
+        $order = ['yandex', 'google'];
+        $keys = array_values(array_unique(array_merge($order, array_keys($engines))));
+
+        $html = '<div class="cabinet-sa-serp-diff cabinet-sa-serp-diff--snippets">';
+        if ($pageTitle !== '') {
+            $html .= '<div class="cabinet-sa-serp-diff__page">'
+                . '<div class="cabinet-sa-serp-diff__label">Заголовок на сайте (TITLE)</div>'
+                . '<div class="cabinet-sa-serp-diff__text">' . e($pageTitle) . '</div>'
+                . '</div>';
+        }
+
+        $html .= '<div class="cabinet-sa-serp-diff__engines">';
+        $any = false;
+        foreach ($keys as $engine) {
+            if (! isset($engines[$engine]) || ! is_array($engines[$engine])) {
+                continue;
+            }
+            $any = true;
+            $block = $engines[$engine];
+            $engineLabel = $engine === 'yandex' ? 'Яндекс'
+                : ($engine === 'google' ? 'Google' : $engine);
+            $serpTitle = trim((string) ($block['title'] ?? ''));
+            $snippet = trim((string) ($block['snippet'] ?? ''));
+            $indexed = array_key_exists('indexed', $block) ? ! empty($block['indexed']) : ($serpTitle !== '' || $snippet !== '');
+            $error = trim((string) ($block['error'] ?? ''));
+
+            $statusClass = 'cabinet-sa-serp-diff__engine-card';
+            $statusBadge = '';
+            if ($error !== '') {
+                $statusClass .= ' is-error';
+                $statusBadge = '<span class="cabinet-sa-serp-diff__status is-error">ошибка</span>';
+            } elseif (! $indexed) {
+                $statusClass .= ' is-miss';
+                $statusBadge = '<span class="cabinet-sa-serp-diff__status is-miss">нет в поиске</span>';
+            }
+
+            $html .= '<div class="' . $statusClass . '">';
+            $html .= '<div class="cabinet-sa-serp-diff__engine-head">'
+                . '<span class="cabinet-sa-serp-diff__engine">' . e($engineLabel) . '</span>'
+                . $statusBadge
+                . '</div>';
+
+            if ($error !== '') {
+                $html .= '<div class="cabinet-sa-serp-diff__text cabinet-sa-serp-diff__text--muted">'
+                    . e(self::clip($error, 120)) . '</div>';
+            } elseif (! $indexed) {
+                $html .= '<div class="cabinet-sa-serp-diff__text cabinet-sa-serp-diff__text--muted">'
+                    . 'В выдаче не нашли</div>';
+            } else {
+                if ($serpTitle !== '') {
+                    $html .= '<div class="cabinet-sa-serp-diff__label">Заголовок в поиске</div>'
+                        . '<div class="cabinet-sa-serp-diff__text">' . e($serpTitle) . '</div>';
+                }
+                if ($snippet !== '') {
+                    $html .= '<div class="cabinet-sa-serp-diff__snippet-inline">'
+                        . '<div class="cabinet-sa-serp-diff__label">Текст под ссылкой</div>'
+                        . '<div class="cabinet-sa-serp-diff__text cabinet-sa-serp-diff__text--muted">'
+                        . e($snippet) . '</div></div>';
+                }
+                if ($serpTitle === '' && $snippet === '') {
+                    $html .= '<div class="cabinet-sa-serp-diff__text cabinet-sa-serp-diff__text--muted">'
+                        . 'Есть в поиске, текст не получили</div>';
+                }
+            }
+            $html .= '</div>';
+        }
+        $html .= '</div></div>';
+
+        return $any || $pageTitle !== '' ? $html : null;
     }
 
     /**

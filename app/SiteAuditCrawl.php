@@ -249,7 +249,7 @@ class SiteAuditCrawl extends Model
             $sampled = (int) ($psi['sampled'] ?? 0);
             $cursor = (int) ($psi['cursor'] ?? 0);
             if ($sampled < 1) {
-                $sampled = max(1, (int) config('site_audit.psi_max_urls', 20));
+                $sampled = max(1, (int) config('site_audit.psi_max_urls', 30));
                 // этап PSI ещё не стартовал — считаем полный прогон
                 if ($stage !== '' && $stage !== 'psi' && $stage !== 'finalize') {
                     // до PSI ещё есть этапы — грубый запас

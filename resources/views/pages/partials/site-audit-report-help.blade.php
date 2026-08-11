@@ -6,7 +6,14 @@
         'serp_snippet_source',
     ], true);
     $isPsiFamily = in_array($code ?? '', ['psi_mobile', 'psi_desktop'], true);
-    $serpSampleMax = (int) config('site_audit.serp_snippets_max_urls', 12);
+    $helpSeverity = (string) (($meta['severity'] ?? '') ?: '');
+    $whyLabel = in_array($helpSeverity, ['info'], true) || ($code ?? '') === 'serp_snippets'
+        ? 'Зачем смотреть'
+        : 'Почему плохо';
+    $fixLabel = ($code ?? '') === 'serp_snippets'
+        ? 'Что делать'
+        : 'Как исправить';
+    $serpSampleMax = (int) config('site_audit.serp_snippets_max_urls', 30);
     $serpSampleDone = null;
     if ($isSerpSnippetsFamily && !empty($crawl)) {
         $serpProgress = is_array($crawl->progress_json['serp_snippets'] ?? null)
@@ -24,7 +31,7 @@
             }
         }
     }
-    $psiSampleMax = (int) config('site_audit.psi_max_urls', 20);
+    $psiSampleMax = (int) config('site_audit.psi_max_urls', config('site_audit.serp_snippets_max_urls', 30));
     $psiWarnPct = (int) round(((float) config('site_audit.psi_score_warn', 0.5)) * 100);
     $psiSampleDone = null;
     if ($isPsiFamily && !empty($crawl)) {
@@ -42,23 +49,27 @@
         <span class="cabinet-sa-help__text">{{ $help['what'] ?? '' }}</span>
     </div>
     <div class="cabinet-sa-help__row">
-        <span class="cabinet-sa-help__label">Почему плохо</span>
+        <span class="cabinet-sa-help__label">{{ $whyLabel }}</span>
         <span class="cabinet-sa-help__text">{{ $help['why'] ?? '' }}</span>
     </div>
     <div class="cabinet-sa-help__row">
-        <span class="cabinet-sa-help__label">Как исправить</span>
+        <span class="cabinet-sa-help__label">{{ $fixLabel }}</span>
         <span class="cabinet-sa-help__text">{{ $help['fix'] ?? '' }}</span>
     </div>
     @if($isSerpSnippetsFamily)
         <div class="cabinet-sa-help__row">
-            <span class="cabinet-sa-help__label">Выборка</span>
+            <span class="cabinet-sa-help__label">Сколько страниц</span>
             <span class="cabinet-sa-help__text">
-                Не весь сайт: до <strong>{{ $serpSampleMax }}</strong> URL
-                (посадочные страницы и несколько страниц из обхода), Яндекс и Google.
                 @if($serpSampleDone !== null)
-                    В этой проверке снято: <strong>{{ $serpSampleDone }}</strong>.
+                    В этой проверке посмотрели <strong>{{ number_format($serpSampleDone, 0, '', ' ') }}</strong>
+                    адресов в Яндексе и Google
+                    (один съём на URL → сниппеты, TITLE и источник).
+                @else
+                    Обычно берём до <strong>{{ number_format($serpSampleMax, 0, '', ' ') }}</strong> адресов
+                    (из мониторинга позиций и из обхода), не весь сайт.
+                    На каждый адрес — один запрос к выдаче, все отчёты читают один пакет.
                 @endif
-                Полный список своих URL со сверкой TITLE с выдачей — модуль
+                Нужен свой длинный список URL —
                 <a href="{{ route('pages.index-check') }}" target="_blank" rel="noopener">Проверка индексации</a>.
             </span>
         </div>

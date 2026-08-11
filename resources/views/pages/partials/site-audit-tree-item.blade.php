@@ -15,21 +15,32 @@
         && $itemCount === 0
         && is_array($probe)
         && ($probe['status'] ?? '') === 'skipped';
+    $showXmlBadges = empty($isPublic)
+        && auth()->check()
+        && method_exists(auth()->user(), 'hasRole')
+        && auth()->user()->hasRole(['admin', 'Super Admin']);
+    $usesXml = !empty($item['uses_xml']);
 @endphp
-<a class="cabinet-sa-tree__item {{ $isActive ? 'is-active' : '' }} {{ ($itemCount || $isExternal || $probeSkipped) ? '' : 'is-empty' }}{{ $isExternal ? ' cabinet-sa-tree__item--external' : '' }}{{ $probeSkipped ? ' cabinet-sa-tree__item--skipped' : '' }}"
+<a class="cabinet-sa-tree__item {{ $isActive ? 'is-active' : '' }} {{ ($itemCount || $isExternal || $probeSkipped) ? '' : 'is-empty' }}{{ $isExternal ? ' cabinet-sa-tree__item--external' : '' }}{{ $probeSkipped ? ' cabinet-sa-tree__item--skipped' : '' }}{{ ($showXmlBadges && $usesXml) ? ' cabinet-sa-tree__item--xml' : '' }}"
    href="{{ $itemHref }}"
    data-title="{{ $item['title'] }}"
    data-severity="{{ $sev }}"
    data-count="{{ $itemCount }}"
    @if($isExternal) data-external="1" @endif
    @if($probeSkipped) data-probe-skipped="1" @endif
-   title="{{ $isExternal ? 'Отдельный модуль Titlo — сначала объяснение, затем переход' : ($probeSkipped ? ('Не запускалась: ' . \App\Services\SiteAudit\SiteAuditProbeStatus::reasonLabel($probe['reason'] ?? null, $probe['probe'] ?? null)) : '') }}">
-    <span>
-        {{ $item['title'] }}
-        <span class="cabinet-sa-sev">({{ \App\Services\SiteAudit\SiteAuditFindingPresenter::severityTag($sev) }})</span>
-        @if(!empty($showGroup) && !empty($item['group']))
-            <span class="cabinet-sa-group-tag cabinet-sa-group-tag--{{ $item['group'] }}">{{ $item['group'] === 'seo' ? 'SEO' : 'тех' }}</span>
+   @if($showXmlBadges && $usesXml) data-xml="1" @endif
+   title="{{ $isExternal ? 'Отдельный модуль Titlo — сначала объяснение, затем переход' : ($probeSkipped ? ('Не запускалась: ' . \App\Services\SiteAudit\SiteAuditProbeStatus::reasonLabel($probe['reason'] ?? null, $probe['probe'] ?? null)) : '') }}{{ ($showXmlBadges && $usesXml) ? ((($isExternal || $probeSkipped) ? ' · ' : '') . 'Запросы к выдаче (XML)') : '' }}">
+    <span class="cabinet-sa-tree__item-main">
+        @if($showXmlBadges && $usesXml)
+            <span class="cabinet-sa-xml-tag" title="Запросы к выдаче (XML)">XML</span>
         @endif
+        <span class="cabinet-sa-tree__item-title">
+            {{ $item['title'] }}
+            <span class="cabinet-sa-sev">({{ \App\Services\SiteAudit\SiteAuditFindingPresenter::severityTag($sev) }})</span>
+            @if(!empty($showGroup) && !empty($item['group']))
+                <span class="cabinet-sa-group-tag cabinet-sa-group-tag--{{ $item['group'] }}">{{ $item['group'] === 'seo' ? 'SEO' : 'тех' }}</span>
+            @endif
+        </span>
     </span>
     @if($isExternal)
         <span class="cabinet-sa-badge cabinet-sa-badge--zero" title="Отдельный модуль — не счётчик ошибок">модуль</span>

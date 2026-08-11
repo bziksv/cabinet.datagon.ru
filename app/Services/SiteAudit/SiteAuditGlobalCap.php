@@ -263,6 +263,9 @@ class SiteAuditGlobalCap
                     DiscoverSiteAuditUrlsJob::dispatch($crawl->id);
                 }
 
+                // Local queue: если воркер мёртв/в sandbox без MySQL — краул иначе вечно «Запуск».
+                \App\Support\SiteAuditLocalQueueGuard::ensureWorkers();
+
                 return true;
             });
         } catch (\Throwable $e) {

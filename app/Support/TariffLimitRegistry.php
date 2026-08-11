@@ -189,7 +189,7 @@ class TariffLimitRegistry
             [
                 'code' => 'SiteAuditSchedules',
                 'module' => 'Аудит сайта (авторасписаний)',
-                'hint' => 'Проектов на автозапуске (= лимит проектов). Free 1 / Optimal 20 / Ultimate 50 / Maximum 100.',
+                'hint' => 'Проектов на автозапуске. Free 0 / Optimal 20 / Ultimate 50 / Maximum 100.',
                 'enforcement' => self::ENFORCEMENT_STRICT,
             ],
             [

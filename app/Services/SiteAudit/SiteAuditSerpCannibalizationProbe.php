@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Log;
  * Каннибализация по живым сниппетам: по запросу мониторинга в ТОП выдачи
  * ≥2 URL нашего домена → finding (не путать с duplicate_title на сайте).
  *
+ * Это searchQuery (выдача по фразе), не url-check. Общий SiteAuditSerpUrlBatch
+ * сюда не подходит — другой тип XML-запроса.
+ *
  * Gate: SITE_AUDIT_SERP_CANNIBALIZATION (по умолчанию = SITE_AUDIT_SERP_SNIPPETS).
  */
 class SiteAuditSerpCannibalizationProbe

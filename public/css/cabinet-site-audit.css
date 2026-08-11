@@ -455,11 +455,11 @@
   color: #0f172a;
 }
 
-/* V2: компактный список сайтов */
+/* V2: список сайтов — отдельные карточки, не сплошная простыня */
 .cabinet-sa-sites {
   border: 1px solid #e2e8f0;
   border-radius: 1rem;
-  background: #fff;
+  background: #f1f5f9;
   overflow: hidden;
 }
 
@@ -470,7 +470,7 @@
   gap: 0.75rem;
   padding: 0.9rem 1.1rem;
   border-bottom: 1px solid #e2e8f0;
-  background: #f8fafc;
+  background: #fff;
 }
 
 .cabinet-sa-sites__title {
@@ -509,12 +509,23 @@
   gap: 0.5rem;
 }
 
+.cabinet-sa-sites__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.75rem;
+}
+
 .cabinet-sa-site {
-  border-bottom: 1px solid #eef2f7;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
 }
 
 .cabinet-sa-site:last-child {
-  border-bottom: 0;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .cabinet-sa-site__row {
@@ -522,7 +533,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.55rem 0.85rem;
-  padding: 0.75rem 1.1rem;
+  padding: 0.85rem 1rem 0.7rem;
 }
 
 .cabinet-sa-site__main {
@@ -539,7 +550,7 @@
 .cabinet-sa-site__meta {
   font-size: 0.8rem;
   color: #64748b;
-  margin-top: 0.1rem;
+  margin-top: 0.15rem;
 }
 
 .cabinet-sa-site__chips {
@@ -582,8 +593,8 @@
 }
 
 .cabinet-sa-site__more {
-  border-top: 1px dashed #e2e8f0;
-  background: #fafbfc;
+  border-top: 1px solid #f1f5f9;
+  background: #fff;
 }
 
 .cabinet-sa-site__more-sum {
@@ -593,10 +604,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: 0.45rem 1.1rem;
-  font-size: 0.8rem;
-  font-weight: 650;
-  color: #64748b;
+  padding: 0.4rem 1rem 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
   user-select: none;
 }
 
@@ -605,12 +616,14 @@
 }
 
 .cabinet-sa-site__more-sum:hover {
-  color: #0f172a;
-  background: #f1f5f9;
+  color: #475569;
+  background: #f8fafc;
 }
 
 .cabinet-sa-site__more[open] .cabinet-sa-site__more-sum {
-  color: #0f172a;
+  color: #334155;
+  background: #f8fafc;
+  border-bottom: 1px solid #eef2f7;
 }
 
 .cabinet-sa-site__more[open] .cabinet-sa-site__more-sum .bi {
@@ -622,7 +635,8 @@
 }
 
 .cabinet-sa-site__more-body {
-  padding: 0.15rem 1.1rem 0.9rem;
+  padding: 0.65rem 1rem 0.95rem;
+  background: #f8fafc;
 }
 
 .cabinet-sa-site__schedule {
@@ -1151,6 +1165,34 @@
 
 .cabinet-sa-tree__item.is-empty {
   opacity: 0.55;
+}
+
+.cabinet-sa-tree__item-main {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.cabinet-sa-tree__item-title {
+  min-width: 0;
+}
+
+.cabinet-sa-xml-tag {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.15rem;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.5;
+  color: #1e3a8a;
+  background: #dbeafe;
+  border: 1px solid #93c5fd;
 }
 
 .cabinet-sa-badge {

@@ -6,7 +6,9 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
+use App\Support\SiteAuditLocalQueueGuard;
 use App\Support\SmtpSettingsRegistry;
 use App\Support\MailFromResolver;
 use App\Support\NotificationDispatchLogger;
@@ -42,6 +44,11 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->environment('local') && ($root = config('app.url'))) {
             URL::forceRootUrl(rtrim($root, '/'));
         }
+
+        // Local site_audit_local: heartbeat от живого queue:work (зомби без MySQL — age растёт).
+        Queue::looping(static function () {
+            SiteAuditLocalQueueGuard::touchHeartbeat();
+        });
 
         Validator::extend('website', function ($attribute, $value) {
             if (isset($value)) {

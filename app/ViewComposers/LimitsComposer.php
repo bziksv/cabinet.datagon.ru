@@ -388,10 +388,19 @@ class LimitsComposer
                 return 5;
 
             case 'SiteAudit':
-                return 4;
+                return 24;
 
             case 'SiteAuditCrawls':
-                return 5;
+                return 25;
+
+            case 'SiteAuditConcurrency':
+                return 26;
+
+            case 'SiteAuditProjects':
+                return 27;
+
+            case 'SiteAuditSchedules':
+                return 28;
 
             case 'EseninTextCheck':
                 return 4;

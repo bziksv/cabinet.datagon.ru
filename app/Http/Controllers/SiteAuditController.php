@@ -1511,6 +1511,23 @@ class SiteAuditController extends Controller
             $buckets = $this->bucketsFromTree($this->buildReportTree($counts, null));
         }
 
+        $queueHint = null;
+        if (! $crawl->isFinished()
+            && in_array($crawl->status, [
+                \App\SiteAuditCrawl::STATUS_QUEUED,
+                \App\SiteAuditCrawl::STATUS_DISCOVERING,
+                \App\SiteAuditCrawl::STATUS_FETCHING,
+            ], true)
+            && (int) $crawl->pages_fetched < 1
+            && $crawl->updated_at
+            && $crawl->updated_at->lt(now()->subSeconds(45))
+        ) {
+            $guard = \App\Support\SiteAuditLocalQueueGuard::ensureWorkers();
+            if (! ($guard['ok'] ?? true)) {
+                $queueHint = $guard['message'] ?? 'Очередь аудита не обрабатывается';
+            }
+        }
+
         return response()->json([
             'id' => $crawl->id,
             'status' => $crawl->status,
@@ -1530,6 +1547,7 @@ class SiteAuditController extends Controller
             'finished_at' => optional($crawl->finished_at)->format('d.m H:i'),
             'eta_at' => $crawl->estimateFinishedAtFormatted(),
             'eta_title' => $crawl->estimateFinishedAtTitle(),
+            'queue_hint' => $queueHint,
         ]);
     }
 
@@ -2055,6 +2073,7 @@ class SiteAuditController extends Controller
                 'external' => $isExternal,
                 'href' => $href,
                 'probe' => $probe,
+                'uses_xml' => ! empty($meta['uses_xml']),
             ];
         }
 

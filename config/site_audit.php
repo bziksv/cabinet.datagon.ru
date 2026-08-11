@@ -102,10 +102,11 @@ return [
     'serp_index_deep_sample' => (int) env('SITE_AUDIT_SERP_INDEX_DEEP', 20), // legacy
     'serp_index_deep_engine' => env('SITE_AUDIT_SERP_INDEX_DEEP_ENGINE', 'yandex'),
 
-    // Сниппеты ПС: посадочные + сэмпл (XML). По умолчанию вкл. — снимать при аудите; выкл.: SITE_AUDIT_SERP_SNIPPETS=0
+    // Сниппеты ПС: один XML-пакет на URL (SiteAuditSerpUrlBatch) → отчёты сниппеты/TITLE/источник.
+    // По умолчанию вкл. Выкл.: SITE_AUDIT_SERP_SNIPPETS=0
     'serp_snippets_enabled' => (bool) env('SITE_AUDIT_SERP_SNIPPETS', true),
     'serp_snippets_engines' => ['yandex', 'google'],
-    'serp_snippets_max_urls' => (int) env('SITE_AUDIT_SERP_SNIPPETS_MAX', 12),
+    'serp_snippets_max_urls' => (int) env('SITE_AUDIT_SERP_SNIPPETS_MAX', 30),
     // Каннибализация по живым сниппетам (по умолчанию тот же gate, что SERP-сниппеты)
     'serp_cannibalization_enabled' => (bool) env(
         'SITE_AUDIT_SERP_CANNIBALIZATION',
@@ -116,10 +117,10 @@ return [
     'serp_cannibalization_engines' => ['yandex'],
     'serp_cannibalization_yandex_lr' => env('SITE_AUDIT_SERP_CANNIBAL_LR', '213'),
 
-    // PSI (PageSpeed Insights v5). Выборка до psi_max_urls; mobile+desktop. Вкл. по умолчанию.
+    // PSI: те же URL, что SERP-пакет (SiteAuditSerpUrlBatch::sampleUrls), лимит = serp_snippets_max_urls по умолчанию.
     'psi_enabled' => (bool) env('SITE_AUDIT_PSI', true),
     'psi_api_key' => env('SITE_AUDIT_PSI_API_KEY', ''),
-    'psi_max_urls' => (int) env('SITE_AUDIT_PSI_MAX_URLS', 20),
+    'psi_max_urls' => (int) env('SITE_AUDIT_PSI_MAX_URLS', 30),
     'psi_strategies' => ['mobile', 'desktop'],
     'psi_score_warn' => (float) env('SITE_AUDIT_PSI_SCORE_WARN', 0.5),
     'psi_timeout' => (int) env('SITE_AUDIT_PSI_TIMEOUT', 75),
@@ -834,6 +835,7 @@ return [
             'title' => 'Низкая уникальность текста (внешний)',
             'description' => 'Текст страницы слабо уникален относительно выдачи (шинглы + SERP). Запуск вручную на вкладке «Антиплагиат».',
             'group' => 'seo',
+            'uses_xml' => true,
         ],
         'landing_no_inbound_internal' => [
             'phase' => 'C',
@@ -860,8 +862,9 @@ return [
             'phase' => 'B',
             'severity' => 'warning',
             'title' => 'Каннибализация по сниппетам (SERP)',
-            'description' => 'По запросу мониторинга в ТОП выдачи ≥2 URL вашего сайта (живые сниппеты). Gate SITE_AUDIT_SERP_CANNIBALIZATION / SERP_SNIPPETS.',
+            'description' => 'По запросу мониторинга в ТОП выдачи ≥2 URL вашего сайта (живые сниппеты). Отдельные запросы по фразам (не общий набор из 30 URL).',
             'group' => 'seo',
+            'uses_xml' => true,
         ],
         'landing_query_mismatch' => [
             'phase' => 'D',
@@ -961,14 +964,14 @@ return [
             'phase' => 'C',
             'severity' => 'info',
             'title' => 'Мобильные устройства (PSI)',
-            'description' => 'Скорость «как на телефоне»: до 20 URL, балл, метрики, рекомендации Google PSI.',
+            'description' => 'Скорость «как на телефоне»: до 30 URL (тот же набор, что у сниппетов), балл, метрики, рекомендации Google PSI.',
             'group' => 'tech',
         ],
         'psi_desktop' => [
             'phase' => 'C',
             'severity' => 'info',
             'title' => 'Компьютеры (PSI)',
-            'description' => 'Скорость «как на компьютере»: до 20 URL, балл, метрики, рекомендации Google PSI.',
+            'description' => 'Скорость «как на компьютере»: до 30 URL (тот же набор, что у сниппетов), балл, метрики, рекомендации Google PSI.',
             'group' => 'tech',
         ],
         'deep_pages' => [
@@ -994,15 +997,17 @@ return [
             'phase' => 'B',
             'severity' => 'info',
             'title' => 'Сниппеты Яндекс / Google',
-            'description' => 'Выборка (посадочные страницы и несколько страниц из обхода): title/snippet Яндекс и Google. Снимается при аудите.',
+            'description' => 'Как страница выглядит в поиске: заголовок и текст под ссылкой. Общий набор до 30 URL (с PSI), один съём на адрес.',
             'group' => 'seo',
+            'uses_xml' => true,
         ],
         'serp_title_mismatch' => [
             'phase' => 'B',
             'severity' => 'warning',
             'title' => 'TITLE страницы ≠ TITLE в выдаче',
-            'description' => 'Только расхождения по выборке: Яндекс и Google проверяются оба; совпавшая ПС в таблицу не попадает. Типичный rewrite бренда — не ошибка.',
+            'description' => 'Расхождения по общему набору до 30 URL: Яндекс и Google. Совпавшая ПС в таблицу не попадает. Типичный rewrite бренда — не ошибка.',
             'group' => 'seo',
+            'uses_xml' => true,
         ],
         'serp_not_indexed' => [
             'phase' => 'B',
@@ -1011,13 +1016,15 @@ return [
             'description' => 'Устарело: дублировало сверку Вебмастера. Индекс смотрите в «Страницы на сайте не в индексе поисковых».',
             'group' => 'seo',
             'deprecated' => true,
+            'uses_xml' => true,
         ],
         'serp_snippet_source' => [
             'phase' => 'C',
             'severity' => 'info',
             'title' => 'Подсветка источника сниппета',
-            'description' => 'Откуда в выдаче, похоже, взяли заголовок и текст: TITLE, H1, description или «неизвестно».',
+            'description' => 'Откуда в выдаче, похоже, взяли заголовок и текст: TITLE, H1, description или «неизвестно». Тот же набор до 30 URL.',
             'group' => 'seo',
+            'uses_xml' => true,
         ],
         'probable_affiliate' => [
             'phase' => 'C',
@@ -1058,6 +1065,7 @@ return [
             'route' => 'competitor.analysis',
             'external_cta' => 'Открыть анализ конкурентов',
             'related_codes' => [],
+            'uses_xml' => true,
         ],
         'site_index_check' => [
             'phase' => 'D',
@@ -1073,6 +1081,7 @@ return [
                 'serp_snippets',
                 'serp_title_mismatch',
             ],
+            'uses_xml' => true,
         ],
         'site_meta_tags' => [
             'phase' => 'D',

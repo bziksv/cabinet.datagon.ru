@@ -26,6 +26,7 @@
         </div>
     </header>
 
+    <div class="cabinet-sa-sites__list">
     @forelse($projects as $project)
         @php
             $last = $project->crawls->first();
@@ -231,4 +232,5 @@
             Сайтов пока нет — запустите первую проверку слева.
         </div>
     @endforelse
+    </div>
 </section>

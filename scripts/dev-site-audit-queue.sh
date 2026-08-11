@@ -47,6 +47,21 @@ NUM="${1:-2}"
 stop_workers
 
 mkdir -p "$PIDDIR"
+
+# Fail-fast: зомби-воркер без MySQL (sandbox) иначе вечно «Запуск».
+if ! "$PHP" -r '
+require "vendor/autoload.php";
+$app=require "bootstrap/app.php";
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+DB::connection()->getPdo();
+file_put_contents("storage/logs/dev-site-audit.heartbeat", (string) time());
+echo "db-ok\n";
+' >/dev/null 2>>"${PIDDIR}/dev-site-audit-guard.log"; then
+  echo "ERROR: MySQL недоступен — воркеры не стартую (проверь сеть/sandbox)."
+  echo "См. ${PIDDIR}/dev-site-audit-guard.log"
+  exit 1
+fi
+
 for i in $(seq 1 "$NUM"); do
   LOG="${PIDDIR}/dev-site-audit-${i}.log"
   PIDFILE="${PIDDIR}/dev-site-audit-${i}.pid"

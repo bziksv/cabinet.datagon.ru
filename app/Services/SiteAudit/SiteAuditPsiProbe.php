@@ -2,10 +2,8 @@
 
 namespace App\Services\SiteAudit;
 
-use App\Services\IndexCheckService;
 use App\SiteAuditCrawl;
 use App\SiteAuditFinding;
-use App\SiteAuditPage;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Log;
 
@@ -57,7 +55,10 @@ class SiteAuditPsiProbe
             return false;
         }
 
-        $max = max(1, (int) config('site_audit.psi_max_urls', 20));
+        $max = max(1, (int) config(
+            'site_audit.psi_max_urls',
+            config('site_audit.serp_snippets_max_urls', 30)
+        ));
         $strategies = config('site_audit.psi_strategies', ['mobile', 'desktop']);
         if (! is_array($strategies) || $strategies === []) {
             $strategies = ['mobile', 'desktop'];
@@ -234,51 +235,13 @@ class SiteAuditPsiProbe
      */
     private function sampleUrls(SiteAuditCrawl $crawl, int $max): array
     {
-        $seen = [];
+        // Тот же порядок URL, что у SERP XML-пакета (посадочные → краул).
+        $rows = (new SiteAuditSerpUrlBatch())->sampleUrls($crawl, $max);
         $out = [];
-
-        $add = function (string $url) use (&$seen, &$out, $max) {
-            if (count($out) >= $max) {
-                return;
-            }
-            $norm = IndexCheckService::normalizeUrl($url) ?: $url;
-            $key = SiteAuditUrlNormalizer::hash($norm);
-            if (isset($seen[$key])) {
-                return;
-            }
-            $seen[$key] = true;
-            $out[] = $norm;
-        };
-
-        $resolved = (new SiteAuditLandingResolver())->forCrawl($crawl);
-        foreach ($resolved['urls'] as $url) {
-            $add($url);
-            if (count($out) >= $max) {
-                return $out;
-            }
-        }
-
-        if (optional($crawl->project)->domain) {
-            $home = 'https://' . preg_replace('#^https?://#i', '', rtrim($crawl->project->domain, '/')) . '/';
-            $add($home);
-        }
-
-        if (count($out) < $max) {
-            $pages = SiteAuditPage::query()
-                ->where('crawl_id', $crawl->id)
-                ->whereNotNull('url')
-                ->where(function ($q) {
-                    $q->whereNull('status_code')->orWhereBetween('status_code', [200, 399]);
-                })
-                ->orderByRaw('CASE WHEN click_depth IS NULL THEN 999 ELSE click_depth END')
-                ->orderBy('id')
-                ->limit($max * 2)
-                ->pluck('url');
-            foreach ($pages as $u) {
-                $add((string) $u);
-                if (count($out) >= $max) {
-                    break;
-                }
+        foreach ($rows as $row) {
+            $url = (string) ($row['url'] ?? '');
+            if ($url !== '') {
+                $out[] = $url;
             }
         }
 

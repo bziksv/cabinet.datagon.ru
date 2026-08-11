@@ -193,8 +193,16 @@ class SiteAuditContacts
         $hasPrice = (bool) preg_match('/[₽€$]\s*\d|\d[\d\s]{0,12}\s*(₽|руб\.?|рублей|rub\b)/iu', $text)
             || (bool) preg_match('/\b(цена|стоимость|от\s+\d[\d\s]{2,})\b/iu', $t);
 
+        // Услуги (RU/EN) + e-commerce. Не одиночные «order»/«request» — ловят FAQ.
         $hasCta = false;
-        foreach (['купить', 'заказать', 'в корзину', 'оформить заказ', 'оставить заявку', 'добавить в корзину', 'buy now', 'add to cart'] as $w) {
+        foreach ([
+            'купить', 'заказать', 'в корзину', 'оформить заказ', 'оставить заявку', 'добавить в корзину',
+            'заказать звонок', 'получить консультац', 'рассчитать стоимость', 'связаться', 'написать нам',
+            'обсудить проект', 'получить смету', 'оставить заявк', 'отправьте заявк',
+            'buy now', 'add to cart', 'add to basket', 'order now', 'talk to us', 'contact us',
+            'get a quote', 'request a quote', 'request a', 'get started', 'book a call',
+            'free consultation', 'schedule a', 'send a request', 'leave a request',
+        ] as $w) {
             if (mb_strpos($t, $w) !== false) {
                 $hasCta = true;
                 break;

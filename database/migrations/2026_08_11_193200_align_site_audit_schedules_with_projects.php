@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Schema;
 class AlignSiteAuditSchedulesWithProjects extends Migration
 {
     private const LIMITS = [
-        'Free' => 1,
+        'Free' => 0,
         'Optimal' => 20,
         'Ultimate' => 50,
         'Maximum' => 100,

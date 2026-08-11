@@ -11,7 +11,7 @@ class SiteAuditDemoFixture
 {
     public const DOMAIN = 'demo-audit.titlo.ru';
     public const PROJECT_NAME = 'Демо: полный аудит (фикстура)';
-    public const DEMO_VERSION = 10;
+    public const DEMO_VERSION = 13;
     public const SHARE_TOKEN = 'demo-site-audit-rich';
 
     /**
@@ -297,7 +297,22 @@ class SiteAuditDemoFixture
                 'sitemap' => ['found' => true, 'url_count' => count($urls)],
                 // Чтобы в дереве не было «не было» у probe-вкладок
                 'psi' => ['ran' => true, 'ok' => true, 'checked' => 20],
-                'serp_snippets' => ['ran' => true, 'ok' => true, 'engines' => ['yandex', 'google']],
+                'serp_snippets' => [
+                    'ran' => true,
+                    'ok' => true,
+                    'engines' => ['yandex', 'google'],
+                    'sampled' => 30,
+                    'max_urls' => 30,
+                    'from_batch' => true,
+                ],
+                'serp_url_batch' => [
+                    'skipped' => false,
+                    'max_urls' => 30,
+                    'engines' => ['yandex', 'google'],
+                    'errors' => 0,
+                    'sampled' => 30,
+                    'rows' => [],
+                ],
                 'serp_cannibalization' => ['ran' => true, 'ok' => true],
                 'serp_index' => [
                     'ran' => true,
@@ -349,9 +364,12 @@ class SiteAuditDemoFixture
         ];
     }
 
-    /** Стабильно 10…100 на код. */
+    /** Стабильно 10…100 на код; SERP-выборки — как боевой лимит. */
     private static function countForCode(string $code): int
     {
+        if (in_array($code, ['serp_snippets', 'serp_title_mismatch', 'serp_snippet_source'], true)) {
+            return 30;
+        }
         $n = 10 + (abs(crc32($code)) % 91);
 
         return min(100, max(10, $n));
@@ -576,10 +594,46 @@ class SiteAuditDemoFixture
             case 'serp_not_indexed':
                 return ['engine' => 'yandex', 'in_index' => false];
             case 'serp_snippets':
+                $n = $j + 1;
+                $pageTitle = 'Демо TITLE #' . $n . ' — интернет-магазин';
+                $yTitle = $n % 3 === 0
+                    ? 'Другой заголовок в Яндексе #' . $n
+                    : $pageTitle;
+                $gTitle = $n % 4 === 0
+                    ? $pageTitle . ' | Titlo'
+                    : $pageTitle;
+
+                return [
+                    'source' => $n % 2 ? 'landing' : 'crawl',
+                    'page_title' => $pageTitle,
+                    'engines' => [
+                        'yandex' => [
+                            'indexed' => $n % 11 !== 0,
+                            'title' => $n % 11 === 0 ? null : $yTitle,
+                            'snippet' => $n % 11 === 0
+                                ? null
+                                : 'Демо-текст Яндекса под ссылкой для страницы #' . $n . '. Кратко о товаре и доставке.',
+                            'title_match' => $yTitle === $pageTitle,
+                            'title_mismatch' => $yTitle !== $pageTitle,
+                        ],
+                        'google' => [
+                            'indexed' => $n % 13 !== 0,
+                            'title' => $n % 13 === 0 ? null : $gTitle,
+                            'snippet' => $n % 13 === 0
+                                ? null
+                                : 'Google demo snippet for page #' . $n . ' — short description under the blue link.',
+                            'title_match' => $gTitle === $pageTitle,
+                            'title_mismatch' => $gTitle !== $pageTitle,
+                        ],
+                    ],
+                ];
             case 'serp_snippet_source':
                 return [
                     'engine' => $j % 2 ? 'google' : 'yandex',
-                    'snippet' => 'Демо-сниппет для витрины #' . ($j + 1),
+                    'title_source' => $j % 3 === 0 ? 'h1' : 'title',
+                    'snippet_source' => $j % 2 ? 'description' : 'body',
+                    'serp_title' => 'Заголовок в выдаче #' . ($j + 1),
+                    'snippet' => 'Текст под ссылкой в поиске для демо #' . ($j + 1),
                 ];
             case 'psi_mobile':
             case 'psi_desktop':

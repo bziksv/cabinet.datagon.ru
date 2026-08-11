@@ -62,6 +62,14 @@ class SiteAuditFindingPresenter
             return self::brokenInternalLinkDetailsHtml($meta);
         }
 
+        if ($code === 'external_assets') {
+            return self::externalAssetsDetailsHtml($meta);
+        }
+
+        if ($code === 'external_links') {
+            return self::externalLinksDetailsHtml($meta);
+        }
+
         if (in_array($code, ['redirect', 'redirect_chain_long', 'redirect_loop'], true)) {
             return self::redirectDetailsHtml($meta, $code);
         }
@@ -76,7 +84,6 @@ class SiteAuditFindingPresenter
             'landing_plagiarism_external',
             'mixed_content',
             'insecure_form',
-            'external_assets',
             'broken_image',
             'www_both_available',
             'http_https_both_available',
@@ -360,11 +367,7 @@ class SiteAuditFindingPresenter
                 return '—';
 
             case 'external_links':
-                if (isset($meta['count'])) {
-                    return 'внешних: ' . (int) $meta['count'];
-                }
-
-                return '—';
+                return self::externalLinksPlain($meta);
 
             case 'meta_spam':
                 $bits = [];
@@ -477,8 +480,9 @@ class SiteAuditFindingPresenter
                 }
                 $refN = (int) ($meta['referrer_count'] ?? 0);
                 if ($refN > 0) {
-                    $first = ! empty($meta['referrers'][0]) ? self::clip((string) $meta['referrers'][0], 45) : '';
-                    $bits[] = 'ссылаются: ' . $refN . ($first !== '' ? ' · ' . $first : '');
+                    // URL страниц со ссылкой — в колонке «Страница со ссылкой», не дублируем здесь
+                    // (длинный URL + nowrap ломал таблицу).
+                    $bits[] = 'ссылаются: ' . $refN;
                 } elseif (array_key_exists('referrer_count', $meta)) {
                     $bits[] = 'ссылок с страниц проверки нет';
                 }
@@ -666,10 +670,7 @@ class SiteAuditFindingPresenter
                 return isset($meta['count']) ? ('nofollow-ссылок: ' . (int) $meta['count']) : '—';
 
             case 'external_assets':
-                $n = (int) ($meta['count'] ?? 0);
-                $sample = ! empty($meta['samples'][0]) ? ' · ' . self::clip((string) $meta['samples'][0], 70) : '';
-
-                return $n ? ('внешних: ' . $n . $sample) : '—';
+                return self::externalAssetsPlain($meta);
 
             case 'soft_404':
                 $bits = [];
@@ -1492,6 +1493,227 @@ class SiteAuditFindingPresenter
             . $pill
             . '<div class="cabinet-sa-details-stack__url">' . self::urlLinkHtml($asset) . '</div>'
             . '</div>';
+    }
+
+    /**
+     * Исходящие ссылки на чужие домены: хост · полный URL.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private static function externalLinksDetailsHtml(array $meta): ?string
+    {
+        $samples = self::normalizeUrlSamples($meta);
+        $n = (int) ($meta['count'] ?? count($samples));
+        if ($samples === [] && $n <= 0) {
+            return null;
+        }
+
+        $parts = [];
+        if ($n > 0) {
+            $parts[] = '<div class="mb-1"><strong>внешних ссылок: ' . $n . '</strong></div>';
+        }
+        if ($samples === []) {
+            return $parts ? implode('', $parts) : null;
+        }
+
+        $parts[] = '<ul class="mb-0 ps-3 cabinet-sa-ext-assets">';
+        foreach (array_slice($samples, 0, 15) as $item) {
+            $host = $item['host'] !== '' ? e($item['host']) : '—';
+            $parts[] = '<li class="cabinet-sa-ext-assets__item">'
+                . '<span class="text-secondary">→ ' . $host . '</span>'
+                . '<div class="cabinet-sa-details-stack__url">' . self::urlLinkHtml($item['url']) . '</div>'
+                . '</li>';
+        }
+        $parts[] = '</ul>';
+        if ($n > count($samples)) {
+            $parts[] = '<div class="text-secondary small mt-1">показаны '
+                . count($samples) . ' из ' . $n . '</div>';
+        }
+
+        return implode('', $parts);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function externalLinksPlain(array $meta): string
+    {
+        $samples = self::normalizeUrlSamples($meta);
+        $n = (int) ($meta['count'] ?? count($samples));
+        if ($n <= 0 && $samples === []) {
+            return '—';
+        }
+
+        $bits = ['внешних: ' . max($n, count($samples))];
+        $hosts = [];
+        foreach ($samples as $item) {
+            if ($item['host'] !== '' && ! isset($hosts[$item['host']])) {
+                $hosts[$item['host']] = true;
+            }
+        }
+        if ($hosts) {
+            $bits[] = 'хосты: ' . implode(', ', array_slice(array_keys($hosts), 0, 5));
+        }
+        if ($samples) {
+            $bits[] = self::clip($samples[0]['url'], 80);
+        }
+
+        return implode(' · ', $bits);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return list<array{url:string,host:string}>
+     */
+    private static function normalizeUrlSamples(array $meta): array
+    {
+        $raw = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+        $out = [];
+        foreach ($raw as $sample) {
+            $url = '';
+            if (is_string($sample)) {
+                $url = trim($sample);
+            } elseif (is_array($sample)) {
+                $url = trim((string) ($sample['url'] ?? $sample['href'] ?? $sample['src'] ?? ''));
+            }
+            if ($url === '') {
+                continue;
+            }
+            $host = (string) (parse_url($url, PHP_URL_HOST) ?: '');
+            $out[] = ['url' => $url, 'host' => $host];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Список внешних script/css/img: тип · хост · полный URL.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private static function externalAssetsDetailsHtml(array $meta): ?string
+    {
+        $items = self::normalizeExternalAssetItems($meta);
+        $n = (int) ($meta['count'] ?? count($items));
+        if ($items === [] && $n <= 0) {
+            return null;
+        }
+
+        $parts = [];
+        if ($n > 0) {
+            $parts[] = '<div class="mb-1"><strong>внешних файлов: ' . $n . '</strong></div>';
+        }
+        if ($items === []) {
+            return $parts ? implode('', $parts) : null;
+        }
+
+        $parts[] = '<ul class="mb-0 ps-3 cabinet-sa-ext-assets">';
+        foreach (array_slice($items, 0, 15) as $item) {
+            $kindLabel = self::externalAssetKindLabel($item['kind']);
+            $host = $item['host'] !== '' ? e($item['host']) : '—';
+            $parts[] = '<li class="cabinet-sa-ext-assets__item">'
+                . '<span class="cabinet-sa-ext-assets__kind">' . e($kindLabel) . '</span>'
+                . ' <span class="text-secondary">с ' . $host . '</span>'
+                . '<div class="cabinet-sa-details-stack__url">' . self::urlLinkHtml($item['url']) . '</div>'
+                . '</li>';
+        }
+        $parts[] = '</ul>';
+        if ($n > count($items)) {
+            $parts[] = '<div class="text-secondary small mt-1">показаны '
+                . count($items) . ' из ' . $n . '</div>';
+        }
+
+        return implode('', $parts);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function externalAssetsPlain(array $meta): string
+    {
+        $items = self::normalizeExternalAssetItems($meta);
+        $n = (int) ($meta['count'] ?? count($items));
+        if ($n <= 0 && $items === []) {
+            return '—';
+        }
+
+        $bits = ['внешних: ' . max($n, count($items))];
+        $hosts = [];
+        foreach ($items as $item) {
+            if ($item['host'] !== '' && ! isset($hosts[$item['host']])) {
+                $hosts[$item['host']] = true;
+            }
+        }
+        if ($hosts) {
+            $bits[] = 'хосты: ' . implode(', ', array_slice(array_keys($hosts), 0, 5));
+        }
+        if ($items) {
+            $first = $items[0];
+            $bits[] = self::externalAssetKindLabel($first['kind']) . ' ' . self::clip($first['url'], 80);
+        }
+
+        return implode(' · ', $bits);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return list<array{url:string,kind:string,host:string}>
+     */
+    private static function normalizeExternalAssetItems(array $meta): array
+    {
+        $raw = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+        $out = [];
+        foreach ($raw as $sample) {
+            $url = '';
+            $kind = 'file';
+            if (is_string($sample)) {
+                $url = trim($sample);
+                $kind = self::guessExternalAssetKind($url);
+            } elseif (is_array($sample)) {
+                $url = trim((string) ($sample['url'] ?? $sample['src'] ?? $sample['href'] ?? ''));
+                $kind = trim((string) ($sample['kind'] ?? $sample['type'] ?? ''));
+                if ($kind === '') {
+                    $kind = self::guessExternalAssetKind($url);
+                }
+            }
+            if ($url === '') {
+                continue;
+            }
+            $host = (string) (parse_url($url, PHP_URL_HOST) ?: '');
+            $out[] = ['url' => $url, 'kind' => $kind, 'host' => $host];
+        }
+
+        return $out;
+    }
+
+    private static function guessExternalAssetKind(string $url): string
+    {
+        $path = strtolower((string) (parse_url($url, PHP_URL_PATH) ?: $url));
+        if (preg_match('/\.(js)(\?|$)/', $path)) {
+            return 'script';
+        }
+        if (preg_match('/\.(css)(\?|$)/', $path)) {
+            return 'css';
+        }
+        if (preg_match('/\.(png|jpe?g|gif|webp|svg|ico|avif)(\?|$)/', $path)) {
+            return 'img';
+        }
+
+        return 'file';
+    }
+
+    private static function externalAssetKindLabel(string $kind): string
+    {
+        switch ($kind) {
+            case 'script':
+                return 'JS';
+            case 'css':
+                return 'CSS';
+            case 'img':
+                return 'картинка';
+            default:
+                return 'файл';
+        }
     }
 
     /**

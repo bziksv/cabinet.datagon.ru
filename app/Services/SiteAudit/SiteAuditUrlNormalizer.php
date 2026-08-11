@@ -40,8 +40,15 @@ class SiteAuditUrlNormalizer
             }
         }
 
+        // prefer_host — только унификация www/без www СВОЕГО домена.
+        // Иначе внешние https://vk.com/primeltd превращаются в https://prime-ltd.su/primeltd.
         if (! empty($opts['prefer_host']) && empty($opts['allowed_hosts'])) {
-            $host = strtolower((string) $opts['prefer_host']);
+            $prefer = strtolower((string) $opts['prefer_host']);
+            $preferBare = preg_replace('/^www\./', '', $prefer);
+            $bare = preg_replace('/^www\./', '', $host);
+            if ($bare === $preferBare) {
+                $host = $prefer;
+            }
         } elseif (! empty($opts['strip_www'])) {
             $host = preg_replace('/^www\./', '', $host);
         }

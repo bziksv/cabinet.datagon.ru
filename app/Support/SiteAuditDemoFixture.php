@@ -11,7 +11,7 @@ class SiteAuditDemoFixture
 {
     public const DOMAIN = 'demo-audit.titlo.ru';
     public const PROJECT_NAME = 'Демо: полный аудит (фикстура)';
-    public const DEMO_VERSION = 3;
+    public const DEMO_VERSION = 5;
     public const SHARE_TOKEN = 'demo-site-audit-rich';
 
     /**
@@ -430,12 +430,38 @@ class SiteAuditDemoFixture
             case 'images_without_alt':
             case 'page_has_broken_links':
             case 'too_many_strong':
-            case 'external_links':
             case 'duplicate_links':
             case 'links_nofollow':
                 return ['count' => 1 + ($j % 4)];
+            case 'external_links':
+                return [
+                    'count' => 2 + ($j % 3),
+                    'samples' => [
+                        'https://example.com/partner/',
+                        'https://t.me/demo_channel',
+                        'https://vk.com/demo_group',
+                    ],
+                ];
             case 'broken_image':
                 return ['src' => $base . '/img/broken-' . ($j + 1) . '.jpg', 'status' => 404];
+            case 'external_assets':
+                return [
+                    'count' => 3,
+                    'samples' => [
+                        [
+                            'url' => 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
+                            'kind' => 'script',
+                        ],
+                        [
+                            'url' => 'https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap',
+                            'kind' => 'css',
+                        ],
+                        [
+                            'url' => 'https://mc.yandex.ru/metrika/tag.js',
+                            'kind' => 'script',
+                        ],
+                    ],
+                ];
             case 'lost_file':
                 return [
                     'asset' => $base . '/assets/app-' . ($j % 5) . '.css',

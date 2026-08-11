@@ -495,16 +495,26 @@ class SiteAuditPageProcessor
                         'count' => $links['nofollow_links'],
                     ]);
                 }
-                if ($links['external_assets']) {
+                if ($links['external_assets'] || ! empty($links['external_asset_items'])) {
+                    $items = is_array($links['external_asset_items'] ?? null)
+                        ? $links['external_asset_items']
+                        : [];
+                    if ($items === [] && ! empty($links['external_assets'])) {
+                        foreach (array_slice($links['external_assets'], 0, 15) as $assetUrl) {
+                            $items[] = ['url' => (string) $assetUrl, 'kind' => 'file'];
+                        }
+                    }
                     $findings[] = $this->finding('external_assets', $url, $urlHash, [
-                        'count' => count($links['external_assets']),
-                        'samples' => array_slice($links['external_assets'], 0, 5),
+                        'count' => (int) ($links['external_assets']
+                            ? count($links['external_assets'])
+                            : count($items)),
+                        'samples' => array_slice($items, 0, 15),
                     ]);
                 }
                 if (! empty($links['external'])) {
                     $findings[] = $this->finding('external_links', $url, $urlHash, [
                         'count' => count($links['external']),
-                        'samples' => array_slice($links['external'], 0, 5),
+                        'samples' => array_slice($links['external'], 0, 15),
                     ]);
                     $aff = SiteAuditAffiliateDetector::fromExternalUrls($links['external']);
                     if ($aff) {

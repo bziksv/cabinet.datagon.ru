@@ -1535,10 +1535,31 @@
 .cabinet-sa-findings-table > colgroup > .cabinet-sa-col-from { width: 24%; }
 .cabinet-sa-findings-table > colgroup > .cabinet-sa-col-actions { width: 168px; }
 
+.cabinet-sa-table-wrap--broken > .cabinet-sa-findings-table > colgroup > .cabinet-sa-col-url { width: 32%; }
+.cabinet-sa-table-wrap--broken > .cabinet-sa-findings-table > colgroup > .cabinet-sa-col-details { width: 18%; }
+.cabinet-sa-table-wrap--broken > .cabinet-sa-findings-table > colgroup > .cabinet-sa-col-from { width: 28%; }
+.cabinet-sa-table-wrap--broken > .cabinet-sa-findings-table > colgroup > .cabinet-sa-col-actions { width: 168px; }
+
+.cabinet-sa-findings-table td {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  vertical-align: top;
+}
+
+.cabinet-sa-findings-table td.cabinet-sa-url,
+.cabinet-sa-findings-table td.cabinet-sa-from-cell,
+.cabinet-sa-findings-table td.cabinet-sa-details-cell {
+  overflow: hidden;
+  max-width: 0; /* table-layout:fixed — ячейка уважает ширину col, длинный URL переносится */
+}
+
 .cabinet-sa-actions-cell {
   width: 168px;
-  overflow: visible;
+  overflow: hidden;
   vertical-align: top;
+  background: #fff;
+  position: relative;
+  z-index: 2;
 }
 
 .cabinet-sa-actions {
@@ -1962,13 +1983,44 @@
   line-height: 1.35;
 }
 
+.cabinet-sa-ext-assets {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.cabinet-sa-ext-assets__item {
+  margin-bottom: 0.45rem;
+}
+
+.cabinet-sa-ext-assets__kind {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  background: #eef2ff;
+  color: #3730a3;
+}
+
 .cabinet-sa-table-wrap--broken .cabinet-sa-details-cell {
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .cabinet-sa-from-cell {
   font-size: 12.5px;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.cabinet-sa-from-cell a,
+.cabinet-sa-url a {
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 .cabinet-sa-note-cell .cabinet-sa-note-form textarea,

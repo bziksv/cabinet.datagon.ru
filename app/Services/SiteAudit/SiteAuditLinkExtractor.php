@@ -14,6 +14,7 @@ class SiteAuditLinkExtractor
      *   external:string[],
      *   nofollow_links:int,
      *   external_assets:string[],
+     *   external_asset_items:list<array{url:string,kind:string}>,
      *   meta_nofollow:bool
      * }
      */
@@ -24,6 +25,7 @@ class SiteAuditLinkExtractor
         $external = [];
         $nofollowLinks = 0;
         $externalAssets = [];
+        $externalAssetItems = [];
         $badLinks = [];
 
         // Ссылки в <!-- ... --> не живут в DOM для пользователя/бота — не считаем.
@@ -111,6 +113,23 @@ class SiteAuditLinkExtractor
             }
         }
 
+        $addExternalAsset = function (string $abs, string $kind) use (&$externalAssets, &$externalAssetItems, $projectHost) {
+            $h = SiteAuditUrlNormalizer::hostOf($abs);
+            if (! $h) {
+                return;
+            }
+            $bare = preg_replace('/^www\./', '', $h);
+            $baseBare = preg_replace('/^www\./', '', strtolower($projectHost));
+            if ($bare === $baseBare) {
+                return;
+            }
+            if (isset($externalAssets[$abs])) {
+                return;
+            }
+            $externalAssets[$abs] = true;
+            $externalAssetItems[] = ['url' => $abs, 'kind' => $kind];
+        };
+
         $imgSrcs = [];
         if (preg_match_all('/<img\b([^>]*)>/i', $html, $imgTags)) {
             foreach ($imgTags[1] as $attrs) {
@@ -128,66 +147,44 @@ class SiteAuditLinkExtractor
                     continue;
                 }
                 $imgSrcs[$abs] = true;
+                if (count($externalAssetItems) < 25) {
+                    $addExternalAsset($abs, 'img');
+                }
                 if (count($imgSrcs) >= 40) {
                     break;
                 }
             }
         }
 
-        $patterns = [
-            '/<script\b[^>]*\bsrc\s*=\s*["\']([^"\']+)["\']/i',
-            '/<link\b[^>]*\brel\s*=\s*["\'][^"\']*stylesheet[^"\']*["\'][^>]*\bhref\s*=\s*["\']([^"\']+)["\']/i',
-            '/<link\b[^>]*\bhref\s*=\s*["\']([^"\']+)["\'][^>]*\brel\s*=\s*["\'][^"\']*stylesheet[^"\']*["\']/i',
-        ];
+        // Внешние script + stylesheet (+ полный список asset_srcs для других проверок)
         $assetSrcs = [];
-        foreach ($patterns as $re) {
-            if (! preg_match_all($re, $html, $mm)) {
-                continue;
-            }
-            $group = isset($mm[1]) ? $mm[1] : [];
-            foreach ($group as $src) {
-                $src = html_entity_decode(trim($src), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-                if ($src === '' || strpos($src, 'data:') === 0) {
-                    continue;
-                }
-                $abs = SiteAuditUrlNormalizer::resolve($src, $baseUrl, null, $opts);
-                if (! $abs) {
-                    continue;
-                }
-                $assetSrcs[$abs] = true;
-                if (count($assetSrcs) >= 40) {
-                    break 2;
-                }
-            }
-        }
-
-        $patternsExt = [
-            '/<script\b[^>]*\bsrc\s*=\s*["\']([^"\']+)["\']/i',
-            '/<link\b[^>]*\bhref\s*=\s*["\']([^"\']+)["\']/i',
+        $assetPatterns = [
+            'script' => ['/<script\b[^>]*\bsrc\s*=\s*["\']([^"\']+)["\']/i'],
+            'css' => [
+                '/<link\b[^>]*\brel\s*=\s*["\'][^"\']*stylesheet[^"\']*["\'][^>]*\bhref\s*=\s*["\']([^"\']+)["\']/i',
+                '/<link\b[^>]*\bhref\s*=\s*["\']([^"\']+)["\'][^>]*\brel\s*=\s*["\'][^"\']*stylesheet[^"\']*["\']/i',
+            ],
         ];
-        foreach ($patternsExt as $re) {
-            if (! preg_match_all($re, $html, $mm)) {
-                continue;
-            }
-            foreach ($mm[1] as $src) {
-                $src = html_entity_decode(trim($src), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-                if ($src === '' || strpos($src, 'data:') === 0) {
+        foreach ($assetPatterns as $kind => $patterns) {
+            foreach ($patterns as $re) {
+                if (! preg_match_all($re, $html, $mm)) {
                     continue;
                 }
-                $abs = SiteAuditUrlNormalizer::resolve($src, $baseUrl, null, $opts);
-                if (! $abs) {
-                    continue;
-                }
-                $h = SiteAuditUrlNormalizer::hostOf($abs);
-                if (! $h) {
-                    continue;
-                }
-                $bare = preg_replace('/^www\./', '', $h);
-                $baseBare = preg_replace('/^www\./', '', strtolower($projectHost));
-                if ($bare !== $baseBare) {
-                    $externalAssets[$abs] = true;
-                    if (count($externalAssets) >= 20) {
-                        break 2;
+                foreach ($mm[1] as $src) {
+                    $src = html_entity_decode(trim($src), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    if ($src === '' || strpos($src, 'data:') === 0) {
+                        continue;
+                    }
+                    $abs = SiteAuditUrlNormalizer::resolve($src, $baseUrl, null, $opts);
+                    if (! $abs) {
+                        continue;
+                    }
+                    $assetSrcs[$abs] = true;
+                    if (count($externalAssetItems) < 25) {
+                        $addExternalAsset($abs, $kind);
+                    }
+                    if (count($assetSrcs) >= 40 && count($externalAssetItems) >= 25) {
+                        break 3;
                     }
                 }
             }
@@ -208,6 +205,7 @@ class SiteAuditLinkExtractor
             'external' => array_keys($external),
             'nofollow_links' => $nofollowLinks,
             'external_assets' => array_keys($externalAssets),
+            'external_asset_items' => $externalAssetItems,
             'meta_nofollow' => $metaNofollow,
             'duplicate_links' => $dupLinks,
             'duplicate_links_count' => count(array_filter($internalCounts, function ($c) {

@@ -459,17 +459,30 @@ class SiteAuditPageProcessor
 
                 $contacts = is_array($parsed['contacts'] ?? null) ? $parsed['contacts'] : [];
                 if (! empty($contacts['commercial']) && (int) ($pageData['word_count'] ?? 0) >= 40) {
+                    // Телефон обязателен. Адрес сам по себе не валим, если телефон уже есть
+                    // (часто в шапке; адрес — в JSON-LD / на /kontakty/).
                     $missing = [];
                     if (empty($contacts['has_phone'])) {
                         $missing[] = 'phone';
-                    }
-                    if (empty($contacts['has_address'])) {
-                        $missing[] = 'address';
+                        if (empty($contacts['has_address'])) {
+                            $missing[] = 'address';
+                        }
                     }
                     if ($missing !== []) {
-                        $findings[] = $this->finding('commercial_missing_contacts', $url, $urlHash, [
-                            'missing' => $missing,
-                        ]);
+                        $meta = ['missing' => $missing];
+                        if (! empty($contacts['phone_sample'])) {
+                            $meta['phone_sample'] = $contacts['phone_sample'];
+                        }
+                        if (! empty($contacts['address_sample'])) {
+                            $meta['address_sample'] = $contacts['address_sample'];
+                        }
+                        if (! empty($contacts['phone_source'])) {
+                            $meta['phone_source'] = $contacts['phone_source'];
+                        }
+                        if (! empty($contacts['address_source'])) {
+                            $meta['address_source'] = $contacts['address_source'];
+                        }
+                        $findings[] = $this->finding('commercial_missing_contacts', $url, $urlHash, $meta);
                     }
                     if (empty($contacts['has_price'])) {
                         $findings[] = $this->finding('commercial_missing_price', $url, $urlHash);

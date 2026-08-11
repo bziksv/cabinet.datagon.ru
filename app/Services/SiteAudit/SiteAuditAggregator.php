@@ -2513,19 +2513,45 @@ class SiteAuditAggregator
             if ($count < 2) {
                 continue;
             }
+            $groupUrls = [];
             foreach ($group as $page) {
+                $u = trim((string) $page->url);
+                if ($u !== '' && ! in_array($u, $groupUrls, true)) {
+                    $groupUrls[] = $u;
+                }
+            }
+            $groupLabel = null;
+            if ($code === 'duplicate_content') {
+                foreach ($group as $page) {
+                    $t = trim((string) ($page->title ?? ''));
+                    if ($t !== '') {
+                        $groupLabel = $t;
+                        break;
+                    }
+                }
+            }
+            foreach ($group as $page) {
+                $pageUrl = trim((string) $page->url);
+                $peers = array_values(array_filter($groupUrls, static function ($u) use ($pageUrl) {
+                    return $u !== $pageUrl;
+                }));
+                $meta = [
+                    'group_size' => $count,
+                    'hash' => $hash,
+                    'title' => $page->title,
+                    'description' => $page->description,
+                    'peer_urls' => array_slice($peers, 0, 12),
+                ];
+                if ($groupLabel !== null) {
+                    $meta['label'] = $groupLabel;
+                }
                 SiteAuditFinding::query()->create([
                     'crawl_id' => $crawlId,
                     'code' => $code,
                     'severity' => $severity,
                     'url' => $page->url,
                     'url_hash' => $page->url_hash,
-                    'meta_json' => [
-                        'group_size' => $count,
-                        'hash' => $hash,
-                        'title' => $page->title,
-                        'description' => $page->description,
-                    ],
+                    'meta_json' => $meta,
                 ]);
             }
         }

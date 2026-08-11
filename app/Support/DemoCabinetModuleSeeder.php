@@ -773,16 +773,19 @@ HTML;
 
         if ($existing) {
             $ver = (int) data_get($existing->settings_json, 'demo_version', 0);
-            if ($ver >= \App\Support\SiteAuditDemoFixture::DEMO_VERSION) {
-                $crawlId = SiteAuditCrawl::query()
-                    ->where('project_id', $existing->id)
-                    ->orderByDesc('id')
-                    ->value('id');
+            $crawlId = (int) SiteAuditCrawl::query()
+                ->where('project_id', $existing->id)
+                ->orderByDesc('id')
+                ->value('id');
+            if ($ver >= \App\Support\SiteAuditDemoFixture::DEMO_VERSION && $crawlId > 0) {
                 $this->out('site-audit: уже есть (crawl #' . $crawlId . ', v' . $ver . ')');
 
                 return 'skip';
             }
-            // Старая скудная фикстура — пересоздаём.
+            // Обновляем на месте — crawl_id не меняем (закладки / URL в чатах).
+            if ($crawlId > 0) {
+                return $this->refreshSiteAuditDemoInPlace($userId, $existing, $crawlId);
+            }
             $this->purgeSiteAuditDomain($userId, \App\Support\SiteAuditDemoFixture::DOMAIN);
         }
 
@@ -841,6 +844,80 @@ HTML;
             . ', findings ' . $sum['findings']
             . ', codes ' . $sum['codes']
             . ', share ' . \App\Support\SiteAuditDemoFixture::SHARE_TOKEN . ')'
+        );
+
+        return 'ok';
+    }
+
+    /**
+     * Перезалить фикстуру в существующий crawl_id (URL не меняется).
+     */
+    private function refreshSiteAuditDemoInPlace(int $userId, SiteAuditProject $project, int $crawlId): string
+    {
+        $data = \App\Support\SiteAuditDemoFixture::build($userId);
+
+        $project->name = $data['project']['name'];
+        $project->settings_json = json_decode($data['project']['settings_json'], true);
+        $project->save();
+
+        SiteAuditFinding::query()->where('crawl_id', $crawlId)->delete();
+        SiteAuditPage::query()->where('crawl_id', $crawlId)->delete();
+        SiteAuditCrawlStat::query()->where('crawl_id', $crawlId)->delete();
+
+        SiteAuditCrawl::query()
+            ->where('share_token', \App\Support\SiteAuditDemoFixture::SHARE_TOKEN)
+            ->where('id', '<>', $crawlId)
+            ->update(['share_token' => null]);
+
+        $crawlPayload = $data['crawl'];
+        unset($crawlPayload['user_id'], $crawlPayload['created_at']);
+        $crawl = SiteAuditCrawl::query()->find($crawlId);
+        if (! $crawl) {
+            $this->warnOut('site-audit: crawl #' . $crawlId . ' пропал при refresh');
+
+            return 'fail';
+        }
+        $crawl->fill(array_merge($crawlPayload, [
+            'project_id' => $project->id,
+            'user_id' => $userId,
+            'buckets_json' => json_decode($crawlPayload['buckets_json'], true),
+            'counts_json' => json_decode($crawlPayload['counts_json'], true),
+            'progress_json' => json_decode($crawlPayload['progress_json'], true),
+            'save_html' => false,
+        ]));
+        $crawl->save();
+
+        foreach ($data['pages'] as $row) {
+            $row['crawl_id'] = $crawlId;
+            $row['out_links_json'] = json_decode((string) $row['out_links_json'], true);
+            SiteAuditPage::query()->create($row);
+        }
+
+        foreach ($data['findings'] as $f) {
+            SiteAuditFinding::query()->create([
+                'crawl_id' => $crawlId,
+                'code' => $f['code'],
+                'severity' => $f['severity'],
+                'url' => $f['url'],
+                'url_hash' => $f['url_hash'],
+                'meta_json' => $f['meta_json'] !== null ? json_decode($f['meta_json'], true) : null,
+            ]);
+        }
+
+        foreach ($data['stats'] as $s) {
+            SiteAuditCrawlStat::query()->create([
+                'crawl_id' => $crawlId,
+                'bucket' => $s['bucket'],
+                'value' => $s['value'],
+            ]);
+        }
+
+        $sum = $data['summary'];
+        $this->out(
+            'site-audit: refresh in-place crawl #' . $crawlId
+            . ' (pages ' . $sum['pages']
+            . ', findings ' . $sum['findings']
+            . ', codes ' . $sum['codes'] . ')'
         );
 
         return 'ok';

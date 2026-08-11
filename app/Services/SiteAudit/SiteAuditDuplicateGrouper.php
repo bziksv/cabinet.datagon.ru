@@ -222,11 +222,13 @@ class SiteAuditDuplicateGrouper
             foreach ($rawSamples as $sample) {
                 $target = '';
                 $kind = '';
+                $scope = '';
                 if (is_string($sample)) {
                     $target = trim($sample);
                 } elseif (is_array($sample)) {
                     $target = trim((string) ($sample['url'] ?? $sample['href'] ?? $sample['src'] ?? ''));
                     $kind = trim((string) ($sample['kind'] ?? ''));
+                    $scope = trim((string) ($sample['scope'] ?? ''));
                 }
                 if ($target === '') {
                     continue;
@@ -250,6 +252,12 @@ class SiteAuditDuplicateGrouper
                             $label = '«' . self::clipLabel($anchor, 48) . '» → ' . $label;
                         }
                     }
+                    if ($scope === '' && $code === 'external_assets') {
+                        $scope = 'external';
+                    }
+                    if ($scope === '' && in_array($code, ['broken_external_link', 'page_has_broken_external_links'], true)) {
+                        $scope = 'external';
+                    }
                     $buckets[$sig] = [
                         'hash' => $sig,
                         'size' => 0,
@@ -261,8 +269,11 @@ class SiteAuditDuplicateGrouper
                         'likely_template' => false,
                         'href' => $target,
                         'host' => $host,
+                        'scope' => $scope,
                         '_urls' => [],
                     ];
+                } elseif ($scope !== '' && ($buckets[$sig]['scope'] ?? '') === '') {
+                    $buckets[$sig]['scope'] = $scope;
                 }
 
                 if ($pageUrl !== '' && ! isset($buckets[$sig]['_urls'][$pageUrl])) {
@@ -404,6 +415,16 @@ class SiteAuditDuplicateGrouper
 
     private static function labelFor(string $code, array $meta): string
     {
+        if ($code === 'duplicate_content') {
+            if (! empty($meta['label'])) {
+                return 'Текст ≈ «' . self::clipLabel((string) $meta['label'], 100) . '»';
+            }
+            if (! empty($meta['title'])) {
+                return 'Текст ≈ title «' . self::clipLabel((string) $meta['title'], 100) . '»';
+            }
+
+            return 'Одинаковый текст страниц';
+        }
         if ($code === 'duplicate_description' && ! empty($meta['description'])) {
             return (string) $meta['description'];
         }

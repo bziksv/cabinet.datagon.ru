@@ -11,7 +11,7 @@ class SiteAuditDemoFixture
 {
     public const DOMAIN = 'demo-audit.titlo.ru';
     public const PROJECT_NAME = 'Демо: полный аудит (фикстура)';
-    public const DEMO_VERSION = 5;
+    public const DEMO_VERSION = 10;
     public const SHARE_TOKEN = 'demo-site-audit-rich';
 
     /**
@@ -380,6 +380,29 @@ class SiteAuditDemoFixture
     }
 
     /**
+     * Другие URL той же демо-группы дублей (как в emitDuplicates → peer_urls).
+     *
+     * @return list<string>
+     */
+    private static function demoPeerUrls(string $base, int $j, int $groupSize): array
+    {
+        $paths = self::pagePaths();
+        $n = count($paths);
+        $groupId = (int) floor($j / $groupSize);
+        $selfIdx = $j % $n;
+        $peers = [];
+        for ($k = 0; $k < $groupSize; $k++) {
+            $idx = ($groupId * $groupSize + $k) % $n;
+            if ($idx === $selfIdx) {
+                continue;
+            }
+            $peers[] = $base . $paths[$idx];
+        }
+
+        return $peers;
+    }
+
+    /**
      * @return array<string,mixed>|null
      */
     private static function metaFor(string $code, string $base, string $url, int $j): ?array
@@ -414,18 +437,56 @@ class SiteAuditDemoFixture
                     'loop' => true,
                 ];
             case 'duplicate_title':
-                $title = 'Дубль TITLE группы ' . ((int) floor($j / 8) + 1);
+                $groupSize = 8;
+                $groupId = (int) floor($j / $groupSize);
+                $title = 'Дубль TITLE: «Каталог — группа ' . ($groupId + 1) . '»';
+                $peers = self::demoPeerUrls($base, $j, $groupSize);
 
-                return ['title' => $title, 'hash' => hash('sha256', $title), 'group_size' => 8];
+                return [
+                    'title' => $title,
+                    'hash' => hash('sha256', $title),
+                    'group_size' => $groupSize,
+                    'peer_urls' => $peers,
+                    'label' => $title,
+                ];
             case 'duplicate_description':
-                $desc = 'Одинаковое description #' . ((int) floor($j / 6) + 1);
+                $groupSize = 6;
+                $groupId = (int) floor($j / $groupSize);
+                $desc = 'Одинаковое description: доставка и оплата, группа ' . ($groupId + 1);
+                $peers = self::demoPeerUrls($base, $j, $groupSize);
 
-                return ['description' => $desc, 'hash' => hash('sha256', $desc), 'group_size' => 6];
+                return [
+                    'description' => $desc,
+                    'hash' => hash('sha256', $desc),
+                    'group_size' => $groupSize,
+                    'peer_urls' => $peers,
+                    'label' => $desc,
+                ];
             case 'duplicate_content':
-                return ['hash' => hash('sha256', 'dup-content-' . ((int) floor($j / 4))), 'group_size' => 4];
+                $groupSize = 4;
+                $groupId = (int) floor($j / $groupSize);
+                $labels = [
+                    'Карточка товара: насос Прайм-100 (шаблон без уникального текста)',
+                    'Страница доставки: копипаст из /delivery/ на языковые зеркала',
+                    'Пустой листинг каталога: один и тот же HTML на фильтрах',
+                    'Контакты: одинаковый блок реквизитов на /contacts/ и /about/',
+                    'Промо-лендинг: клон оффера с другим URL',
+                ];
+                $label = $labels[$groupId % count($labels)];
+                $hashKey = 'dup-content-' . $groupId;
+                $peers = self::demoPeerUrls($base, $j, $groupSize);
+
+                return [
+                    'hash' => hash('sha256', $hashKey),
+                    'group_size' => $groupSize,
+                    'peer_urls' => $peers,
+                    'label' => $label,
+                    'title' => $label,
+                ];
             case 'similar_pages':
                 return [
                     'similar_url' => $base . '/catalog/item-' . (($j % 40) + 1) . '/',
+                    'hamming' => 3 + ($j % 5),
                     'distance' => 3 + ($j % 5),
                 ];
             case 'thin_content':
@@ -583,7 +644,49 @@ class SiteAuditDemoFixture
             case 'negative_content':
                 return ['hits' => ['demo', 'fixture'], 'score' => 2 + ($j % 3)];
             case 'heavy_image':
-                return ['src' => $base . '/img/big-' . $j . '.jpg', 'bytes' => 2500000];
+                $count = 1 + ($j % 2);
+                $threshold = 500000;
+                $samples = [];
+                for ($s = 0; $s < $count; $s++) {
+                    $id = (($j + $s * 3) % 12) + 10;
+                    $samples[] = [
+                        'img' => 'https://picsum.photos/id/' . $id . '/1600/1200',
+                        'size_bytes' => 1800000 + (($j + $s) % 5) * 250000,
+                        'threshold' => $threshold,
+                    ];
+                }
+
+                return [
+                    'count' => $count,
+                    'threshold' => $threshold,
+                    'samples' => $samples,
+                ];
+            case 'probable_affiliate':
+                $nets = ['admitad', 'cityads', 'amazon', 'awin', 'generic'];
+                $samples = [
+                    [
+                        'url' => 'https://ad.admitad.com/g/demo' . ($j + 1) . '/?ulp=https%3A%2F%2Fshop.example%2Fitem',
+                        'network' => 'admitad',
+                    ],
+                ];
+                if ($j % 2 === 1) {
+                    $samples[] = [
+                        'url' => 'https://www.awin1.com/cread.php?awinmid=1&awinaffid=demo' . $j,
+                        'network' => 'awin',
+                    ];
+                }
+                if ($j % 3 === 0) {
+                    $samples[] = [
+                        'url' => $base . '/go.php?aff_id=42&offer=' . ($j + 1),
+                        'network' => 'generic',
+                    ];
+                }
+
+                return [
+                    'count' => count($samples),
+                    'samples' => $samples,
+                    'network' => $nets[$j % count($nets)],
+                ];
             case 'page_too_large':
                 return ['size_bytes' => 2500000 + $j * 1000];
             case 'duplicate_url_variants':

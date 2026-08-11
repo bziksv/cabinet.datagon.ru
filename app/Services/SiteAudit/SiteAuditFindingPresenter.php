@@ -38,8 +38,24 @@ class SiteAuditFindingPresenter
             return null;
         }
 
+        if ($code === 'commercial_missing_contacts') {
+            return self::commercialMissingContactsHtml($meta);
+        }
+
+        if ($code === 'probable_affiliate') {
+            return self::probableAffiliateDetailsHtml($meta);
+        }
+
+        if ($code === 'heavy_image') {
+            return self::heavyImageDetailsHtml($meta);
+        }
+
         if ($code === 'duplicate_url_variants') {
             return self::duplicateUrlVariantsHtml($meta, $url);
+        }
+
+        if (in_array($code, ['duplicate_content', 'duplicate_title', 'duplicate_description'], true)) {
+            return self::duplicatePeersHtml($code, $meta, $url);
         }
 
         if ($code === 'page_has_bad_links') {
@@ -181,6 +197,308 @@ class SiteAuditFindingPresenter
         return $html;
     }
 
+    private static function commercialMissingContactsHtml(array $meta): ?string
+    {
+        $plain = self::commercialMissingContactsPlain($meta);
+        if ($plain === '—' || $plain === '') {
+            return null;
+        }
+
+        return '<div class="cabinet-sa-contacts-miss">' . e($plain) . '</div>';
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function commercialMissingContactsPlain(array $meta): string
+    {
+        $miss = isset($meta['missing']) && is_array($meta['missing']) ? $meta['missing'] : [];
+        $labels = [];
+        foreach ($miss as $m) {
+            $m = (string) $m;
+            if ($m === 'phone') {
+                $labels[] = 'телефон';
+            } elseif ($m === 'address') {
+                $labels[] = 'адрес';
+            } elseif ($m !== '') {
+                $labels[] = $m;
+            }
+        }
+        if ($labels === []) {
+            return 'нет контактов';
+        }
+
+        $parts = ['нет: ' . implode(' и ', $labels)];
+        if (! empty($meta['phone_sample'])) {
+            $parts[] = 'найден телефон: ' . self::clip((string) $meta['phone_sample'], 40);
+        }
+        if (! empty($meta['address_sample'])) {
+            $parts[] = 'найден адрес: ' . self::clip((string) $meta['address_sample'], 60);
+        }
+
+        return implode(' · ', $parts);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function probableAffiliateDetailsHtml(array $meta): ?string
+    {
+        $samples = self::probableAffiliateSamples($meta);
+        if ($samples === []) {
+            return null;
+        }
+
+        $n = max((int) ($meta['count'] ?? 0), count($samples));
+        $html = '<div class="cabinet-sa-aff">';
+        $html .= '<div class="cabinet-sa-aff__head">партнёрских: '
+            . number_format($n, 0, '', ' ') . '</div>';
+        foreach (array_slice($samples, 0, 8) as $sample) {
+            $netLabel = self::affiliateNetworkLabel($sample['network']);
+            $html .= '<div class="cabinet-sa-aff__card">';
+            $html .= '<div class="cabinet-sa-aff__net">' . e($netLabel) . '</div>';
+            $host = (string) (parse_url($sample['url'], PHP_URL_HOST) ?? '');
+            if ($host !== '') {
+                $html .= '<div class="cabinet-sa-aff__host">' . e($host) . '</div>';
+            }
+            $html .= '<a class="cabinet-sa-aff__url cabinet-sa-url-break" href="'
+                . e($sample['url']) . '" target="_blank" rel="noopener noreferrer">'
+                . e($sample['url']) . '</a>';
+            $html .= '</div>';
+        }
+        $more = $n - min(8, count($samples));
+        if ($more > 0) {
+            $html .= '<div class="cabinet-sa-aff__more">и ещё '
+                . number_format($more, 0, '', ' ') . '</div>';
+        }
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function probableAffiliatePlain(array $meta): string
+    {
+        $samples = self::probableAffiliateSamples($meta);
+        if ($samples === []) {
+            return 'партнёрские ссылки';
+        }
+        $n = max((int) ($meta['count'] ?? 0), count($samples));
+        $nets = [];
+        foreach ($samples as $s) {
+            $label = self::affiliateNetworkLabel($s['network']);
+            if ($label !== '' && ! isset($nets[$label])) {
+                $nets[$label] = true;
+            }
+        }
+        $parts = ['партнёрских: ' . $n];
+        if ($nets !== []) {
+            $parts[] = implode(', ', array_slice(array_keys($nets), 0, 4));
+        }
+        $parts[] = $samples[0]['url'];
+
+        return implode(' · ', $parts);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return list<array{url:string,network:string}>
+     */
+    private static function probableAffiliateSamples(array $meta): array
+    {
+        $raw = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+        $out = [];
+        foreach ($raw as $sample) {
+            if (is_string($sample)) {
+                $url = trim($sample);
+                if ($url === '') {
+                    continue;
+                }
+                $out[] = ['url' => $url, 'network' => 'generic'];
+                continue;
+            }
+            if (! is_array($sample)) {
+                continue;
+            }
+            $url = trim((string) ($sample['url'] ?? $sample['href'] ?? ''));
+            if ($url === '') {
+                continue;
+            }
+            $out[] = [
+                'url' => $url,
+                'network' => trim((string) ($sample['network'] ?? 'generic')) ?: 'generic',
+            ];
+        }
+
+        return $out;
+    }
+
+    private static function affiliateNetworkLabel(string $network): string
+    {
+        $map = [
+            'admitad' => 'Admitad',
+            'actionpay' => 'ActionPay',
+            'gdeslon' => 'GdeSlon',
+            'cityads' => 'CityAds',
+            'advertise' => 'Advertise.ru',
+            'tradetracker' => 'TradeTracker',
+            'awin' => 'Awin',
+            'cj' => 'CJ / Commission Junction',
+            'amazon' => 'Amazon',
+            'generic' => 'партнёрский URL',
+        ];
+        $key = strtolower(trim($network));
+
+        return $map[$key] ?? ($network !== '' ? $network : 'партнёрский URL');
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function heavyImageDetailsHtml(array $meta): ?string
+    {
+        $samples = self::heavyImageSamples($meta);
+        if ($samples === []) {
+            return null;
+        }
+
+        $threshold = (int) ($meta['threshold'] ?? 0);
+        if ($threshold <= 0) {
+            $threshold = (int) ($samples[0]['threshold'] ?? 0);
+        }
+
+        $html = '<div class="cabinet-sa-heavy">';
+        foreach (array_slice($samples, 0, 5) as $sample) {
+            $img = (string) $sample['img'];
+            $bytes = (int) $sample['bytes'];
+            $name = self::heavyImageBasename($img);
+            $html .= '<div class="cabinet-sa-heavy__card">';
+            $html .= '<a class="cabinet-sa-heavy__thumb" href="' . e($img) . '" target="_blank" rel="noopener noreferrer" title="Открыть изображение">';
+            $html .= '<img src="' . e($img) . '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"'
+                . ' onerror="this.parentElement.classList.add(\'is-broken\');this.remove();">';
+            $html .= '<span class="cabinet-sa-heavy__thumb-fallback" aria-hidden="true">IMG</span>';
+            $html .= '</a>';
+            $html .= '<div class="cabinet-sa-heavy__body">';
+            if ($bytes > 0) {
+                $html .= '<div class="cabinet-sa-heavy__size">' . e(self::formatBytes($bytes)) . '</div>';
+                if ($threshold > 0 && $bytes > $threshold) {
+                    $over = $bytes / max(1, $threshold);
+                    $html .= '<div class="cabinet-sa-heavy__meta">порог '
+                        . e(self::formatBytes($threshold))
+                        . ' · тяжелее в '
+                        . e(self::formatHeavyRatio($over))
+                        . '</div>';
+                }
+            }
+            if ($name !== '') {
+                $html .= '<div class="cabinet-sa-heavy__name" title="' . e($name) . '">' . e($name) . '</div>';
+            }
+            $html .= '<a class="cabinet-sa-heavy__url cabinet-sa-url-break" href="' . e($img)
+                . '" target="_blank" rel="noopener noreferrer">' . e($img) . '</a>';
+            $html .= '</div></div>';
+        }
+        $more = count($samples) - min(5, count($samples));
+        if ($more > 0) {
+            $html .= '<div class="cabinet-sa-heavy__more">и ещё '
+                . number_format($more, 0, '', ' ') . ' на этой странице</div>';
+        }
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return list<array{img:string,bytes:int,threshold:int}>
+     */
+    private static function heavyImageSamples(array $meta): array
+    {
+        $out = [];
+        $raw = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+        foreach ($raw as $sample) {
+            if (! is_array($sample)) {
+                continue;
+            }
+            $img = trim((string) ($sample['img'] ?? $sample['src'] ?? $sample['url'] ?? ''));
+            if ($img === '') {
+                continue;
+            }
+            $out[] = [
+                'img' => $img,
+                'bytes' => (int) ($sample['size_bytes'] ?? $sample['bytes'] ?? 0),
+                'threshold' => (int) ($sample['threshold'] ?? $meta['threshold'] ?? 0),
+            ];
+        }
+        if ($out === []) {
+            $img = trim((string) ($meta['src'] ?? $meta['img'] ?? $meta['url'] ?? ''));
+            if ($img !== '') {
+                $out[] = [
+                    'img' => $img,
+                    'bytes' => (int) ($meta['bytes'] ?? $meta['size_bytes'] ?? 0),
+                    'threshold' => (int) ($meta['threshold'] ?? 0),
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    private static function heavyImageBasename(string $url): string
+    {
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?? '');
+        $base = rawurldecode(basename($path));
+        if ($base !== '' && $base !== '/' && $base !== '.' && preg_match('/\.(jpe?g|png|gif|webp|avif|svg|bmp|ico)(\?|$)/i', $base)) {
+            return $base;
+        }
+        $host = (string) (parse_url($url, PHP_URL_HOST) ?? '');
+        $path = trim($path, '/');
+        if ($host !== '' && $path !== '') {
+            return $host . '/' . self::clip($path, 48);
+        }
+        if ($host !== '') {
+            return $host;
+        }
+
+        return $base !== '' && $base !== '/' ? $base : '';
+    }
+
+    private static function formatHeavyRatio(float $ratio): string
+    {
+        if ($ratio >= 10) {
+            return (string) (int) round($ratio) . '×';
+        }
+        if ($ratio >= 2) {
+            return str_replace('.', ',', (string) round($ratio, 1)) . '×';
+        }
+
+        return str_replace('.', ',', (string) round($ratio, 2)) . '×';
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function heavyImagePlain(array $meta): string
+    {
+        $samples = self::heavyImageSamples($meta);
+        if ($samples === []) {
+            return 'тяжёлое изображение';
+        }
+        $parts = [];
+        $n = max((int) ($meta['count'] ?? 0), count($samples));
+        if ($n > 1) {
+            $parts[] = 'тяжёлых: ' . number_format($n, 0, '', ' ');
+        }
+        $first = $samples[0];
+        if ($first['bytes'] > 0) {
+            $parts[] = self::formatBytes($first['bytes']);
+        }
+        $parts[] = $first['img'];
+
+        return implode(' · ', $parts);
+    }
+
     /**
      * @param  array<string, mixed>  $meta
      */
@@ -221,6 +539,150 @@ class SiteAuditFindingPresenter
         $html .= '</ul></div>';
 
         return $html;
+    }
+
+    /**
+     * Дубли title/description/content: что совпало + другие URL в группе.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private static function duplicatePeersHtml(string $code, array $meta, ?string $rowUrl = null): ?string
+    {
+        $size = (int) ($meta['group_size'] ?? 0);
+        $peers = self::peerUrlsFromMeta($meta, $rowUrl);
+        $match = self::duplicateMatchLabel($code, $meta);
+
+        if ($match === '' && $peers === [] && $size < 2) {
+            return null;
+        }
+
+        $html = '<div class="cabinet-sa-url-variants cabinet-sa-dup-peers">';
+        $html .= '<div class="cabinet-sa-url-variants__head">';
+        if ($match !== '') {
+            $html .= '<span class="cabinet-sa-dup-peers__match">' . e(self::clip($match, 120)) . '</span>';
+        }
+        if ($size > 0) {
+            $html .= ($match !== '' ? ' · ' : '')
+                . '<span class="cabinet-sa-dup-peers__size">'
+                . number_format($size, 0, '', ' ') . ' стр. с одинаковым '
+                . self::duplicateKindWord($code)
+                . '</span>';
+        }
+        $html .= '</div>';
+
+        if ($peers !== []) {
+            $shown = array_slice($peers, 0, 8);
+            $more = count($peers) - count($shown);
+            $html .= '<div class="cabinet-sa-url-variants__diff">те же, что:</div>';
+            $html .= '<ul class="cabinet-sa-url-variants__list">';
+            foreach ($shown as $peer) {
+                $html .= '<li><a href="' . e($peer) . '" target="_blank" rel="noopener noreferrer">'
+                    . e($peer) . '</a></li>';
+            }
+            $html .= '</ul>';
+            if ($more > 0) {
+                $html .= '<div class="text-secondary small mt-1">и ещё '
+                    . number_format($more, 0, '', ' ') . ' — удобнее смотреть вид «Группы»</div>';
+            }
+        } elseif ($size > 1) {
+            $html .= '<div class="text-secondary small mt-1">откройте вид «Группы», чтобы увидеть все URL с этим совпадением</div>';
+        }
+
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function duplicatePeersPlain(string $code, array $meta, ?string $rowUrl = null): string
+    {
+        $parts = [];
+        $match = self::duplicateMatchLabel($code, $meta);
+        if ($match !== '') {
+            $parts[] = self::clip($match, 80);
+        }
+        $size = (int) ($meta['group_size'] ?? 0);
+        if ($size > 0) {
+            $parts[] = 'в группе: ' . $size;
+        }
+        $peers = self::peerUrlsFromMeta($meta, $rowUrl);
+        if ($peers !== []) {
+            $parts[] = 'те же: ' . implode(', ', array_map(static function ($u) {
+                return self::clip($u, 60);
+            }, array_slice($peers, 0, 4)));
+            if (count($peers) > 4) {
+                $parts[] = '…+' . (count($peers) - 4);
+            }
+        }
+
+        return $parts ? implode(' · ', $parts) : '—';
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return list<string>
+     */
+    private static function peerUrlsFromMeta(array $meta, ?string $rowUrl = null): array
+    {
+        $raw = [];
+        if (isset($meta['peer_urls']) && is_array($meta['peer_urls'])) {
+            $raw = $meta['peer_urls'];
+        } elseif (! empty($meta['peer_url'])) {
+            $raw = [(string) $meta['peer_url']];
+        } elseif (isset($meta['urls']) && is_array($meta['urls'])) {
+            $raw = $meta['urls'];
+        }
+
+        $out = [];
+        foreach ($raw as $u) {
+            $u = trim((string) $u);
+            if ($u === '' || ($rowUrl !== null && $u === $rowUrl)) {
+                continue;
+            }
+            if (! in_array($u, $out, true)) {
+                $out[] = $u;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function duplicateMatchLabel(string $code, array $meta): string
+    {
+        if ($code === 'duplicate_description') {
+            return trim((string) ($meta['description'] ?? $meta['label'] ?? ''));
+        }
+        if ($code === 'duplicate_title') {
+            return trim((string) ($meta['title'] ?? $meta['label'] ?? ''));
+        }
+        // content
+        $label = trim((string) ($meta['label'] ?? ''));
+        if ($label !== '') {
+            return 'текст ≈ «' . $label . '»';
+        }
+        $title = trim((string) ($meta['title'] ?? ''));
+        if ($title !== '') {
+            return 'текст ≈ title «' . $title . '»';
+        }
+
+        return 'одинаковый текст страниц';
+    }
+
+    private static function duplicateKindWord(string $code): string
+    {
+        if ($code === 'duplicate_title') {
+            return 'title';
+        }
+        if ($code === 'duplicate_description') {
+            return 'description';
+        }
+
+        return 'текстом';
     }
 
     /**
@@ -284,18 +746,8 @@ class SiteAuditFindingPresenter
         switch ($code) {
             case 'duplicate_title':
             case 'duplicate_description':
-                $parts = [];
-                if (! empty($meta['group_size'])) {
-                    $parts[] = 'в группе: ' . (int) $meta['group_size'];
-                }
-                if (! empty($meta['title'])) {
-                    $parts[] = 'title: ' . self::clip($meta['title'], 80);
-                }
-                if (! empty($meta['description'])) {
-                    $parts[] = 'desc: ' . self::clip($meta['description'], 80);
-                }
-
-                return $parts ? implode(' · ', $parts) : '—';
+            case 'duplicate_content':
+                return self::duplicatePeersPlain($code, $meta, $url);
 
             case 'thin_content':
                 return isset($meta['word_count'])
@@ -672,11 +1124,6 @@ class SiteAuditFindingPresenter
 
                 return $parts ? implode(' · ', $parts) : '—';
 
-            case 'duplicate_content':
-                return isset($meta['group_size'])
-                    ? ('в группе: ' . (int) $meta['group_size'])
-                    : '—';
-
             case 'meta_nofollow':
                 $bits = [];
                 if (! empty($meta['robots'])) {
@@ -880,11 +1327,7 @@ class SiteAuditFindingPresenter
                     . ($hits !== '' ? (' · ' . $hits) : '');
 
             case 'commercial_missing_contacts':
-                $miss = isset($meta['missing']) && is_array($meta['missing'])
-                    ? implode(', ', $meta['missing'])
-                    : '';
-
-                return $miss !== '' ? ('нет: ' . $miss) : 'нет контактов';
+                return self::commercialMissingContactsPlain($meta);
 
             case 'commercial_missing_price':
                 return 'нет цены';
@@ -913,12 +1356,7 @@ class SiteAuditFindingPresenter
                 return $n ? ('битых img: ' . $n . ($img !== '' ? ' · ' . $img : '')) : 'битое изображение';
 
             case 'heavy_image':
-                $n = (int) ($meta['count'] ?? 0);
-                $sz = ! empty($meta['samples'][0]['size_bytes'])
-                    ? round(((int) $meta['samples'][0]['size_bytes']) / 1024) . ' KB'
-                    : '';
-
-                return $n ? ('тяжёлых: ' . $n . ($sz !== '' ? ' · ' . $sz : '')) : 'тяжёлое изображение';
+                return self::heavyImagePlain($meta);
 
             case 'error_spike':
                 $kind = (string) ($meta['kind'] ?? '');
@@ -1128,14 +1566,7 @@ class SiteAuditFindingPresenter
                 return self::serpSnippetSourcePlain($meta);
 
             case 'probable_affiliate':
-                $n = (int) ($meta['count'] ?? 0);
-                $net = ! empty($meta['samples'][0]['network'])
-                    ? (string) $meta['samples'][0]['network']
-                    : '';
-
-                return $n
-                    ? ('affiliate: ' . $n . ($net !== '' ? ' · ' . $net : ''))
-                    : 'affiliate-ссылки';
+                return self::probableAffiliatePlain($meta);
 
             case 'missing_permissions_policy':
                 return 'нет Permissions-Policy';
@@ -1266,9 +1697,13 @@ class SiteAuditFindingPresenter
             $href = trim((string) ($sample['href'] ?? $sample['url'] ?? ''));
             $text = trim((string) ($sample['text'] ?? ''));
             $scope = (string) ($sample['scope'] ?? '');
-            $scopeBit = $scope === 'internal'
-                ? '<span class="badge badge-light border">внутр.</span> '
-                : ($scope === 'external' ? '<span class="badge badge-light border">внешн.</span> ' : '');
+            if ($scope === 'internal') {
+                $scopeBit = '<span class="cabinet-sa-link-scope cabinet-sa-link-scope--internal">внутр.</span> ';
+            } elseif ($scope === 'external') {
+                $scopeBit = '<span class="cabinet-sa-link-scope cabinet-sa-link-scope--external">внешн.</span> ';
+            } else {
+                $scopeBit = '';
+            }
             $anchorBit = $text !== ''
                 ? '<span class="cabinet-sa-nofollow-list__anchor">«' . e(self::clip($text, 70)) . '»</span>'
                 : '<span class="text-muted">без анкора</span>';
@@ -2215,12 +2650,21 @@ class SiteAuditFindingPresenter
     private static function formatBytes(int $bytes): string
     {
         if ($bytes < 1024) {
-            return $bytes . ' B';
+            return $bytes . ' Б';
+        }
+        // Круглые пороги из конфига (500000) — показываем как 500 КБ, не 488.
+        if ($bytes >= 100000 && $bytes % 1000 === 0 && $bytes < 1048576) {
+            return number_format((int) round($bytes / 1000), 0, '', ' ') . ' КБ';
         }
         if ($bytes < 1048576) {
-            return round($bytes / 1024, 1) . ' KB';
-        }
+            $kb = $bytes / 1024;
+            $label = $kb >= 100 ? (string) (int) round($kb) : (string) round($kb, 1);
 
-        return round($bytes / 1048576, 2) . ' MB';
+            return str_replace('.', ',', $label) . ' КБ';
+        }
+        $mb = $bytes / 1048576;
+        $label = $mb >= 10 ? (string) (int) round($mb) : (string) round($mb, 2);
+
+        return str_replace('.', ',', $label) . ' МБ';
     }
 }

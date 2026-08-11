@@ -246,7 +246,10 @@
 
 @if(!empty($canNote))
     <div class="alert alert-light border small mb-3 cabinet-sa-note-legend">
-        Заметка / Исправлено / Игнор — навсегда для проекта (тип ошибки + URL). Наведите на «?» у кнопки.
+        <strong>Заметка</strong> — комментарий к строке.
+        <strong>Исправлено</strong> — починили, строка уходит из счётчиков.
+        <strong>Игнор</strong> — не ошибка / ложное срабатывание.
+        Пометки помнятся для этого сайта (тот же тип замечания + тот же адрес) в следующих проверках, пока сами не снимете.
     </div>
 @endif
 
@@ -256,14 +259,19 @@
             @php $tone = $gi % 6; @endphp
             <div class="cabinet-sa-dup-group cabinet-sa-dup-group--t{{ $tone }}{{ !empty($group['likely_template']) ? ' cabinet-sa-dup-group--template' : '' }}">
                 <div class="cabinet-sa-dup-group__head">
-                    <span class="cabinet-sa-dup-group__count">{{ number_format((int) $group['size'], 0, '', ' ') }} стр.</span>
-                    @if(!empty($group['likely_template']))
-                        <span class="cabinet-sa-dup-group__badge" title="{{ !empty($isLinkInvertedReport) ? 'Одинаковая исходящая на многих URL — почти наверняка общий блок' : 'Одинаковая ошибка на многих URL — почти наверняка общий шаблон' }}">{{ !empty($isLinkInvertedReport) ? 'общий блок' : 'сквозной' }}</span>
-                    @endif
+                    <div class="cabinet-sa-dup-group__meta">
+                        <span class="cabinet-sa-dup-group__count">{{ number_format((int) $group['size'], 0, '', ' ') }} стр.</span>
+                        @if(!empty($isLinkInvertedReport) && (($group['scope'] ?? '') === 'external' || ($group['scope'] ?? '') === 'internal'))
+                            <span class="cabinet-sa-dup-group__scope cabinet-sa-dup-group__scope--{{ $group['scope'] }}">{{ ($group['scope'] ?? '') === 'internal' ? 'внутренняя' : 'внешняя' }}</span>
+                        @endif
+                        @if(!empty($group['likely_template']))
+                            <span class="cabinet-sa-dup-group__badge" title="{{ !empty($isLinkInvertedReport) ? 'Одинаковая исходящая на многих URL — почти наверняка общий блок' : 'Одинаковая ошибка на многих URL — почти наверняка общий шаблон' }}">{{ !empty($isLinkInvertedReport) ? 'общий блок' : 'сквозной' }}</span>
+                        @endif
+                    </div>
                     <div class="cabinet-sa-dup-group__label">
                         @if(!empty($group['href']))
                             @if(!empty($group['host']))
-                                <span class="text-secondary me-1">{{ $group['host'] }}</span>
+                                <span class="cabinet-sa-dup-group__host">{{ $group['host'] }}</span>
                             @endif
                             <a href="{{ $group['href'] }}" target="_blank" rel="noopener noreferrer" class="cabinet-sa-url-break">{{ $group['href'] }}</a>
                         @else
@@ -344,6 +352,8 @@
         $isRedirectReport = in_array($code ?? '', ['redirect', 'redirect_chain_long', 'redirect_loop'], true);
         $isBrokenTarget = !empty($showReferrers) && ! $isRedirectReport;
         $isSerpTitleReport = ($code ?? '') === 'serp_title_mismatch';
+        $isHeavyImageReport = ($code ?? '') === 'heavy_image';
+        $isAffiliateReport = ($code ?? '') === 'probable_affiliate';
         $showActions = !empty($canNote) || !empty($canIgnore);
         // Срочность задаётся на тип ошибки в конфиге. В обычном отчёте все строки одинаковые —
         // колонку «Приор.» показываем только в сводных (virtual), где реально смешаны уровни.
@@ -362,18 +372,30 @@
             ? "URL, который сам отвечает редиректом.\nГде на него ссылаются — колонка «Откуда ссылаются» (меню, HTML, sitemap)."
             : ($isBrokenTarget
                 ? "Это URL, который сам ответил ошибкой при обходе (404 и т.п.).\nНе путать со страницей, где стоит ссылка — она в колонке «Откуда ссылаются»."
-                : "Адрес страницы с проблемой.\nНажмите ссылку — откроется сайт в новой вкладке.");
+                : ($isHeavyImageReport
+                    ? "Страница HTML, на которой стоит тяжёлая картинка.\nСама картинка (файл) — в колонке «Изображение»."
+                    : ($isAffiliateReport
+                        ? "Страница, на которой стоят исходящие ссылки, похожие на партнёрские.\nСами ссылки — в колонке «Партнёрки»."
+                        : "Адрес страницы с проблемой.\nНажмите ссылку — откроется сайт в новой вкладке.")));
         $urlColTitle = $isRedirectReport
             ? 'URL с редиректом'
-            : ($isBrokenTarget ? 'Битый URL (цель)' : 'Адрес страницы с проблемой');
+            : ($isBrokenTarget ? 'Битый URL (цель)' : ($isHeavyImageReport ? 'Страница с картинкой' : ($isAffiliateReport ? 'Страница со ссылками' : 'Адрес страницы с проблемой')));
         $urlColLabel = $isRedirectReport
             ? 'URL'
-            : ($isBrokenTarget ? 'Битый URL' : 'URL');
+            : ($isBrokenTarget ? 'Битый URL' : ($isHeavyImageReport ? 'Страница' : ($isAffiliateReport ? 'Страница' : 'URL')));
+        $detailsColLabel = $isSerpTitleReport ? 'Сравнение title' : ($isHeavyImageReport ? 'Изображение' : ($isAffiliateReport ? 'Партнёрки' : 'Детали'));
+        $detailsColTip = $isSerpTitleReport
+            ? "Слева — TITLE в HTML, справа — заголовок в сниппете ПС."
+            : ($isHeavyImageReport
+                ? "Файл картинки: превью, вес, имя и полный URL.\nИменно его нужно сжать или заменить."
+                : ($isAffiliateReport
+                    ? "Какие исходящие ссылки похожи на партнёрские: сеть, хост и полный URL."
+                    : "Кратко что не так: код ответа, какой дубль, какой запрос и т.д."));
         $refColTip = $isRedirectReport
             ? "Откуда URL попал в проверка: sitemap.xml, посев, главная или страница со ссылкой."
             : "Откуда URL попал в проверка или страницы со ссылкой.";
     @endphp
-    <div class="cabinet-sa-table-wrap{{ $isSerpTitleReport ? ' cabinet-sa-table-wrap--serp-title' : '' }}{{ $isBrokenTarget ? ' cabinet-sa-table-wrap--broken' : '' }}">
+    <div class="cabinet-sa-table-wrap{{ $isSerpTitleReport ? ' cabinet-sa-table-wrap--serp-title' : '' }}{{ $isBrokenTarget ? ' cabinet-sa-table-wrap--broken' : '' }}{{ $isHeavyImageReport ? ' cabinet-sa-table-wrap--heavy' : '' }}{{ $isAffiliateReport ? ' cabinet-sa-table-wrap--aff' : '' }}">
         <table class="table table-sm table-hover mb-0 cabinet-sa-findings-table">
             <colgroup>
                 <col class="cabinet-sa-col-url">
@@ -400,11 +422,9 @@
                         @include('pages.partials.site-audit-tip', ['tip' => "Срочность разных типов в сводке.\nГрубые — чинить в первую очередь.\nИнфо — просто знать.\nВ обычном отчёте (один тип) колонка скрыта: все строки одного уровня."])
                     </th>
                 @endif
-                <th title="{{ $isSerpTitleReport ? 'Сравнение TITLE на сайте и в выдаче ПС' : 'Коротко: что именно не так (код ответа, дубль и т.п.).' }}">
-                    {{ $isSerpTitleReport ? 'Сравнение title' : 'Детали' }}
-                    @include('pages.partials.site-audit-tip', ['tip' => $isSerpTitleReport
-                        ? "Слева — TITLE в HTML, справа — заголовок в сниппете ПС."
-                        : "Кратко что не так: код ответа, какой дубль, какой запрос и т.д."])
+                <th title="{{ $isAffiliateReport ? 'Партнёрские ссылки: сеть и URL' : ($isHeavyImageReport ? 'Файл изображения: вес и URL' : ($isSerpTitleReport ? 'Сравнение TITLE на сайте и в выдаче ПС' : 'Коротко: что именно не так (код ответа, дубль и т.п.).')) }}">
+                    {{ $detailsColLabel }}
+                    @include('pages.partials.site-audit-tip', ['tip' => $detailsColTip])
                 </th>
                 @if(!empty($showReferrers))
                     <th title="Откуда URL попал в очередь проверки">
@@ -415,7 +435,7 @@
                     </th>
                 @endif
                 @if($showActions)
-                    <th class="cabinet-sa-th-actions" title="Заметка — комментарий. Исправлено — починили. Игнор — не ошибка. «?» на кнопке — подробнее.">
+                    <th class="cabinet-sa-th-actions" title="Заметка — комментарий. Исправлено — починили. Игнор — не считаем ошибкой. «?» у кнопки — подробнее.">
                         Действия
                     </th>
                 @endif

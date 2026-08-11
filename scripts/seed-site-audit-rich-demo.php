@@ -3,6 +3,9 @@
 /**
  * Сид богатой демо-проверки Site Audit (без artisan / Laravel bootstrap).
  *
+ * Важно: project_id и crawl_id НЕ меняются при пересборке — данные
+ * перезаписываются на месте (URL /site-audit/crawl/N остаётся тем же).
+ *
  * Usage:
  *   php scripts/seed-site-audit-rich-demo.php
  *   php scripts/seed-site-audit-rich-demo.php --user=4
@@ -85,48 +88,74 @@ if ($userId <= 0) {
 
 $pdo->beginTransaction();
 try {
-    // Удалить прошлую фикстуру этого домена у пользователя
-    $st = $pdo->prepare('SELECT id FROM site_audit_projects WHERE user_id = ? AND domain = ?');
+    $data = SiteAuditDemoFixture::build($userId);
+    $p = $data['project'];
+    $c = $data['crawl'];
+
+    // Переиспользуем существующие id — URL /crawl/N не прыгает.
+    $st = $pdo->prepare('SELECT id FROM site_audit_projects WHERE user_id = ? AND domain = ? ORDER BY id DESC LIMIT 1');
     $st->execute([$userId, SiteAuditDemoFixture::DOMAIN]);
-    $oldProjectIds = $st->fetchAll(PDO::FETCH_COLUMN);
-    if ($oldProjectIds) {
-        $in = implode(',', array_map('intval', $oldProjectIds));
-        $crawlIds = $pdo->query("SELECT id FROM site_audit_crawls WHERE project_id IN ($in)")->fetchAll(PDO::FETCH_COLUMN);
-        if ($crawlIds) {
-            $cin = implode(',', array_map('intval', $crawlIds));
-            $pdo->exec("DELETE FROM site_audit_findings WHERE crawl_id IN ($cin)");
-            $pdo->exec("DELETE FROM site_audit_pages WHERE crawl_id IN ($cin)");
-            $pdo->exec("DELETE FROM site_audit_crawl_stats WHERE crawl_id IN ($cin)");
-            $pdo->exec("DELETE FROM site_audit_crawls WHERE id IN ($cin)");
-        }
-        $pdo->exec("DELETE FROM site_audit_projects WHERE id IN ($in)");
+    $projectId = (int) $st->fetchColumn();
+
+    $crawlId = 0;
+    if ($projectId > 0) {
+        $st = $pdo->prepare('SELECT id FROM site_audit_crawls WHERE project_id = ? ORDER BY id DESC LIMIT 1');
+        $st->execute([$projectId]);
+        $crawlId = (int) $st->fetchColumn();
     }
 
-    // Старый share_token мог остаться у другого проекта
-    $pdo->prepare('UPDATE site_audit_crawls SET share_token = NULL WHERE share_token = ?')
-        ->execute([SiteAuditDemoFixture::SHARE_TOKEN]);
+    // Share-токен мог висеть на чужом крауле — освободим, кроме нашего.
+    if ($crawlId > 0) {
+        $pdo->prepare('UPDATE site_audit_crawls SET share_token = NULL WHERE share_token = ? AND id <> ?')
+            ->execute([SiteAuditDemoFixture::SHARE_TOKEN, $crawlId]);
+    } else {
+        $pdo->prepare('UPDATE site_audit_crawls SET share_token = NULL WHERE share_token = ?')
+            ->execute([SiteAuditDemoFixture::SHARE_TOKEN]);
+    }
 
-    $data = SiteAuditDemoFixture::build($userId);
+    if ($projectId > 0) {
+        $pdo->prepare('UPDATE site_audit_projects SET name = ?, settings_json = ?, updated_at = ? WHERE id = ?')
+            ->execute([$p['name'], $p['settings_json'], $p['updated_at'], $projectId]);
+    } else {
+        $st = $pdo->prepare('INSERT INTO site_audit_projects (user_id, team_id, domain, name, settings_json, created_at, updated_at) VALUES (?,?,?,?,?,?,?)');
+        $st->execute([$p['user_id'], $p['team_id'], $p['domain'], $p['name'], $p['settings_json'], $p['created_at'], $p['updated_at']]);
+        $projectId = (int) $pdo->lastInsertId();
+    }
 
-    $p = $data['project'];
-    $st = $pdo->prepare('INSERT INTO site_audit_projects (user_id, team_id, domain, name, settings_json, created_at, updated_at) VALUES (?,?,?,?,?,?,?)');
-    $st->execute([$p['user_id'], $p['team_id'], $p['domain'], $p['name'], $p['settings_json'], $p['created_at'], $p['updated_at']]);
-    $projectId = (int) $pdo->lastInsertId();
+    if ($crawlId > 0) {
+        $pdo->prepare('DELETE FROM site_audit_findings WHERE crawl_id = ?')->execute([$crawlId]);
+        $pdo->prepare('DELETE FROM site_audit_pages WHERE crawl_id = ?')->execute([$crawlId]);
+        $pdo->prepare('DELETE FROM site_audit_crawl_stats WHERE crawl_id = ?')->execute([$crawlId]);
 
-    $c = $data['crawl'];
-    $st = $pdo->prepare('INSERT INTO site_audit_crawls (
-        project_id, user_id, status, pages_total, pages_fetched, pages_limit,
-        buckets_json, counts_json, progress_json, error, save_html,
-        share_token, share_enabled_at, share_white_label, share_brand_name, share_brand_url, share_brand_logo,
-        started_at, finished_at, created_at, updated_at
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
-    $st->execute([
-        $projectId, $c['user_id'], $c['status'], $c['pages_total'], $c['pages_fetched'], $c['pages_limit'],
-        $c['buckets_json'], $c['counts_json'], $c['progress_json'], $c['error'], $c['save_html'],
-        $c['share_token'], $c['share_enabled_at'], $c['share_white_label'], $c['share_brand_name'], $c['share_brand_url'], $c['share_brand_logo'],
-        $c['started_at'], $c['finished_at'], $c['created_at'], $c['updated_at'],
-    ]);
-    $crawlId = (int) $pdo->lastInsertId();
+        $pdo->prepare('UPDATE site_audit_crawls SET
+            user_id = ?, status = ?, pages_total = ?, pages_fetched = ?, pages_limit = ?,
+            buckets_json = ?, counts_json = ?, progress_json = ?, error = ?, save_html = ?,
+            share_token = ?, share_enabled_at = ?, share_white_label = ?, share_brand_name = ?,
+            share_brand_url = ?, share_brand_logo = ?, started_at = ?, finished_at = ?, updated_at = ?
+            WHERE id = ?')->execute([
+            $c['user_id'], $c['status'], $c['pages_total'], $c['pages_fetched'], $c['pages_limit'],
+            $c['buckets_json'], $c['counts_json'], $c['progress_json'], $c['error'], $c['save_html'],
+            $c['share_token'], $c['share_enabled_at'], $c['share_white_label'], $c['share_brand_name'],
+            $c['share_brand_url'], $c['share_brand_logo'], $c['started_at'], $c['finished_at'], $c['updated_at'],
+            $crawlId,
+        ]);
+        $mode = 'updated';
+    } else {
+        $st = $pdo->prepare('INSERT INTO site_audit_crawls (
+            project_id, user_id, status, pages_total, pages_fetched, pages_limit,
+            buckets_json, counts_json, progress_json, error, save_html,
+            share_token, share_enabled_at, share_white_label, share_brand_name, share_brand_url, share_brand_logo,
+            started_at, finished_at, created_at, updated_at
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+        $st->execute([
+            $projectId, $c['user_id'], $c['status'], $c['pages_total'], $c['pages_fetched'], $c['pages_limit'],
+            $c['buckets_json'], $c['counts_json'], $c['progress_json'], $c['error'], $c['save_html'],
+            $c['share_token'], $c['share_enabled_at'], $c['share_white_label'], $c['share_brand_name'], $c['share_brand_url'], $c['share_brand_logo'],
+            $c['started_at'], $c['finished_at'], $c['created_at'], $c['updated_at'],
+        ]);
+        $crawlId = (int) $pdo->lastInsertId();
+        $mode = 'created';
+    }
 
     $pageSql = 'INSERT INTO site_audit_pages (
         crawl_id, url, url_hash, final_url, status_code, redirect_chain, size_bytes, content_type, charset,
@@ -200,7 +229,7 @@ try {
 }
 
 $s = $data['summary'];
-echo "OK user_id={$userId} project_id={$projectId} crawl_id={$crawlId}\n";
+echo "OK mode={$mode} user_id={$userId} project_id={$projectId} crawl_id={$crawlId}\n";
 echo "pages={$s['pages']} findings={$s['findings']} codes={$s['codes']}\n";
 echo "Crawl: http://localhost:3002/site-audit/crawl/{$crawlId}\n";
 echo "HTML: http://localhost:3002/site-audit/crawl/{$crawlId}/report/html_critical_errors\n";

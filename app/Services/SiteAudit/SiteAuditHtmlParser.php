@@ -51,7 +51,7 @@ class SiteAuditHtmlParser
                 'word_repeat' => false,
                 'word_repeat_samples' => [],
             ];
-        $contacts = SiteAuditContacts::detect($text);
+        $contacts = SiteAuditContacts::detect($text, $html);
         $signals = SiteAuditContacts::detectSignals($text);
         $looksCommercial = SiteAuditContacts::looksCommercial($finalUrl, [
             'title' => $title,

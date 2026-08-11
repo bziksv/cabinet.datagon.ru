@@ -8,7 +8,8 @@ return [
     | phase: A|B|C|D
     |--------------------------------------------------------------------------
     */
-    'queue' => env('SITE_AUDIT_QUEUE', 'site_audit'),
+    // local + remote MySQL: не класть jobs в общий site_audit — prod съест тик без локального crawl_N.json.
+    'queue' => env('SITE_AUDIT_QUEUE') ?: (env('APP_ENV') === 'local' ? 'site_audit_local' : 'site_audit'),
     'user_agent' => env('SITE_AUDIT_UA', 'TitloSiteAuditBot/1.0 (+https://titlo.ru)'),
     'request_timeout' => (int) env('SITE_AUDIT_TIMEOUT', 15),
     'max_redirects' => (int) env('SITE_AUDIT_MAX_REDIRECTS', 10),
@@ -57,6 +58,9 @@ return [
     'simhash_max_pairs' => (int) env('SITE_AUDIT_SIMHASH_MAX_PAIRS', 200),
     'share_ttl_days' => (int) env('SITE_AUDIT_SHARE_TTL_DAYS', 0), // 0 = бессрочно
     'broken_link_head_max' => (int) env('SITE_AUDIT_BROKEN_HEAD_MAX', 40),
+    'broken_external_head_max' => (int) env('SITE_AUDIT_BROKEN_EXT_HEAD_MAX', 80),
+    'broken_external_max_findings' => (int) env('SITE_AUDIT_BROKEN_EXT_MAX', 200),
+    'aggregate_broken_external_chunk' => (int) env('SITE_AUDIT_BROKEN_EXT_CHUNK', 150),
     'broken_link_max_findings' => (int) env('SITE_AUDIT_BROKEN_MAX_FINDINGS', 200),
     'broken_image_head_max' => (int) env('SITE_AUDIT_BROKEN_IMAGE_HEAD_MAX', 50),
     'heavy_image_bytes' => (int) env('SITE_AUDIT_HEAVY_IMAGE_BYTES', 500000),
@@ -265,6 +269,7 @@ return [
         'http_https_both_available',
         'page_has_broken_links',
         'broken_internal_link',
+        'broken_external_link',
         'deep_pages',
         'site_availability',
             'index_count_mismatch',
@@ -668,7 +673,7 @@ return [
             'phase' => 'B',
             'severity' => 'info',
             'title' => 'Ссылки с nofollow',
-            'description' => 'На странице есть исходящие ссылки с rel=nofollow.',
+            'description' => 'В HTML есть rel=nofollow: анкор и URL. Виды «По ссылкам» / «По страницам».',
         ],
         'external_assets' => [
             'phase' => 'B',
@@ -759,6 +764,20 @@ return [
             'severity' => 'critical',
             'title' => 'Битые внутренние ссылки',
             'description' => 'Целевой URL отвечает 4xx/5xx или недоступен. Одна строка на битый URL; страницы со ссылкой — в «Откуда ссылаются».',
+        ],
+        'page_has_broken_external_links' => [
+            'phase' => 'B',
+            'severity' => 'warning',
+            // Дубль «Битые внешние ссылки» (там же «Откуда ссылаются») — в меню не показываем.
+            'hidden' => true,
+            'title' => 'Страницы с битыми внешними ссылками',
+            'description' => 'На странице есть исходящие ссылки на чужие URL с 4xx/5xx/ошибкой. Сводный список — в «Битые внешние ссылки».',
+        ],
+        'broken_external_link' => [
+            'phase' => 'B',
+            'severity' => 'warning',
+            'title' => 'Битые внешние ссылки',
+            'description' => 'Внешний URL отвечает 4xx/5xx или недоступен. Одна строка на битый адрес; страницы со ссылкой — в «Откуда ссылаются».',
         ],
         'page_has_bad_links' => [
             'phase' => 'C',
@@ -956,7 +975,7 @@ return [
             'phase' => 'B',
             'severity' => 'info',
             'title' => 'Глубокие страницы',
-            'description' => 'Страница далеко от главной по внутренним ссылкам (много кликов).',
+            'description' => 'Далеко от главной по HTML-ссылкам (без JS). Часто листинг на JS — тогда путь идёт через соседние URL.',
         ],
         'site_availability' => [
             'phase' => 'B',
@@ -1145,7 +1164,7 @@ return [
             'phase' => 'C',
             'severity' => 'info',
             'title' => 'Нет Referrer-Policy',
-            'description' => 'Ответ не задаёт Referrer-Policy (утечка URL в Referer).',
+            'description' => 'Нет Referrer-Policy — браузер может отдавать полный URL страницы в Referer на чужие сайты.',
             'group' => 'tech',
         ],
         'missing_permissions_policy' => [
@@ -1173,7 +1192,7 @@ return [
             'phase' => 'C',
             'severity' => 'info',
             'title' => 'Нет Cross-Origin-Resource-Policy',
-            'description' => 'Ответ не задаёт CORP (защита ресурса от чужого embedding).',
+            'description' => 'Нет CORP — ресурс не помечает, можно ли его встраивать/читать с чужого сайта; важно вместе с COEP.',
             'group' => 'tech',
         ],
         'missing_charset' => [

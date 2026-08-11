@@ -46,6 +46,18 @@ class SiteAuditFindingPresenter
             return self::badLinksDetailsHtml($meta);
         }
 
+        if ($code === 'links_nofollow') {
+            return self::nofollowLinksDetailsHtml($meta);
+        }
+
+        if ($code === 'page_has_broken_external_links') {
+            return self::brokenExternalPageDetailsHtml($meta);
+        }
+
+        if ($code === 'broken_external_link') {
+            return self::brokenExternalLinkDetailsHtml($meta);
+        }
+
         if ($code === 'serp_title_mismatch') {
             return self::serpTitleMismatchHtml($meta);
         }
@@ -62,12 +74,20 @@ class SiteAuditFindingPresenter
             return self::brokenInternalLinkDetailsHtml($meta);
         }
 
+        if (in_array($code, ['http_4xx', 'http_5xx', 'unreachable'], true)) {
+            return self::httpStatusDetailsHtml($code, $meta, $url);
+        }
+
         if ($code === 'external_assets') {
             return self::externalAssetsDetailsHtml($meta);
         }
 
         if ($code === 'external_links') {
             return self::externalLinksDetailsHtml($meta);
+        }
+
+        if ($code === 'deep_pages') {
+            return self::deepPagesDetailsHtml($meta);
         }
 
         if (in_array($code, ['redirect', 'redirect_chain_long', 'redirect_loop'], true)) {
@@ -91,8 +111,6 @@ class SiteAuditFindingPresenter
             'duplicate_links',
             'keyword_cannibalization',
             'ad_cannibalization',
-            'http_4xx',
-            'http_5xx',
             'robots_txt_error',
         ], true)) {
             // URL в деталях — кликабельно и без обрезки (metaLine оставляем для экспорта/CSV).
@@ -487,10 +505,14 @@ class SiteAuditFindingPresenter
                     $bits[] = 'ссылок с страниц проверки нет';
                 }
                 if (! empty($meta['slash_hint']) || ! empty($meta['false_404_slash'])) {
-                    $slashUrl = trim((string) ($meta['slash_url'] ?? ''));
-                    $bits[] = $slashUrl !== ''
-                        ? ('в sitemap часто со слэшем: ' . self::clip($slashUrl, 60))
-                        : 'возможен ложный 404: страница жива со слэшем в конце';
+                    // Не тащим в CSV кривой slash_url от мусорного href
+                    if (! self::urlLooksBrokenHref((string) ($url ?? ''))
+                        && ! self::urlLooksBrokenHref(trim((string) ($meta['slash_url'] ?? '')))) {
+                        $slashUrl = trim((string) ($meta['slash_url'] ?? ''));
+                        $bits[] = $slashUrl !== ''
+                            ? ('в sitemap часто со слэшем: ' . self::clip($slashUrl, 60))
+                            : 'возможен ложный 404: страница жива со слэшем в конце';
+                    }
                 }
 
                 return $bits ? implode(' · ', $bits) : '—';
@@ -667,7 +689,13 @@ class SiteAuditFindingPresenter
                 return $bits ? implode(' · ', $bits) : 'nofollow';
 
             case 'links_nofollow':
-                return isset($meta['count']) ? ('nofollow-ссылок: ' . (int) $meta['count']) : '—';
+                return self::nofollowLinksPlain($meta);
+
+            case 'page_has_broken_external_links':
+                return self::brokenExternalPagePlain($meta);
+
+            case 'broken_external_link':
+                return self::brokenExternalLinkPlain($meta);
 
             case 'external_assets':
                 return self::externalAssetsPlain($meta);
@@ -1214,6 +1242,170 @@ class SiteAuditFindingPresenter
     }
 
     /**
+     * Список nofollow: анкор → URL.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private static function nofollowLinksDetailsHtml(array $meta): ?string
+    {
+        $samples = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+        $n = (int) ($meta['count'] ?? count($samples));
+        if ($samples === [] && $n <= 0) {
+            return $n > 0 ? ('nofollow-ссылок: ' . $n) : null;
+        }
+
+        $parts = [];
+        if ($n > 0) {
+            $parts[] = '<div class="mb-1"><strong>nofollow: ' . $n . '</strong></div>';
+        }
+        $parts[] = '<ul class="mb-0 ps-3 cabinet-sa-nofollow-list">';
+        foreach (array_slice($samples, 0, 15) as $sample) {
+            if (! is_array($sample)) {
+                continue;
+            }
+            $href = trim((string) ($sample['href'] ?? $sample['url'] ?? ''));
+            $text = trim((string) ($sample['text'] ?? ''));
+            $scope = (string) ($sample['scope'] ?? '');
+            $scopeBit = $scope === 'internal'
+                ? '<span class="badge badge-light border">внутр.</span> '
+                : ($scope === 'external' ? '<span class="badge badge-light border">внешн.</span> ' : '');
+            $anchorBit = $text !== ''
+                ? '<span class="cabinet-sa-nofollow-list__anchor">«' . e(self::clip($text, 70)) . '»</span>'
+                : '<span class="text-muted">без анкора</span>';
+            $urlBit = $href !== ''
+                ? '<div class="cabinet-sa-details-stack__url">' . self::urlLinkHtml($href) . '</div>'
+                : '';
+            $parts[] = '<li class="cabinet-sa-nofollow-list__item">'
+                . $scopeBit . $anchorBit
+                . ($urlBit !== '' ? ' → ' . $urlBit : '')
+                . '</li>';
+        }
+        $parts[] = '</ul>';
+        if ($n > count($samples) && $samples !== []) {
+            $parts[] = '<div class="text-secondary small mt-1">показаны '
+                . count($samples) . ' из ' . $n . '</div>';
+        }
+
+        return implode('', $parts);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function nofollowLinksPlain(array $meta): string
+    {
+        $samples = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+        $n = (int) ($meta['count'] ?? count($samples));
+        if ($n <= 0 && $samples === []) {
+            return '—';
+        }
+        $bits = ['nofollow: ' . max($n, count($samples))];
+        foreach (array_slice($samples, 0, 2) as $sample) {
+            if (! is_array($sample)) {
+                continue;
+            }
+            $text = trim((string) ($sample['text'] ?? ''));
+            $href = trim((string) ($sample['href'] ?? $sample['url'] ?? ''));
+            if ($text !== '' && $href !== '') {
+                $bits[] = '«' . self::clip($text, 40) . '» → ' . self::clip($href, 50);
+            } elseif ($href !== '') {
+                $bits[] = self::clip($href, 60);
+            }
+        }
+
+        return implode(' · ', $bits);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function brokenExternalPageDetailsHtml(array $meta): ?string
+    {
+        $samples = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+        $n = (int) ($meta['count'] ?? count($samples));
+        if ($samples === [] && $n <= 0) {
+            return null;
+        }
+        $parts = [];
+        if ($n > 0) {
+            $parts[] = '<div class="mb-1"><strong>битых внешних: ' . $n . '</strong></div>';
+        }
+        $parts[] = '<ul class="mb-0 ps-3">';
+        foreach (array_slice($samples, 0, 12) as $sample) {
+            if (! is_array($sample)) {
+                continue;
+            }
+            $href = trim((string) ($sample['url'] ?? $sample['href'] ?? ''));
+            $text = trim((string) ($sample['text'] ?? ''));
+            $status = $sample['status'] ?? null;
+            $statusBit = $status !== null && $status !== ''
+                ? '<span class="badge badge-danger">' . e((string) $status) . '</span> '
+                : '<span class="badge badge-secondary">ошибка</span> ';
+            $anchorBit = $text !== ''
+                ? '«' . e(self::clip($text, 50)) . '» → '
+                : '';
+            $parts[] = '<li>' . $statusBit . $anchorBit
+                . ($href !== '' ? self::urlLinkHtml($href) : '—')
+                . '</li>';
+        }
+        $parts[] = '</ul>';
+
+        return implode('', $parts);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function brokenExternalPagePlain(array $meta): string
+    {
+        $n = (int) ($meta['count'] ?? 0);
+        $samples = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+        if ($n <= 0 && $samples === []) {
+            return '—';
+        }
+        $bits = ['битых внешних: ' . max($n, count($samples))];
+        if ($samples) {
+            $first = $samples[0];
+            if (is_array($first)) {
+                $u = (string) ($first['url'] ?? '');
+                if ($u !== '') {
+                    $bits[] = self::clip($u, 70);
+                }
+            }
+        }
+
+        return implode(' · ', $bits);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function brokenExternalLinkDetailsHtml(array $meta): ?string
+    {
+        return self::brokenInternalLinkDetailsHtml($meta);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function brokenExternalLinkPlain(array $meta): string
+    {
+        $status = $meta['status'] ?? null;
+        $refs = (int) ($meta['referrer_count'] ?? (is_array($meta['referrers'] ?? null) ? count($meta['referrers']) : 0));
+        $bits = [];
+        if ($status !== null && $status !== '') {
+            $bits[] = 'HTTP ' . $status;
+        } elseif (! empty($meta['error'])) {
+            $bits[] = 'недоступен';
+        }
+        if ($refs > 0) {
+            $bits[] = 'на ' . $refs . ' стр.';
+        }
+
+        return $bits !== [] ? implode(' · ', $bits) : 'битая внешняя ссылка';
+    }
+
+    /**
      * Список плохих ссылок на странице: href / текст / фрагмент тега.
      *
      * @param array<string,mixed> $meta
@@ -1475,6 +1667,8 @@ class SiteAuditFindingPresenter
             'empty_or_hash' => 'пустой href / #',
             'javascript' => 'javascript:',
             'whitespace' => 'пробел в href',
+            'quotes' => 'кавычки в href',
+            'nested_url' => 'два URL в одном href',
         ];
 
         return $map[$reason] ?? ($reason !== '' ? $reason : '');
@@ -1493,6 +1687,91 @@ class SiteAuditFindingPresenter
             . $pill
             . '<div class="cabinet-sa-details-stack__url">' . self::urlLinkHtml($asset) . '</div>'
             . '</div>';
+    }
+
+    /**
+     * Глубина клика + свёрнутый путь от главной по out_links.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private static function deepPagesDetailsHtml(array $meta): string
+    {
+        $depth = isset($meta['depth']) ? (int) $meta['depth'] : null;
+        $threshold = isset($meta['threshold']) ? (int) $meta['threshold'] : null;
+        $line = $depth !== null
+            ? ('глубина: ' . $depth . ($threshold !== null ? (' (порог ' . $threshold . ')') : ''))
+            : 'глубокая страница';
+
+        $path = [];
+        if (! empty($meta['path']) && is_array($meta['path'])) {
+            foreach ($meta['path'] as $u) {
+                $u = trim((string) $u);
+                if ($u !== '') {
+                    $path[] = $u;
+                }
+            }
+        }
+
+        $html = '<div class="cabinet-sa-depth">'
+            . '<div class="cabinet-sa-depth__line">' . e($line) . '</div>';
+
+        if ($path !== []) {
+            $steps = count($path) > 0 ? (count($path) - 1) : 0;
+            $html .= '<details class="cabinet-sa-depth-path">'
+                . '<summary class="cabinet-sa-depth-path__sum">Показать путь'
+                . ($steps > 0 ? (' · ' . $steps . ' ' . self::ruClicksWord($steps)) : '')
+                . '</summary>'
+                . '<ol class="cabinet-sa-depth-path__list">';
+            foreach ($path as $i => $u) {
+                $label = self::depthPathLabel($u, $i === 0);
+                $html .= '<li class="cabinet-sa-depth-path__item">'
+                    . '<a href="' . e($u) . '" target="_blank" rel="noopener" title="' . e($u) . '">'
+                    . e($label)
+                    . '</a></li>';
+            }
+            $html .= '</ol></details>';
+        }
+
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    private static function ruClicksWord(int $n): string
+    {
+        $n = abs($n) % 100;
+        $n1 = $n % 10;
+        if ($n > 10 && $n < 20) {
+            return 'кликов';
+        }
+        if ($n1 === 1) {
+            return 'клик';
+        }
+        if ($n1 >= 2 && $n1 <= 4) {
+            return 'клика';
+        }
+
+        return 'кликов';
+    }
+
+    private static function depthPathLabel(string $url, bool $isRoot): string
+    {
+        if ($isRoot) {
+            $host = (string) (parse_url($url, PHP_URL_HOST) ?: '');
+            $path = (string) (parse_url($url, PHP_URL_PATH) ?: '/');
+            if ($path === '/' || $path === '') {
+                return $host !== '' ? ($host . '/') : '/';
+            }
+        }
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?: $url);
+        if ($path === '') {
+            $path = '/';
+        }
+        if (mb_strlen($path) > 64) {
+            return self::clip($path, 64);
+        }
+
+        return $path;
     }
 
     /**
@@ -1734,6 +2013,107 @@ class SiteAuditFindingPresenter
         }
 
         return '<div class="cabinet-sa-details-stack">' . implode(' ', $parts) . '</div>';
+    }
+
+    /**
+     * Структурированные детали для http_4xx / http_5xx / unreachable
+     * (не одна каша «код · ссылаются · слэш»).
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private static function httpStatusDetailsHtml(string $code, array $meta, ?string $url): string
+    {
+        $status = isset($meta['status']) ? (int) $meta['status'] : 0;
+        $rows = [];
+
+        if ($code === 'unreachable') {
+            $err = trim((string) ($meta['error'] ?? ''));
+            $rows[] = '<div class="cabinet-sa-http-details__row">'
+                . '<span class="cabinet-sa-http-details__k">Статус</span>'
+                . '<span class="cabinet-sa-http-details__v">'
+                . '<span class="cabinet-sa-status-pill">недоступна</span>'
+                . ($err !== '' ? ' <span class="text-secondary">' . e(self::clip($err, 80)) . '</span>' : '')
+                . '</span></div>';
+        } elseif ($status > 0) {
+            $rows[] = '<div class="cabinet-sa-http-details__row">'
+                . '<span class="cabinet-sa-http-details__k">Код</span>'
+                . '<span class="cabinet-sa-http-details__v">'
+                . self::httpStatusPillHtml($status, (string) $status)
+                . '</span></div>';
+        }
+
+        $refN = (int) ($meta['referrer_count'] ?? 0);
+        if ($refN > 1) {
+            $rows[] = '<div class="cabinet-sa-http-details__row">'
+                . '<span class="cabinet-sa-http-details__k">Ссылаются</span>'
+                . '<span class="cabinet-sa-http-details__v">'
+                . number_format($refN, 0, '', ' ') . ' стр. '
+                . '<span class="text-secondary">(колонка справа)</span>'
+                . '</span></div>';
+        } elseif (array_key_exists('referrer_count', $meta) && $refN === 0) {
+            $rows[] = '<div class="cabinet-sa-http-details__row">'
+                . '<span class="cabinet-sa-http-details__k">Ссылаются</span>'
+                . '<span class="cabinet-sa-http-details__v text-secondary">нет с страниц проверки</span>'
+                . '</div>';
+        }
+
+        $slashUrl = trim((string) ($meta['slash_url'] ?? ''));
+        $showSlash = (! empty($meta['slash_hint']) || ! empty($meta['false_404_slash']))
+            && ! self::urlLooksBrokenHref((string) $url)
+            && ! self::urlLooksBrokenHref($slashUrl);
+        if ($showSlash) {
+            $rows[] = '<div class="cabinet-sa-http-details__row">'
+                . '<span class="cabinet-sa-http-details__k">Подсказка</span>'
+                . '<span class="cabinet-sa-http-details__v">'
+                . ($slashUrl !== ''
+                    ? 'Часто жива со слэшем: ' . self::urlLinkHtml($slashUrl)
+                    : 'Возможен ложный 404: страница жива со слэшем в конце')
+                . '</span></div>';
+        }
+
+        if ($rows === []) {
+            return '<div class="cabinet-sa-details-stack"><span class="text-secondary">—</span></div>';
+        }
+
+        return '<div class="cabinet-sa-http-details">' . implode('', $rows) . '</div>';
+    }
+
+    /** URL с кавычками/бэкслешами — почти всегда мусор из HTML, не нормальный адрес. */
+    public static function urlLooksBrokenHref(string $url): bool
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return false;
+        }
+
+        if (strpbrk($url, "\"'\\<>") !== false) {
+            return true;
+        }
+        // Два «https://» в одном URL — склейка href + пример из текста.
+        if (preg_match('#https?://.+https?://#i', $url)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Короткий читаемый ярлык для битого URL в первой колонке.
+     *
+     * @return array{display:string,warn:?string}
+     */
+    public static function brokenUrlDisplay(string $url): array
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return ['display' => '—', 'warn' => null];
+        }
+
+        // Полный URL всегда видимый — без «…». Метка «кривой href» отдельно.
+        return [
+            'display' => $url,
+            'warn' => self::urlLooksBrokenHref($url) ? 'кривой href' : null,
+        ];
     }
 
     private static function httpStatusPillHtml(?int $status, string $fallbackLabel): string

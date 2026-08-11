@@ -26,6 +26,8 @@
             <div class="alert alert-warning py-2">{{ session('error') }}</div>
         @endif
 
+        @include('pages.partials.site-audit-module-nav', ['active' => 'module'])
+
         <div class="cabinet-sa-beta-wrap" data-sa-pro>
             @include('pages.partials.site-audit-beta-banner')
         </div>
@@ -210,6 +212,28 @@
                 var tokenMeta = document.querySelector('meta[name="csrf-token"]');
                 var token = tokenMeta ? tokenMeta.getAttribute('content') : '';
                 var historyTable = document.getElementById('sa-history-table');
+
+                window.cabinetSaInitHistoryTips = function (root) {
+                    if (typeof window.jQuery === 'undefined' || !window.jQuery.fn || !window.jQuery.fn.tooltip) {
+                        return;
+                    }
+                    var $scope = window.jQuery(root || historyTable || document);
+                    $scope.find('[data-toggle="tooltip"]').each(function () {
+                        var $el = window.jQuery(this);
+                        var prev = $el.data('bs.tooltip') || $el.data('tooltip');
+                        if (prev) {
+                            try { $el.tooltip('dispose'); } catch (e1) {
+                                try { $el.tooltip('destroy'); } catch (e2) {}
+                            }
+                        }
+                        $el.tooltip({
+                            container: 'body',
+                            placement: $el.attr('data-placement') || 'top',
+                            trigger: 'hover focus',
+                            delay: { show: 150, hide: 0 }
+                        });
+                    });
+                };
                 var pollTimers = {};
 
                 function saParseIntSpaces(v) {
@@ -412,7 +436,10 @@
                                     cont.setAttribute('data-cabinet-confirm-ok', 'Возобновить');
                                     cont.innerHTML =
                                         '<input type="hidden" name="_token" value="' + token + '">' +
-                                        '<button type="submit" class="btn btn-sm btn-outline-primary">Возобновить</button>';
+                                        '<button type="submit" class="btn btn-sm btn-outline-primary cabinet-sa-icon-btn"' +
+                                        ' data-toggle="tooltip" data-placement="top"' +
+                                        ' title="Возобновить проверку" aria-label="Возобновить проверку">' +
+                                        '<i class="bi bi-play-fill" aria-hidden="true"></i></button>';
                                     actions.appendChild(cont);
                                 }
                                 var repeat = document.createElement('form');
@@ -425,7 +452,10 @@
                                 repeat.setAttribute('data-cabinet-confirm-ok', 'Повторить');
                                 repeat.innerHTML =
                                     '<input type="hidden" name="_token" value="' + token + '">' +
-                                    '<button type="submit" class="btn btn-sm btn-outline-secondary">Повторить</button>';
+                                    '<button type="submit" class="btn btn-sm btn-outline-secondary cabinet-sa-icon-btn"' +
+                                    ' data-toggle="tooltip" data-placement="top"' +
+                                    ' title="Повторить с нуля" aria-label="Повторить с нуля">' +
+                                    '<i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>';
                                 actions.appendChild(repeat);
 
                                 var del = document.createElement('form');
@@ -439,8 +469,14 @@
                                 del.innerHTML =
                                     '<input type="hidden" name="_token" value="' + token + '">' +
                                     '<input type="hidden" name="_method" value="DELETE">' +
-                                    '<button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>';
+                                    '<button type="submit" class="btn btn-sm btn-outline-danger cabinet-sa-icon-btn"' +
+                                    ' data-toggle="tooltip" data-placement="top"' +
+                                    ' title="Удалить проверку" aria-label="Удалить проверку">' +
+                                    '<i class="bi bi-trash" aria-hidden="true"></i></button>';
                                 actions.appendChild(del);
+                                if (typeof window.cabinetSaInitHistoryTips === 'function') {
+                                    window.cabinetSaInitHistoryTips(actions);
+                                }
                             }
                         }
                     }
@@ -567,6 +603,9 @@
                 }
 
                 pollActiveRows();
+                if (typeof window.cabinetSaInitHistoryTips === 'function') {
+                    window.cabinetSaInitHistoryTips(historyTable);
+                }
 
                 if (window.location.hash === '#sa-history' || /[?&]highlight=/.test(window.location.search) || /[?&]domain=/.test(window.location.search)) {
                     setTimeout(scrollToHistory, 100);

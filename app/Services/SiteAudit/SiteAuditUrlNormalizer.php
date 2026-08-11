@@ -280,4 +280,31 @@ class SiteAuditUrlNormalizer
 
         return self::normalize($rebuilt, $baseHost, $opts);
     }
+
+    /**
+     * HTML-документ для SEO-отчётов (sitemap / тупики / сироты / META), не файл.
+     * Расширение важнее Content-Type: сервер часто отдаёт CSV/PDF как text/html.
+     * text/csv раньше ошибочно проходил фильтр «stripos text» в sitemap_coverage.
+     */
+    public static function isHtmlDocument(?string $contentType, ?string $url = null): bool
+    {
+        $path = strtolower((string) (parse_url((string) $url, PHP_URL_PATH) ?: ''));
+        if ($path !== '' && preg_match(
+            '/\.(?:webp|png|jpe?g|gif|svg|ico|avif|bmp|tiff?|pdf|csv|tsv|xlsx?|docx?|pptx?|od[tsp]|rtf|zip|rar|7z|gz|tgz|tar|mp[34]|webm|avi|mov|woff2?|ttf|eot|otf|css|js|mjs|map|json|xml|txt|rss|atom|ics|vcf)(?:$|\?|#)/',
+            $path
+        )) {
+            return false;
+        }
+
+        // charset и прочий мусор после ';'
+        $ct = strtolower(trim((string) $contentType));
+        if ($ct !== '') {
+            $ct = trim(explode(';', $ct, 2)[0]);
+        }
+        if ($ct === '') {
+            return true;
+        }
+
+        return strpos($ct, 'html') !== false;
+    }
 }

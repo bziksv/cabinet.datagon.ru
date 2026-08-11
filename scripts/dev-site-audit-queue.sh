@@ -12,7 +12,14 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 PHP="${PHP_BIN:-/opt/homebrew/opt/php@7.4/bin/php}"
-QUEUES="site_audit"
+# По умолчанию локальная очередь: общая site_audit на remote DB хватает prod.
+if [[ -f "${ROOT}/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source <(grep -E '^(SITE_AUDIT_QUEUE|APP_ENV)=' "${ROOT}/.env" | sed 's/\r$//') || true
+  set +a
+fi
+QUEUES="${SITE_AUDIT_QUEUE:-site_audit_local}"
 PIDDIR="storage/logs"
 
 stop_workers() {

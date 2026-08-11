@@ -293,6 +293,7 @@ class SiteAuditPageProcessor
             'content_unchanged' => false,
             'simhash' => null,
             'out_links_json' => null,
+            'ext_links_json' => null,
             'img_count' => 0,
             'img_without_alt' => 0,
         ];
@@ -328,11 +329,17 @@ class SiteAuditPageProcessor
             }
         } else {
             $code = (int) $result['status_code'];
-            if ($code >= 400 && $code < 500) {
+            // Мусорный URL из примера в JSON-LD / кривого href — не «ошибка 4xx сайта».
+            $urlLooksGarbage = SiteAuditFindingPresenter::urlLooksBrokenHref($url);
+            if ($code >= 400 && $code < 500 && ! $urlLooksGarbage) {
                 $meta4 = ['status' => $code];
                 $p = parse_url($url);
                 $path = is_array($p) ? (string) ($p['path'] ?? '') : '';
-                if ($path !== '' && $path !== '/' && substr($path, -1) !== '/' && is_array($p) && ! empty($p['host'])) {
+                if ($path !== ''
+                    && $path !== '/'
+                    && substr($path, -1) !== '/'
+                    && is_array($p)
+                    && ! empty($p['host'])) {
                     $meta4['slash_hint'] = true;
                     $meta4['slash_url'] = ($p['scheme'] ?? 'https') . '://' . $p['host']
                         . (isset($p['port']) ? ':' . $p['port'] : '')
@@ -340,7 +347,7 @@ class SiteAuditPageProcessor
                         . (isset($p['query']) ? '?' . $p['query'] : '');
                 }
                 $findings[] = $this->finding('http_4xx', $url, $urlHash, $meta4);
-            } elseif ($code >= 500) {
+            } elseif ($code >= 500 && ! $urlLooksGarbage) {
                 $findings[] = $this->finding('http_5xx', $url, $urlHash, ['status' => $code]);
             }
 
@@ -352,7 +359,7 @@ class SiteAuditPageProcessor
                 ]);
             }
 
-            $isHtml = ! $result['content_type'] || stripos($result['content_type'], 'html') !== false;
+            $isHtml = SiteAuditUrlNormalizer::isHtmlDocument($result['content_type'] ?? null, $url);
             if ($isHtml && $code >= 200 && $code < 400) {
                 $parsed = $this->parser->parse($body, $result['final_url'] ?: $url);
                 $pageData['title'] = $parsed['title'];
@@ -493,6 +500,7 @@ class SiteAuditPageProcessor
                 if ($links['nofollow_links'] > 0) {
                     $findings[] = $this->finding('links_nofollow', $url, $urlHash, [
                         'count' => $links['nofollow_links'],
+                        'samples' => array_slice($links['nofollow_samples'] ?? [], 0, 20),
                     ]);
                 }
                 if ($links['external_assets'] || ! empty($links['external_asset_items'])) {
@@ -512,10 +520,38 @@ class SiteAuditPageProcessor
                     ]);
                 }
                 if (! empty($links['external'])) {
+                    $extSamples = [];
+                    if (! empty($links['external_items']) && is_array($links['external_items'])) {
+                        foreach (array_slice($links['external_items'], 0, 40) as $item) {
+                            if (! is_array($item)) {
+                                continue;
+                            }
+                            $eu = trim((string) ($item['url'] ?? ''));
+                            if ($eu === '') {
+                                continue;
+                            }
+                            $extSamples[] = [
+                                'url' => $eu,
+                                'text' => trim((string) ($item['text'] ?? '')),
+                            ];
+                        }
+                    }
+                    if ($extSamples === []) {
+                        foreach (array_slice($links['external'], 0, 40) as $eu) {
+                            $extSamples[] = ['url' => (string) $eu, 'text' => ''];
+                        }
+                    }
                     $findings[] = $this->finding('external_links', $url, $urlHash, [
                         'count' => count($links['external']),
-                        'samples' => array_slice($links['external'], 0, 15),
+                        'samples' => $extSamples,
                     ]);
+                    $pageData['ext_links_json'] = array_values(array_unique(array_map(function ($item) {
+                        return is_array($item) ? (string) ($item['url'] ?? '') : (string) $item;
+                    }, $extSamples)));
+                    $pageData['ext_links_json'] = array_values(array_filter($pageData['ext_links_json']));
+                    if ($pageData['ext_links_json'] === []) {
+                        $pageData['ext_links_json'] = array_slice($links['external'], 0, 80);
+                    }
                     $aff = SiteAuditAffiliateDetector::fromExternalUrls($links['external']);
                     if ($aff) {
                         $findings[] = $this->finding('probable_affiliate', $url, $urlHash, $aff);
@@ -711,6 +747,8 @@ class SiteAuditPageProcessor
                 'duplicate_url_variants',
                 'page_has_broken_links',
                 'broken_internal_link',
+                'page_has_broken_external_links',
+                'broken_external_link',
                 'lost_file',
                 'broken_image',
                 'heavy_image',

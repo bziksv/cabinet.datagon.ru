@@ -27,6 +27,7 @@ class SiteAuditAggregator
         'no_outbound',
         'url_param_risks',
         'broken_links',
+        'broken_external_links',
         'image_assets',
         'lost_files',
         'incremental_head',
@@ -58,6 +59,8 @@ class SiteAuditAggregator
         'duplicate_url_variants',
         'page_has_broken_links',
         'broken_internal_link',
+        'page_has_broken_external_links',
+        'broken_external_link',
         'broken_image',
         'heavy_image',
         'lost_file',
@@ -292,6 +295,11 @@ class SiteAuditAggregator
                 $state['meta'] = $meta;
 
                 return $more;
+            case 'broken_external_links':
+                $more = $this->emitBrokenExternalLinks($crawl, $meta, $deadline);
+                $state['meta'] = $meta;
+
+                return $more;
             case 'image_assets':
                 $this->emitImageAssets($crawl);
                 break;
@@ -465,8 +473,12 @@ class SiteAuditAggregator
                     // SEO/контент-находки только для успешно открытых HTML-страниц.
                     // На 4xx/5xx/unreachable HTML не парсился → img/title = 0 по умолчанию,
                     // иначе «Нет уникальных изображений» и т.п. заливают весь отчёт битыми URL.
+                    // webp/csv/pdf тоже лежат в pages, но это не документы перелинковки/META.
                     $status = $page->status_code;
                     if ($status === null || (int) $status < 200 || (int) $status >= 400) {
+                        continue;
+                    }
+                    if (! SiteAuditUrlNormalizer::isHtmlDocument($page->content_type ?? null, (string) $page->url)) {
                         continue;
                     }
                     // Контент/мета после follow — у финала; редирект уже в «Редиректы».
@@ -729,8 +741,7 @@ class SiteAuditAggregator
                 if ($code < 200 || $code >= 400) {
                     continue;
                 }
-                $ct = (string) ($page->content_type ?? '');
-                if ($ct !== '' && stripos($ct, 'html') === false && stripos($ct, 'text') === false) {
+                if (! SiteAuditUrlNormalizer::isHtmlDocument($page->content_type ?? null, (string) $page->url)) {
                     continue;
                 }
                 if ($notIn >= $maxNotIn) {
@@ -1094,7 +1105,7 @@ class SiteAuditAggregator
     {
         $pages = SiteAuditPage::query()
             ->where('crawl_id', $crawlId)
-            ->get(['id', 'url', 'url_hash', 'out_links_json', 'status_code']);
+            ->get(['id', 'url', 'url_hash', 'out_links_json', 'status_code', 'content_type']);
 
         if ($pages->count() < 2) {
             return;
@@ -1141,9 +1152,12 @@ class SiteAuditAggregator
             if (! empty($inbound[$page->url_hash])) {
                 continue;
             }
-            // только успешные HTML-страницы
+            // только успешные HTML-страницы (не webp/csv/pdf/…)
             $code = (int) $page->status_code;
             if ($code && ($code < 200 || $code >= 400)) {
+                continue;
+            }
+            if (! SiteAuditUrlNormalizer::isHtmlDocument($page->content_type ?? null, (string) $page->url)) {
                 continue;
             }
 
@@ -1159,7 +1173,7 @@ class SiteAuditAggregator
     }
 
     /**
-     * Успешные страницы без исходящих внутренних ссылок (тупики).
+     * Успешные HTML-страницы без исходящих внутренних ссылок (тупики).
      */
     private function emitNoOutboundInternal(int $crawlId): void
     {
@@ -1177,6 +1191,9 @@ class SiteAuditAggregator
                     }
                     $code = (int) $page->status_code;
                     if ($code < 200 || $code >= 400) {
+                        continue;
+                    }
+                    if (! SiteAuditUrlNormalizer::isHtmlDocument($page->content_type ?? null, (string) $page->url)) {
                         continue;
                     }
                     $path = parse_url($page->url, PHP_URL_PATH);
@@ -1581,6 +1598,219 @@ class SiteAuditAggregator
         }
 
         return false;
+    }
+
+    /**
+     * Битые внешние ссылки: HEAD по ext_links_json (или samples из finding external_links).
+     *
+     * @param array<string,mixed> $meta
+     * @return bool true = ещё есть страницы
+     */
+    private function emitBrokenExternalLinks(SiteAuditCrawl $crawl, array &$meta = [], ?float $deadline = null): bool
+    {
+        $settings = is_array($crawl->progress_json['settings'] ?? null)
+            ? $crawl->progress_json['settings']
+            : [];
+        if (array_key_exists('check_broken_external_links', $settings) && ! $settings['check_broken_external_links']) {
+            return false;
+        }
+        // По умолчанию включено; явно false в settings — выкл.
+        if (array_key_exists('check_broken_links', $settings) && ! $settings['check_broken_links']) {
+            return false;
+        }
+
+        $chunkSize = max(40, (int) config('site_audit.aggregate_broken_external_chunk', 150));
+        $afterId = (int) ($meta['after_id'] ?? 0);
+        $cacheKey = 'site_audit_agg_broken_ext_' . (int) $crawl->id;
+        $headCacheKey = $cacheKey . '_head';
+        $maxHead = (int) config('site_audit.broken_external_head_max', 80);
+        $checker = new SiteAuditLinkChecker();
+        $headCache = Cache::get($headCacheKey);
+        if (! is_array($headCache)) {
+            $headCache = [];
+        }
+        $headBudget = array_key_exists('head_budget', $meta)
+            ? (int) $meta['head_budget']
+            : $maxHead;
+
+        $linkSev = config('site_audit.findings.broken_external_link.severity', 'warning');
+
+        $uniqueBroken = Cache::get($cacheKey);
+        if (! is_array($uniqueBroken)) {
+            $uniqueBroken = [];
+        }
+
+        $hasExtCol = Schema::hasColumn('site_audit_pages', 'ext_links_json');
+
+        while (true) {
+            $cols = ['id', 'url', 'url_hash'];
+            if ($hasExtCol) {
+                $cols[] = 'ext_links_json';
+            }
+            $pages = SiteAuditPage::query()
+                ->where('crawl_id', $crawl->id)
+                ->where('id', '>', $afterId)
+                ->orderBy('id')
+                ->limit($chunkSize)
+                ->get($cols);
+
+            if ($pages->isEmpty()) {
+                $this->flushBrokenExternalFindings($crawl->id, $uniqueBroken, $linkSev);
+                Cache::forget($cacheKey);
+                Cache::forget($headCacheKey);
+                $meta = [];
+
+                return false;
+            }
+
+            // Fallback: samples из finding external_links, если колонки ещё нет / пусто
+            $samplesByPage = [];
+            if (! $hasExtCol) {
+                $hashes = $pages->pluck('url_hash')->all();
+                $rows = SiteAuditFinding::query()
+                    ->where('crawl_id', $crawl->id)
+                    ->where('code', 'external_links')
+                    ->whereIn('url_hash', $hashes)
+                    ->get(['url_hash', 'meta_json']);
+                foreach ($rows as $row) {
+                    $m = is_array($row->meta_json) ? $row->meta_json : [];
+                    $samplesByPage[(string) $row->url_hash] = isset($m['samples']) && is_array($m['samples'])
+                        ? $m['samples']
+                        : [];
+                }
+            }
+
+            foreach ($pages as $page) {
+                $afterId = (int) $page->id;
+                $outs = [];
+                $textByUrl = [];
+                if ($hasExtCol && is_array($page->ext_links_json)) {
+                    foreach ($page->ext_links_json as $u) {
+                        $u = trim((string) $u);
+                        if ($u !== '') {
+                            $outs[$u] = true;
+                        }
+                    }
+                }
+                if ($outs === []) {
+                    $raw = $samplesByPage[(string) $page->url_hash] ?? [];
+                    foreach ($raw as $sample) {
+                        if (is_string($sample)) {
+                            $u = trim($sample);
+                            if ($u !== '') {
+                                $outs[$u] = true;
+                            }
+                        } elseif (is_array($sample)) {
+                            $u = trim((string) ($sample['url'] ?? $sample['href'] ?? ''));
+                            if ($u !== '') {
+                                $outs[$u] = true;
+                                $t = trim((string) ($sample['text'] ?? ''));
+                                if ($t !== '') {
+                                    $textByUrl[$u] = $t;
+                                }
+                            }
+                        }
+                    }
+                }
+                if ($outs === []) {
+                    continue;
+                }
+
+                $brokenSamples = [];
+                foreach (array_keys($outs) as $out) {
+                    if (isset($headCache[$out])) {
+                        $check = $headCache[$out];
+                    } elseif ($headBudget > 0) {
+                        $check = $checker->check($out);
+                        $headCache[$out] = $check;
+                        $headBudget--;
+                    } else {
+                        continue;
+                    }
+                    if (! empty($check['ok'])) {
+                        continue;
+                    }
+                    $brokenSamples[] = [
+                        'url' => $out,
+                        'text' => $textByUrl[$out] ?? '',
+                        'status' => $check['status'] ?? null,
+                        'error' => $check['error'] ?? null,
+                        'source' => 'head',
+                    ];
+                }
+
+                if ($brokenSamples === []) {
+                    continue;
+                }
+
+                // Страничный код page_has_broken_external_links не пишем —
+                // в меню это был дубль «Битые внешние ссылки» (referrers там же).
+                $brokenSamples = array_slice($brokenSamples, 0, 15);
+
+                foreach ($brokenSamples as $sample) {
+                    $bu = (string) ($sample['url'] ?? '');
+                    if ($bu === '') {
+                        continue;
+                    }
+                    if (! isset($uniqueBroken[$bu])) {
+                        $uniqueBroken[$bu] = [
+                            'status' => $sample['status'] ?? null,
+                            'source' => $sample['source'] ?? null,
+                            'error' => $sample['error'] ?? null,
+                            'text' => $sample['text'] ?? '',
+                            'from' => [],
+                        ];
+                    }
+                    if (count($uniqueBroken[$bu]['from']) < 50
+                        && ! in_array($page->url, $uniqueBroken[$bu]['from'], true)) {
+                        $uniqueBroken[$bu]['from'][] = $page->url;
+                    }
+                }
+            }
+
+            $meta['after_id'] = $afterId;
+            $meta['head_budget'] = $headBudget;
+            Cache::put($cacheKey, $uniqueBroken, 7200);
+            Cache::put($headCacheKey, $headCache, 7200);
+
+            if ($deadline !== null && microtime(true) >= $deadline) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<string,array<string,mixed>> $uniqueBroken
+     */
+    private function flushBrokenExternalFindings(int $crawlId, array $uniqueBroken, string $linkSev): void
+    {
+        $maxBrokenFindings = max(1, (int) config('site_audit.broken_external_max_findings', 200));
+        $emitted = 0;
+        foreach ($uniqueBroken as $bu => $info) {
+            if ($emitted >= $maxBrokenFindings) {
+                break;
+            }
+            $fromList = $info['from'] ?? [];
+            SiteAuditFinding::query()->create([
+                'crawl_id' => $crawlId,
+                'code' => 'broken_external_link',
+                'severity' => $linkSev,
+                'url' => $bu,
+                'url_hash' => SiteAuditUrlNormalizer::hash((string) $bu),
+                'meta_json' => [
+                    'from' => $fromList[0] ?? null,
+                    'referrers' => array_slice($fromList, 0, 12),
+                    'referrer_count' => count($fromList),
+                    'status' => $info['status'] ?? null,
+                    'source' => $info['source'] ?? null,
+                    'error' => $info['error'] ?? null,
+                    'text' => $info['text'] ?? '',
+                ],
+            ]);
+            $emitted++;
+        }
     }
 
     /**
@@ -2078,89 +2308,33 @@ class SiteAuditAggregator
      */
     private function emitClickDepth(int $crawlId): array
     {
-        $pages = SiteAuditPage::query()
-            ->where('crawl_id', $crawlId)
-            ->get(['id', 'url', 'url_hash', 'out_links_json']);
+        $computed = SiteAuditClickDepth::compute($crawlId);
+        $depth = $computed['depth_by_id'];
+        $pathByUrl = $computed['path_by_url'];
+        $maxDepth = (int) $computed['max_depth'];
 
-        if ($pages->isEmpty()) {
+        if ($depth === []) {
             return ['click_depth_max' => 0];
         }
 
-        $byUrl = [];
-        $byHash = [];
-        foreach ($pages as $page) {
-            $byUrl[$page->url] = $page;
-            $byHash[$page->url_hash] = $page;
-        }
-
-        $depth = [];
-        $queue = [];
-        foreach ($pages as $page) {
-            $path = parse_url($page->url, PHP_URL_PATH);
-            if ($path === '/' || $path === '' || $path === null) {
-                $depth[$page->id] = 0;
-                $queue[] = $page;
-            }
-        }
-
-        if (! $queue) {
-            // нет «корня» — берём страницу с самым коротким path
-            $best = null;
-            $bestLen = PHP_INT_MAX;
-            foreach ($pages as $page) {
-                $path = (string) (parse_url($page->url, PHP_URL_PATH) ?: '/');
-                $len = strlen($path);
-                if ($len < $bestLen) {
-                    $bestLen = $len;
-                    $best = $page;
-                }
-            }
-            if ($best) {
-                $depth[$best->id] = 0;
-                $queue[] = $best;
-            }
-        }
-
-        $qi = 0;
-        while ($qi < count($queue)) {
-            $cur = $queue[$qi++];
-            $curDepth = $depth[$cur->id];
-            $outs = is_array($cur->out_links_json) ? $cur->out_links_json : [];
-            foreach ($outs as $out) {
-                $out = (string) $out;
-                $target = null;
-                if (isset($byUrl[$out])) {
-                    $target = $byUrl[$out];
-                } elseif (isset($byHash[$out])) {
-                    $target = $byHash[$out];
-                } else {
-                    $h = SiteAuditUrlNormalizer::hash($out);
-                    if (isset($byHash[$h])) {
-                        $target = $byHash[$h];
-                    }
-                }
-                if (! $target || isset($depth[$target->id])) {
-                    continue;
-                }
-                $depth[$target->id] = $curDepth + 1;
-                $queue[] = $target;
-            }
-        }
+        $pages = SiteAuditPage::query()
+            ->where('crawl_id', $crawlId)
+            ->get(['id', 'url', 'url_hash', 'content_type']);
 
         $warnAt = (int) config('site_audit.click_depth_warn', 4);
         $severity = config('site_audit.findings.deep_pages.severity', 'info');
-        $maxDepth = 0;
         $byDepthIds = [];
 
         foreach ($pages as $page) {
-            $d = array_key_exists($page->id, $depth) ? $depth[$page->id] : null;
-            if ($d !== null && $d > $maxDepth) {
-                $maxDepth = $d;
-            }
+            $id = (int) $page->id;
+            $d = array_key_exists($id, $depth) ? $depth[$id] : null;
             $key = $d === null ? 'null' : (string) $d;
-            $byDepthIds[$key][] = $page->id;
+            $byDepthIds[$key][] = $id;
 
-            if ($d !== null && $d >= $warnAt) {
+            if ($d !== null && $d >= $warnAt
+                && SiteAuditUrlNormalizer::isHtmlDocument($page->content_type ?? null, (string) $page->url)
+            ) {
+                $path = $pathByUrl[(string) $page->url] ?? [];
                 SiteAuditFinding::query()->create([
                     'crawl_id' => $crawlId,
                     'code' => 'deep_pages',
@@ -2170,6 +2344,7 @@ class SiteAuditAggregator
                     'meta_json' => [
                         'depth' => $d,
                         'threshold' => $warnAt,
+                        'path' => array_values($path),
                     ],
                 ]);
             }
@@ -2289,10 +2464,19 @@ class SiteAuditAggregator
     {
         $severity = config('site_audit.findings.' . $code . '.severity', 'other');
 
+        $cols = ['url', 'url_hash', 'title', 'description', $hashColumn, 'redirect_chain', 'final_url'];
+        if ($hashColumn === 'content_hash') {
+            $cols[] = 'word_count';
+            $cols[] = 'text_len';
+        }
+
         $pages = SiteAuditPage::query()
             ->where('crawl_id', $crawlId)
             ->whereNotNull($hashColumn)
-            ->get(['url', 'url_hash', 'title', 'description', $hashColumn, 'redirect_chain', 'final_url']);
+            ->get($cols);
+
+        // SHA-256 пустой строки — оболочка без текста (JS-листинг и т.п.), не «дубль контента».
+        $emptyContentHash = hash('sha256', '');
 
         $byHash = [];
         foreach ($pages as $page) {
@@ -2302,6 +2486,23 @@ class SiteAuditAggregator
             }
             $hash = (string) $page->{$hashColumn};
             if ($hash === '') {
+                continue;
+            }
+            if ($hashColumn === 'content_hash') {
+                if ($hash === $emptyContentHash) {
+                    continue;
+                }
+                $words = (int) ($page->word_count ?? 0);
+                $textLen = (int) ($page->text_len ?? 0);
+                // Слишком мало текста — не сравниваем как полноценный контент.
+                if ($words < 20 && $textLen < 80) {
+                    continue;
+                }
+            }
+            if ($hashColumn === 'title_hash' && trim((string) ($page->title ?? '')) === '') {
+                continue;
+            }
+            if ($hashColumn === 'description_hash' && trim((string) ($page->description ?? '')) === '') {
                 continue;
             }
             $byHash[$hash][] = $page;

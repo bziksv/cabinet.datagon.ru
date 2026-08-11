@@ -6,6 +6,7 @@ use App\Exports\SiteAuditCanonicalSheet;
 use App\Exports\SiteAuditCrawlSummaryExport;
 use App\Exports\SiteAuditFindingsExport;
 use App\Services\SiteAudit\SiteAuditActionPlanBuilder;
+use App\Services\SiteAudit\SiteAuditClickDepth;
 use App\Services\SiteAudit\SiteAuditCrawlStarter;
 use App\Services\SiteAudit\SiteAuditCrawlStorage;
 use App\Services\SiteAudit\SiteAuditDuplicateGrouper;
@@ -32,6 +33,7 @@ use App\SiteAuditSchedule;
 use App\Support\DemoCabinet;
 use App\Support\SiteAuditLimits;
 use App\Support\TextUniquenessLimits;
+use App\User;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -499,13 +501,15 @@ class SiteAuditController extends Controller
             $total = (clone $query)->count();
 
             // Groups тянут findings в память — на больших отчётах уходим в list.
-            // Для HTML-паттернов лимит выше: сквозные шаблоны как раз на сотнях URL.
-            $groupsMax = SiteAuditDuplicateGrouper::isHtmlErrors($code) ? 2500 : 400;
+            // HTML / исходящие: лимит выше — сквозной шаблон как раз на сотнях–тысячах URL.
+            $groupsMax = SiteAuditDuplicateGrouper::groupsMemoryLimit($code);
             if ($viewMode === 'groups' && $total > $groupsMax) {
                 $viewMode = 'list';
             }
 
             $allGroupsForSummary = [];
+            $needsSitewide = SiteAuditDuplicateGrouper::isHtmlErrors($code)
+                || SiteAuditDuplicateGrouper::isLinkInverted($code);
 
             if ($viewMode === 'groups') {
                 $allRows = $query->get();
@@ -527,14 +531,18 @@ class SiteAuditController extends Controller
                 $ignoredMap = $ignoreSvc->ignoredMapForFindings($projectId, $rows);
                 $notesMap = $noteSvc->mapForFindings($projectId, $rows);
 
-                // В списке страниц всё равно ловим доминантный HTML-паттерн (сквозной шаблон).
-                if (SiteAuditDuplicateGrouper::isHtmlErrors($code) && $total >= 3 && $total <= $groupsMax) {
+                // В списке страниц всё равно ловим доминантный паттерн (сквозной блок).
+                if ($needsSitewide && $total >= 3 && $total <= $groupsMax) {
                     $allGroupsForSummary = SiteAuditDuplicateGrouper::group((clone $query)->get(), $code);
                 }
             }
 
-            if (SiteAuditDuplicateGrouper::isHtmlErrors($code) && $allGroupsForSummary !== []) {
+            if ($needsSitewide && $allGroupsForSummary !== []) {
                 $htmlSitewide = SiteAuditDuplicateGrouper::sitewideSummary($allGroupsForSummary, $total);
+            }
+
+            if ($code === 'deep_pages' && $rows instanceof \Illuminate\Support\Collection && $rows->isNotEmpty()) {
+                $rows = $this->enrichDeepPagesPaths((int) $crawl->id, $rows);
             }
         }
 
@@ -664,6 +672,7 @@ class SiteAuditController extends Controller
             'groupTotal' => $groupTotal,
             'htmlSitewide' => $htmlSitewide,
             'isHtmlErrorReport' => SiteAuditDuplicateGrouper::isHtmlErrors($code),
+            'isLinkInvertedReport' => SiteAuditDuplicateGrouper::isLinkInverted($code),
             'total' => $total,
             'page' => $page,
             'perPage' => $perPage,
@@ -1887,11 +1896,56 @@ class SiteAuditController extends Controller
             return;
         }
 
+        // Админы модуля смотрят чужие отчёты из «Администрирование».
+        if (User::isUserAdmin()) {
+            return;
+        }
+
         $project = $crawl->relationLoaded('project')
             ? $crawl->project
             : SiteAuditProject::query()->find($crawl->project_id);
 
         abort_unless($project && $project->isAccessibleBy($userId), 403);
+    }
+
+    /**
+     * Старые deep_pages без meta.path — досчитываем путь BFS на лету для текущей страницы отчёта.
+     *
+     * @param  \Illuminate\Support\Collection  $rows
+     * @return \Illuminate\Support\Collection
+     */
+    private function enrichDeepPagesPaths(int $crawlId, $rows)
+    {
+        $need = false;
+        foreach ($rows as $row) {
+            $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+            if (empty($meta['path']) || ! is_array($meta['path'])) {
+                $need = true;
+                break;
+            }
+        }
+        if (! $need) {
+            return $rows;
+        }
+
+        $pathByUrl = SiteAuditClickDepth::compute($crawlId)['path_by_url'] ?? [];
+        if ($pathByUrl === []) {
+            return $rows;
+        }
+
+        return $rows->map(function ($row) use ($pathByUrl) {
+            $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+            if (! empty($meta['path']) && is_array($meta['path'])) {
+                return $row;
+            }
+            $url = (string) ($row->url ?? '');
+            if ($url !== '' && ! empty($pathByUrl[$url]) && is_array($pathByUrl[$url])) {
+                $meta['path'] = array_values($pathByUrl[$url]);
+                $row->meta_json = $meta;
+            }
+
+            return $row;
+        });
     }
 
     private function assertCrawlOwner(SiteAuditCrawl $crawl): void
@@ -1943,6 +1997,9 @@ class SiteAuditController extends Controller
             $phase = $meta['phase'] ?? '';
             // Волна 5: в меню все фазы A–D (раньше только A/B — C/D-находки пропадали из дерева и корзин UI).
             if (! in_array($phase, ['A', 'B', 'C', 'D'], true)) {
+                continue;
+            }
+            if (! empty($meta['hidden'])) {
                 continue;
             }
 

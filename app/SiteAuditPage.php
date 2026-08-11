@@ -32,6 +32,7 @@ class SiteAuditPage extends Model
         'content_hash',
         'simhash',
         'out_links_json',
+        'ext_links_json',
         'img_srcs_json',
         'asset_srcs_json',
         'click_depth',
@@ -60,6 +61,7 @@ class SiteAuditPage extends Model
     protected $casts = [
         'redirect_chain' => 'array',
         'out_links_json' => 'array',
+        'ext_links_json' => 'array',
         'img_srcs_json' => 'array',
         'asset_srcs_json' => 'array',
         'noindex' => 'boolean',

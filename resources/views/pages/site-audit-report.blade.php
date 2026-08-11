@@ -23,6 +23,8 @@
             <div class="alert alert-success py-2">{{ session('status') }}</div>
         @endif
 
+        @include('pages.partials.site-audit-module-nav', ['active' => 'module'])
+
         @include('pages.partials.site-audit-beta-banner')
 
         @include('pages.partials.site-audit-breadcrumbs', [

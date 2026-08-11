@@ -5,6 +5,7 @@ namespace App\Services\SiteAudit;
 use App\Jobs\SiteAudit\AggregateSiteAuditCrawlJob;
 use App\Jobs\SiteAudit\ContinueSiteAuditCrawlJob;
 use App\SiteAuditCrawl;
+use App\SiteAuditPage;
 use App\SiteAuditProject;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -75,6 +76,9 @@ class SiteAuditCrawlEngine
     {
         $lockKey = 'site_audit_crawl_tick_' . $crawl->id;
         $lockTtl = max(120, (int) config('site_audit.batch_max_seconds', 240) + 180);
+        // Continue ставим после unlock — иначе второй воркер сразу упирается в lock
+        // и копит «промахи» / отложенные тики впустую.
+        $continueAfterUnlock = null;
         if (! Cache::add($lockKey, 1, $lockTtl)) {
             // Иначе при убитом воркере с живым lock цепочка Continue обрывается навсегда.
             if ($dispatchContinue) {
@@ -93,16 +97,51 @@ class SiteAuditCrawlEngine
                 return false;
             }
             if (! $this->hasEngineState($crawl)) {
-                if ($crawl->status === SiteAuditCrawl::STATUS_FETCHING) {
-                    $crawl->status = SiteAuditCrawl::STATUS_FAILED;
-                    $crawl->error = 'Прерван: потеряно состояние очереди краула';
-                    $crawl->finished_at = now();
-                    $crawl->save();
-                    SiteAuditGlobalCap::promoteWaiting();
+                // rename/tmp race или Continue прилетел раньше записи на диск —
+                // не валим краул сразу: подождём и перепоставим тик.
+                $path = $this->engineStatePath((int) $crawl->id);
+                for ($t = 0; $t < 10; $t++) {
+                    usleep(200000);
+                    clearstatcache(true, $path);
+                    if ($this->hasEngineState($crawl)) {
+                        break;
+                    }
+                }
+            }
+            if (! $this->hasEngineState($crawl) && (int) $crawl->pages_fetched > 0) {
+                // Файл могли снести гонкой — восстановить очередь из sitemap − pages.
+                $this->tryRebuildEngineStateForResume($crawl);
+                $crawl->refresh();
+            }
+            if (! $this->hasEngineState($crawl)) {
+                if (in_array($crawl->status, [
+                    SiteAuditCrawl::STATUS_FETCHING,
+                    SiteAuditCrawl::STATUS_DISCOVERING,
+                ], true)) {
+                    $missKey = 'site_audit_engine_miss_' . $crawl->id;
+                    $misses = (int) Cache::get($missKey, 0) + 1;
+                    Cache::put($missKey, $misses, 3600);
+                    Log::warning('SiteAudit engine state missing', [
+                        'crawl_id' => $crawl->id,
+                        'status' => $crawl->status,
+                        'misses' => $misses,
+                        'pages_fetched' => (int) $crawl->pages_fetched,
+                        'engine_path' => $this->engineStatePath((int) $crawl->id),
+                        'engine_is_file' => is_file($this->engineStatePath((int) $crawl->id)),
+                    ]);
+                    // Никогда не валим краул из‑за «промаха» файла: либо rebuild уже
+                    // отработал выше, либо Continue повторит тик. Hard-fail отсюда
+                    // давал ложные «Ошибка» при живом crawl_N.json (#100/#104).
+                    if ($dispatchContinue) {
+                        $continueAfterUnlock = ['delay' => min(120, 5 + 10 * min(max($misses, 1), 10))];
+                    }
+
+                    return true;
                 }
 
                 return false;
             }
+            Cache::forget('site_audit_engine_miss_' . $crawl->id);
 
             $maxPages = max(1, (int) config('site_audit.batch_max_pages', 80));
             $maxSeconds = max(30, (int) config('site_audit.batch_max_seconds', 240));
@@ -175,7 +214,9 @@ class SiteAuditCrawlEngine
                 // cancel/fail — редко; не долбим MySQL на каждом URL
                 if ($processed === 0 || $processed % 10 === 0) {
                     if ($this->crawlStatusIsTerminal((int) $crawl->id)) {
+                        // Важно: сохранить файл очереди и meta — иначе «Возобновить» пропадает.
                         $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded, $origins);
+                        $crawl->save();
 
                         return false;
                     }
@@ -274,16 +315,42 @@ class SiteAuditCrawlEngine
 
             // ещё есть URL — следующий тик
             $pagesTotal = max(count($seen), $fetched + (count($queue) - $i));
-            $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded, $origins);
+            $saved = $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded, $origins);
+            if (! $saved) {
+                // одна повторная попытка записать очередь
+                $saved = $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded, $origins);
+            }
+            // engine_resume в MySQL — иначе UI/canResume смотрят на stale meta с discover.
+            if ($saved) {
+                $crawl->save();
+            }
             $this->touchProgress($crawl, $fetched, $pagesTotal, $unchanged, $expanded);
 
             if ($dispatchContinue) {
-                $this->pushContinueJob((int) $crawl->id);
+                clearstatcache(true, $this->engineStatePath((int) $crawl->id));
+                if ($saved && $this->hasEngineState($crawl)) {
+                    // 1с после unlock — второй воркер не стартует внахлёст с finally.
+                    $continueAfterUnlock = ['delay' => 1];
+                } else {
+                    Log::warning('SiteAudit defer continue: state not durable yet', [
+                        'crawl_id' => $crawl->id,
+                        'fetched' => $fetched,
+                    ]);
+                    $continueAfterUnlock = ['delay' => 15];
+                }
             }
 
             return true;
         } finally {
             Cache::forget($lockKey);
+            if (is_array($continueAfterUnlock) && isset($continueAfterUnlock['delay'])) {
+                $delay = (int) $continueAfterUnlock['delay'];
+                if ($delay <= 1) {
+                    $this->pushContinueJob((int) $crawl->id, max(0, $delay));
+                } else {
+                    $this->scheduleContinue((int) $crawl->id, $delay);
+                }
+            }
         }
     }
 
@@ -305,13 +372,16 @@ class SiteAuditCrawlEngine
      */
     public function pushContinueJob(int $crawlId, int $delaySeconds = 0): void
     {
+        $queue = (string) (config('site_audit.queue') ?: 'site_audit');
         for ($attempt = 0; $attempt < 4; $attempt++) {
             try {
                 $job = new ContinueSiteAuditCrawlJob($crawlId);
+                // Явно pushOn/laterOn: Queue::push() в этом Laravel кладёт в default,
+                // и prod-воркеры съедают тик без локального crawl_N.json.
                 if ($delaySeconds > 0) {
-                    Queue::later(now()->addSeconds($delaySeconds), $job);
+                    Queue::laterOn($queue, now()->addSeconds($delaySeconds), $job);
                 } else {
-                    Queue::push($job);
+                    Queue::pushOn($queue, $job);
                 }
 
                 return;
@@ -321,6 +391,7 @@ class SiteAuditCrawlEngine
                 if (! $deadlock || $attempt >= 3) {
                     Log::warning('SiteAudit continue dispatch failed', [
                         'crawl_id' => $crawlId,
+                        'queue' => $queue,
                         'delay' => $delaySeconds,
                         'attempt' => $attempt + 1,
                         'error' => $msg,
@@ -495,6 +566,24 @@ class SiteAuditCrawlEngine
             $seen[$u] = true;
         }
 
+        // Resume/kick могли параллельно дернуть Discover: не затираем уже скачанный прогресс.
+        $crawl->refresh();
+        if ((int) $crawl->pages_fetched > 0 || $this->hasEngineState($crawl)) {
+            Log::warning('SiteAudit discover skipped: engine/progress already present', [
+                'crawl_id' => $crawl->id,
+                'pages_fetched' => (int) $crawl->pages_fetched,
+            ]);
+            if ($crawl->status !== SiteAuditCrawl::STATUS_FETCHING
+                && ! $crawl->isFinished()
+                && $crawl->status !== SiteAuditCrawl::STATUS_CANCELLED
+            ) {
+                $crawl->status = SiteAuditCrawl::STATUS_FETCHING;
+                $crawl->save();
+            }
+
+            return $crawl;
+        }
+
         $crawl->pages_total = count($queue);
         $crawl->pages_fetched = 0;
         $crawl->status = SiteAuditCrawl::STATUS_FETCHING;
@@ -522,10 +611,10 @@ class SiteAuditCrawlEngine
     private function finishFetch(SiteAuditCrawl $crawl, bool $queueAggregate = true): void
     {
         SiteAuditUserAgentSession::clear($crawl->id);
-        $this->clearEngineState($crawl);
-        $crawl->save();
 
         $crawl->refresh();
+        // Остановлен пользователем — очередь на диске нужна для «Возобновить».
+        // Раньше clearEngineState() здесь сносил файл → play пропадал при 20/240.
         if ($crawl->status === SiteAuditCrawl::STATUS_CANCELLED) {
             $crawl->finished_at = $crawl->finished_at ?: now();
             $crawl->save();
@@ -533,6 +622,9 @@ class SiteAuditCrawlEngine
 
             return;
         }
+
+        $this->clearEngineState($crawl);
+        $crawl->save();
 
         if ($crawl->isFinished()) {
             SiteAuditGlobalCap::promoteWaiting();
@@ -585,7 +677,9 @@ class SiteAuditCrawlEngine
                     . " '$.fetched', " . (int) $fetched . ","
                     . " '$.total', " . (int) $pagesTotal . ","
                     . " '$.pages_unchanged', " . (int) $unchanged . ","
-                    . " '$.links_expanded', " . (int) $expanded
+                    . " '$.links_expanded', " . (int) $expanded . ","
+                    . " '$.engine_resume.fetched', " . (int) $fetched . ","
+                    . " '$.engine_resume.remaining', GREATEST(0, " . (int) $pagesTotal . " - " . (int) $fetched . ")"
                     . ")"
                 ),
             ]);
@@ -618,7 +712,9 @@ class SiteAuditCrawlEngine
             @mkdir($dir, 0775, true);
         }
         $path = $dir . '/crawl_' . (int) $crawl->id . '_sitemap_urls.b64';
-        file_put_contents($path, $gz);
+        if (@file_put_contents($path, $gz) === false) {
+            return;
+        }
         unset($progress['sitemap']['urls_gz']);
         $progress['sitemap']['urls_gz_file'] = true;
         $crawl->progress_json = $progress;
@@ -627,8 +723,13 @@ class SiteAuditCrawlEngine
     public function hasEngineState(SiteAuditCrawl $crawl): bool
     {
         $path = $this->engineStatePath((int) $crawl->id);
-        if (is_file($path) && filesize($path) > 2) {
-            return true;
+        clearstatcache(true, $path);
+        if (is_file($path)) {
+            $size = @filesize($path);
+            // filesize() может вернуть false при гонке — не считаем это «нет файла».
+            if ($size === false || $size > 2) {
+                return true;
+            }
         }
 
         $engine = $crawl->progress_json['engine'] ?? null;
@@ -650,19 +751,107 @@ class SiteAuditCrawlEngine
             return false;
         }
 
-        // Без файла/blob очереди resume бесполезен — meta.remaining врёт после потери engine.
         if (! $this->hasEngineState($crawl)) {
-            return false;
+            // Файл могли снести старым finishFetch при cancel — пробуем восстановить очередь.
+            if (! $this->tryRebuildEngineStateForResume($crawl)) {
+                return false;
+            }
         }
 
         $meta = $this->engineResumeMeta($crawl);
-        if ($meta !== null) {
-            return (int) ($meta['remaining'] ?? 0) > 0;
+        if ($meta !== null && (int) ($meta['remaining'] ?? 0) > 0) {
+            return true;
         }
 
         $state = $this->loadEngineState($crawl);
 
         return count($state['queue']) > $state['index'];
+    }
+
+    /**
+     * Если файл очереди потерян, а страницы уже скачаны — собрать remaining из sitemap − pages.
+     */
+    public function tryRebuildEngineStateForResume(SiteAuditCrawl $crawl): bool
+    {
+        if ($this->hasEngineState($crawl)) {
+            return true;
+        }
+        if ((int) $crawl->pages_fetched < 1) {
+            return false;
+        }
+
+        $sitemapUrls = SiteAuditSitemapProbe::urlsFromProgress($crawl);
+        if ($sitemapUrls === []) {
+            // urls_gz / файл карты могли пропасть вместе с engine — пересоберём sitemap.
+            $project = SiteAuditProject::query()->find($crawl->project_id);
+            if (! $project) {
+                return false;
+            }
+            $seedLimit = max((int) $crawl->pages_limit, (int) ($crawl->progress_json['sitemap']['url_count'] ?? 0), 100);
+            try {
+                $meta = (new SiteAuditSitemapDiscovery())->discoverWithMeta($project->domain, $seedLimit);
+                $sitemapUrls = is_array($meta['all_urls'] ?? null) ? $meta['all_urls'] : [];
+            } catch (\Throwable $e) {
+                Log::warning('SiteAudit resume rebuild: sitemap rediscover failed', [
+                    'crawl_id' => $crawl->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return false;
+            }
+        }
+        if ($sitemapUrls === []) {
+            return false;
+        }
+
+        $done = SiteAuditPage::query()
+            ->where('crawl_id', $crawl->id)
+            ->pluck('url')
+            ->all();
+        $doneSet = array_fill_keys($done, true);
+
+        $remaining = [];
+        $seen = [];
+        foreach ($done as $u) {
+            $seen[(string) $u] = true;
+        }
+        foreach ($sitemapUrls as $u) {
+            $u = (string) $u;
+            if ($u === '' || isset($doneSet[$u])) {
+                continue;
+            }
+            $remaining[] = $u;
+            $seen[$u] = true;
+        }
+        if ($remaining === []) {
+            return false;
+        }
+
+        $limit = max(1, (int) $crawl->pages_limit);
+        $remaining = array_slice($remaining, 0, max(0, $limit - count($done)));
+        if ($remaining === []) {
+            return false;
+        }
+
+        $origins = [];
+        foreach ($remaining as $u) {
+            $origins[$u] = ['via' => 'sitemap', 'from' => null];
+        }
+
+        $fetched = max((int) $crawl->pages_fetched, count($done));
+        $ok = $this->persistEngineState($crawl, $remaining, 0, $fetched, $seen, 0, 0, $origins);
+        if (! $ok) {
+            return false;
+        }
+        $crawl->save();
+
+        Log::warning('SiteAudit engine state rebuilt for resume', [
+            'crawl_id' => $crawl->id,
+            'fetched' => $fetched,
+            'remaining' => count($remaining),
+        ]);
+
+        return $this->hasEngineState($crawl);
     }
 
     /**
@@ -692,6 +881,7 @@ class SiteAuditCrawlEngine
 
     /**
      * Снять finished и снова поставить в очередь (тот же crawl_id, тот же прогресс).
+     * Важно: не через Discover — иначе при гонке hasEngineState=false discover затрёт очередь.
      */
     public function resume(SiteAuditCrawl $crawl): SiteAuditCrawl
     {
@@ -699,12 +889,16 @@ class SiteAuditCrawlEngine
             throw new \RuntimeException('Нет сохранённого прогресса для продолжения — только полный повтор');
         }
 
-        $crawl->status = SiteAuditCrawl::STATUS_QUEUED_WAIT;
+        Cache::forget('site_audit_engine_miss_' . $crawl->id);
+        Cache::forget('site_audit_crawl_tick_' . $crawl->id);
+        Cache::forget('site_audit_continue_sched_' . $crawl->id);
+
+        $crawl->status = SiteAuditCrawl::STATUS_FETCHING;
         $crawl->error = null;
         $crawl->finished_at = null;
         $crawl->save();
 
-        SiteAuditGlobalCap::tryDispatch($crawl);
+        $this->pushContinueJob((int) $crawl->id, 1);
 
         return $crawl->fresh() ?: $crawl;
     }
@@ -793,6 +987,7 @@ class SiteAuditCrawlEngine
      * @param string[] $queue
      * @param array<string,bool> $seen
      * @param array<string, array{via:string,from:?string}> $origins
+     * @return bool false — файл очереди не записался
      */
     private function persistEngineState(
         SiteAuditCrawl $crawl,
@@ -803,7 +998,7 @@ class SiteAuditCrawlEngine
         int $unchanged,
         int $expanded,
         array $origins = []
-    ): void {
+    ): bool {
         $remaining = array_values(array_slice($queue, max(0, $index)));
         $originsPersist = [];
         foreach ($remaining as $u) {
@@ -826,10 +1021,45 @@ class SiteAuditCrawlEngine
             'origins' => $originsPersist,
         ];
 
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json === false || $json === '') {
+            Log::warning('SiteAudit engine state encode failed', [
+                'crawl_id' => $crawl->id,
+                'remaining' => count($remaining),
+            ]);
+
+            return false;
+        }
+
         $path = $this->engineStatePath((int) $crawl->id);
-        $tmp = $path . '.tmp';
-        file_put_contents($tmp, json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-        @rename($tmp, $path);
+        // Уникальный tmp: два воркера иначе перетирают один crawl_N.json.tmp.
+        $tmp = $path . '.tmp.' . getmypid() . '.' . str_replace('.', '', uniqid('', true));
+        $written = @file_put_contents($tmp, $json);
+        if ($written === false || $written < 3) {
+            @unlink($tmp);
+            Log::warning('SiteAudit engine state write failed', [
+                'crawl_id' => $crawl->id,
+                'bytes' => $written,
+            ]);
+
+            return false;
+        }
+        if (! @rename($tmp, $path)) {
+            @unlink($tmp);
+            Log::warning('SiteAudit engine state rename failed', [
+                'crawl_id' => $crawl->id,
+            ]);
+
+            return false;
+        }
+        clearstatcache(true, $path);
+        if (! is_file($path) || filesize($path) < 3) {
+            Log::warning('SiteAudit engine state missing after rename', [
+                'crawl_id' => $crawl->id,
+            ]);
+
+            return false;
+        }
 
         // убираем blob очереди из MySQL — иначе 6MB UPDATE на каждый тик
         $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
@@ -846,6 +1076,8 @@ class SiteAuditCrawlEngine
         $crawl->progress_json = $progress;
         $crawl->pages_fetched = $fetched;
         $crawl->pages_total = (int) $progress['total'];
+
+        return true;
     }
 
     private function clearEngineState(SiteAuditCrawl $crawl): void

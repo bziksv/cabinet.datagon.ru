@@ -531,6 +531,7 @@ class SiteAuditLinkReferrers
             'http_5xx',
             'unreachable',
             'broken_internal_link',
+            'broken_external_link',
             'redirect',
             'redirect_chain_long',
             'redirect_loop',

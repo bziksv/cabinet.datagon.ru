@@ -181,7 +181,17 @@
                href="{{ request()->fullUrlWithQuery(['view' => 'list', 'page' => 1]) }}"
                title="Список всех URL по одной строке">По страницам</a>
             @if(($viewMode ?? '') === 'groups' && !empty($groupTotal))
-                <span class="text-muted small ms-2">паттернов: {{ $groupTotal }} · URL: {{ $total }}</span>
+                <span class="text-muted small ms-2">паттернов: {{ number_format((int) $groupTotal, 0, '', ' ') }} · URL: {{ number_format((int) $total, 0, '', ' ') }}</span>
+            @endif
+        @elseif(!empty($isLinkInvertedReport))
+            <a class="cabinet-sa-view-toggle__btn {{ ($viewMode ?? '') === 'groups' ? 'is-active' : '' }}"
+               href="{{ request()->fullUrlWithQuery(['view' => 'groups', 'page' => 1]) }}"
+               title="Одинаковые исходящие вместе — видно общий блок (шапка/подвал/соцсети)">По ссылкам</a>
+            <a class="cabinet-sa-view-toggle__btn {{ ($viewMode ?? '') === 'list' ? 'is-active' : '' }}"
+               href="{{ request()->fullUrlWithQuery(['view' => 'list', 'page' => 1]) }}"
+               title="Каждая страница со своим списком исходящих">По страницам</a>
+            @if(($viewMode ?? '') === 'groups' && !empty($groupTotal))
+                <span class="text-muted small ms-2">целей: {{ number_format((int) $groupTotal, 0, '', ' ') }} · стр.: {{ number_format((int) $total, 0, '', ' ') }}</span>
             @endif
         @else
             <a class="cabinet-sa-view-toggle__btn {{ ($viewMode ?? '') === 'groups' ? 'is-active' : '' }}"
@@ -191,7 +201,7 @@
                href="{{ request()->fullUrlWithQuery(['view' => 'list', 'page' => 1]) }}"
                title="Просто список всех URL по одной строке">Список</a>
             @if(($viewMode ?? '') === 'groups' && !empty($groupTotal))
-                <span class="text-muted small ms-2">групп: {{ $groupTotal }} · URL: {{ $total }}</span>
+                <span class="text-muted small ms-2">групп: {{ number_format((int) $groupTotal, 0, '', ' ') }} · URL: {{ number_format((int) $total, 0, '', ' ') }}</span>
             @endif
         @endif
     </div>
@@ -199,20 +209,38 @@
 
 @if(!empty($htmlSitewide) && is_array($htmlSitewide))
     <div class="alert alert-warning border small mb-3 cabinet-sa-html-sitewide">
-        <strong>Скорее сквозной шаблон</strong>
-        (шапка / подвал / layout) —
-        одна и та же ошибка на
-        <strong>{{ (int) $htmlSitewide['pages'] }}</strong>
-        из {{ (int) $htmlSitewide['total'] }} стр.
-        ({{ (int) $htmlSitewide['pct'] }}%):
-        <code class="cabinet-sa-html-sitewide__code">{{ $htmlSitewide['label'] }}</code>.
-        <div class="mt-1 mb-0">
-            Не правьте каждую страницу: найдите общий include и почините один раз —
-            ошибка уйдёт с остальных URL после нового съема.
-            @if(($viewMode ?? '') === 'list')
-                <a href="{{ request()->fullUrlWithQuery(['view' => 'groups', 'page' => 1]) }}">Смотреть по ошибкам →</a>
+        @if(!empty($isLinkInvertedReport))
+            <strong>Скорее общий блок</strong>
+            (шапка / подвал / соцсети) —
+            одна и та же исходящая на
+            <strong>{{ number_format((int) $htmlSitewide['pages'], 0, '', ' ') }}</strong>
+            из {{ number_format((int) $htmlSitewide['total'], 0, '', ' ') }} стр.
+            ({{ (int) $htmlSitewide['pct'] }}%):
+            @if(!empty($htmlSitewide['label']))
+                <code class="cabinet-sa-html-sitewide__code">{{ $htmlSitewide['label'] }}</code>.
             @endif
-        </div>
+            <div class="mt-1 mb-0">
+                Не разбирайте каждую страницу: уберите или разметьте ссылку в общем шаблоне один раз.
+                @if(($viewMode ?? '') === 'list')
+                    <a href="{{ request()->fullUrlWithQuery(['view' => 'groups', 'page' => 1]) }}">Смотреть по ссылкам →</a>
+                @endif
+            </div>
+        @else
+            <strong>Скорее сквозной шаблон</strong>
+            (шапка / подвал / layout) —
+            одна и та же ошибка на
+            <strong>{{ number_format((int) $htmlSitewide['pages'], 0, '', ' ') }}</strong>
+            из {{ number_format((int) $htmlSitewide['total'], 0, '', ' ') }} стр.
+            ({{ (int) $htmlSitewide['pct'] }}%):
+            <code class="cabinet-sa-html-sitewide__code">{{ $htmlSitewide['label'] }}</code>.
+            <div class="mt-1 mb-0">
+                Не правьте каждую страницу: найдите общий include и почините один раз —
+                ошибка уйдёт с остальных URL после нового съема.
+                @if(($viewMode ?? '') === 'list')
+                    <a href="{{ request()->fullUrlWithQuery(['view' => 'groups', 'page' => 1]) }}">Смотреть по ошибкам →</a>
+                @endif
+            </div>
+        @endif
     </div>
 @endif
 
@@ -228,11 +256,20 @@
             @php $tone = $gi % 6; @endphp
             <div class="cabinet-sa-dup-group cabinet-sa-dup-group--t{{ $tone }}{{ !empty($group['likely_template']) ? ' cabinet-sa-dup-group--template' : '' }}">
                 <div class="cabinet-sa-dup-group__head">
-                    <span class="cabinet-sa-dup-group__count">{{ (int) $group['size'] }} стр.</span>
+                    <span class="cabinet-sa-dup-group__count">{{ number_format((int) $group['size'], 0, '', ' ') }} стр.</span>
                     @if(!empty($group['likely_template']))
-                        <span class="cabinet-sa-dup-group__badge" title="Одинаковая ошибка на многих URL — почти наверняка общий шаблон">сквозной</span>
+                        <span class="cabinet-sa-dup-group__badge" title="{{ !empty($isLinkInvertedReport) ? 'Одинаковая исходящая на многих URL — почти наверняка общий блок' : 'Одинаковая ошибка на многих URL — почти наверняка общий шаблон' }}">{{ !empty($isLinkInvertedReport) ? 'общий блок' : 'сквозной' }}</span>
                     @endif
-                    <div class="cabinet-sa-dup-group__label">{{ $group['label'] }}</div>
+                    <div class="cabinet-sa-dup-group__label">
+                        @if(!empty($group['href']))
+                            @if(!empty($group['host']))
+                                <span class="text-secondary me-1">{{ $group['host'] }}</span>
+                            @endif
+                            <a href="{{ $group['href'] }}" target="_blank" rel="noopener noreferrer" class="cabinet-sa-url-break">{{ $group['href'] }}</a>
+                        @else
+                            {{ $group['label'] }}
+                        @endif
+                    </div>
                 </div>
                 @if(!empty($group['hint']))
                     <div class="cabinet-sa-dup-group__hint">{{ $group['hint'] }}</div>
@@ -241,10 +278,14 @@
                     $groupUrls = is_array($group['urls'] ?? null) ? $group['urls'] : [];
                     $groupUrlTotal = count($groupUrls);
                     $groupUrlPreview = 10;
+                    // Не раздуваем DOM тысячами <a> в сквозном блоке.
+                    $groupUrlExpandMax = 40;
                     $groupUrlsHead = array_slice($groupUrls, 0, $groupUrlPreview);
-                    $groupUrlsTail = $groupUrlTotal > $groupUrlPreview
+                    $groupUrlsTailAll = $groupUrlTotal > $groupUrlPreview
                         ? array_slice($groupUrls, $groupUrlPreview)
                         : [];
+                    $groupUrlsTail = array_slice($groupUrlsTailAll, 0, $groupUrlExpandMax);
+                    $groupUrlsHidden = max(0, count($groupUrlsTailAll) - count($groupUrlsTail));
                 @endphp
                 <ul class="cabinet-sa-dup-group__urls">
                     @foreach($groupUrlsHead as $u)
@@ -253,18 +294,29 @@
                         </li>
                     @endforeach
                 </ul>
-                @if($groupUrlsTail !== [])
+                @if($groupUrlsTail !== [] || $groupUrlsHidden > 0)
                     <details class="cabinet-sa-dup-group__more">
                         <summary class="cabinet-sa-dup-group__more-sum">
-                            Ещё {{ count($groupUrlsTail) }} URL
+                            Ещё {{ number_format($groupUrlTotal - $groupUrlPreview, 0, '', ' ') }} URL
                         </summary>
-                        <ul class="cabinet-sa-dup-group__urls cabinet-sa-dup-group__urls--more">
-                            @foreach($groupUrlsTail as $u)
-                                <li>
-                                    <a href="{{ $u['url'] }}" target="_blank" rel="noopener noreferrer">{{ $u['url'] }}</a>
-                                </li>
-                            @endforeach
-                        </ul>
+                        @if($groupUrlsTail !== [])
+                            <ul class="cabinet-sa-dup-group__urls cabinet-sa-dup-group__urls--more">
+                                @foreach($groupUrlsTail as $u)
+                                    <li>
+                                        <a href="{{ $u['url'] }}" target="_blank" rel="noopener noreferrer">{{ $u['url'] }}</a>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endif
+                        @if($groupUrlsHidden > 0)
+                            <div class="cabinet-sa-dup-group__more-note text-muted small mt-2">
+                                Показаны {{ number_format($groupUrlPreview + count($groupUrlsTail), 0, '', ' ') }}
+                                из {{ number_format($groupUrlTotal, 0, '', ' ') }}.
+                                Остальные {{ number_format($groupUrlsHidden, 0, '', ' ') }} —
+                                в режиме
+                                <a href="{{ request()->fullUrlWithQuery(['view' => 'list', 'page' => 1]) }}">По страницам</a>.
+                            </div>
+                        @endif
                     </details>
                 @endif
             </div>
@@ -382,13 +434,27 @@
                 @endphp
                 <tr class="{{ $isIgn ? 'cabinet-sa-row--ignored' : '' }}{{ $isFixed ? ' cabinet-sa-row--fixed' : '' }}">
                     <td class="cabinet-sa-url">
-                        <a href="{{ $row->url }}" target="_blank" rel="noopener noreferrer">{{ $row->url }}</a>
-                        @if($isIgn)
-                            <span class="badge text-bg-light border ms-1">игнор</span>
-                        @endif
-                        @if($isFixed)
-                            <span class="badge text-bg-success ms-1">исправлено</span>
-                        @endif
+                        @php
+                            $urlDisp = !empty($isBrokenTarget)
+                                ? \App\Services\SiteAudit\SiteAuditFindingPresenter::brokenUrlDisplay((string) $row->url)
+                                : ['display' => (string) $row->url, 'warn' => null];
+                            $httpStatus = isset($rowMeta['status']) ? (int) $rowMeta['status'] : 0;
+                        @endphp
+                        <div class="cabinet-sa-url-block{{ !empty($urlDisp['warn']) ? ' cabinet-sa-url-block--warn' : '' }}">
+                            @if(!empty($isBrokenTarget) && $httpStatus >= 400)
+                                <span class="cabinet-sa-status-pill {{ $httpStatus >= 500 ? 'cabinet-sa-status-pill--5xx' : 'cabinet-sa-status-pill--4xx' }}">{{ $httpStatus }}</span>
+                            @endif
+                            <a href="{{ $row->url }}" target="_blank" rel="noopener noreferrer" class="cabinet-sa-url-break">{{ $urlDisp['display'] }}</a>
+                            @if(!empty($urlDisp['warn']))
+                                <div class="cabinet-sa-url-block__warn" title="{{ $row->url }}">{{ $urlDisp['warn'] }}</div>
+                            @endif
+                            @if($isIgn)
+                                <span class="badge text-bg-light border ms-1">игнор</span>
+                            @endif
+                            @if($isFixed)
+                                <span class="badge text-bg-success ms-1">исправлено</span>
+                            @endif
+                        </div>
                     </td>
                     @if(!empty($showSeverityCol))
                         <td class="cabinet-sa-sev-cell">

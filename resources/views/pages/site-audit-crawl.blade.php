@@ -82,6 +82,8 @@
          data-status-url="{{ route('pages.site-audit.crawl.status', $crawl->id) }}"
          data-finished="{{ $crawl->isFinished() ? '1' : '0' }}">
 
+        @include('pages.partials.site-audit-module-nav', ['active' => 'module'])
+
         @include('pages.partials.site-audit-beta-banner')
 
         @include('pages.partials.site-audit-breadcrumbs', [

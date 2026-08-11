@@ -11,6 +11,18 @@ class SiteAuditDuplicateGrouper
         'duplicate_description',
         'duplicate_content',
         'html_critical_errors',
+        'external_links',
+        'external_assets',
+        'links_nofollow',
+        'page_has_broken_external_links',
+    ];
+
+    /** Инверсия: группа = исходящая ссылка/ассет, внутри — страницы с ней. */
+    private const LINK_INVERTED = [
+        'external_links',
+        'external_assets',
+        'links_nofollow',
+        'page_has_broken_external_links',
     ];
 
     public static function isGroupable(string $code): bool
@@ -23,14 +35,32 @@ class SiteAuditDuplicateGrouper
         return $code === 'html_critical_errors';
     }
 
+    public static function isLinkInverted(string $code): bool
+    {
+        return in_array($code, self::LINK_INVERTED, true);
+    }
+
+    /** Лимит findings в память для режима groups (иначе fallback в list). */
+    public static function groupsMemoryLimit(string $code): int
+    {
+        if (self::isHtmlErrors($code) || self::isLinkInverted($code)) {
+            return 2500;
+        }
+
+        return 400;
+    }
+
     /**
      * @param  Collection|iterable  $rows  SiteAuditFinding-like objects with meta_json
-     * @return array<int, array{hash:string,size:int,label:string,severity:string,urls:array<int,array{url:string,severity:string}>,hint:?string,likely_template:bool}>
+     * @return array<int, array{hash:string,size:int,label:string,severity:string,urls:array<int,array{url:string,severity:string}>,hint:?string,likely_template:bool,href?:string,host?:string}>
      */
     public static function group($rows, string $code): array
     {
         if (self::isHtmlErrors($code)) {
             return self::groupHtmlErrors($rows);
+        }
+        if (self::isLinkInverted($code)) {
+            return self::groupByOutboundUrl($rows, $code);
         }
 
         $buckets = [];
@@ -139,6 +169,158 @@ class SiteAuditDuplicateGrouper
         }
 
         return self::sortGroups($groups);
+    }
+
+    /**
+     * Группировка исходящих ссылок/ассетов: одна цель → список страниц.
+     * Удобно, когда vk/t.me/иконка в шапке повторяется на всём сайте.
+     *
+     * @param  Collection|iterable  $rows
+     * @return array<int, array{hash:string,size:int,label:string,severity:string,urls:array<int,array{url:string,severity:string}>,hint:?string,likely_template:bool,href:string,host:string}>
+     */
+    private static function groupByOutboundUrl($rows, string $code): array
+    {
+        $buckets = [];
+        $pageTotal = 0;
+        $kindNoun = $code === 'external_assets' ? 'файл' : 'ссылка';
+
+        foreach ($rows as $row) {
+            $pageTotal++;
+            $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+            $rawSamples = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+            $pageUrl = (string) ($row->url ?? '');
+            $severity = (string) ($row->severity ?? 'info');
+            $seenOnPage = [];
+
+            if ($rawSamples === []) {
+                $sig = 'empty';
+                if (! isset($buckets[$sig])) {
+                    $buckets[$sig] = [
+                        'hash' => $sig,
+                        'size' => 0,
+                        'label' => 'Без списка целей в сэмпле',
+                        'severity' => $severity,
+                        'urls' => [],
+                        'hint' => 'В finding нет samples — смотрите режим «По страницам».',
+                        'likely_template' => false,
+                        'href' => '',
+                        'host' => '',
+                        '_urls' => [],
+                    ];
+                }
+                if ($pageUrl !== '' && ! isset($buckets[$sig]['_urls'][$pageUrl])) {
+                    $buckets[$sig]['_urls'][$pageUrl] = true;
+                    $buckets[$sig]['urls'][] = [
+                        'url' => $pageUrl,
+                        'severity' => $severity,
+                    ];
+                    $buckets[$sig]['size'] = count($buckets[$sig]['urls']);
+                }
+                continue;
+            }
+
+            foreach ($rawSamples as $sample) {
+                $target = '';
+                $kind = '';
+                if (is_string($sample)) {
+                    $target = trim($sample);
+                } elseif (is_array($sample)) {
+                    $target = trim((string) ($sample['url'] ?? $sample['href'] ?? $sample['src'] ?? ''));
+                    $kind = trim((string) ($sample['kind'] ?? ''));
+                }
+                if ($target === '') {
+                    continue;
+                }
+
+                $sig = self::normalizeOutboundSignature($target);
+                if ($sig === '' || isset($seenOnPage[$sig])) {
+                    continue;
+                }
+                $seenOnPage[$sig] = true;
+
+                if (! isset($buckets[$sig])) {
+                    $host = self::hostOf($target);
+                    $label = $host !== '' ? ($host . ' · ' . self::clipLabel($target, 100)) : self::clipLabel($target, 120);
+                    if ($kind !== '') {
+                        $label = '[' . $kind . '] ' . $label;
+                    }
+                    if (is_array($sample)) {
+                        $anchor = trim((string) ($sample['text'] ?? ''));
+                        if ($anchor !== '') {
+                            $label = '«' . self::clipLabel($anchor, 48) . '» → ' . $label;
+                        }
+                    }
+                    $buckets[$sig] = [
+                        'hash' => $sig,
+                        'size' => 0,
+                        'label' => $label,
+                        'severity' => $severity,
+                        'urls' => [],
+                        'hint' => 'Одинаковая исходящая ' . $kindNoun
+                            . ' на многих URL — чаще всего общий блок (шапка, подвал, сайдбар).',
+                        'likely_template' => false,
+                        'href' => $target,
+                        'host' => $host,
+                        '_urls' => [],
+                    ];
+                }
+
+                if ($pageUrl !== '' && ! isset($buckets[$sig]['_urls'][$pageUrl])) {
+                    $buckets[$sig]['_urls'][$pageUrl] = true;
+                    $buckets[$sig]['urls'][] = [
+                        'url' => $pageUrl,
+                        'severity' => $severity,
+                    ];
+                    $buckets[$sig]['size'] = count($buckets[$sig]['urls']);
+                }
+            }
+        }
+
+        $groups = [];
+        foreach ($buckets as $bucket) {
+            unset($bucket['_urls']);
+            $bucket['likely_template'] = self::isLikelyTemplate($bucket['size'], $pageTotal);
+            $groups[] = $bucket;
+        }
+
+        return self::sortGroups($groups);
+    }
+
+    public static function normalizeOutboundSignature(string $url): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return '';
+        }
+
+        // Схлопываем только очевидный шум: хвостовой слэш и регистр схемы/хоста.
+        $parts = @parse_url($url);
+        if (! is_array($parts) || empty($parts['host'])) {
+            return mb_strtolower(rtrim($url, '/'));
+        }
+
+        $scheme = strtolower((string) ($parts['scheme'] ?? 'https'));
+        $host = strtolower((string) $parts['host']);
+        $port = isset($parts['port']) ? (':' . (int) $parts['port']) : '';
+        $path = (string) ($parts['path'] ?? '');
+        if ($path === '' || $path === '/') {
+            $path = '';
+        } else {
+            $path = rtrim($path, '/');
+        }
+        $query = isset($parts['query']) && $parts['query'] !== '' ? ('?' . $parts['query']) : '';
+        $fragment = isset($parts['fragment']) && $parts['fragment'] !== ''
+            ? ('#' . $parts['fragment'])
+            : '';
+
+        return $scheme . '://' . $host . $port . $path . $query . $fragment;
+    }
+
+    private static function hostOf(string $url): string
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+
+        return is_string($host) ? strtolower($host) : '';
     }
 
     /**

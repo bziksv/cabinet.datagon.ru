@@ -173,9 +173,10 @@ class SiteAuditGlobalCap
 
     private static function pushDiscoverJob(int $crawlId): void
     {
+        $queue = (string) (config('site_audit.queue') ?: 'site_audit');
         for ($attempt = 0; $attempt < 4; $attempt++) {
             try {
-                Queue::push(new DiscoverSiteAuditUrlsJob($crawlId));
+                Queue::pushOn($queue, new DiscoverSiteAuditUrlsJob($crawlId));
 
                 return;
             } catch (\Throwable $e) {
@@ -252,7 +253,15 @@ class SiteAuditGlobalCap
                     $crawl->started_at = now();
                 }
                 $crawl->save();
-                DiscoverSiteAuditUrlsJob::dispatch($crawl->id);
+                // Уже есть очередь на диске (resume / оборванный fetching) — только Continue.
+                $engine = new SiteAuditCrawlEngine();
+                if ($engine->hasEngineState($crawl) && (int) $crawl->pages_fetched > 0) {
+                    $crawl->status = SiteAuditCrawl::STATUS_FETCHING;
+                    $crawl->save();
+                    $engine->pushContinueJob((int) $crawl->id, 1);
+                } else {
+                    DiscoverSiteAuditUrlsJob::dispatch($crawl->id);
+                }
 
                 return true;
             });

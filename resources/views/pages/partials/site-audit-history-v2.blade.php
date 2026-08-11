@@ -226,7 +226,14 @@
                                           data-cabinet-confirm-title="Возобновить проверку"
                                           data-cabinet-confirm-ok="Возобновить">
                                         @csrf
-                                        <button type="submit" class="btn btn-sm btn-outline-primary">Возобновить</button>
+                                        <button type="submit"
+                                                class="btn btn-sm btn-outline-primary cabinet-sa-icon-btn"
+                                                data-toggle="tooltip"
+                                                data-placement="top"
+                                                title="Возобновить проверку"
+                                                aria-label="Возобновить проверку">
+                                            <i class="bi bi-play-fill" aria-hidden="true"></i>
+                                        </button>
                                     </form>
                                 @endif
                                 <form method="POST" action="{{ route('pages.site-audit.crawl.repeat', $c->id) }}" class="d-inline"
@@ -234,7 +241,14 @@
                                       data-cabinet-confirm-title="Новая проверка"
                                       data-cabinet-confirm-ok="Повторить">
                                     @csrf
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Повторить">↻</button>
+                                    <button type="submit"
+                                            class="btn btn-sm btn-outline-secondary cabinet-sa-icon-btn"
+                                            data-toggle="tooltip"
+                                            data-placement="top"
+                                            title="Повторить с нуля"
+                                            aria-label="Повторить с нуля">
+                                        <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+                                    </button>
                                 </form>
                                 <form method="POST" action="{{ route('pages.site-audit.crawl.destroy', $c->id) }}" class="d-inline"
                                       data-cabinet-confirm="Удалить проверку #{{ $c->id }}?"
@@ -243,7 +257,12 @@
                                       data-cabinet-confirm-danger="1">
                                     @csrf
                                     @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Удалить">
+                                    <button type="submit"
+                                            class="btn btn-sm btn-outline-danger cabinet-sa-icon-btn"
+                                            data-toggle="tooltip"
+                                            data-placement="top"
+                                            title="Удалить проверку"
+                                            aria-label="Удалить проверку">
                                         <i class="bi bi-trash" aria-hidden="true"></i>
                                     </button>
                                 </form>

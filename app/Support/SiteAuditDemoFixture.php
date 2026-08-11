@@ -86,6 +86,8 @@ class SiteAuditDemoFixture
         'http_https_both_available' => 'critical',
         'page_has_broken_links' => 'warning',
         'broken_internal_link' => 'critical',
+        'page_has_broken_external_links' => 'warning',
+        'broken_external_link' => 'warning',
         'page_has_bad_links' => 'warning',
         'lost_file' => 'warning',
         'adult_content' => 'warning',
@@ -384,6 +386,7 @@ class SiteAuditDemoFixture
     {
         switch ($code) {
             case 'broken_internal_link':
+            case 'broken_external_link':
             case 'http_4xx':
                 return [
                     'status' => 404,
@@ -431,15 +434,40 @@ class SiteAuditDemoFixture
             case 'page_has_broken_links':
             case 'too_many_strong':
             case 'duplicate_links':
-            case 'links_nofollow':
                 return ['count' => 1 + ($j % 4)];
+            case 'links_nofollow':
+                return [
+                    'count' => 2,
+                    'samples' => [
+                        [
+                            'href' => $base . '/go/partner/',
+                            'text' => 'Партнёр',
+                            'scope' => 'external',
+                        ],
+                        [
+                            'href' => 'https://example.com/old-offer/',
+                            'text' => 'Старое предложение',
+                            'scope' => 'external',
+                        ],
+                    ],
+                ];
+            case 'page_has_broken_external_links':
+                return [
+                    'count' => 1,
+                    'samples' => [
+                        [
+                            'url' => 'https://example.com/gone/',
+                            'text' => 'Битая внешняя',
+                            'status' => 404,
+                        ],
+                    ],
+                ];
             case 'external_links':
                 return [
                     'count' => 2 + ($j % 3),
                     'samples' => [
-                        'https://example.com/partner/',
-                        'https://t.me/demo_channel',
-                        'https://vk.com/demo_group',
+                        ['url' => 'https://example.com/partner/', 'text' => 'Партнёр'],
+                        ['url' => 'https://t.me/example', 'text' => 'Telegram'],
                     ],
                 ];
             case 'broken_image':

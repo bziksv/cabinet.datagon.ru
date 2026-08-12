@@ -513,13 +513,13 @@ return [
         ],
         'title_too_short' => [
             'phase' => 'A',
-            'severity' => 'warning',
+            'severity' => 'important',
             'title' => 'Короткий TITLE',
             'description' => 'TITLE короче рекомендуемой длины.',
         ],
         'title_too_long' => [
             'phase' => 'A',
-            'severity' => 'warning',
+            'severity' => 'important',
             'title' => 'Длинный TITLE',
             'description' => 'TITLE длиннее рекомендуемой длины.',
         ],
@@ -537,13 +537,13 @@ return [
         ],
         'title_equals_h1' => [
             'phase' => 'A',
-            'severity' => 'warning',
+            'severity' => 'important',
             'title' => 'TITLE = H1',
             'description' => 'TITLE совпадает с H1.',
         ],
         'title_equals_description' => [
             'phase' => 'A',
-            'severity' => 'warning',
+            'severity' => 'important',
             'title' => 'TITLE = Description',
             'description' => 'TITLE совпадает с Description.',
         ],

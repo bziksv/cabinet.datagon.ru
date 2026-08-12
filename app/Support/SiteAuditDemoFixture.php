@@ -11,7 +11,7 @@ class SiteAuditDemoFixture
 {
     public const DOMAIN = 'demo-audit.titlo.ru';
     public const PROJECT_NAME = 'Демо: полный аудит (фикстура)';
-    public const DEMO_VERSION = 33;
+    public const DEMO_VERSION = 34;
     public const SHARE_TOKEN = 'demo-site-audit-rich';
 
     /**
@@ -31,7 +31,7 @@ class SiteAuditDemoFixture
         'duplicate_content' => 'critical',
         'similar_pages' => 'important',
         'empty_title' => 'critical',
-        'empty_description' => 'warning',
+        'empty_description' => 'critical',
         'multiple_title_or_description' => 'critical',
         'noindex' => 'warning',
         'canonical_foreign' => 'other',

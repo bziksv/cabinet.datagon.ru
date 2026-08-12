@@ -425,7 +425,7 @@ return [
         ],
         'empty_description' => [
             'phase' => 'A',
-            'severity' => 'warning',
+            'severity' => 'critical',
             'title' => 'Пустой Description',
             'description' => 'Отсутствует meta description.',
         ],

@@ -170,7 +170,7 @@ class SiteAuditFindingHelp
             ],
             'empty_description' => [
                 'what' => 'Нет meta description.',
-                'why' => 'Поисковик сам соберёт сниппет — часто хуже контролируемого описания, ниже CTR.',
+                'why' => 'Без description поисковик сам соберёт сниппет — часто хуже контролируемого текста, ниже CTR. Это грубая SEO-ошибка наравне с пустым TITLE.',
                 'fix' => 'Добавьте уникальный <meta name="description" content="…">.',
             ],
             'multiple_title_or_description' => [

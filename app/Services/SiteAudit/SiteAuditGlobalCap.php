@@ -9,9 +9,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 
 /**
- * Глобальный backpressure: одновременно N краулов на весь сервер.
+ * Backpressure: глобально N краулов + лимит на пользователя.
  * Остальные — queued_wait без Discover/Fetch jobs.
- * Cabinet default N=2 (как numprocs site_audit); proxy2 — SITE_AUDIT_GLOBAL_MAX_ACTIVE.
+ * Cabinet default: global=3, per-user=2 (как numprocs site_audit); proxy2 — env.
  */
 class SiteAuditGlobalCap
 {
@@ -29,7 +29,12 @@ class SiteAuditGlobalCap
 
     public static function maxActive(): int
     {
-        return max(1, (int) config('site_audit.global_max_active_crawls', 1));
+        return max(1, (int) config('site_audit.global_max_active_crawls', 3));
+    }
+
+    public static function maxPerUser(): int
+    {
+        return max(1, (int) config('site_audit.max_active_crawls_per_user', 2));
     }
 
     public static function countActive(?int $exceptCrawlId = null): int
@@ -42,11 +47,10 @@ class SiteAuditGlobalCap
         return (int) $q->count();
     }
 
-    /** Есть ли у пользователя другой краул в работе (не queued_wait). */
-    public static function userHasOtherActive(int $userId, ?int $exceptCrawlId = null): bool
+    public static function countUserActive(int $userId, ?int $exceptCrawlId = null): int
     {
         if ($userId < 1) {
-            return false;
+            return 0;
         }
         $q = SiteAuditCrawl::query()
             ->where('user_id', $userId)
@@ -55,7 +59,19 @@ class SiteAuditGlobalCap
             $q->where('id', '!=', $exceptCrawlId);
         }
 
-        return $q->exists();
+        return (int) $q->count();
+    }
+
+    /** У пользователя уже занят лимит параллельных проверок. */
+    public static function userAtCap(int $userId, ?int $exceptCrawlId = null): bool
+    {
+        return self::countUserActive($userId, $exceptCrawlId) >= self::maxPerUser();
+    }
+
+    /** @deprecated используйте userAtCap(); оставлено для совместимости */
+    public static function userHasOtherActive(int $userId, ?int $exceptCrawlId = null): bool
+    {
+        return self::userAtCap($userId, $exceptCrawlId);
     }
 
     /**
@@ -229,8 +245,8 @@ class SiteAuditGlobalCap
 
                 self::reclaimStale();
 
-                // 1 активный краул на пользователя (остальные ждут в очереди)
-                if (self::userHasOtherActive((int) $crawl->user_id, (int) $crawl->id)) {
+                // Лимит параллельных проверок на пользователя (остальные ждут в очереди)
+                if (self::userAtCap((int) $crawl->user_id, (int) $crawl->id)) {
                     if ($crawl->status !== SiteAuditCrawl::STATUS_QUEUED_WAIT) {
                         $crawl->status = SiteAuditCrawl::STATUS_QUEUED_WAIT;
                         $crawl->save();
@@ -304,7 +320,7 @@ class SiteAuditGlobalCap
                     if ($started >= $slots) {
                         break;
                     }
-                    if (self::userHasOtherActive((int) $crawl->user_id, (int) $crawl->id)) {
+                    if (self::userAtCap((int) $crawl->user_id, (int) $crawl->id)) {
                         continue;
                     }
                     if (self::countActive((int) $crawl->id) >= self::maxActive()) {

@@ -117,7 +117,7 @@ return [
         ],
         'cabinet-titlo-site-audit' => [
             'queues' => ['site_audit'],
-            'numprocs_lk' => 2,
+            'numprocs_lk' => 3,
         ],
         'cabinet-titlo-websockets' => [
             'queues' => [],

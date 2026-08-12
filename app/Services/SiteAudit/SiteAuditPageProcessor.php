@@ -735,9 +735,17 @@ class SiteAuditPageProcessor
                         }
                     }
                     if (($parsed['canonical_count'] ?? 0) > 1) {
+                        $canonicals = [];
+                        foreach (($parsed['canonicals'] ?? []) as $c) {
+                            $c = trim((string) $c);
+                            if ($c !== '') {
+                                $canonicals[] = mb_substr($c, 0, 500);
+                            }
+                        }
                         $findings[] = $this->finding('multiple_canonical', $url, $urlHash, [
                             'count' => (int) $parsed['canonical_count'],
                             'canonical' => $pageData['canonical'],
+                            'canonicals' => $canonicals,
                         ]);
                     }
                 } else {

@@ -842,6 +842,12 @@ class SiteAuditAggregator
         }
 
         $robotsSkipped = (int) ($crawl->progress_json['robots_skipped'] ?? 0);
+        $robotsGroups = is_array($crawl->progress_json['robots']['groups'] ?? null)
+            ? $crawl->progress_json['robots']['groups']
+            : null;
+        $robotsTxt = is_array($robotsGroups) && $robotsGroups !== []
+            ? new SiteAuditRobotsTxt()
+            : null;
         $pagesLimit = (int) $crawl->pages_limit;
         $pagesFetched = (int) $crawl->pages_fetched;
         $pagesStored = count($crawledSet);
@@ -849,6 +855,10 @@ class SiteAuditAggregator
         foreach ($sitemapUrls as $u) {
             // Уже есть в проверке (любой статус) — не считаем «не в проверке»
             if (isset($crawledSet[$u])) {
+                continue;
+            }
+            // Закрытые robots.txt — отдельный отчёт robots_blocked, не дублируем сюда.
+            if ($robotsTxt && ! $robotsTxt->isPathAllowed($robotsGroups, $u)) {
                 continue;
             }
             if ($emitted >= $sampleNotCrawled) {

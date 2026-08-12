@@ -2387,22 +2387,91 @@ class SiteAuditController extends Controller
                 }
             }
 
-            // multiple_title_or_description: хотя бы текущие title/description со страницы.
+            // multiple_title_or_description: все TITLE/Description с страницы (не «первый + и ещё N»).
             if ($page && (string) ($row->code ?? '') === 'multiple_title_or_description') {
                 $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
-                $hasTitles = ! empty($meta['titles']) && is_array($meta['titles']);
-                $hasDescs = ! empty($meta['descriptions']) && is_array($meta['descriptions']);
+                $titleCount = (int) ($meta['title_count'] ?? 0);
+                $descCount = (int) ($meta['description_count'] ?? 0);
+                $titles = (! empty($meta['titles']) && is_array($meta['titles'])) ? array_values($meta['titles']) : [];
+                $descs = (! empty($meta['descriptions']) && is_array($meta['descriptions'])) ? array_values($meta['descriptions']) : [];
+                $needTitles = $titleCount > 1 && count($titles) < $titleCount;
+                $needDescs = $descCount > 1 && count($descs) < $descCount;
                 $changed = false;
-                if (! $hasTitles && trim((string) ($page->title ?? '')) !== '') {
+
+                if ($needTitles || $needDescs) {
+                    $parsed = $this->parseMultipleMetaFromUrl((string) ($row->url ?? $page->url ?? ''));
+                    if ($parsed !== null) {
+                        if ($needTitles && ! empty($parsed['titles'])) {
+                            $meta['titles'] = $parsed['titles'];
+                            $meta['title_count'] = max($titleCount, (int) ($parsed['title_count'] ?? 0), count($parsed['titles']));
+                            $changed = true;
+                        }
+                        if ($needDescs && ! empty($parsed['descriptions'])) {
+                            $meta['descriptions'] = $parsed['descriptions'];
+                            $meta['description_count'] = max($descCount, (int) ($parsed['description_count'] ?? 0), count($parsed['descriptions']));
+                            $changed = true;
+                        }
+                    }
+                }
+
+                if ((empty($meta['titles']) || ! is_array($meta['titles'])) && trim((string) ($page->title ?? '')) !== '') {
                     $meta['titles'] = [mb_substr(trim((string) $page->title), 0, 300)];
                     $changed = true;
                 }
-                if (! $hasDescs && trim((string) ($page->description ?? '')) !== '') {
+                if ((empty($meta['descriptions']) || ! is_array($meta['descriptions'])) && trim((string) ($page->description ?? '')) !== '') {
                     $meta['descriptions'] = [mb_substr(trim((string) $page->description), 0, 400)];
                     $changed = true;
                 }
+
                 if ($changed) {
                     $row->meta_json = $meta;
+                    $findingId = (int) ($row->id ?? 0);
+                    if ($findingId > 0) {
+                        try {
+                            SiteAuditFinding::query()
+                                ->where('crawl_id', $crawlId)
+                                ->where('id', $findingId)
+                                ->update([
+                                    'meta_json' => json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                                ]);
+                        } catch (\Throwable $e) {
+                            // UI важнее персиста
+                        }
+                    }
+                }
+            }
+
+            // multiple_canonical: все href из link rel=canonical (не только count / первый).
+            if ($page && (string) ($row->code ?? '') === 'multiple_canonical') {
+                $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+                $count = (int) ($meta['count'] ?? 0);
+                $canonicals = (! empty($meta['canonicals']) && is_array($meta['canonicals']))
+                    ? array_values($meta['canonicals'])
+                    : [];
+                $need = $count > 1 && count($canonicals) < $count;
+                if ($need || ($count > 1 && $canonicals === [])) {
+                    $parsed = $this->parseMultipleCanonicalsFromUrl((string) ($row->url ?? $page->url ?? ''));
+                    if ($parsed !== null && ! empty($parsed['canonicals'])) {
+                        $meta['canonicals'] = $parsed['canonicals'];
+                        $meta['count'] = max($count, (int) ($parsed['count'] ?? 0), count($parsed['canonicals']));
+                        if (trim((string) ($meta['canonical'] ?? '')) === '' && ! empty($parsed['canonicals'][0])) {
+                            $meta['canonical'] = $parsed['canonicals'][0];
+                        }
+                        $row->meta_json = $meta;
+                        $findingId = (int) ($row->id ?? 0);
+                        if ($findingId > 0) {
+                            try {
+                                SiteAuditFinding::query()
+                                    ->where('crawl_id', $crawlId)
+                                    ->where('id', $findingId)
+                                    ->update([
+                                        'meta_json' => json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                                    ]);
+                            } catch (\Throwable $e) {
+                                // UI важнее персиста
+                            }
+                        }
+                    }
                 }
             }
 
@@ -2429,6 +2498,100 @@ class SiteAuditController extends Controller
 
             return $row;
         });
+    }
+
+    /**
+     * Дозапрос HTML, когда в finding нет полного списка rel=canonical.
+     *
+     * @return array{canonicals:list<string>,count:int}|null
+     */
+    private function parseMultipleCanonicalsFromUrl(string $url): ?array
+    {
+        $url = trim($url);
+        if ($url === '' || ! preg_match('#^https?://#i', $url)) {
+            return null;
+        }
+
+        try {
+            $fetcher = new \App\Services\SiteAudit\SiteAuditFetcher();
+            $result = $fetcher->fetch($url);
+            $body = (string) ($result['body'] ?? '');
+            if ($body === '' && ! empty($result['body_path']) && is_readable((string) $result['body_path'])) {
+                $body = (string) file_get_contents((string) $result['body_path']);
+            }
+            \App\Services\SiteAudit\SiteAuditBodyTemp::release($result['body_path'] ?? null);
+            if ($body === '') {
+                return null;
+            }
+            $parsed = (new \App\Services\SiteAudit\SiteAuditHtmlParser())->parse($body, (string) ($result['final_url'] ?? $url));
+            $canonicals = [];
+            foreach (($parsed['canonicals'] ?? []) as $c) {
+                $c = trim((string) $c);
+                if ($c !== '') {
+                    $canonicals[] = mb_substr($c, 0, 500);
+                }
+            }
+            if ($canonicals === []) {
+                return null;
+            }
+
+            return [
+                'canonicals' => $canonicals,
+                'count' => max((int) ($parsed['canonical_count'] ?? 0), count($canonicals)),
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Дозапрос HTML, когда в finding нет полного списка TITLE/Description.
+     *
+     * @return array{titles?:list<string>,descriptions?:list<string>,title_count?:int,description_count?:int}|null
+     */
+    private function parseMultipleMetaFromUrl(string $url): ?array
+    {
+        $url = trim($url);
+        if ($url === '' || ! preg_match('#^https?://#i', $url)) {
+            return null;
+        }
+
+        try {
+            $fetcher = new \App\Services\SiteAudit\SiteAuditFetcher();
+            $result = $fetcher->fetch($url);
+            $body = (string) ($result['body'] ?? '');
+            if ($body === '' && ! empty($result['body_path']) && is_readable((string) $result['body_path'])) {
+                $body = (string) file_get_contents((string) $result['body_path']);
+            }
+            \App\Services\SiteAudit\SiteAuditBodyTemp::release($result['body_path'] ?? null);
+            if ($body === '') {
+                return null;
+            }
+            $parsed = (new \App\Services\SiteAudit\SiteAuditHtmlParser())->parse($body, (string) ($result['final_url'] ?? $url));
+            $titles = [];
+            foreach (($parsed['titles'] ?? []) as $t) {
+                $t = trim((string) $t);
+                if ($t !== '') {
+                    $titles[] = mb_substr($t, 0, 300);
+                }
+            }
+            $descs = [];
+            foreach (($parsed['descriptions'] ?? []) as $d) {
+                $d = trim((string) $d);
+                if ($d !== '') {
+                    $descs[] = mb_substr($d, 0, 400);
+                }
+            }
+
+            return [
+                'titles' => $titles,
+                'descriptions' => $descs,
+                'title_count' => (int) ($parsed['title_count'] ?? count($titles)),
+                'description_count' => (int) ($parsed['description_count'] ?? count($descs)),
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**

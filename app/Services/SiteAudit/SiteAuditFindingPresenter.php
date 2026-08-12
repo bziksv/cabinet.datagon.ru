@@ -232,6 +232,10 @@ class SiteAuditFindingPresenter
             return self::multipleTitleDescriptionDetailsHtml($meta);
         }
 
+        if ($code === 'multiple_canonical') {
+            return self::multipleCanonicalDetailsHtml($meta);
+        }
+
         if ($code === 'www_both_available') {
             return self::wwwBothAvailableDetailsHtml($meta);
         }
@@ -248,6 +252,10 @@ class SiteAuditFindingPresenter
             return self::pageHasBrokenLinksDetailsHtml($meta);
         }
 
+        if ($code === 'duplicate_links') {
+            return self::duplicateLinksDetailsHtml($meta);
+        }
+
         if (in_array($code, [
             'canonical_foreign',
             'canonical_not_self',
@@ -255,7 +263,6 @@ class SiteAuditFindingPresenter
             'crawl_pages',
             'crawl_images',
             'landing_url_changed',
-            'duplicate_links',
             'ad_cannibalization',
             'robots_txt_error',
         ], true)) {
@@ -1863,21 +1870,7 @@ class SiteAuditFindingPresenter
                 return '—';
 
             case 'duplicate_links':
-                if (isset($meta['count'])) {
-                    $sample = '';
-                    if (! empty($meta['samples']) && is_array($meta['samples'])) {
-                        $first = reset($meta['samples']);
-                        if (is_string($first)) {
-                            $sample = ' · ' . self::clip($first, 70);
-                        } elseif (is_array($first) && ! empty($first['url'])) {
-                            $sample = ' · ' . self::clip($first['url'], 70);
-                        }
-                    }
-
-                    return 'дублей URL: ' . (int) $meta['count'] . $sample;
-                }
-
-                return '—';
+                return self::duplicateLinksPlain($meta);
 
             case 'external_links':
                 return self::externalLinksPlain($meta);
@@ -2676,9 +2669,7 @@ class SiteAuditFindingPresenter
                 return 'нет CORP';
 
             case 'multiple_canonical':
-                return isset($meta['count'])
-                    ? ('canonical: ' . (int) $meta['count'])
-                    : 'несколько canonical';
+                return self::multipleCanonicalPlain($meta);
 
             case 'no_outbound_internal':
                 return 'нет исходящих внутренних ссылок';
@@ -2870,6 +2861,101 @@ class SiteAuditFindingPresenter
         $parts[] = '</ul>';
 
         return implode('', $parts);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return list<array{url:string,count:int}>
+     */
+    private static function duplicateLinkSamples(array $meta): array
+    {
+        $raw = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+        $out = [];
+        foreach ($raw as $item) {
+            if (is_string($item)) {
+                $u = trim($item);
+                if ($u !== '') {
+                    $out[] = ['url' => $u, 'count' => 2];
+                }
+                continue;
+            }
+            if (! is_array($item)) {
+                continue;
+            }
+            $u = trim((string) ($item['url'] ?? ''));
+            if ($u === '') {
+                continue;
+            }
+            $out[] = [
+                'url' => $u,
+                'count' => max(2, (int) ($item['count'] ?? 2)),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function duplicateLinksPlain(array $meta): string
+    {
+        $samples = self::duplicateLinkSamples($meta);
+        $n = (int) ($meta['count'] ?? 0);
+        if ($n < 1) {
+            $n = count($samples);
+        }
+        if ($n < 1 && $samples === []) {
+            return '—';
+        }
+
+        $bits = [number_format(max($n, 1), 0, '', ' ') . ' URL с повторами на странице'];
+        foreach (array_slice($samples, 0, 4) as $s) {
+            $bits[] = self::clip($s['url'], 48) . ' ×' . number_format($s['count'], 0, '', ' ');
+        }
+        if (count($samples) > 4) {
+            $bits[] = '… ещё ' . number_format(count($samples) - 4, 0, '', ' ');
+        }
+
+        return implode(' · ', $bits);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function duplicateLinksDetailsHtml(array $meta): ?string
+    {
+        $samples = self::duplicateLinkSamples($meta);
+        $n = (int) ($meta['count'] ?? 0);
+        if ($n < 1) {
+            $n = count($samples);
+        }
+        if ($n < 1 && $samples === []) {
+            return null;
+        }
+
+        $html = '<div class="cabinet-sa-duplinks">';
+        $html .= '<div class="cabinet-sa-duplinks__head">'
+            . '<span class="cabinet-sa-duplinks__count">' . number_format(max($n, 1), 0, '', ' ') . '</span>'
+            . '<span class="cabinet-sa-duplinks__label"> URL с повторами на этой странице</span>'
+            . '</div>';
+
+        if ($samples !== []) {
+            $html .= '<ul class="cabinet-sa-duplinks__list">';
+            foreach ($samples as $s) {
+                $html .= '<li class="cabinet-sa-duplinks__item">'
+                    . '<span class="cabinet-sa-duplinks__times">×'
+                    . number_format($s['count'], 0, '', ' ')
+                    . '</span> '
+                    . self::urlLinkHtml($s['url'])
+                    . '</li>';
+            }
+            $html .= '</ul>';
+        }
+
+        $html .= '</div>';
+
+        return $html;
     }
 
     /**
@@ -4190,11 +4276,6 @@ class SiteAuditFindingPresenter
                     . '</li>';
             }
             $html .= '</ol>';
-            if ($count > count($samples)) {
-                $html .= '<div class="cabinet-sa-mh1__more text-secondary">… и ещё '
-                    . number_format($count - count($samples), 0, '', ' ')
-                    . '</div>';
-            }
         } else {
             $html .= '<div class="cabinet-sa-mh1__more text-secondary">'
                 . 'Тексты H1 появятся после нового обхода страницы.'
@@ -4237,6 +4318,98 @@ class SiteAuditFindingPresenter
 
     /**
      * @param  array<string, mixed>  $meta
+     * @return list<string>
+     */
+    private static function multipleCanonicalSamples(array $meta): array
+    {
+        $samples = self::metaTextSamples($meta, 'canonicals');
+        if ($samples !== []) {
+            return $samples;
+        }
+        $one = trim((string) ($meta['canonical'] ?? ''));
+
+        return $one !== '' ? [$one] : [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function multipleCanonicalPlain(array $meta): string
+    {
+        $count = (int) ($meta['count'] ?? 0);
+        $samples = self::multipleCanonicalSamples($meta);
+        if ($count < 1) {
+            $count = count($samples);
+        }
+        if ($count < 1 && $samples === []) {
+            return 'несколько canonical';
+        }
+
+        $bits = [];
+        foreach ($samples as $href) {
+            $bits[] = self::clip($href, 96);
+        }
+        $head = number_format(max($count, count($samples)), 0, '', ' ') . ' canonical';
+        if ($bits === []) {
+            return $head;
+        }
+
+        return $head . ': ' . implode(' · ', $bits);
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function multipleCanonicalDetailsHtml(array $meta): string
+    {
+        $count = (int) ($meta['count'] ?? 0);
+        $samples = self::multipleCanonicalSamples($meta);
+        if ($count < 1) {
+            $count = count($samples);
+        }
+        if ($count < 1 && $samples === []) {
+            return '<div class="cabinet-sa-mh1">несколько canonical</div>';
+        }
+
+        $n = max($count, count($samples));
+        $html = '<div class="cabinet-sa-mh1">';
+        $html .= '<div class="cabinet-sa-mh1__head">'
+            . '<span class="cabinet-sa-mh1__count">'
+            . number_format($n, 0, '', ' ')
+            . '</span>'
+            . '<span class="cabinet-sa-mh1__head-text">'
+            . e(self::ruWordForm($n, 'тег rel=canonical', 'тега rel=canonical', 'тегов rel=canonical'))
+            . '</span></div>';
+
+        if ($samples !== []) {
+            $html .= '<ol class="cabinet-sa-mh1__list">';
+            foreach ($samples as $i => $href) {
+                $html .= '<li class="cabinet-sa-mh1__item">'
+                    . '<span class="cabinet-sa-mh1__n" aria-hidden="true">' . ($i + 1) . '</span>'
+                    . '<span class="cabinet-sa-mh1__text">' . e(self::clip($href, 200)) . '</span>'
+                    . '</li>';
+            }
+            $html .= '</ol>';
+            if ($count > count($samples)) {
+                $html .= '<div class="cabinet-sa-mh1__more text-secondary">'
+                    . 'Показаны ' . number_format(count($samples), 0, '', ' ')
+                    . ' из ' . number_format($count, 0, '', ' ')
+                    . '. Полный список — после нового обхода.'
+                    . '</div>';
+            }
+        } else {
+            $html .= '<div class="cabinet-sa-mh1__more text-secondary">'
+                . 'Адреса canonical появятся после нового обхода страницы.'
+                . '</div>';
+        }
+
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
      */
     private static function multipleTitleDescriptionPlain(array $meta): string
     {
@@ -4256,8 +4429,8 @@ class SiteAuditFindingPresenter
             $bit = number_format($titleCount, 0, '', ' ') . ' TITLE';
             if ($titles !== []) {
                 $quoted = [];
-                foreach (array_slice($titles, 0, 3) as $t) {
-                    $quoted[] = '«' . self::clip($t, 56) . '»';
+                foreach ($titles as $t) {
+                    $quoted[] = '«' . self::clip($t, 72) . '»';
                 }
                 $bit .= ': ' . implode(' · ', $quoted);
             }
@@ -4267,8 +4440,8 @@ class SiteAuditFindingPresenter
             $bit = number_format($descCount, 0, '', ' ') . ' Description';
             if ($descs !== []) {
                 $quoted = [];
-                foreach (array_slice($descs, 0, 2) as $t) {
-                    $quoted[] = '«' . self::clip($t, 56) . '»';
+                foreach ($descs as $t) {
+                    $quoted[] = '«' . self::clip($t, 72) . '»';
                 }
                 $bit .= ': ' . implode(' · ', $quoted);
             }
@@ -4332,6 +4505,7 @@ class SiteAuditFindingPresenter
      */
     private static function mtdSectionHtml(string $label, int $count, array $samples, bool $isProblem): string
     {
+        // Показываем все сохранённые тексты; count = max(declared, samples), без «… и ещё N».
         $count = max($count, count($samples));
         $html = '<div class="cabinet-sa-mtd__section' . ($isProblem ? ' is-problem' : '') . '">';
         $html .= '<div class="cabinet-sa-mtd__head">'
@@ -4348,15 +4522,10 @@ class SiteAuditFindingPresenter
             foreach ($samples as $i => $t) {
                 $html .= '<li class="cabinet-sa-mtd__item">'
                     . '<span class="cabinet-sa-mtd__n" aria-hidden="true">' . ($i + 1) . '</span>'
-                    . '<span class="cabinet-sa-mtd__text">«' . e(self::clip($t, 160)) . '»</span>'
+                    . '<span class="cabinet-sa-mtd__text">«' . e(self::clip($t, 220)) . '»</span>'
                     . '</li>';
             }
             $html .= '</ol>';
-            if ($count > count($samples)) {
-                $html .= '<div class="cabinet-sa-mtd__more text-secondary">… и ещё '
-                    . number_format($count - count($samples), 0, '', ' ')
-                    . '</div>';
-            }
         } else {
             $html .= '<div class="cabinet-sa-mtd__more text-secondary">'
                 . 'Тексты появятся после нового обхода.'

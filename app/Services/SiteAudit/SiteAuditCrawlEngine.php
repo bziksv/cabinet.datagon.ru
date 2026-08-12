@@ -5,6 +5,7 @@ namespace App\Services\SiteAudit;
 use App\Jobs\SiteAudit\AggregateSiteAuditCrawlJob;
 use App\Jobs\SiteAudit\ContinueSiteAuditCrawlJob;
 use App\SiteAuditCrawl;
+use App\SiteAuditFinding;
 use App\SiteAuditPage;
 use App\SiteAuditProject;
 use Illuminate\Support\Facades\Cache;
@@ -202,6 +203,8 @@ class SiteAuditCrawlEngine
 
             $processor = new SiteAuditPageProcessor();
             $robotsTxt = is_array($robotsGroups) ? new SiteAuditRobotsTxt() : null;
+            /** @var array<string, true> $robotsBlockedSeen URL уже отмечены в robots_blocked */
+            $robotsBlockedSeen = [];
             $processed = 0;
             $maxConcurrency = max(1, (int) config('site_audit.max_concurrency', 8));
             $concurrency = max(1, min($maxConcurrency, (int) ($settings['concurrency'] ?? 1)));
@@ -280,6 +283,16 @@ class SiteAuditCrawlEngine
                                 continue;
                             }
                             if ($robotsTxt && ! $robotsTxt->isPathAllowed($robotsGroups, $link)) {
+                                if (! isset($robotsBlockedSeen[$link])) {
+                                    $robotsBlockedSeen[$link] = true;
+                                    $this->emitRobotsBlockedFinding(
+                                        (int) $crawl->id,
+                                        $link,
+                                        $robotsTxt,
+                                        $robotsGroups,
+                                        ['via' => 'link', 'from' => $url]
+                                    );
+                                }
                                 continue;
                             }
                             $seen[$link] = true;
@@ -542,20 +555,39 @@ class SiteAuditCrawlEngine
             $crawl->progress_json = $progress;
         }
 
+        $robotsSkipped = 0;
         $groups = $crawl->progress_json['robots']['groups'] ?? null;
         if (is_array($groups) && $groups !== []) {
             $robotsTxt = new SiteAuditRobotsTxt();
-            $before = count($queue);
-            $queue = array_values(array_filter($queue, function ($u) use ($robotsTxt, $groups, $home) {
+            $kept = [];
+            $skipped = [];
+            foreach ($queue as $u) {
                 if ($home && $u === $home) {
-                    return true;
+                    $kept[] = $u;
+                    continue;
                 }
-
-                return $robotsTxt->isPathAllowed($groups, $u);
-            }));
+                if ($robotsTxt->isPathAllowed($groups, $u)) {
+                    $kept[] = $u;
+                    continue;
+                }
+                $skipped[] = $u;
+            }
+            $robotsSkipped = count($skipped);
+            $queue = $kept;
+            foreach ($skipped as $u) {
+                $this->emitRobotsBlockedFinding(
+                    (int) $crawl->id,
+                    $u,
+                    $robotsTxt,
+                    $groups,
+                    $origins[$u] ?? ['via' => 'sitemap', 'from' => null]
+                );
+            }
             $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
-            $progress['robots_skipped'] = max(0, $before - count($queue));
+            $progress['robots_skipped'] = $robotsSkipped;
             $crawl->progress_json = $progress;
+            // Сразу в БД: иначе refresh() ниже затирает несёханный robots_skipped.
+            $crawl->save();
         }
 
         $queue = array_slice($queue, 0, $limit);
@@ -591,6 +623,7 @@ class SiteAuditCrawlEngine
         $progress['fetched'] = 0;
         $progress['total'] = count($queue);
         $progress['links_expanded'] = 0;
+        $progress['robots_skipped'] = $robotsSkipped;
         $crawl->progress_json = $progress;
         $this->persistEngineState($crawl, $queue, 0, 0, $seen, 0, 0, $origins);
         $this->offloadSitemapUrlsGz($crawl);
@@ -606,6 +639,75 @@ class SiteAuditCrawlEngine
         }
 
         return $crawl;
+    }
+
+    /**
+     * URL выкинут из очереди из‑за Disallow — фиксируем robots_blocked (иначе отчёт пустой:
+     * processFetched на такие URL не вызывается).
+     *
+     * @param  array  $groups
+     * @param  array{via?:string,from?:?string}|null  $discovery
+     */
+    private function emitRobotsBlockedFinding(
+        int $crawlId,
+        string $url,
+        SiteAuditRobotsTxt $robotsTxt,
+        array $groups,
+        ?array $discovery = null
+    ): void {
+        $url = trim($url);
+        if ($url === '') {
+            return;
+        }
+        $hash = SiteAuditUrlNormalizer::hash($url);
+        $exists = SiteAuditFinding::query()
+            ->where('crawl_id', $crawlId)
+            ->where('code', 'robots_blocked')
+            ->where('url_hash', $hash)
+            ->exists();
+        if ($exists) {
+            return;
+        }
+
+        $match = $robotsTxt->matchingRule($groups, $url);
+        if ($match === null || ! empty($match['allow'])) {
+            return;
+        }
+
+        $cfg = config('site_audit.findings.robots_blocked', []);
+        $meta = [
+            'source' => 'robots.txt',
+            'directive' => (string) ($match['directive'] ?? 'Disallow'),
+            'rule' => (string) ($match['path'] ?? ''),
+            'agent' => (string) ($match['agent'] ?? '*'),
+        ];
+        $via = is_array($discovery) ? trim((string) ($discovery['via'] ?? '')) : '';
+        if ($via !== '' && in_array($via, ['sitemap', 'seed', 'home', 'link'], true)) {
+            $meta['discovered_via'] = $via;
+            if ($via === 'link') {
+                $from = trim((string) ($discovery['from'] ?? ''));
+                if ($from !== '') {
+                    $meta['discovered_from'] = $from;
+                }
+            }
+        }
+
+        try {
+            SiteAuditFinding::query()->create([
+                'crawl_id' => $crawlId,
+                'code' => 'robots_blocked',
+                'severity' => $cfg['severity'] ?? 'warning',
+                'url' => $url,
+                'url_hash' => $hash,
+                'meta_json' => $meta,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('SiteAudit robots_blocked emit failed', [
+                'crawl_id' => $crawlId,
+                'url' => $url,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function finishFetch(SiteAuditCrawl $crawl, bool $queueAggregate = true): void

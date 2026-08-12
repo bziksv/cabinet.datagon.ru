@@ -49,8 +49,9 @@ class SiteAuditHtmlParser
             }
         }
 
-        $canonical = $this->canonical($html);
-        $canonicalCount = $this->canonicalCount($html);
+        $canonicals = $this->canonicals($html);
+        $canonical = $canonicals[0] ?? $this->canonical($html);
+        $canonicalCount = max(count($canonicals), $this->canonicalCount($html));
 
         // Заголовки — без <script>/<style>: в статьях про SEO часто сырой пример `<h1>`
         // внутри script/JSON → regex тянет мусор до настоящего </h1>.
@@ -184,6 +185,7 @@ class SiteAuditHtmlParser
             'heading_issues' => $headingIssues,
             'canonical' => $canonical,
             'canonical_count' => $canonicalCount,
+            'canonicals' => $canonicals,
             'robots_meta' => $robotsMeta,
             'keywords_meta' => $keywordsMeta,
             'noindex' => $noindex,
@@ -335,17 +337,34 @@ class SiteAuditHtmlParser
 
     private function canonicalCount(string $html): int
     {
+        return count($this->canonicals($html));
+    }
+
+    /**
+     * Все href из link rel=canonical (порядок как в HTML).
+     *
+     * @return list<string>
+     */
+    private function canonicals(string $html): array
+    {
         if (! preg_match_all('/<link\b[^>]*>/i', $html, $tags)) {
-            return 0;
+            return [];
         }
-        $n = 0;
+        $out = [];
         foreach ($tags[0] as $tag) {
-            if (preg_match('/\brel\s*=\s*["\'][^"\']*\bcanonical\b[^"\']*["\']/i', $tag)) {
-                $n++;
+            if (! preg_match('/\brel\s*=\s*["\'][^"\']*\bcanonical\b[^"\']*["\']/i', $tag)) {
+                continue;
+            }
+            if (! preg_match('/\bhref\s*=\s*("([^"]*)"|\'([^\']*)\')/i', $tag, $hm)) {
+                continue;
+            }
+            $href = html_entity_decode(trim($this->quotedAttr($hm)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($href !== '') {
+                $out[] = $href;
             }
         }
 
-        return $n;
+        return $out;
     }
 
     /**

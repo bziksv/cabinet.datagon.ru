@@ -136,6 +136,12 @@ class AppServiceProvider extends ServiceProvider
             // БД может быть недоступна при первой установке
         }
 
+        try {
+            \App\Support\SiteAuditAdminRuntimeSettings::applyToConfig();
+        } catch (\Throwable $e) {
+            // storage может быть недоступен при bootstrap
+        }
+
         TriggerCampaign::observe(TriggerCampaignObserver::class);
     }
 }

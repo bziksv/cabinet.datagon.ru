@@ -623,6 +623,8 @@ class DemoCabinet
         return [
             'logout',
             'demo-cabinet/exit',
+            // FAB обратной связи (идея / данные / баг)
+            'support/module-feedback',
             // layout: учёт времени / кликов (иначе blur→alert→blur цикл на демо)
             'update-statistics',
             'click-tracking',

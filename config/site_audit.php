@@ -81,7 +81,9 @@ return [
     'broken_external_max_findings' => (int) env('SITE_AUDIT_BROKEN_EXT_MAX', 200),
     'aggregate_broken_external_chunk' => (int) env('SITE_AUDIT_BROKEN_EXT_CHUNK', 150),
     'broken_link_max_findings' => (int) env('SITE_AUDIT_BROKEN_MAX_FINDINGS', 200),
-    'broken_image_head_max' => (int) env('SITE_AUDIT_BROKEN_IMAGE_HEAD_MAX', 500),
+    // Уникальные img URL на краул (раньше 500 — «хвост» инвентаря без кода/размера).
+    'broken_image_head_max' => (int) env('SITE_AUDIT_BROKEN_IMAGE_HEAD_MAX', 8000),
+    'aggregate_image_head_chunk' => (int) env('SITE_AUDIT_IMAGE_HEAD_CHUNK', 80),
     'heavy_image_bytes' => (int) env('SITE_AUDIT_HEAVY_IMAGE_BYTES', 500000),
     'html_critical_min' => (int) env('SITE_AUDIT_HTML_CRITICAL_MIN', 1),
     'lost_file_head_max' => (int) env('SITE_AUDIT_LOST_FILE_HEAD_MAX', 40),
@@ -100,7 +102,6 @@ return [
     'bigram_spam_density_min' => (float) env('SITE_AUDIT_BIGRAM_SPAM_DENSITY', 1.5),
     'trigram_spam_min' => (int) env('SITE_AUDIT_TRIGRAM_SPAM_MIN', 3),
     'trigram_spam_density_min' => (float) env('SITE_AUDIT_TRIGRAM_SPAM_DENSITY', 1.0),
-    'noindex_text_min' => (int) env('SITE_AUDIT_NOINDEX_TEXT_MIN', 40),
     'sitemap_url_cap' => (int) env('SITE_AUDIT_SITEMAP_URL_CAP', 20000),
     'sitemap_not_crawled_sample' => (int) env('SITE_AUDIT_SITEMAP_NOT_CRAWLED_SAMPLE', 80),
     'not_in_sitemap_max' => (int) env('SITE_AUDIT_NOT_IN_SITEMAP_MAX', 500),
@@ -150,23 +151,93 @@ return [
     // Ориентир ETA в истории: секунд на 1 URL (mobile+desktop) на этапе PSI.
     'psi_eta_seconds_per_url' => (int) env('SITE_AUDIT_PSI_ETA_SEC_PER_URL', 55),
 
-    // Content risk lite (keyword classifiers + word repeats). Cheap — on by default.
+    // Content risk lite: словари топ-15 языков веба (не ML).
+    // Языки: ru, en, uk, de, fr, es, pt, it, pl, tr, zh, ja, ko, ar, id.
     'content_risk_enabled' => (bool) env('SITE_AUDIT_CONTENT_RISK', true),
     'content_risk_adult_min_hits' => (int) env('SITE_AUDIT_ADULT_MIN_HITS', 2),
     'content_risk_negative_min_hits' => (int) env('SITE_AUDIT_NEGATIVE_MIN_HITS', 2),
     'word_repeat_min_len' => (int) env('SITE_AUDIT_WORD_REPEAT_MIN_LEN', 4),
     'word_repeat_min_count' => (int) env('SITE_AUDIT_WORD_REPEAT_MIN_COUNT', 3),
     'content_risk_adult' => [
-        'порно', 'порнуха', 'xxx', 'erotica', 'эротика', 'сексшоп', 'секс-шоп',
-        'эскорт', 'webcam', 'camsoda', 'onlyfans', 'hentai', 'nsfw',
-        'интим-услуги', 'интим услуги', 'prostitut', 'проститут',
+        // ru
+        'порно', 'порнуха', 'порнограф', 'эротика', 'сексшоп', 'секс-шоп', 'секс шоп',
+        'эскорт', 'интим-услуги', 'интим услуги', 'проститут', 'проституц',
+        // en
+        'porn', 'pornography', 'xxx', 'erotica', 'sex shop', 'sexshop', 'escort',
+        'webcam', 'camsoda', 'onlyfans', 'hentai', 'nsfw', 'camgirl', 'prostitut',
+        // uk
+        'порнографія', 'еротика', 'секс-шоп', 'ескорт', 'інтим-послуги', 'проституція', 'проститут',
+        // de
+        'porno', 'pornografie', 'erotik', 'sexshop', 'sex-shop', 'escortservice', 'prostituierte',
+        // fr
+        'pornographie', 'érotique', 'erotique', 'sexshop', 'escort girl', 'prostituée', 'prostituee',
+        // es
+        'pornografía', 'pornografia', 'erótica', 'erotica', 'sexshop', 'prostituta', 'prostitución',
+        // pt
+        'pornografia', 'erótica', 'erotica', 'sex shop', 'prostituta', 'prostituição', 'prostituicao',
+        // it
+        'pornografia', 'erotismo', 'sex shop', 'escort', 'prostituta', 'prostituzione',
+        // pl
+        'pornografia', 'erotyka', 'sex shop', 'seks-shop', 'prostytucja', 'prostytutka',
+        // tr
+        'porno', 'pornografi', 'erotik', 'seks shop', 'eskort', 'fahişe', 'fahise', 'orospu',
+        // zh (简体)
+        '色情', '黄色网站', '成人视频', '成人影片', '援交', '卖淫', '色情片',
+        // ja
+        'ポルノ', 'アダルト', 'エロ動画', '風俗', '援交', '売春',
+        // ko
+        '포르노', '야동', '성인영상', '성인물', '원조교제', '성매매',
+        // ar
+        'إباحية', 'اباحية', 'بورنو', 'قحبة', 'دعارة', 'جنس للكبار',
+        // id
+        'pornografi', 'bokep', 'video dewasa', 'seks bebas', 'pelacur', 'prostitusi',
     ],
     'content_risk_negative' => [
-        'суицид', 'самоубийств', 'наркотик', 'героин', 'кокаин', 'амфетамин',
-        'спайс', 'мефедрон', 'взрывчатк', 'терроризм', 'террорист',
-        'убийство', 'расчленен', 'педофил', 'насилие над',
+        // ru
+        'суицид', 'самоубийство', 'самоубийств', 'наркотик', 'наркотики', 'героин', 'кокаин',
+        'амфетамин', 'спайс', 'мефедрон', 'взрывчатка', 'взрывчатки', 'терроризм', 'террорист',
+        'террористы', 'убийство', 'убийства', 'расчленение', 'расчленен', 'педофил', 'педофилия',
+        'насилие над',
+        // en
+        'suicide', 'suicidal', 'heroin', 'cocaine', 'amphetamine', 'methamphetamine',
+        'terrorism', 'terrorist', 'beheading', 'pedophile', 'paedophile', 'pedophilia',
+        'child porn', 'explosive device', 'bomb making',
+        // uk
+        'суїцид', 'самогубство', 'наркотик', 'героїн', 'кокаїн', 'тероризм', 'терорист',
+        'вбивство', 'педофіл', 'педофілія', 'вибухівка',
+        // de
+        'selbstmord', 'suizid', 'heroine', 'kokain', 'amphetamine', 'terrorismus', 'terrorist',
+        'mord', 'pädophil', 'paedophil', 'kindesmissbrauch', 'sprengstoff',
+        // fr
+        'suicide', 'suicidaire', 'héroïne', 'heroine', 'cocaïne', 'cocaine', 'amphétamine',
+        'terrorisme', 'terroriste', 'meurtre', 'pédophile', 'pedophile', 'pédophilie', 'explosif',
+        // es
+        'suicidio', 'heroína', 'heroina', 'cocaína', 'cocaina', 'anfetamina', 'terrorismo',
+        'terrorista', 'asesinato', 'pedófilo', 'pedofilo', 'pedofilia', 'explosivo',
+        // pt
+        'suicídio', 'suicidio', 'heroína', 'heroina', 'cocaína', 'cocaina', 'anfetamina',
+        'terrorismo', 'terrorista', 'assassinato', 'pedófilo', 'pedofilo', 'pedofilia', 'explosivo',
+        // it
+        'suicidio', 'eroina', 'cocaina', 'anfetamina', 'terrorismo', 'terrorista',
+        'omicidio', 'pedofilo', 'pedofilia', 'esplosivo',
+        // pl
+        'samobójstwo', 'samobojstwo', 'heroina', 'kokaina', 'amfetamina', 'terroryzm', 'terrorysta',
+        'morderstwo', 'pedofil', 'pedofilia', 'materiał wybuchowy', 'material wybuchowy',
+        // tr
+        'intihar', 'eroin', 'kokain', 'amfetamin', 'terörizm', 'terorizm', 'terörist', 'terorist',
+        'cinayet', 'pedofil', 'patlayıcı', 'patlayici',
+        // zh
+        '自杀', '自殺', '海洛因', '可卡因', '冰毒', '恐怖主义', '恐怖分子', '谋杀', '恋童', '爆炸物',
+        // ja
+        '自殺', 'ヘロイン', 'コカイン', '覚醒剤', 'テロリズム', 'テロリスト', '殺人', '児童ポルノ', '爆弾',
+        // ko
+        '자살', '헤로인', '코카인', '필로폰', '테러리즘', '테러리스트', '살인', '아동성애', '폭발물',
+        // ar
+        'انتحار', 'هيروين', 'كوكايين', 'إرهاب', 'ارهاب', 'إرهابي', 'ارهابي', 'قتل', 'اعتداء جنسي على الأطفال', 'متفجرات',
+        // id
+        'bunuh diri', 'heroin', 'kokain', 'amfetamin', 'terorisme', 'teroris',
+        'pembunuhan', 'pedofil', 'bahan peledak',
     ],
-    'landing_plagiarism_max' => (int) env('SITE_AUDIT_LANDING_PLAGIARISM_MAX', 200),
     // Внешний антиплагиат (вкладка): Titlo TextUniqueness, выборочный запуск
     'plagiarism_external_max_urls' => (int) env('SITE_AUDIT_PLAGIARISM_EXTERNAL_MAX', 20),
     'plagiarism_external_warn_below' => (float) env('SITE_AUDIT_PLAGIARISM_WARN_BELOW', 70),
@@ -273,7 +344,6 @@ return [
         'landing_not_in_sitemap',
         'landing_not_crawled',
         'landing_url_changed',
-        'landing_plagiarism_suspect',
         'landing_plagiarism_external',
         'landing_no_inbound_internal',
         'keyword_cannibalization',
@@ -440,7 +510,7 @@ return [
             'phase' => 'A',
             'severity' => 'warning',
             'title' => 'Страницы с noindex',
-            'description' => 'Страница закрыта от индексации meta robots или X-Robots-Tag.',
+            'description' => 'Закрыто meta name="robots" и/или HTTP X-Robots-Tag (не robots.txt).',
         ],
         'canonical_foreign' => [
             'phase' => 'A',
@@ -562,7 +632,7 @@ return [
         ],
         'heading_hierarchy' => [
             'phase' => 'B',
-            'severity' => 'warning',
+            'severity' => 'important',
             'title' => 'Нарушена иерархия заголовков',
             'description' => 'Заголовок до первого H1 или пропуск уровня (например H1→H3) в outline h1–h6.',
             'group' => 'seo',
@@ -626,7 +696,7 @@ return [
             'phase' => 'B',
             'severity' => 'warning',
             'title' => 'Текст в noindex',
-            'description' => 'Внутри тегов/комментариев noindex есть заметный объём текста.',
+            'description' => 'Внутри Яндекс-блоков <!--noindex--> / <noindex> есть текст или ссылки (часто соцсети в шаблоне).',
         ],
         'images_without_alt' => [
             'phase' => 'A',
@@ -705,7 +775,7 @@ return [
             'phase' => 'B',
             'severity' => 'critical',
             'title' => 'Форма на http с HTTPS-страницы',
-            'description' => 'На HTTPS-странице есть form action=http:// — данные уходят без шифрования.',
+            'description' => 'На HTTPS-странице есть form action=http:// — данные уходят без шифрования. Виды «По формам» / «По страницам»; в деталях — id/name/class и фрагмент тега.',
             'group' => 'tech',
         ],
         'bad_doctype' => [
@@ -796,13 +866,13 @@ return [
             'phase' => 'A',
             'severity' => 'critical',
             'title' => 'Сайт открыт и с www, и без www',
-            'description' => 'Оба зеркала (www и без www) отдают контент и не сводятся редиректом на один хост. Это дубли всего сайта — грубое нарушение (склейка, вес, индексация). Нужен 301 на один канонический хост.',
+            'description' => 'Оба зеркала (www и без www) отдают контент и не сводятся редиректом на один хост. В деталях — куда уходит каждый вариант и куда настроить 301. Дубль всего сайта — грубое нарушение.',
         ],
         'http_https_both_available' => [
             'phase' => 'A',
             'severity' => 'critical',
             'title' => 'Сайт открыт и по http, и по https',
-            'description' => 'HTTP отвечает без редиректа на HTTPS, при этом HTTPS тоже доступен. Дубли по схеме — грубое нарушение. Нужен 301 http→https.',
+            'description' => 'HTTP отвечает без редиректа на HTTPS, при этом HTTPS тоже доступен. В деталях — куда должен идти 301. Дубли по схеме — грубое нарушение.',
         ],
         'page_has_broken_links' => [
             'phase' => 'A',
@@ -855,14 +925,14 @@ return [
             'phase' => 'C',
             'severity' => 'warning',
             'title' => '«Взрослый» контент',
-            'description' => 'В тексте страницы найдены маркеры adult-тематики (keyword lite, не ML).',
+            'description' => 'В тексте страницы найдены слова из списка 18+ (15 языков, поиск по словарю).',
             'group' => 'seo',
         ],
         'negative_content' => [
             'phase' => 'C',
             'severity' => 'warning',
             'title' => 'Негативный контент',
-            'description' => 'В тексте страницы найдены маркеры негативной тематики (keyword lite, не ML).',
+            'description' => 'В тексте найдены слова из «тревожного» списка на 15 языках (насилие, наркотики, терроризм и т.п.).',
             'group' => 'seo',
         ],
         'word_repeat_in_sentence' => [
@@ -870,13 +940,6 @@ return [
             'severity' => 'info',
             'title' => 'Повторы слова в предложении',
             'description' => 'Одно и то же слово повторяется в предложении выше порога (стилистика / переспам).',
-            'group' => 'seo',
-        ],
-        'landing_plagiarism_suspect' => [
-            'phase' => 'C',
-            'severity' => 'warning',
-            'title' => 'Поиск плагиата на посадочных (lite)',
-            'description' => 'Посадочная совпадает или очень похожа на другую страницу сайта (внутренний дубль/simhash). Внешний — вкладка «Антиплагиат».',
             'group' => 'seo',
         ],
         'landing_plagiarism_external' => [
@@ -1055,17 +1118,8 @@ return [
             'phase' => 'B',
             'severity' => 'warning',
             'title' => 'TITLE страницы ≠ TITLE в выдаче',
-            'description' => 'Расхождения по общему набору до 30 URL: Яндекс и Google. Совпавшая ПС в таблицу не попадает. Типичный rewrite бренда — не ошибка.',
+            'description' => 'Общий набор до 30 URL: Яндекс и Google. В таблице — все снятые; расхождения и совпадения («всё ок»). В счётчике слева — только проблемы.',
             'group' => 'seo',
-            'uses_xml' => true,
-        ],
-        'serp_not_indexed' => [
-            'phase' => 'B',
-            'severity' => 'warning',
-            'title' => 'URL не найден в выдаче ПС (устарело)',
-            'description' => 'Устарело: дублировало сверку Вебмастера. Индекс смотрите в «Страницы на сайте не в индексе поисковых».',
-            'group' => 'seo',
-            'deprecated' => true,
             'uses_xml' => true,
         ],
         'serp_snippet_source' => [

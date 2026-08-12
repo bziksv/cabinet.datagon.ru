@@ -9,12 +9,31 @@ class SiteAuditHtmlParser
 {
     public function parse(string $html, string $finalUrl): array
     {
-        $title = $this->firstMatch('/<title[^>]*>(.*?)<\/title>/is', $html);
-        $title = $title !== null ? html_entity_decode(strip_tags($title), ENT_QUOTES | ENT_HTML5, 'UTF-8') : null;
-        $title = $title !== null ? trim(preg_replace('/\s+/u', ' ', $title)) : null;
+        $titleRaws = $this->allMatches('/<title[^>]*>(.*?)<\/title>/is', $html);
+        $titles = [];
+        foreach ($titleRaws as $rawTitle) {
+            $t = html_entity_decode(strip_tags((string) $rawTitle), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $t = trim(preg_replace('/\s+/u', ' ', $t) ?: '');
+            if ($t === '') {
+                continue;
+            }
+            $titles[] = mb_substr($t, 0, 300);
+            if (count($titles) >= 8) {
+                break;
+            }
+        }
+        $title = $titles[0] ?? null;
 
         $descriptions = $this->metaContents($html, 'description');
         $description = $descriptions[0] ?? null;
+        $descriptionSamples = [];
+        foreach (array_slice($descriptions, 0, 8) as $d) {
+            $d = trim(preg_replace('/\s+/u', ' ', (string) $d) ?: '');
+            if ($d === '') {
+                continue;
+            }
+            $descriptionSamples[] = mb_substr($d, 0, 400);
+        }
 
         $robots = $this->metaContents($html, 'robots');
         $robotsMeta = $robots[0] ?? null;
@@ -32,18 +51,19 @@ class SiteAuditHtmlParser
 
         $canonical = $this->canonical($html);
         $canonicalCount = $this->canonicalCount($html);
-        $h1s = $this->allMatches('/<h1\b[^>]*>(.*?)<\/h1>/is', $html);
-        $h1s = array_map(function ($h) {
-            return trim(html_entity_decode(strip_tags($h), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-        }, $h1s);
 
-        $h2s = $this->allMatches('/<h2\b[^>]*>(.*?)<\/h2>/is', $html);
-        $h2s = array_map(function ($h) {
-            return trim(html_entity_decode(strip_tags($h), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-        }, $h2s);
-        $h2s = array_values(array_filter($h2s, function ($h) {
-            return $h !== '';
-        }));
+        // Заголовки — без <script>/<style>: в статьях про SEO часто сырой пример `<h1>`
+        // внутри script/JSON → regex тянет мусор до настоящего </h1>.
+        $markup = $this->stripNonContentBlocks($html);
+        $h1s = $this->allMatches('/<h1\b[^>]*>(.*?)<\/h1>/is', $markup);
+        $h1s = array_values(array_filter(array_map(function ($h) {
+            return $this->normalizeHeadingText($h);
+        }, $h1s)));
+
+        $h2s = $this->allMatches('/<h2\b[^>]*>(.*?)<\/h2>/is', $markup);
+        $h2s = array_values(array_filter(array_map(function ($h) {
+            return $this->normalizeHeadingText($h);
+        }, $h2s)));
 
         $text = $this->visibleText($html);
         $words = preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY);
@@ -108,7 +128,7 @@ class SiteAuditHtmlParser
             $noindex = true;
         }
 
-        $titleCount = preg_match_all('/<title\b/i', $html) ?: 0;
+        $titleCount = max(count($titles), preg_match_all('/<title\b/i', $html) ?: 0);
         $descCount = count($descriptions);
 
         $iframeCount = (preg_match_all('/<iframe\b/i', $html) ?: 0)
@@ -142,17 +162,20 @@ class SiteAuditHtmlParser
 
         $insecureForms = $isHttps ? $this->insecureFormActions($html) : [];
         $htmlErrors = $this->collectHtmlErrors($html);
-        $headingOutline = $this->headingOutline($html);
+        $headingOutline = $this->headingOutline($markup);
         $headingIssues = $this->headingHierarchyIssues($headingOutline);
         $headingsByLevel = $this->headingsByLevel($headingOutline, $h1s, $h2s);
 
         return [
-            'title' => $title !== '' ? $title : null,
+            'title' => $title !== '' && $title !== null ? $title : null,
             'title_count' => $titleCount,
+            'titles' => $titles,
             'description' => $description !== null && $description !== '' ? $description : null,
             'description_count' => $descCount,
+            'descriptions' => $descriptionSamples,
             'h1' => $h1s[0] ?? null,
             'h1_count' => count($h1s),
+            'h1s' => array_values(array_slice($h1s, 0, 8)),
             'h2' => $h2s[0] ?? null,
             'h2_count' => $h2Count,
             'h2s' => array_slice($h2s, 0, 20),
@@ -326,29 +349,72 @@ class SiteAuditHtmlParser
     }
 
     /**
-     * @return list<string>
+     * Формы на HTTPS с action=http:// — с атрибутами для поиска в HTML.
+     *
+     * @return list<array{action:string, id:?string, name:?string, class:?string, method:?string, snippet:string}>
      */
     private function insecureFormActions(string $html): array
     {
-        if (! preg_match_all('/<form\b([^>]*)>/i', $html, $forms)) {
+        if (! preg_match_all('/<form\b([^>]*)>/i', $html, $forms, PREG_SET_ORDER)) {
             return [];
         }
         $samples = [];
-        foreach ($forms[1] as $attrs) {
-            if (! preg_match('/\baction\s*=\s*("([^"]*)"|\'([^\']*)\')/i', $attrs, $m)) {
+        foreach ($forms as $form) {
+            $attrs = (string) ($form[1] ?? '');
+            $openTag = trim(preg_replace('/\s+/u', ' ', (string) ($form[0] ?? '')) ?: '');
+            if (! preg_match('/\baction\s*=\s*("([^"]*)"|\'([^\']*)\'|([^\s>]+))/i', $attrs, $m)) {
                 continue;
             }
             $action = trim($this->quotedAttr($m));
+            if ($action === '' && isset($m[4])) {
+                $action = trim((string) $m[4]);
+            }
             if ($action === '' || stripos($action, 'http://') !== 0) {
                 continue;
             }
-            $samples[] = $action;
+            $action = html_entity_decode($action, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $samples[] = [
+                'action' => mb_substr($action, 0, 500),
+                'id' => $this->htmlAttrValue($attrs, 'id'),
+                'name' => $this->htmlAttrValue($attrs, 'name'),
+                'class' => $this->htmlAttrValue($attrs, 'class'),
+                'method' => $this->htmlAttrValue($attrs, 'method'),
+                'snippet' => mb_substr($openTag !== '' ? $openTag : ('<form ' . trim($attrs) . '>'), 0, 220),
+            ];
             if (count($samples) >= 5) {
                 break;
             }
         }
 
         return $samples;
+    }
+
+    /**
+     * Значение HTML-атрибута из строки attrs открывающего тега.
+     */
+    private function htmlAttrValue(string $attrs, string $name): ?string
+    {
+        $name = preg_quote($name, '/');
+        if (! preg_match('/\b' . $name . '\s*=\s*("([^"]*)"|\'([^\']*)\'|([^\s>]+))/i', $attrs, $m)) {
+            return null;
+        }
+        $val = '';
+        if (isset($m[2]) && $m[2] !== '') {
+            $val = $m[2];
+        } elseif (isset($m[3]) && $m[3] !== '') {
+            $val = $m[3];
+        } elseif (isset($m[4])) {
+            $val = $m[4];
+        } elseif (isset($m[2])) {
+            $val = $m[2];
+        }
+        $val = trim(html_entity_decode($val, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $val = trim(preg_replace('/\s+/u', ' ', $val) ?: $val);
+        if ($val === '') {
+            return null;
+        }
+
+        return mb_substr($val, 0, 160);
     }
 
     /**
@@ -404,9 +470,8 @@ class SiteAuditHtmlParser
             return $out;
         }
         foreach ($matches as $m) {
-            $text = trim(html_entity_decode(strip_tags($m[3]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-            $text = trim(preg_replace('/\s+/u', ' ', $text) ?: $text);
-            if ($text === '') {
+            $text = $this->normalizeHeadingText($m[3]);
+            if ($text === null || $text === '') {
                 continue;
             }
             $out[] = [
@@ -580,5 +645,34 @@ class SiteAuditHtmlParser
         }
 
         return $m[1];
+    }
+
+    /** Убрать script/style/noscript — там не заголовки страницы. */
+    private function stripNonContentBlocks(string $html): string
+    {
+        $html = preg_replace('/<script\b[^>]*>.*?<\/script>/is', ' ', $html) ?? $html;
+        $html = preg_replace('/<style\b[^>]*>.*?<\/style>/is', ' ', $html) ?? $html;
+        $html = preg_replace('/<noscript\b[^>]*>.*?<\/noscript>/is', ' ', $html) ?? $html;
+
+        return $html;
+    }
+
+    /** Текст заголовка: без тегов, без гигантского мусора. */
+    private function normalizeHeadingText(string $raw): ?string
+    {
+        $text = trim(html_entity_decode(strip_tags($raw), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $text = trim(preg_replace('/\s+/u', ' ', $text) ?: $text);
+        if ($text === '') {
+            return null;
+        }
+        // Явный мусор из JSON-LD / CSS, если что-то всё же просочилось
+        if (preg_match('/\{"@type"|position\s*:\s*relative|!important/i', $text)) {
+            return null;
+        }
+        if (mb_strlen($text) > 300) {
+            $text = mb_substr($text, 0, 300);
+        }
+
+        return $text;
     }
 }

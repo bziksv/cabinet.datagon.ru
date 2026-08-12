@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Support\SupportAccess;
 use App\Support\StaffTelegramNotifier;
+use App\Support\CabinetModuleFeedback;
 use App\SupportTicket;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -83,6 +85,86 @@ class SupportTicketController extends Controller
             Log::warning('Staff telegram ticket created failed', [
                 'ticket_id' => $ticket->id,
                 'error' => $e->getMessage(),
+            ]);
+        }
+
+        flash()->overlay(__('Ticket created'), __('Success'))->success();
+
+        return redirect()->route('support.show', $ticket);
+    }
+
+    /**
+     * Быстрый фидбек из модуля (плавающая кнопка): сразу тикет + URL страницы.
+     *
+     * @return JsonResponse|RedirectResponse
+     */
+    public function storeModuleFeedback(Request $request)
+    {
+        $data = $request->validate([
+            'kind' => ['required', 'in:idea,missing_data,bug'],
+            'body' => ['required', 'string', 'max:5000'],
+            'page_url' => ['required', 'string', 'max:2000'],
+            'module' => ['nullable', 'string', 'max:64'],
+        ]);
+
+        $module = trim((string) ($data['module'] ?? ''));
+        if ($module === '') {
+            $resolved = CabinetModuleFeedback::resolveFromPath(trim($data['page_url'] ?? ''));
+            $module = $resolved['code'];
+        }
+
+        $kindLabels = [
+            'idea' => 'есть идея',
+            'missing_data' => 'не хватает данных',
+            'bug' => 'баг',
+        ];
+        $kindLabel = $kindLabels[$data['kind']] ?? $data['kind'];
+
+        $moduleLabel = CabinetModuleFeedback::labelForCode($module);
+
+        $pageUrl = trim($data['page_url']);
+        // Только http(s) или путь кабинета — без javascript:
+        if (! preg_match('#^(https?://|/)#i', $pageUrl)) {
+            $pageUrl = url()->previous() ?: url('/');
+        }
+
+        $subject = $moduleLabel . ': ' . $kindLabel;
+        $messageBody = $kindLabel . "\n\n"
+            . 'Страница: ' . $pageUrl . "\n\n"
+            . "---\n"
+            . trim($data['body']);
+
+        $ticket = DB::transaction(function () use ($subject, $messageBody) {
+            $ticket = SupportTicket::create([
+                'user_id' => Auth::id(),
+                'subject' => mb_substr($subject, 0, 255),
+                'status' => SupportTicket::STATUS_OPEN,
+            ]);
+
+            $ticket->messages()->create([
+                'user_id' => Auth::id(),
+                'body' => $messageBody,
+                'is_staff' => false,
+            ]);
+
+            return $ticket;
+        });
+
+        try {
+            StaffTelegramNotifier::notifyTicketCreated($ticket);
+        } catch (\Throwable $e) {
+            Log::warning('Staff telegram ticket created failed', [
+                'ticket_id' => $ticket->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'ok' => true,
+                'ticket_id' => (int) $ticket->id,
+                'url' => route('support.show', $ticket),
+                'message' => 'Отправлено в поддержку',
             ]);
         }
 

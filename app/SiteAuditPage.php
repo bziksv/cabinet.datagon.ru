@@ -57,6 +57,9 @@ class SiteAuditPage extends Model
         'top_trigram_count',
         'content_unchanged',
         'noindex_text_len',
+        'noindex_sample',
+        'noindex_links_json',
+        'noindex_hash',
         'charset',
         'html_storage_key',
         'html_bytes_gz',
@@ -71,6 +74,7 @@ class SiteAuditPage extends Model
         'headings_json' => 'array',
         'token_top_json' => 'array',
         'shingles_json' => 'array',
+        'noindex_links_json' => 'array',
         'noindex' => 'boolean',
         'content_unchanged' => 'boolean',
     ];

@@ -257,6 +257,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('support', 'SupportTicketController@index')->name('support.index');
     Route::get('support/create', 'SupportTicketController@create')->name('support.create');
     Route::post('support', 'SupportTicketController@store')->name('support.store');
+    Route::post('support/module-feedback', 'SupportTicketController@storeModuleFeedback')->name('support.module-feedback');
     Route::get('support/{ticket}', 'SupportTicketController@show')->name('support.show');
     Route::post('support/{ticket}/messages', 'SupportTicketController@storeMessage')->name('support.messages.store');
     Route::patch('support/{ticket}/close', 'SupportTicketController@close')->name('support.close');
@@ -285,6 +286,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('site-audit', 'SiteAuditController@index')->name('pages.site-audit')->middleware('permission:Site audit');
     Route::get('site-audit/admin', 'SiteAuditAdminController@index')->name('pages.site-audit.admin')->middleware(['permission:Site audit', 'role:Super Admin|admin']);
+    Route::post('site-audit/admin/settings', 'SiteAuditAdminController@updateSettings')->name('pages.site-audit.admin.settings')->middleware(['permission:Site audit', 'role:Super Admin|admin']);
+    Route::post('site-audit/admin/promote', 'SiteAuditAdminController@promoteWaiting')->name('pages.site-audit.admin.promote')->middleware(['permission:Site audit', 'role:Super Admin|admin']);
     Route::post('site-audit/start', 'SiteAuditController@start')->name('pages.site-audit.start')->middleware('permission:Site audit');
     Route::delete('site-audit/project/{id}', 'SiteAuditController@destroyProject')->name('pages.site-audit.project.destroy')->middleware('permission:Site audit');
     Route::post('site-audit/project/{id}/team', 'SiteAuditController@assignProjectTeam')->name('pages.site-audit.project.team')->middleware('permission:Site audit');

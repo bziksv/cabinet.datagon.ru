@@ -8,8 +8,12 @@
     $ciSortable = SiteAuditCrawlImagesColumns::sortableKeys();
     $ciSort = $crawlPagesSort ?? 'url';
     $ciDir = $crawlPagesDir ?? 'asc';
+    $ciGroupLabels = ['base' => 'База', 'meta' => 'Alt / атрибуты'];
+    $ciCatalogKeys = array_column($ciCatalog, 'key');
 @endphp
-<div class="cabinet-sa-crawl-pages-toolbar mb-2" data-sa-crawl-images-cols>
+<div class="cabinet-sa-crawl-pages-toolbar mb-2"
+     data-sa-crawl-images-cols
+     data-sa-cols-catalog="{{ implode(',', $ciCatalogKeys) }}">
     <div class="cabinet-sa-crawl-pages-toolbar__presets" role="group" aria-label="Пресеты столбцов">
         @foreach($ciPresets as $presetKey => $preset)
             <button type="button" class="btn btn-sm btn-outline-secondary cabinet-sa-crawl-pages-preset"
@@ -33,25 +37,27 @@
         </label>
         <details class="cabinet-sa-crawl-pages-cols">
             <summary class="btn btn-sm btn-outline-secondary">Столбцы</summary>
-            <div class="cabinet-sa-crawl-pages-cols__panel">
-                @php $groupLabels = ['base' => 'База', 'meta' => 'Alt / атрибуты']; @endphp
-                @foreach($groupLabels as $gKey => $gLabel)
-                    <div class="cabinet-sa-crawl-pages-cols__group">
-                        <div class="cabinet-sa-crawl-pages-cols__group-title">{{ $gLabel }}</div>
-                        @foreach($ciCatalog as $col)
-                            @if(($col['group'] ?? '') !== $gKey)
-                                @continue
-                            @endif
-                            <label class="cabinet-sa-crawl-pages-cols__item">
-                                <input type="checkbox"
-                                       data-sa-col-toggle="{{ $col['key'] }}"
-                                       @if(!empty($col['locked'])) disabled @endif
-                                       @if(in_array($col['key'], $ciDefault, true)) checked @endif>
-                                <span>{{ $col['label'] }}</span>
-                            </label>
-                        @endforeach
-                    </div>
+            <div class="cabinet-sa-crawl-pages-cols__panel" data-sa-cols-order-list>
+                <div class="cabinet-sa-report-cols__hint">Перетащите строки — так задаётся порядок в таблице.</div>
+                @foreach($ciCatalog as $col)
+                    @php $gLabel = $ciGroupLabels[$col['group'] ?? ''] ?? ''; @endphp
+                    <label class="cabinet-sa-crawl-pages-cols__item cabinet-sa-report-cols__item"
+                           draggable="true"
+                           data-sa-col-order="{{ $col['key'] }}">
+                        <span class="cabinet-sa-report-cols__drag" aria-hidden="true">⋮⋮</span>
+                        <input type="checkbox"
+                               data-sa-col-toggle="{{ $col['key'] }}"
+                               @if(!empty($col['locked'])) disabled @endif
+                               @if(in_array($col['key'], $ciDefault, true)) checked @endif>
+                        <span class="cabinet-sa-report-cols__label">{{ $col['label'] }}</span>
+                        @if($gLabel !== '')
+                            <span class="cabinet-sa-report-cols__group-tag">{{ $gLabel }}</span>
+                        @endif
+                    </label>
                 @endforeach
+                <div class="cabinet-sa-report-cols__foot" data-sa-cols-foot>
+                    <button type="button" class="btn btn-sm btn-link px-0" data-sa-cols-reset>По умолчанию</button>
+                </div>
             </div>
         </details>
     </div>
@@ -149,19 +155,21 @@
                                 @elseif($ok === false)
                                     <span class="cabinet-sa-status-pill cabinet-sa-status-pill--4xx">err</span>
                                 @else
-                                    <span class="text-muted">—</span>
+                                    @include('pages.partials.site-audit-na-tip', ['tip' => "Код ответа запрашивается отдельно после обхода HTML (проба файла по URL).\nЕсли пусто — URL ещё не попал в бюджет пробы или проверка не дошла до этапа картинок.\nПерезапустите агрегацию / новую проверку, чтобы добрать."])
                                 @endif
                                 @break
                             @case('size')
                                 @if($sizeLabel === '—')
-                                    <span class="text-muted">—</span>
+                                    @include('pages.partials.site-audit-na-tip', ['tip' => $statusInt === null
+                                        ? "Размер берётся из ответа сервера при пробе файла (Content-Length / Content-Range).\nПока нет кода ответа — размер тоже неизвестен: проба ещё не выполнялась."
+                                        : "Сервер не отдал размер файла (нет Content-Length и Content-Range).\nТак бывает у CDN, chunked-ответов и части SVG."])
                                 @else
                                     {{ $sizeLabel }}
                                 @endif
                                 @break
                             @case('dims')
                                 @if($dimsLabel === '—')
-                                    <span class="text-muted">—</span>
+                                    @include('pages.partials.site-audit-na-tip', ['tip' => "Ширина и высота берутся из HTML (атрибуты width/height у <img>).\nУ webp/jpg их часто нет в разметке — тогда прочерк; у SVG обычно указаны."])
                                 @else
                                     {{ $dimsLabel }}
                                 @endif

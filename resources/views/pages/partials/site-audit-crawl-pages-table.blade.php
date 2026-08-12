@@ -7,6 +7,14 @@
     $cpSortable = SiteAuditCrawlPagesColumns::sortableSql();
     $cpSort = $crawlPagesSort ?? 'url';
     $cpDir = $crawlPagesDir ?? 'asc';
+    $cpCatalogKeys = array_column($cpCatalog, 'key');
+    $cpGroupLabels = [
+        'base' => 'База',
+        'meta' => 'Meta / SEO',
+        'headings' => 'Заголовки',
+        'content' => 'Контент',
+        'links' => 'Ссылки',
+    ];
     $viaLabels = [
         'sitemap' => 'sitemap',
         'link' => 'по ссылке',
@@ -14,7 +22,9 @@
         'home' => 'главная',
     ];
 @endphp
-<div class="cabinet-sa-crawl-pages-toolbar mb-2" data-sa-crawl-pages-cols>
+<div class="cabinet-sa-crawl-pages-toolbar mb-2"
+     data-sa-crawl-pages-cols
+     data-sa-cols-catalog="{{ implode(',', $cpCatalogKeys) }}">
     <div class="cabinet-sa-crawl-pages-toolbar__presets" role="group" aria-label="Пресеты столбцов">
         @foreach($cpPresets as $presetKey => $preset)
             <button type="button" class="btn btn-sm btn-outline-secondary cabinet-sa-crawl-pages-preset"
@@ -38,25 +48,27 @@
         </label>
         <details class="cabinet-sa-crawl-pages-cols">
             <summary class="btn btn-sm btn-outline-secondary">Столбцы</summary>
-            <div class="cabinet-sa-crawl-pages-cols__panel">
-                @php $groupLabels = ['base' => 'База', 'meta' => 'Meta / SEO', 'headings' => 'Заголовки', 'content' => 'Контент', 'links' => 'Ссылки']; @endphp
-                @foreach($groupLabels as $gKey => $gLabel)
-                    <div class="cabinet-sa-crawl-pages-cols__group">
-                        <div class="cabinet-sa-crawl-pages-cols__group-title">{{ $gLabel }}</div>
-                        @foreach($cpCatalog as $col)
-                            @if(($col['group'] ?? '') !== $gKey)
-                                @continue
-                            @endif
-                            <label class="cabinet-sa-crawl-pages-cols__item">
-                                <input type="checkbox"
-                                       data-sa-col-toggle="{{ $col['key'] }}"
-                                       @if(!empty($col['locked'])) disabled @endif
-                                       @if(in_array($col['key'], $cpDefault, true)) checked @endif>
-                                <span>{{ $col['label'] }}</span>
-                            </label>
-                        @endforeach
-                    </div>
+            <div class="cabinet-sa-crawl-pages-cols__panel" data-sa-cols-order-list>
+                <div class="cabinet-sa-report-cols__hint">Перетащите строки — так задаётся порядок в таблице.</div>
+                @foreach($cpCatalog as $col)
+                    @php $gLabel = $cpGroupLabels[$col['group'] ?? ''] ?? ''; @endphp
+                    <label class="cabinet-sa-crawl-pages-cols__item cabinet-sa-report-cols__item"
+                           draggable="true"
+                           data-sa-col-order="{{ $col['key'] }}">
+                        <span class="cabinet-sa-report-cols__drag" aria-hidden="true">⋮⋮</span>
+                        <input type="checkbox"
+                               data-sa-col-toggle="{{ $col['key'] }}"
+                               @if(!empty($col['locked'])) disabled @endif
+                               @if(in_array($col['key'], $cpDefault, true)) checked @endif>
+                        <span class="cabinet-sa-report-cols__label">{{ $col['label'] }}</span>
+                        @if($gLabel !== '')
+                            <span class="cabinet-sa-report-cols__group-tag">{{ $gLabel }}</span>
+                        @endif
+                    </label>
                 @endforeach
+                <div class="cabinet-sa-report-cols__foot" data-sa-cols-foot>
+                    <button type="button" class="btn btn-sm btn-link px-0" data-sa-cols-reset>По умолчанию</button>
+                </div>
             </div>
         </details>
     </div>

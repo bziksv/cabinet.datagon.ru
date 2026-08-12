@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="{{ asset('css/cabinet-monitoring-schedule-prompt.css') }}">
     <link rel="stylesheet" href="{{ asset('css/cabinet-app-footer.css') }}?v={{ @filemtime(public_path('css/cabinet-app-footer.css')) ?: time() }}">
     <link rel="stylesheet" href="{{ asset('css/cabinet-demo-banner.css') }}?v={{ @filemtime(public_path('css/cabinet-demo-banner.css')) ?: time() }}">
+    <link rel="stylesheet" href="{{ asset('css/cabinet-feedback-fab.css') }}?v={{ @filemtime(public_path('css/cabinet-feedback-fab.css')) ?: time() }}">
     @yield('css')
     <script src="{{ asset('plugins/jquery/jquery.min.js') }}"></script>
 </head>
@@ -354,5 +355,6 @@
     });
 </script>
 @include('flash::message')
+@include('layouts.partials.cabinet-feedback-fab')
 </body>
 </html>

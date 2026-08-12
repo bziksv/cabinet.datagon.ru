@@ -65,16 +65,13 @@ class SiteAuditHostVariantProbe
         $crawl->save();
 
         if ($this->bothLiveOnDifferentHosts($apex, $www)) {
-            $this->createFinding($crawl->id, 'www_both_available', $httpsApex, [
-                'apex_url' => $httpsApex,
-                'www_url' => $httpsWww,
-                'apex_status' => $apex['status'],
-                'www_status' => $www['status'],
-                'apex_final' => $apex['final_url'],
-                'www_final' => $www['final_url'],
-                'apex_host' => $apex['final_host'],
-                'www_host' => $www['final_host'],
-            ]);
+            $this->createFinding($crawl->id, 'www_both_available', $httpsApex, $this->wwwFindingMeta(
+                $bare,
+                $httpsApex,
+                $httpsWww,
+                $apex,
+                $www
+            ));
         }
 
         // http открывается «сам по себе», без редиректа на https того же хоста
@@ -85,15 +82,53 @@ class SiteAuditHostVariantProbe
         $crawl->save();
 
         if ($this->httpServesWithoutHttpsCanonical($http, $apex, $www)) {
+            $httpsTarget = $this->isLive($httpsWww) && $this->hasWww((string) ($www['final_host'] ?? ''))
+                ? $httpsWww
+                : $httpsApex;
             $this->createFinding($crawl->id, 'http_https_both_available', $httpApex, [
                 'http_url' => $httpApex,
                 'http_status' => $http['status'],
                 'http_final' => $http['final_url'],
                 'http_final_scheme' => $http['final_scheme'],
+                'http_redirected' => ! empty($http['redirected']),
+                'http_redirect_statuses' => $http['redirect_statuses'] ?? [],
+                'https_apex_url' => $httpsApex,
+                'https_www_url' => $httpsWww,
                 'https_apex_status' => $apex['status'],
                 'https_www_status' => $www['status'],
+                'https_target' => $httpsTarget,
+                'fix_301_to' => $httpsTarget,
             ]);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $apex
+     * @param  array<string, mixed>  $www
+     * @return array<string, mixed>
+     */
+    private function wwwFindingMeta(string $bare, string $httpsApex, string $httpsWww, array $apex, array $www): array
+    {
+        return [
+            'bare_host' => $bare,
+            'apex_url' => $httpsApex,
+            'www_url' => $httpsWww,
+            'apex_status' => $apex['status'],
+            'www_status' => $www['status'],
+            'apex_final' => $apex['final_url'],
+            'www_final' => $www['final_url'],
+            'apex_host' => $apex['final_host'],
+            'www_host' => $www['final_host'],
+            'apex_redirected' => ! empty($apex['redirected']),
+            'www_redirected' => ! empty($www['redirected']),
+            'apex_redirect_statuses' => $apex['redirect_statuses'] ?? [],
+            'www_redirect_statuses' => $www['redirect_statuses'] ?? [],
+            'apex_stays_on' => $this->hasWww((string) ($apex['final_host'] ?? '')) ? 'www' : 'apex',
+            'www_stays_on' => $this->hasWww((string) ($www['final_host'] ?? '')) ? 'www' : 'apex',
+            // Куда настраивать 301 (оба варианта — выбрать один канонический хост).
+            'fix_301_to_apex' => $httpsApex,
+            'fix_301_to_www' => $httpsWww,
+        ];
     }
 
     /**
@@ -169,7 +204,17 @@ class SiteAuditHostVariantProbe
     }
 
     /**
-     * @return array{ok:bool,status:?int,final_url:?string,final_host:?string,final_scheme:?string,error:?string}
+     * @return array{
+     *   ok:bool,
+     *   status:?int,
+     *   final_url:?string,
+     *   final_host:?string,
+     *   final_scheme:?string,
+     *   redirected:bool,
+     *   redirect_urls:list<string>,
+     *   redirect_statuses:list<int>,
+     *   error:?string
+     * }
      */
     private function probe(string $url): array
     {
@@ -184,16 +229,41 @@ class SiteAuditHostVariantProbe
                 $status = $response->getStatusCode();
             }
 
-            $final = $url;
+            $redirectUrls = [];
             $hist = $response->getHeader(RedirectMiddleware::HISTORY_HEADER);
-            if (is_array($hist) && $hist) {
-                $final = (string) end($hist);
+            if (is_array($hist)) {
+                foreach ($hist as $h) {
+                    $h = trim((string) $h);
+                    if ($h !== '') {
+                        $redirectUrls[] = $h;
+                    }
+                }
             }
             $guzzleHist = $response->getHeader('X-Guzzle-Redirect-History');
-            if (is_array($guzzleHist) && $guzzleHist) {
-                $final = (string) end($guzzleHist);
+            if ($redirectUrls === [] && is_array($guzzleHist)) {
+                foreach ($guzzleHist as $h) {
+                    $h = trim((string) $h);
+                    if ($h !== '') {
+                        $redirectUrls[] = $h;
+                    }
+                }
             }
 
+            $redirectStatuses = [];
+            $statusHist = $response->getHeader(RedirectMiddleware::STATUS_HISTORY_HEADER);
+            if (! is_array($statusHist) || $statusHist === []) {
+                $statusHist = $response->getHeader('X-Guzzle-Redirect-Status-History');
+            }
+            if (is_array($statusHist)) {
+                foreach ($statusHist as $s) {
+                    $code = (int) $s;
+                    if ($code > 0) {
+                        $redirectStatuses[] = $code;
+                    }
+                }
+            }
+
+            $final = $redirectUrls !== [] ? (string) end($redirectUrls) : $url;
             $host = SiteAuditUrlNormalizer::hostOf($final);
             $scheme = strtolower((string) (parse_url($final, PHP_URL_SCHEME) ?: 'https'));
 
@@ -203,6 +273,12 @@ class SiteAuditHostVariantProbe
                 'final_url' => $final,
                 'final_host' => $host,
                 'final_scheme' => $scheme,
+                'redirected' => $redirectUrls !== [] && strcasecmp(
+                    rtrim($url, '/'),
+                    rtrim($final, '/')
+                ) !== 0,
+                'redirect_urls' => array_values($redirectUrls),
+                'redirect_statuses' => array_values($redirectStatuses),
                 'error' => null,
             ];
         } catch (\Throwable $e) {
@@ -212,6 +288,9 @@ class SiteAuditHostVariantProbe
                 'final_url' => null,
                 'final_host' => null,
                 'final_scheme' => null,
+                'redirected' => false,
+                'redirect_urls' => [],
+                'redirect_statuses' => [],
                 'error' => $e->getMessage(),
             ];
         }

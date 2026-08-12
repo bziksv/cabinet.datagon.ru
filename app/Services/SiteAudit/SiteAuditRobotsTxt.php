@@ -194,6 +194,19 @@ class SiteAuditRobotsTxt
      */
     public function isPathAllowed(array $groups, string $urlOrPath, string $ua = '*'): bool
     {
+        $match = $this->matchingRule($groups, $urlOrPath, $ua);
+
+        return $match === null || ! empty($match['allow']);
+    }
+
+    /**
+     * Победившее правило Allow/Disallow для URL (longest match), или null если правил нет.
+     *
+     * @param  array  $groups  from analyze()/parse()
+     * @return array{allow:bool,directive:string,path:string,agent:string}|null
+     */
+    public function matchingRule(array $groups, string $urlOrPath, string $ua = '*'): ?array
+    {
         $path = $urlOrPath;
         if (preg_match('#^https?://#i', $urlOrPath)) {
             $parts = parse_url($urlOrPath);
@@ -206,11 +219,13 @@ class SiteAuditRobotsTxt
         $ua = strtolower($ua);
         $group = $this->pickGroup($groups, $ua);
         if (! $group) {
-            return true;
+            return null;
         }
 
         $matchedLen = -1;
-        $allowed = true;
+        $matched = null;
+        $agents = is_array($group['agents'] ?? null) ? $group['agents'] : ['*'];
+        $agentLabel = in_array('*', $agents, true) ? '*' : (string) ($agents[0] ?? '*');
 
         foreach ($group['rules'] as $rule) {
             $pattern = (string) ($rule['path'] ?? '');
@@ -225,16 +240,22 @@ class SiteAuditRobotsTxt
             }
             // Специфичность: длина исходного паттерна (как у Google — longest match).
             $len = strlen($pattern);
+            $candidate = [
+                'allow' => (bool) $rule['allow'],
+                'directive' => ! empty($rule['allow']) ? 'Allow' : 'Disallow',
+                'path' => $pattern,
+                'agent' => $agentLabel,
+            ];
             if ($len > $matchedLen) {
                 $matchedLen = $len;
-                $allowed = (bool) $rule['allow'];
+                $matched = $candidate;
             } elseif ($len === $matchedLen && $rule['allow']) {
                 // при равной длине — менее строгий Allow
-                $allowed = true;
+                $matched = $candidate;
             }
         }
 
-        return $matchedLen < 0 ? true : $allowed;
+        return $matchedLen < 0 ? null : $matched;
     }
 
     /**

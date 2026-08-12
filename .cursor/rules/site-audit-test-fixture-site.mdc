@@ -1,0 +1,31 @@
+---
+description: Site Audit — тестовый сайт test.titlo.ru и запрет травить реальные краулы демо-meta
+alwaysApply: true
+---
+
+# Site Audit — тестовый стенд и demo meta
+
+## Тестовый сайт (правда для детекторов)
+
+- Док: `titlo.ru/docs/cabinet-site-audit-test-fixture-site.md`
+- **Файлы сайта только на сервере:** `/var/www/titlo_ru_usr/data/www/test.titlo.ru` (VPS `155.212.171.103`, `titlo_ru_usr`)
+- URL: `https://test.titlo.ru` (также http:// и www без принудительного 301)
+- Не класть HTML стенда в git-репо `titlo.ru/`
+- На сайте всегда плашка: вымышленный контент, только для проверки Site Audit
+- **Негатив / adult** — не публиковать без явного согласования (см. док)
+
+Новые кейсы отчётов сначала добавляем **этапами** на сервере в `test.titlo.ru`, потом сверяем краулом. Не подменяем это патчем meta в чужих crawl id.
+
+## Демо-фикстура кабинета ≠ боевые краулы
+
+`SiteAuditDemoFixture` / domain `demo-audit.titlo.ru` — только витрина UI.
+
+**Запрещено:**
+
+- писать в `meta_json` реальных краулов тексты из демо («Каталог насосов…», «Доставка по России…» и т.п.)
+- «улучшать» цитаты `duplicate_title` / `duplicate_description` demo-словарём
+
+**Нужно:**
+
+- TITLE/Description в деталях брать со страницы обхода (`site_audit_pages`)
+- smoke качества детекторов — краулом `test.titlo.ru` (или явного тестового домена)

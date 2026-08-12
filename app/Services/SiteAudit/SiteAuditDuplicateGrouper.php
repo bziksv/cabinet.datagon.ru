@@ -16,6 +16,8 @@ class SiteAuditDuplicateGrouper
         'links_nofollow',
         'page_has_broken_external_links',
         'page_has_broken_links',
+        'text_in_noindex',
+        'insecure_form',
     ];
 
     /** Инверсия: группа = исходящая ссылка/ассет, внутри — страницы с ней. */
@@ -42,10 +44,24 @@ class SiteAuditDuplicateGrouper
         return in_array($code, self::LINK_INVERTED, true);
     }
 
+    public static function isTextInNoindex(string $code): bool
+    {
+        return $code === 'text_in_noindex';
+    }
+
+    public static function isInsecureForm(string $code): bool
+    {
+        return $code === 'insecure_form';
+    }
+
     /** Лимит findings в память для режима groups (иначе fallback в list). */
     public static function groupsMemoryLimit(string $code): int
     {
-        if (self::isHtmlErrors($code) || self::isLinkInverted($code)) {
+        if (self::isHtmlErrors($code)
+            || self::isLinkInverted($code)
+            || self::isTextInNoindex($code)
+            || self::isInsecureForm($code)
+        ) {
             return 2500;
         }
 
@@ -63,6 +79,12 @@ class SiteAuditDuplicateGrouper
         }
         if (self::isLinkInverted($code)) {
             return self::groupByOutboundUrl($rows, $code);
+        }
+        if (self::isTextInNoindex($code)) {
+            return self::groupTextInNoindex($rows);
+        }
+        if (self::isInsecureForm($code)) {
+            return self::groupByInsecureForm($rows);
         }
 
         $buckets = [];
@@ -97,6 +119,68 @@ class SiteAuditDuplicateGrouper
         }
 
         return self::sortGroups(array_values($buckets));
+    }
+
+    /**
+     * Одинаковое содержимое <!--noindex--> (соцсети в шаблоне) → одна группа.
+     *
+     * @param  Collection|iterable  $rows
+     * @return array<int, array{hash:string,size:int,label:string,severity:string,urls:array<int,array{url:string,severity:string}>,hint:?string,likely_template:bool}>
+     */
+    private static function groupTextInNoindex($rows): array
+    {
+        $buckets = [];
+        $pageTotal = 0;
+
+        foreach ($rows as $row) {
+            $pageTotal++;
+            $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+            $hash = trim((string) ($meta['hash'] ?? ''));
+            $sample = trim((string) ($meta['sample'] ?? ''));
+            $links = isset($meta['links']) && is_array($meta['links']) ? $meta['links'] : [];
+            if ($hash === '') {
+                $linkKey = [];
+                foreach ($links as $l) {
+                    if (is_array($l) && ! empty($l['href'])) {
+                        $linkKey[] = mb_strtolower((string) $l['href']);
+                    }
+                }
+                sort($linkKey);
+                $hash = md5(mb_strtolower($sample) . '|' . implode('|', $linkKey) . '|' . (int) ($meta['noindex_text_len'] ?? 0));
+            }
+
+            if (! isset($buckets[$hash])) {
+                $buckets[$hash] = [
+                    'hash' => $hash,
+                    'size' => 0,
+                    'label' => self::labelFor('text_in_noindex', $meta),
+                    'severity' => (string) ($row->severity ?? 'warning'),
+                    'urls' => [],
+                    'hint' => 'Одинаковый блок noindex на многих URL — правьте шаблон (шапка/подвал), не каждую страницу.',
+                    'likely_template' => false,
+                    '_urls' => [],
+                ];
+            }
+
+            $url = (string) ($row->url ?? '');
+            if ($url !== '' && ! isset($buckets[$hash]['_urls'][$url])) {
+                $buckets[$hash]['_urls'][$url] = true;
+                $buckets[$hash]['urls'][] = [
+                    'url' => $url,
+                    'severity' => (string) ($row->severity ?? 'warning'),
+                ];
+                $buckets[$hash]['size'] = count($buckets[$hash]['urls']);
+            }
+        }
+
+        $groups = [];
+        foreach ($buckets as $bucket) {
+            unset($bucket['_urls']);
+            $bucket['likely_template'] = self::isLikelyTemplate($bucket['size'], $pageTotal);
+            $groups[] = $bucket;
+        }
+
+        return self::sortGroups($groups);
     }
 
     /**
@@ -171,6 +255,173 @@ class SiteAuditDuplicateGrouper
         }
 
         return self::sortGroups($groups);
+    }
+
+    /**
+     * Одна и та же form action=http на многих страницах → группа = форма, внутри URL.
+     *
+     * @param  Collection|iterable  $rows
+     * @return array<int, array{hash:string,size:int,label:string,severity:string,urls:array<int,array{url:string,severity:string}>,hint:?string,likely_template:bool,href:string,host:string}>
+     */
+    private static function groupByInsecureForm($rows): array
+    {
+        $buckets = [];
+        $pageTotal = 0;
+
+        foreach ($rows as $row) {
+            $pageTotal++;
+            $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+            $rawSamples = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+            $pageUrl = (string) ($row->url ?? '');
+            $severity = (string) ($row->severity ?? 'critical');
+            $seenOnPage = [];
+
+            if ($rawSamples === []) {
+                $sig = 'empty';
+                if (! isset($buckets[$sig])) {
+                    $buckets[$sig] = [
+                        'hash' => $sig,
+                        'size' => 0,
+                        'label' => 'Форма без деталей в сэмпле',
+                        'severity' => $severity,
+                        'urls' => [],
+                        'hint' => 'В finding нет samples — смотрите режим «По страницам».',
+                        'likely_template' => false,
+                        'href' => '',
+                        'host' => '',
+                        '_urls' => [],
+                    ];
+                }
+                if ($pageUrl !== '' && ! isset($buckets[$sig]['_urls'][$pageUrl])) {
+                    $buckets[$sig]['_urls'][$pageUrl] = true;
+                    $buckets[$sig]['urls'][] = [
+                        'url' => $pageUrl,
+                        'severity' => $severity,
+                    ];
+                    $buckets[$sig]['size'] = count($buckets[$sig]['urls']);
+                }
+                continue;
+            }
+
+            foreach ($rawSamples as $sample) {
+                $form = self::normalizeInsecureFormSample($sample);
+                if ($form === null) {
+                    continue;
+                }
+                $sig = $form['sig'];
+                if ($sig === '' || isset($seenOnPage[$sig])) {
+                    continue;
+                }
+                $seenOnPage[$sig] = true;
+
+                if (! isset($buckets[$sig])) {
+                    $buckets[$sig] = [
+                        'hash' => $sig,
+                        'size' => 0,
+                        'label' => $form['label'],
+                        'severity' => $severity,
+                        'urls' => [],
+                        'hint' => 'Одинаковая форма на многих URL — чаще всего общий блок (шапка, подвал, попап). Правьте шаблон один раз.',
+                        'likely_template' => false,
+                        'href' => $form['action'],
+                        'host' => self::hostOf($form['action']),
+                        'form_id' => $form['id'],
+                        'form_name' => $form['name'],
+                        'form_class' => $form['class'],
+                        'form_method' => $form['method'],
+                        '_urls' => [],
+                    ];
+                }
+
+                if ($pageUrl !== '' && ! isset($buckets[$sig]['_urls'][$pageUrl])) {
+                    $buckets[$sig]['_urls'][$pageUrl] = true;
+                    $buckets[$sig]['urls'][] = [
+                        'url' => $pageUrl,
+                        'severity' => $severity,
+                    ];
+                    $buckets[$sig]['size'] = count($buckets[$sig]['urls']);
+                }
+            }
+        }
+
+        $groups = [];
+        foreach ($buckets as $bucket) {
+            unset($bucket['_urls']);
+            $bucket['likely_template'] = self::isLikelyTemplate($bucket['size'], $pageTotal);
+            $groups[] = $bucket;
+        }
+
+        return self::sortGroups($groups);
+    }
+
+    /**
+     * @param  mixed  $sample
+     * @return array{sig:string,action:string,id:?string,name:?string,class:?string,method:?string,label:string}|null
+     */
+    private static function normalizeInsecureFormSample($sample): ?array
+    {
+        $action = '';
+        $id = null;
+        $name = null;
+        $class = null;
+        $method = null;
+
+        if (is_string($sample)) {
+            $action = trim($sample);
+        } elseif (is_array($sample)) {
+            $action = trim((string) ($sample['action'] ?? $sample['url'] ?? ''));
+            $id = isset($sample['id']) && trim((string) $sample['id']) !== ''
+                ? trim((string) $sample['id']) : null;
+            $name = isset($sample['name']) && trim((string) $sample['name']) !== ''
+                ? trim((string) $sample['name']) : null;
+            $class = isset($sample['class']) && trim((string) $sample['class']) !== ''
+                ? trim((string) $sample['class']) : null;
+            $method = isset($sample['method']) && trim((string) $sample['method']) !== ''
+                ? strtolower(trim((string) $sample['method'])) : null;
+        }
+
+        if ($action === '' || stripos($action, 'http://') !== 0) {
+            return null;
+        }
+
+        $actionNorm = self::normalizeOutboundSignature($action);
+        // id / name важнее action: одна подписка в шаблоне на всех страницах.
+        if ($id !== null) {
+            $sig = 'id:' . mb_strtolower($id) . '|' . $actionNorm;
+        } elseif ($name !== null) {
+            $sig = 'name:' . mb_strtolower($name) . '|' . $actionNorm;
+        } else {
+            $sig = 'action:' . $actionNorm
+                . ($method ? ('|' . $method) : '')
+                . ($class ? ('|class:' . mb_strtolower($class)) : '');
+        }
+
+        $bits = [];
+        if ($id !== null) {
+            $bits[] = 'id=' . self::clipLabel($id, 40);
+        }
+        if ($name !== null) {
+            $bits[] = 'name=' . self::clipLabel($name, 40);
+        }
+        if ($class !== null) {
+            $bits[] = 'class=' . self::clipLabel($class, 48);
+        }
+        if ($method !== null) {
+            $bits[] = strtoupper($method);
+        }
+        if ($bits === []) {
+            $bits[] = 'form action=http';
+        }
+
+        return [
+            'sig' => $sig,
+            'action' => $action,
+            'id' => $id,
+            'name' => $name,
+            'class' => $class,
+            'method' => $method,
+            'label' => implode(' · ', $bits),
+        ];
     }
 
     /**
@@ -436,6 +687,32 @@ class SiteAuditDuplicateGrouper
 
     private static function labelFor(string $code, array $meta): string
     {
+        if ($code === 'text_in_noindex') {
+            $sample = trim((string) ($meta['sample'] ?? ''));
+            $links = isset($meta['links']) && is_array($meta['links']) ? $meta['links'] : [];
+            $hosts = [];
+            foreach ($links as $l) {
+                if (! is_array($l)) {
+                    continue;
+                }
+                $host = parse_url((string) ($l['href'] ?? ''), PHP_URL_HOST);
+                if (is_string($host) && $host !== '') {
+                    $hosts[] = $host;
+                }
+            }
+            $hosts = array_values(array_unique($hosts));
+            if ($sample !== '' && $hosts !== []) {
+                return '«' . self::clipLabel($sample, 40) . '» · ' . implode(', ', array_slice($hosts, 0, 3));
+            }
+            if ($sample !== '') {
+                return '«' . self::clipLabel($sample, 80) . '»';
+            }
+            if ($hosts !== []) {
+                return 'ссылки: ' . implode(', ', array_slice($hosts, 0, 4));
+            }
+
+            return 'блок noindex';
+        }
         if ($code === 'duplicate_content') {
             if (! empty($meta['label'])) {
                 return 'Текст ≈ «' . self::clipLabel((string) $meta['label'], 100) . '»';

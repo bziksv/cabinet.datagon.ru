@@ -18,7 +18,7 @@
         }
     }
 @endphp
-<div class="cabinet-sa-buckets mb-4"@if(!empty($bucketsId)) id="{{ $bucketsId }}"@endif>
+<div class="cabinet-sa-buckets mb-3"@if(!empty($bucketsId)) id="{{ $bucketsId }}"@endif>
     @if($pagesHref)
         <a href="{{ $pagesHref }}" class="cabinet-sa-bucket cabinet-sa-bucket--pages cabinet-sa-bucket--link"
            aria-label="Открыть таблицу всех страниц проверки">

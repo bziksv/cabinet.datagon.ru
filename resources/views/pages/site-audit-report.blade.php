@@ -4,6 +4,7 @@
     $saReportTitleHtml = e($saReportTitle)
         . ($saReportSev !== '' ? ' ' . \App\Services\SiteAudit\SiteAuditFindingPresenter::severityBadgeHtml($saReportSev) : '')
         . ' · проверка #' . (int) $crawl->id;
+    $saNeedsSelect2 = in_array(($code ?? ''), ['crawl_pages', 'crawl_images', 'security_headers'], true);
 @endphp
 @component('component.card', [
     'title' => $saReportTitle . ' · проверка #' . $crawl->id,
@@ -12,7 +13,7 @@
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('css/cabinet-site-audit.css') }}?v={{ @filemtime(public_path('css/cabinet-site-audit.css')) ?: time() }}">
-        @if(in_array(($code ?? ''), ['crawl_pages', 'crawl_images'], true))
+        @if($saNeedsSelect2)
             <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
             <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
         @endif
@@ -37,8 +38,6 @@
         @endif
 
         @include('pages.partials.site-audit-module-nav', ['active' => 'module'])
-
-        @include('pages.partials.site-audit-beta-banner')
 
         @include('pages.partials.site-audit-breadcrumbs', [
             'crawl' => $crawl,
@@ -233,9 +232,14 @@
         @if(($code ?? '') === 'index_count_mismatch')
             <script src="{{ asset('js/cabinet-site-audit-index-extra.js') }}?v={{ @filemtime(public_path('js/cabinet-site-audit-index-extra.js')) ?: time() }}" defer></script>
         @endif
-        @if(in_array(($code ?? ''), ['crawl_pages', 'crawl_images'], true))
+        @if(!in_array(($code ?? ''), ['crawl_pages', 'crawl_images'], true) && empty($isExternalModule))
+            <script src="{{ asset('js/cabinet-site-audit-report-cols.js') }}?v={{ @filemtime(public_path('js/cabinet-site-audit-report-cols.js')) ?: time() }}" defer></script>
+        @endif
+        @if(!empty($saNeedsSelect2))
             <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
-            <script src="{{ asset('js/cabinet-site-audit-crawl-filters.js') }}?v={{ @filemtime(public_path('js/cabinet-site-audit-crawl-filters.js')) ?: time() }}"></script>
+            @if(in_array(($code ?? ''), ['crawl_pages', 'crawl_images'], true))
+                <script src="{{ asset('js/cabinet-site-audit-crawl-filters.js') }}?v={{ @filemtime(public_path('js/cabinet-site-audit-crawl-filters.js')) ?: time() }}"></script>
+            @endif
             <script>
                 (function () {
                     function initSaMulti() {

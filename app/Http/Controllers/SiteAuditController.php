@@ -15,6 +15,7 @@ use App\Services\SiteAudit\SiteAuditFindingNoteService;
 use App\Services\SiteAudit\SiteAuditIgnoreService;
 use App\Services\SiteAudit\SiteAuditInventory;
 use App\Services\SiteAudit\SiteAuditPruner;
+use App\Services\SiteAudit\SiteAuditReportColumns;
 use App\Services\SiteAudit\SiteAuditReportFilter;
 use App\Services\SiteAudit\SiteAuditRelevanceBridge;
 use App\Services\SiteAudit\SiteAuditExternalPlagiarismRunner;
@@ -23,6 +24,7 @@ use App\Services\SiteAudit\SiteAuditLinkReferrers;
 use App\Services\SiteAudit\SiteAuditProbeRunner;
 use App\Services\SiteAudit\SiteAuditProbeStatus;
 use App\Services\SiteAudit\SiteAuditSerpIndexProbe;
+use App\Services\SiteAudit\SiteAuditSerpSnippetsProbe;
 use App\Services\SiteAudit\SiteAuditUserAgentSession;
 use App\Services\SeoChecklist\SeoChecklistService;
 use App\SiteAuditCrawl;
@@ -539,8 +541,20 @@ class SiteAuditController extends Controller
             $codes = $this->reportCodes($code, $meta);
             $query = SiteAuditFinding::query()
                 ->where('crawl_id', $crawl->id)
-                ->whereIn('code', $codes)
-                ->orderBy('id');
+                ->whereIn('code', $codes);
+            if ($code === 'serp_title_mismatch') {
+                // Сначала расхождения, потом «нет в выдаче», затем «всё ок».
+                $query->orderByRaw(
+                    "CASE
+                        WHEN JSON_LENGTH(COALESCE(JSON_EXTRACT(meta_json, '$.engines_mismatch'), JSON_ARRAY())) > 0 THEN 0
+                        WHEN JSON_EXTRACT(meta_json, '$.engines.yandex.indexed') = false
+                          OR JSON_EXTRACT(meta_json, '$.engines.google.indexed') = false THEN 1
+                        ELSE 2
+                     END"
+                )->orderBy('id');
+            } else {
+                $query->orderBy('id');
+            }
             SiteAuditReportFilter::applyToFindings($query, $crawl->id, $filterValues);
             if (! $showIgnored) {
                 $ignoreSvc->excludeIgnored($query, $projectId);
@@ -560,7 +574,9 @@ class SiteAuditController extends Controller
 
             $allGroupsForSummary = [];
             $needsSitewide = SiteAuditDuplicateGrouper::isHtmlErrors($code)
-                || SiteAuditDuplicateGrouper::isLinkInverted($code);
+                || SiteAuditDuplicateGrouper::isLinkInverted($code)
+                || SiteAuditDuplicateGrouper::isTextInNoindex($code)
+                || SiteAuditDuplicateGrouper::isInsecureForm($code);
 
             if ($viewMode === 'groups') {
                 $allRows = $query->get();
@@ -683,11 +699,23 @@ class SiteAuditController extends Controller
                         }
                     }
                 }
+                // Не затираем referrers из meta finding (демо / агрегатор / ручной seed).
+                if (! empty($meta['referrers']) && is_array($meta['referrers'])) {
+                    foreach ($meta['referrers'] as $storedRef) {
+                        $storedRef = trim((string) $storedRef);
+                        if ($storedRef !== '' && ! in_array($storedRef, $refs, true)) {
+                            $refs[] = $storedRef;
+                        }
+                    }
+                }
                 if (! empty($meta['from'])) {
                     $metaFrom = trim((string) $meta['from']);
                     if ($metaFrom !== '' && ! in_array($metaFrom, $refs, true)) {
                         array_unshift($refs, $metaFrom);
                     }
+                }
+                if ($from !== '' && ! in_array($from, $refs, true)) {
+                    array_unshift($refs, $from);
                 }
 
                 // Битая ссылка / HEAD-цель: самой страницы в крауле нет — «откуда» = кто ссылается.
@@ -753,6 +781,10 @@ class SiteAuditController extends Controller
             }
         }
 
+        if (! $isExternalModule && ! SiteAuditInventory::isInventorySource($meta['source'] ?? null)) {
+            $rows = $this->enrichFindingsPageColumns((int) $crawl->id, $rows);
+        }
+
         return view('pages.site-audit-report', [
             'crawl' => $crawl,
             'project' => $crawl->project,
@@ -766,6 +798,8 @@ class SiteAuditController extends Controller
             'htmlSitewide' => $htmlSitewide,
             'isHtmlErrorReport' => SiteAuditDuplicateGrouper::isHtmlErrors($code),
             'isLinkInvertedReport' => SiteAuditDuplicateGrouper::isLinkInverted($code) || $isCrawlImages,
+            'isTextInNoindexReport' => SiteAuditDuplicateGrouper::isTextInNoindex($code),
+            'isInsecureFormReport' => SiteAuditDuplicateGrouper::isInsecureForm($code),
             'isCrawlImagesReport' => $isCrawlImages,
             'isImagesWithoutAltReport' => $code === 'images_without_alt',
             'total' => $total,
@@ -2276,6 +2310,128 @@ class SiteAuditController extends Controller
     }
 
     /**
+     * Подтянуть TITLE/Description/H1 и др. со страницы обхода для столбцов отчёта.
+     *
+     * @param  \Illuminate\Support\Collection  $rows
+     * @return \Illuminate\Support\Collection
+     */
+    private function enrichFindingsPageColumns(int $crawlId, $rows)
+    {
+        if ($rows === null || (is_countable($rows) && count($rows) === 0)) {
+            return $rows;
+        }
+
+        $hashes = [];
+        foreach ($rows as $row) {
+            $h = (string) ($row->url_hash ?? '');
+            if ($h !== '') {
+                $hashes[$h] = true;
+            }
+        }
+        if ($hashes === []) {
+            return $rows->map(function ($row) {
+                $row->page_cols = [];
+
+                return $row;
+            });
+        }
+
+        $pages = SiteAuditPage::query()
+            ->where('crawl_id', $crawlId)
+            ->whereIn('url_hash', array_keys($hashes))
+            ->get([
+                'url_hash', 'status_code', 'final_url', 'content_type', 'size_bytes', 'charset',
+                'title', 'description', 'keywords_meta', 'robots_meta', 'noindex', 'canonical',
+                'h1', 'h1_count', 'h2_count', 'headings_json',
+                'word_count', 'text_len', 'img_count', 'img_without_alt',
+                'click_depth', 'discovered_via',
+            ]);
+        $byHash = [];
+        foreach ($pages as $p) {
+            $byHash[(string) $p->url_hash] = $p;
+        }
+
+        return $rows->map(function ($row) use ($byHash) {
+            $page = $byHash[(string) ($row->url_hash ?? '')] ?? null;
+            $row->page_cols = $page
+                ? SiteAuditReportColumns::pageToCols($page)
+                : [];
+
+            // multiple_h1: старые finding без samples — подтянуть тексты H1 из headings_json страницы.
+            if ($page && (string) ($row->code ?? '') === 'multiple_h1') {
+                $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+                $hasSamples = (! empty($meta['samples']) && is_array($meta['samples']))
+                    || (! empty($meta['h1s']) && is_array($meta['h1s']));
+                if (! $hasSamples) {
+                    $headings = is_array($page->headings_json ?? null) ? $page->headings_json : [];
+                    $samples = [];
+                    if (! empty($headings['h1']) && is_array($headings['h1'])) {
+                        foreach (array_slice($headings['h1'], 0, 8) as $t) {
+                            $t = trim((string) $t);
+                            if ($t !== '') {
+                                $samples[] = mb_substr($t, 0, 160);
+                            }
+                        }
+                    }
+                    if ($samples === [] && trim((string) ($page->h1 ?? '')) !== '') {
+                        // Хотя бы первый H1, если полный список ещё не сохраняли.
+                        $samples[] = mb_substr(trim((string) $page->h1), 0, 160);
+                    }
+                    if ($samples !== []) {
+                        $meta['samples'] = $samples;
+                        if (! isset($meta['count']) || (int) $meta['count'] < count($samples)) {
+                            $meta['count'] = max((int) ($page->h1_count ?? 0), count($samples));
+                        }
+                        $row->meta_json = $meta;
+                    }
+                }
+            }
+
+            // multiple_title_or_description: хотя бы текущие title/description со страницы.
+            if ($page && (string) ($row->code ?? '') === 'multiple_title_or_description') {
+                $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+                $hasTitles = ! empty($meta['titles']) && is_array($meta['titles']);
+                $hasDescs = ! empty($meta['descriptions']) && is_array($meta['descriptions']);
+                $changed = false;
+                if (! $hasTitles && trim((string) ($page->title ?? '')) !== '') {
+                    $meta['titles'] = [mb_substr(trim((string) $page->title), 0, 300)];
+                    $changed = true;
+                }
+                if (! $hasDescs && trim((string) ($page->description ?? '')) !== '') {
+                    $meta['descriptions'] = [mb_substr(trim((string) $page->description), 0, 400)];
+                    $changed = true;
+                }
+                if ($changed) {
+                    $row->meta_json = $meta;
+                }
+            }
+
+            // Дубли TITLE/Description: цитата всегда с страницы обхода (не из чужой/демо meta).
+            $dupCode = (string) ($row->code ?? '');
+            if ($page && in_array($dupCode, ['duplicate_title', 'duplicate_description'], true)) {
+                $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+                if ($dupCode === 'duplicate_title') {
+                    $pageTitle = trim((string) ($page->title ?? ''));
+                    if ($pageTitle !== '') {
+                        $meta['title'] = $pageTitle;
+                        $meta['label'] = $pageTitle;
+                        $row->meta_json = $meta;
+                    }
+                } else {
+                    $pageDesc = trim((string) ($page->description ?? ''));
+                    if ($pageDesc !== '') {
+                        $meta['description'] = $pageDesc;
+                        $meta['label'] = $pageDesc;
+                        $row->meta_json = $meta;
+                    }
+                }
+            }
+
+            return $row;
+        });
+    }
+
+    /**
      * Старые findings без title/description в meta — подтянуть текст со страницы обхода.
      *
      * @param  \Illuminate\Support\Collection  $rows
@@ -2770,10 +2926,18 @@ class SiteAuditController extends Controller
 
         if ($crawl->isFinished() && $stored !== []) {
             foreach ($probeCodes as $code => $_) {
+                if ($code === 'serp_title_mismatch') {
+                    $stored[$code] = SiteAuditSerpSnippetsProbe::countMismatchFindings((int) $crawl->id);
+                    continue;
+                }
                 $stored[$code] = (int) ($live[$code] ?? 0);
             }
 
             return $stored;
+        }
+
+        if (isset($live['serp_title_mismatch'])) {
+            $live['serp_title_mismatch'] = SiteAuditSerpSnippetsProbe::countMismatchFindings((int) $crawl->id);
         }
 
         return $live;

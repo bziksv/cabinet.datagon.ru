@@ -90,6 +90,86 @@ class SiteAuditReportFilter
             return $fields;
         }
 
+        if ($code === 'serp_title_mismatch') {
+            $fields[] = [
+                'key' => 'title_status',
+                'label' => 'Статус TITLE',
+                'param' => 'q_title_status',
+                'type' => 'select',
+                'options' => [
+                    '' => 'Все снятые',
+                    'mismatch' => 'Только расхождения',
+                    'ok' => 'Только совпало',
+                    'missing' => 'Нет в выдаче',
+                ],
+                'tip' => "Расхождения — TITLE на сайте ≠ заголовку хотя бы в одной ПС.\nСовпало — заголовок совпал с выдачей.\nНет в выдаче — URL не нашли в Яндексе и/или Google (сравнивать TITLE не с чем).",
+            ];
+            $fields[] = [
+                'key' => 'details',
+                'label' => 'TITLE / детали',
+                'param' => 'q_details',
+                'tip' => 'Поиск по TITLE на сайте или тексту в выдаче.',
+            ];
+
+            return $fields;
+        }
+
+        if ($code === 'noindex') {
+            $fields[] = [
+                'key' => 'noindex_source',
+                'label' => 'Откуда noindex',
+                'param' => 'q_noindex_source',
+                'type' => 'select',
+                'options' => [
+                    '' => 'Все',
+                    'meta' => 'Только meta robots',
+                    'header' => 'Только X-Robots-Tag',
+                    'both' => 'И meta, и заголовок',
+                ],
+                'tip' => "meta — тег <meta name=\"robots\"> в HTML.\nX-Robots-Tag — HTTP-заголовок ответа.\nОба — страница закрыта сразу двумя способами.",
+            ];
+            $fields[] = [
+                'key' => 'noindex_follow',
+                'label' => 'Follow',
+                'param' => 'q_noindex_follow',
+                'type' => 'select',
+                'options' => [
+                    '' => 'Все',
+                    'follow' => 'follow (ссылки можно)',
+                    'nofollow' => 'nofollow (ссылки не передавать)',
+                ],
+                'tip' => "follow — noindex, но по ссылкам со страницы робот может ходить.\nnofollow — и индекс, и ссылки закрыты.",
+            ];
+            $fields[] = [
+                'key' => 'details',
+                'label' => 'Детали',
+                'param' => 'q_details',
+                'tip' => 'Поиск по тексту в meta / X-Robots (например noindex, follow).',
+            ];
+
+            return $fields;
+        }
+
+        if ($code === 'security_headers') {
+            $fields[] = [
+                'key' => 'issue_code',
+                'label' => 'Тип замечания',
+                'param' => 'q_issue_code',
+                'type' => 'multiselect',
+                'placeholder' => 'Все типы',
+                'options' => self::securityHeadersIssueOptions(),
+                'tip' => "Какой именно пункт сводки показать.\nМожно выбрать несколько: HSTS, CSP, mixed content и т.д.",
+            ];
+            $fields[] = [
+                'key' => 'details',
+                'label' => 'Детали',
+                'param' => 'q_details',
+                'tip' => "Поиск по тексту в деталях — например URL http-ресурса в mixed content.",
+            ];
+
+            return $fields;
+        }
+
         $extra = self::extraKeysForCode($code);
         $labels = [
             'title' => 'Title',
@@ -160,7 +240,6 @@ class SiteAuditReportFilter
             'adult_content' => ['details'],
             'negative_content' => ['details'],
             'word_repeat_in_sentence' => ['details'],
-            'landing_plagiarism_suspect' => ['details'],
             'landing_plagiarism_external' => ['details'],
             'landing_no_inbound_internal' => ['details'],
             'keyword_cannibalization' => ['details'],
@@ -189,7 +268,6 @@ class SiteAuditReportFilter
             'missing_hsts' => ['details'],
             'missing_x_frame_options' => ['details'],
             'missing_x_content_type_options' => ['details'],
-            'serp_not_indexed' => ['details'],
             'serp_snippet_source' => ['details'],
             'probable_affiliate' => ['details'],
             'missing_csp' => ['details'],
@@ -770,6 +848,21 @@ class SiteAuditReportFilter
             ) {
                 continue;
             }
+            if (($field['key'] ?? '') === 'noindex_source'
+                && ! in_array($v, ['meta', 'header', 'both'], true)
+            ) {
+                continue;
+            }
+            if (($field['key'] ?? '') === 'noindex_follow'
+                && ! in_array($v, ['follow', 'nofollow'], true)
+            ) {
+                continue;
+            }
+            if (($field['key'] ?? '') === 'title_status'
+                && ! in_array($v, ['mismatch', 'ok', 'missing'], true)
+            ) {
+                continue;
+            }
             if (in_array($field['key'] ?? '', ['discovered_via', 'via'], true)
                 && ! in_array($v, ['sitemap', 'link', 'seed', 'home'], true)
             ) {
@@ -884,6 +977,22 @@ class SiteAuditReportFilter
             self::applyRedirectKind($query, (string) $values['redirect_kind']);
         }
 
+        if (isset($values['noindex_source'])) {
+            self::applyNoindexSource($query, (string) $values['noindex_source']);
+        }
+
+        if (isset($values['noindex_follow'])) {
+            self::applyNoindexFollow($query, (string) $values['noindex_follow']);
+        }
+
+        if (isset($values['title_status'])) {
+            self::applySerpTitleStatus($query, (string) $values['title_status']);
+        }
+
+        if (isset($values['issue_code'])) {
+            self::applyIssueCodes($query, (string) $values['issue_code']);
+        }
+
         if (isset($values['discovered_via'])) {
             $via = (string) $values['discovered_via'];
             if (in_array($via, ['sitemap', 'link', 'seed', 'home'], true)) {
@@ -971,6 +1080,229 @@ class SiteAuditReportFilter
             && SiteAuditRedirectChain::isSlashOnlyRedirect((string) $row->url, $final);
 
         return $kind === 'slash_only' ? $slash : ! $slash;
+    }
+
+    /**
+     * Опции фильтра «Тип замечания» для сводки security_headers.
+     *
+     * @return array<string,string>
+     */
+    public static function securityHeadersIssueOptions(): array
+    {
+        $codes = config('site_audit.findings.security_headers.codes', []);
+        if (! is_array($codes)) {
+            return [];
+        }
+
+        $short = [
+            'missing_hsts' => 'Нет HSTS',
+            'missing_x_frame_options' => 'Нет X-Frame-Options',
+            'missing_x_content_type_options' => 'Нет X-Content-Type-Options',
+            'missing_csp' => 'Нет CSP',
+            'missing_referrer_policy' => 'Нет Referrer-Policy',
+            'missing_permissions_policy' => 'Нет Permissions-Policy',
+            'missing_coop' => 'Нет COOP',
+            'missing_coep' => 'Нет COEP',
+            'missing_corp' => 'Нет CORP',
+            'insecure_form' => 'Небезопасная форма',
+            'mixed_content' => 'Смешанный контент',
+        ];
+
+        $out = [];
+        foreach ($codes as $child) {
+            $child = (string) $child;
+            if ($child === '') {
+                continue;
+            }
+            $out[$child] = $short[$child]
+                ?? (string) (config('site_audit.findings.' . $child . '.title') ?: $child);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Фильтр сводки security_headers: подмножество child-кодов.
+     */
+    public static function applyIssueCodes(Builder $query, string $raw): void
+    {
+        $allowed = array_keys(self::securityHeadersIssueOptions());
+        $picked = [];
+        foreach (preg_split('/\s*,\s*/', $raw) ?: [] as $token) {
+            $token = trim((string) $token);
+            if ($token === '' || ! in_array($token, $allowed, true)) {
+                continue;
+            }
+            $picked[$token] = true;
+        }
+        if ($picked === []) {
+            return;
+        }
+
+        $query->whereIn('site_audit_findings.code', array_keys($picked));
+    }
+
+    /**
+     * Фильтр noindex: только meta / только X-Robots-Tag / оба.
+     */
+    public static function applyNoindexSource(Builder $query, string $source): void
+    {
+        if (! in_array($source, ['meta', 'header', 'both'], true)) {
+            return;
+        }
+
+        $ids = [];
+        (clone $query)
+            ->select(['site_audit_findings.id', 'site_audit_findings.meta_json'])
+            ->orderBy('site_audit_findings.id')
+            ->chunkById(400, function ($rows) use (&$ids, $source) {
+                foreach ($rows as $row) {
+                    if (self::findingMatchesNoindexSource($row, $source)) {
+                        $ids[] = (int) $row->id;
+                    }
+                }
+            }, 'site_audit_findings.id', 'id');
+
+        if ($ids === []) {
+            $query->whereRaw('0 = 1');
+
+            return;
+        }
+
+        $query->whereIn('site_audit_findings.id', $ids);
+    }
+
+    /**
+     * Фильтр noindex: follow vs nofollow (по meta robots и/или X-Robots-Tag).
+     */
+    public static function applyNoindexFollow(Builder $query, string $follow): void
+    {
+        if (! in_array($follow, ['follow', 'nofollow'], true)) {
+            return;
+        }
+
+        $ids = [];
+        (clone $query)
+            ->select(['site_audit_findings.id', 'site_audit_findings.meta_json'])
+            ->orderBy('site_audit_findings.id')
+            ->chunkById(400, function ($rows) use (&$ids, $follow) {
+                foreach ($rows as $row) {
+                    if (self::findingMatchesNoindexFollow($row, $follow)) {
+                        $ids[] = (int) $row->id;
+                    }
+                }
+            }, 'site_audit_findings.id', 'id');
+
+        if ($ids === []) {
+            $query->whereRaw('0 = 1');
+
+            return;
+        }
+
+        $query->whereIn('site_audit_findings.id', $ids);
+    }
+
+    /**
+     * @param object $row {meta_json}
+     */
+    public static function findingMatchesNoindexSource($row, string $source): bool
+    {
+        $meta = self::decodeFindingMeta($row);
+        $hasMeta = trim((string) ($meta['robots'] ?? '')) !== '';
+        $hasHeader = trim((string) ($meta['x_robots'] ?? '')) !== '';
+
+        // Демо и старые записи могли писать только source без robots/x_robots.
+        if (! $hasMeta && ! $hasHeader) {
+            $legacy = (string) ($meta['source'] ?? '');
+            if ($legacy === 'meta') {
+                $hasMeta = true;
+            } elseif ($legacy === 'header') {
+                $hasHeader = true;
+            } elseif ($legacy === 'meta+header' || $legacy === 'both') {
+                $hasMeta = true;
+                $hasHeader = true;
+            }
+        }
+
+        if ($source === 'meta') {
+            return $hasMeta && ! $hasHeader;
+        }
+        if ($source === 'header') {
+            return $hasHeader && ! $hasMeta;
+        }
+
+        return $hasMeta && $hasHeader;
+    }
+
+    /**
+     * @param object $row {meta_json}
+     */
+    public static function findingMatchesNoindexFollow($row, string $follow): bool
+    {
+        $meta = self::decodeFindingMeta($row);
+        $blob = trim(
+            (string) ($meta['robots'] ?? '') . ' ' . (string) ($meta['x_robots'] ?? '')
+            . ' ' . (string) ($meta['meta_html'] ?? '')
+        );
+        $hasNofollow = (bool) preg_match('/\bnofollow\b/i', $blob);
+
+        return $follow === 'nofollow' ? $hasNofollow : ! $hasNofollow;
+    }
+
+    /**
+     * @param object $row {meta_json}
+     * @return array<string, mixed>
+     */
+    private static function decodeFindingMeta($row): array
+    {
+        $meta = $row->meta_json ?? null;
+        if (is_string($meta)) {
+            $decoded = json_decode($meta, true);
+            $meta = is_array($decoded) ? $decoded : [];
+        }
+        if (! is_array($meta)) {
+            $meta = [];
+        }
+
+        return $meta;
+    }
+
+    /**
+     * Фильтр TITLE ≠ выдаче: расхождения / совпало / нет в выдаче.
+     */
+    public static function applySerpTitleStatus(Builder $query, string $status): void
+    {
+        if (! in_array($status, ['mismatch', 'ok', 'missing'], true)) {
+            return;
+        }
+
+        if ($status === 'mismatch') {
+            // Реальные ≠ TITLE (не «нет в выдаче»).
+            $query->whereRaw(
+                "JSON_LENGTH(COALESCE(JSON_EXTRACT(meta_json, '$.engines_mismatch'), JSON_ARRAY())) > 0"
+            );
+
+            return;
+        }
+
+        if ($status === 'ok') {
+            // Совпало хотя бы в одной ПС и без ≠ TITLE.
+            $query->whereRaw(
+                "JSON_LENGTH(COALESCE(JSON_EXTRACT(meta_json, '$.engines_mismatch'), JSON_ARRAY())) = 0"
+            );
+            $query->where(function ($q) {
+                $q->whereRaw("JSON_EXTRACT(meta_json, '$.engines.yandex.title_match') = true")
+                    ->orWhereRaw("JSON_EXTRACT(meta_json, '$.engines.google.title_match') = true");
+            });
+
+            return;
+        }
+
+        // missing: хотя бы одна ПС с indexed = false
+        $query->where(function ($q) {
+            $q->whereRaw("JSON_EXTRACT(meta_json, '$.engines.yandex.indexed') = false")
+                ->orWhereRaw("JSON_EXTRACT(meta_json, '$.engines.google.indexed') = false");
+        });
     }
 
     /**
@@ -1199,12 +1531,8 @@ class SiteAuditReportFilter
     {
         $params = [];
         foreach ($values as $key => $val) {
-            if ($key === 'status' && is_string($val) && strpos($val, ',') !== false) {
-                $params['q_status'] = array_values(array_filter(array_map('trim', explode(',', $val))));
-                continue;
-            }
-            if ($key === 'status' && is_string($val) && $val !== '') {
-                $params['q_status'] = [$val];
+            if (in_array($key, ['status', 'issue_code'], true) && is_string($val) && $val !== '') {
+                $params['q_' . $key] = array_values(array_filter(array_map('trim', explode(',', $val))));
                 continue;
             }
             $params['q_' . $key] = $val;

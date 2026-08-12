@@ -53,17 +53,68 @@ class SiteAuditContentRisk
         $hits = [];
         foreach ($list as $term) {
             $term = mb_strtolower(trim((string) $term));
-            if ($term === '' || mb_strlen($term) < 3) {
+            if ($term === '') {
                 continue;
             }
-            // слово/фраза целиком
-            $pattern = '/(?:^|[^\p{L}\p{N}_])' . preg_quote($term, '/') . '(?:[^\p{L}\p{N}_]|$)/u';
-            if (preg_match($pattern, $normText)) {
+            $isCjk = (bool) preg_match('/[\x{3040}-\x{30ff}\x{3400}-\x{9fff}\x{ac00}-\x{d7af}\x{0e00}-\x{0e7f}]/u', $term);
+            $minLen = $isCjk ? 2 : 3;
+            if (mb_strlen($term) < $minLen) {
+                continue;
+            }
+            if (self::termMatches($normText, $term, $isCjk)) {
                 $hits[] = $term;
             }
         }
 
         return array_values(array_unique($hits));
+    }
+
+    /**
+     * CJK — подстрока.
+     * Фразы (с пробелом) — точное целое вхождение.
+     * Одно слово — точное ИЛИ словоформы: «наркотиков» ← «наркотик», «терроризма» ← «терроризм»
+     * (префикс леммы + короткий падежный/числовой хвост; без полного стеммера).
+     */
+    private static function termMatches(string $normText, string $term, bool $isCjk = false): bool
+    {
+        if ($isCjk) {
+            return mb_strpos($normText, $term) !== false;
+        }
+
+        // Точное целое слово / фраза (как раньше).
+        $exact = '/(?:^|[^\p{L}\p{N}_])' . preg_quote($term, '/') . '(?:[^\p{L}\p{N}_]|$)/u';
+        if (preg_match($exact, $normText)) {
+            return true;
+        }
+
+        // Многословные маркеры («sex shop», «насилие над») — только exact.
+        if (preg_match('/\s/u', $term)) {
+            return false;
+        }
+
+        $termLen = mb_strlen($term);
+        if ($termLen < 4) {
+            return false;
+        }
+
+        // Слово в тексте начинается с леммы из словаря + хвост 1…6 символов
+        // (падеж/число/род: наркотик→наркотиков, terrorism→terrorists).
+        $maxTail = 6;
+        if (! preg_match_all('/[\p{L}\p{N}_]{4,}/u', $normText, $m)) {
+            return false;
+        }
+        foreach ($m[0] as $word) {
+            $word = (string) $word;
+            if (mb_strpos($word, $term) !== 0) {
+                continue;
+            }
+            $tail = mb_strlen($word) - $termLen;
+            if ($tail >= 1 && $tail <= $maxTail) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

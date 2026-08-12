@@ -4,6 +4,7 @@ namespace App\Services\SiteAudit;
 
 use App\Jobs\SiteAudit\DiscoverSiteAuditUrlsJob;
 use App\SiteAuditCrawl;
+use App\Support\SiteAuditAdminRuntimeSettings;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
@@ -29,12 +30,14 @@ class SiteAuditGlobalCap
 
     public static function maxActive(): int
     {
-        return max(1, (int) config('site_audit.global_max_active_crawls', 3));
+        return max(1, SiteAuditAdminRuntimeSettings::getInt('global_max_active_crawls')
+            ?: (int) config('site_audit.global_max_active_crawls', 3));
     }
 
     public static function maxPerUser(): int
     {
-        return max(1, (int) config('site_audit.max_active_crawls_per_user', 2));
+        return max(1, SiteAuditAdminRuntimeSettings::getInt('max_active_crawls_per_user')
+            ?: (int) config('site_audit.max_active_crawls_per_user', 2));
     }
 
     public static function countActive(?int $exceptCrawlId = null): int

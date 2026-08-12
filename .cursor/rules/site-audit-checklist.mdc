@@ -14,3 +14,4 @@ alwaysApply: true
 3. Отчёт ✅ только по DoD Части II.
 4. **proxy2 / remote — в самую последнюю очередь:** не трогать infra/HTML/remote DB, пока модуль обкатывается на local/cabinet. Волны 3–4 стартуют только по явному «пора remote».
 5. После cutover (когда дойдём): воркеры/HTML на proxy2; не LTE/3proxy; restart `site_audit` на proxy2.
+6. **Живой тест детекторов:** `titlo.ru/docs/cabinet-site-audit-test-fixture-site.md`; HTML только на сервере `/var/www/titlo_ru_usr/data/www/test.titlo.ru`. Не путать с demo-фикстурой; не писать demo-тексты в meta реальных краулов.

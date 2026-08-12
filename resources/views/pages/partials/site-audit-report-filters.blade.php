@@ -1,6 +1,6 @@
 <form method="GET"
       action="{{ $filterAction }}"
-      class="cabinet-sa-filters mb-3"
+      class="cabinet-sa-filters mb-2"
       id="sa-report-filters"
       @if(in_array(($code ?? ''), ['crawl_pages', 'crawl_images'], true)) data-sa-filters-customize data-sa-filter-code="{{ $code }}" @endif>
     @if(!empty($groupable) && !empty($viewMode))
@@ -155,7 +155,7 @@
         @elseif($isCrawlPagesFilters)
             Галочки в шестерёнке — какие фильтры показывать в основной строке. Пакетный поиск — отдельно.
         @elseif($isCrawlImagesFilters)
-            По умолчанию — группировка по URL картинки (сквозные пиксели/иконки не дублируются). Код и размер — после HEAD.
+            По умолчанию — группировка по URL картинки (сквозные пиксели/иконки не дублируются). Код и размер — после пробы файла; если «—», наведите на «?».
         @else
             Просто введите часть URL или текста — список сузится.
             Раскладка не важна (можно набрать «йцукен» вместо «qwerty»).

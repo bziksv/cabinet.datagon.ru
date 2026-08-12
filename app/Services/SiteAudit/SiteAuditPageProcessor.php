@@ -254,9 +254,13 @@ class SiteAuditPageProcessor
         $robotsGroups = $this->robotsGroupsForCrawl($crawlId);
         if ($robotsGroups !== null) {
             $robots = new SiteAuditRobotsTxt();
-            if (! $robots->isPathAllowed($robotsGroups, $url)) {
+            $match = $robots->matchingRule($robotsGroups, $url);
+            if ($match !== null && empty($match['allow'])) {
                 $findings[] = $this->finding('robots_blocked', $url, $urlHash, [
                     'source' => 'robots.txt',
+                    'directive' => (string) ($match['directive'] ?? 'Disallow'),
+                    'rule' => (string) ($match['path'] ?? ''),
+                    'agent' => (string) ($match['agent'] ?? '*'),
                 ]);
             }
         }
@@ -417,6 +421,20 @@ class SiteAuditPageProcessor
                     $pageData['shingles_json'] = $sh !== [] ? $sh : null;
                 }
                 $pageData['noindex_text_len'] = $parsed['noindex_text_len'] ?? 0;
+                if (Schema::hasColumn('site_audit_pages', 'noindex_sample')) {
+                    $sample = trim((string) ($parsed['noindex_sample'] ?? ''));
+                    $pageData['noindex_sample'] = $sample !== '' ? mb_substr($sample, 0, 191) : null;
+                }
+                if (Schema::hasColumn('site_audit_pages', 'noindex_links_json')) {
+                    $links = isset($parsed['noindex_links']) && is_array($parsed['noindex_links'])
+                        ? array_values(array_slice($parsed['noindex_links'], 0, 12))
+                        : [];
+                    $pageData['noindex_links_json'] = $links !== [] ? $links : null;
+                }
+                if (Schema::hasColumn('site_audit_pages', 'noindex_hash')) {
+                    $hash = trim((string) ($parsed['noindex_hash'] ?? ''));
+                    $pageData['noindex_hash'] = $hash !== '' ? $hash : null;
+                }
                 $pageData['charset'] = $parsed['charset'] ?? null;
 
                 if ($result['x_robots'] && preg_match('/\bnoindex\b/i', $result['x_robots'])) {
@@ -630,9 +648,33 @@ class SiteAuditPageProcessor
                     $findings[] = $this->finding('empty_description', $url, $urlHash);
                 }
                 if (($parsed['title_count'] ?? 0) > 1 || ($parsed['description_count'] ?? 0) > 1) {
+                    $titleSamples = [];
+                    if (! empty($parsed['titles']) && is_array($parsed['titles'])) {
+                        foreach (array_slice($parsed['titles'], 0, 8) as $t) {
+                            $t = trim((string) $t);
+                            if ($t !== '') {
+                                $titleSamples[] = mb_substr($t, 0, 300);
+                            }
+                        }
+                    } elseif (! empty($parsed['title'])) {
+                        $titleSamples[] = mb_substr(trim((string) $parsed['title']), 0, 300);
+                    }
+                    $descSamples = [];
+                    if (! empty($parsed['descriptions']) && is_array($parsed['descriptions'])) {
+                        foreach (array_slice($parsed['descriptions'], 0, 8) as $d) {
+                            $d = trim((string) $d);
+                            if ($d !== '') {
+                                $descSamples[] = mb_substr($d, 0, 400);
+                            }
+                        }
+                    } elseif (! empty($parsed['description'])) {
+                        $descSamples[] = mb_substr(trim((string) $parsed['description']), 0, 400);
+                    }
                     $findings[] = $this->finding('multiple_title_or_description', $url, $urlHash, [
-                        'title_count' => $parsed['title_count'],
-                        'description_count' => $parsed['description_count'],
+                        'title_count' => (int) ($parsed['title_count'] ?? 0),
+                        'description_count' => (int) ($parsed['description_count'] ?? 0),
+                        'titles' => $titleSamples,
+                        'descriptions' => $descSamples,
                     ]);
                 }
                 if ($pageData['noindex']) {
@@ -644,7 +686,26 @@ class SiteAuditPageProcessor
                 if ($pageData['h1_count'] === 0) {
                     $findings[] = $this->finding('missing_h1', $url, $urlHash);
                 } elseif ($pageData['h1_count'] > 1) {
-                    $findings[] = $this->finding('multiple_h1', $url, $urlHash, ['count' => $pageData['h1_count']]);
+                    $h1Samples = [];
+                    if (! empty($parsed['h1s']) && is_array($parsed['h1s'])) {
+                        foreach (array_slice($parsed['h1s'], 0, 8) as $t) {
+                            $t = trim((string) $t);
+                            if ($t !== '') {
+                                $h1Samples[] = mb_substr($t, 0, 160);
+                            }
+                        }
+                    } elseif (! empty($parsed['headings']['h1']) && is_array($parsed['headings']['h1'])) {
+                        foreach (array_slice($parsed['headings']['h1'], 0, 8) as $t) {
+                            $t = trim((string) $t);
+                            if ($t !== '') {
+                                $h1Samples[] = mb_substr($t, 0, 160);
+                            }
+                        }
+                    }
+                    $findings[] = $this->finding('multiple_h1', $url, $urlHash, [
+                        'count' => (int) $pageData['h1_count'],
+                        'samples' => $h1Samples,
+                    ]);
                 }
 
                 if ($pageData['canonical']) {
@@ -821,7 +882,6 @@ class SiteAuditPageProcessor
                 'serp_snippet_cannibalization',
                 'psi_mobile',
                 'psi_desktop',
-                'landing_plagiarism_suspect',
                 'landing_no_inbound_internal',
                 'keyword_cannibalization',
                 'ad_cannibalization',

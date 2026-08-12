@@ -77,6 +77,10 @@ class SiteAuditProbeRunner
     {
         $counts = is_array($crawl->counts_json) ? $crawl->counts_json : [];
         foreach ($codes as $code) {
+            if ($code === 'serp_title_mismatch') {
+                $counts[$code] = SiteAuditSerpSnippetsProbe::countMismatchFindings((int) $crawl->id);
+                continue;
+            }
             $counts[$code] = (int) SiteAuditFinding::query()
                 ->where('crawl_id', $crawl->id)
                 ->where('code', $code)

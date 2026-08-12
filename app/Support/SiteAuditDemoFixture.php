@@ -11,7 +11,7 @@ class SiteAuditDemoFixture
 {
     public const DOMAIN = 'demo-audit.titlo.ru';
     public const PROJECT_NAME = 'Демо: полный аудит (фикстура)';
-    public const DEMO_VERSION = 35;
+    public const DEMO_VERSION = 42;
     public const SHARE_TOKEN = 'demo-site-audit-rich';
 
     /**
@@ -50,7 +50,7 @@ class SiteAuditDemoFixture
         'title_equals_description' => 'important',
         'description_equals_h1' => 'warning',
         'h1_equals_h2' => 'warning',
-        'heading_hierarchy' => 'warning',
+        'heading_hierarchy' => 'important',
         'too_many_strong' => 'warning',
         'duplicate_links' => 'warning',
         'external_links' => 'info',
@@ -93,7 +93,6 @@ class SiteAuditDemoFixture
         'adult_content' => 'warning',
         'negative_content' => 'warning',
         'word_repeat_in_sentence' => 'info',
-        'landing_plagiarism_suspect' => 'warning',
         'landing_plagiarism_external' => 'warning',
         'landing_no_inbound_internal' => 'warning',
         'keyword_cannibalization' => 'warning',
@@ -117,7 +116,6 @@ class SiteAuditDemoFixture
         'index_count_mismatch' => 'warning',
         'serp_snippets' => 'info',
         'serp_title_mismatch' => 'warning',
-        'serp_not_indexed' => 'warning',
         'serp_snippet_source' => 'info',
         'probable_affiliate' => 'info',
         'no_outbound_internal' => 'info',
@@ -181,7 +179,8 @@ class SiteAuditDemoFixture
                 'content_hash' => hash('sha256', 'content-' . $i),
                 'content_unchanged' => 0,
                 'simhash' => null,
-                'out_links_json' => json_encode([$base . '/', $base . '/catalog/'], JSON_UNESCAPED_UNICODE),
+                // Ссылки на /missing/… — чтобы в 4xx / битых была колонка «Страница со ссылкой».
+                'out_links_json' => json_encode(self::demoOutLinks($base, $i), JSON_UNESCAPED_UNICODE),
                 'img_srcs_json' => json_encode(self::demoImgSrcs($i), JSON_UNESCAPED_UNICODE),
                 'asset_srcs_json' => null,
                 'click_depth' => min(8, (int) floor($i / 15)),
@@ -468,6 +467,36 @@ class SiteAuditDemoFixture
     }
 
     /**
+     * Исходящие ссылки демо-страницы: меню + битые /missing/ для колонки «Страница со ссылкой».
+     *
+     * @return list<string>
+     */
+    private static function demoOutLinks(string $base, int $pageIndex): array
+    {
+        $out = [
+            $base . '/',
+            $base . '/catalog/',
+            $base . '/blog/',
+            $base . '/about/',
+        ];
+        // Покрываем missing/page-1…100 (http_4xx / broken_internal_link в демо).
+        $a = 1 + ($pageIndex % 100);
+        $b = 1 + (($pageIndex * 3 + 7) % 100);
+        $out[] = $base . '/missing/page-' . $a . '/';
+        if ($b !== $a) {
+            $out[] = $base . '/missing/page-' . $b . '/';
+        }
+        // Пара «живых» внутренних для глубины/перелинковки.
+        if ($pageIndex % 2 === 0) {
+            $out[] = $base . '/contacts/';
+        } else {
+            $out[] = $base . '/delivery/';
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
      * Картинки страницы в формате SiteAuditImageItem (с has_alt).
      *
      * @return list<array{src:string,alt:?string,has_alt:bool,width:?int,height:?int}>
@@ -501,15 +530,43 @@ class SiteAuditDemoFixture
             case 'broken_internal_link':
             case 'broken_external_link':
             case 'http_4xx':
+                $fromPages = [
+                    $base . '/',
+                    $base . '/catalog/',
+                    $base . '/blog/',
+                    $base . '/about/',
+                    $base . '/contacts/',
+                ];
+                $from = $fromPages[$j % count($fromPages)];
+                $extra = $fromPages[($j + 2) % count($fromPages)];
+                $refs = array_values(array_unique([$from, $extra]));
+
                 return [
-                    'status' => 404,
-                    'referrers' => [$base . '/catalog/', $base . '/blog/'],
-                    'referrer_count' => 2,
+                    'status' => $code === 'broken_external_link' ? 404 : 404,
+                    'from' => $from,
+                    'referrers' => $refs,
+                    'referrer_count' => count($refs),
+                    'discovered_via' => 'link',
+                    'discovered_from' => $from,
                 ];
             case 'http_5xx':
-                return ['status' => 500 + ($j % 3)];
+                return [
+                    'status' => 500 + ($j % 3),
+                    'from' => $base . '/',
+                    'referrers' => [$base . '/', $base . '/catalog/'],
+                    'referrer_count' => 2,
+                    'discovered_via' => 'link',
+                    'discovered_from' => $base . '/',
+                ];
             case 'unreachable':
-                return ['error' => 'timeout'];
+                return [
+                    'error' => 'timeout',
+                    'from' => $base . '/blog/',
+                    'referrers' => [$base . '/blog/', $base . '/'],
+                    'referrer_count' => 2,
+                    'discovered_via' => 'link',
+                    'discovered_from' => $base . '/blog/',
+                ];
             case 'redirect':
                 return [
                     'to' => $base . '/catalog/',
@@ -531,26 +588,42 @@ class SiteAuditDemoFixture
             case 'duplicate_title':
                 $groupSize = 8;
                 $groupId = (int) floor($j / $groupSize);
-                $title = 'Дубль TITLE: «Каталог — группа ' . ($groupId + 1) . '»';
+                $titles = [
+                    'Каталог насосов и комплектующих',
+                    'Доставка по России — сроки и стоимость',
+                    'Сервисный центр и гарантия',
+                    'Акции и спецпредложения месяца',
+                    'О компании и производство',
+                ];
+                $title = $titles[$groupId % count($titles)];
                 $peers = self::demoPeerUrls($base, $j, $groupSize);
 
                 return [
                     'title' => $title,
-                    'hash' => hash('sha256', $title),
+                    'hash' => hash('sha256', 'dup-title-' . $groupId . '|' . $title),
                     'group_size' => $groupSize,
+                    'group_id' => $groupId + 1,
                     'peer_urls' => $peers,
                     'label' => $title,
                 ];
             case 'duplicate_description':
                 $groupSize = 6;
                 $groupId = (int) floor($j / $groupSize);
-                $desc = 'Одинаковое description: доставка и оплата, группа ' . ($groupId + 1);
+                $descs = [
+                    'Доставка и оплата — условия для клиентов',
+                    'Официальная гарантия на оборудование',
+                    'Подбор насоса под задачу и объект',
+                    'Контакты офиса и схема проезда',
+                    'Каталог с актуальными ценами',
+                ];
+                $desc = $descs[$groupId % count($descs)];
                 $peers = self::demoPeerUrls($base, $j, $groupSize);
 
                 return [
                     'description' => $desc,
-                    'hash' => hash('sha256', $desc),
+                    'hash' => hash('sha256', 'dup-desc-' . $groupId . '|' . $desc),
                     'group_size' => $groupSize,
+                    'group_id' => $groupId + 1,
                     'peer_urls' => $peers,
                     'label' => $desc,
                 ];
@@ -755,28 +828,43 @@ class SiteAuditDemoFixture
             case 'canonical_foreign':
                 return ['canonical' => 'https://other-shop.example/page'];
             case 'title_too_short':
+                $title = 'Диваны';
+                if ($j > 0) {
+                    $title = 'Купить · ' . ($j + 1);
+                }
+
                 return [
-                    'length' => 18 + ($j % 8),
+                    'length' => mb_strlen($title),
                     'min' => 30,
-                    'title' => 'Короткий TITLE #' . ($j + 1),
+                    'title' => $title,
                 ];
             case 'title_too_long':
+                $title = 'Очень длинный демо TITLE для витрины аудита номер ' . ($j + 1)
+                    . ' — интернет-магазин мебели, доставка и сборка по всей России сегодня';
+
                 return [
-                    'length' => 78 + ($j % 20),
+                    'length' => mb_strlen($title),
                     'max' => 70,
-                    'title' => 'Очень длинный демо TITLE для витрины аудита номер ' . ($j + 1) . ' — интернет-магазин мебели и аксессуаров',
+                    'title' => $title,
                 ];
             case 'description_too_short':
+                $desc = $j === 0
+                    ? 'Диваны и кресла.'
+                    : ('Кратко о товаре #' . ($j + 1) . '.');
+
                 return [
-                    'length' => 40 + ($j % 20),
+                    'length' => mb_strlen($desc),
                     'min' => 70,
-                    'description' => 'Короткое description #' . ($j + 1),
+                    'description' => $desc,
                 ];
             case 'description_too_long':
+                $desc = str_repeat('Подробное описание демо-товара для сниппета. ', 6)
+                    . 'Артикул #' . ($j + 1) . '.';
+
                 return [
-                    'length' => 175 + ($j % 30),
+                    'length' => mb_strlen($desc),
                     'max' => 160,
-                    'description' => str_repeat('Длинное описание демо. ', 8) . '#' . ($j + 1),
+                    'description' => $desc,
                 ];
             case 'title_equals_h1':
                 $text = 'Купить диван в Москве — доставка за 1 день';
@@ -809,9 +897,22 @@ class SiteAuditDemoFixture
 
                 return ['title' => $t, 'description' => $t];
             case 'multiple_title_or_description':
+                $tc = 1 + ($j % 2);
+                $dc = 2 + ($j % 2);
+                $titles = ['Основной TITLE страницы'];
+                for ($k = 2; $k <= $tc; $k++) {
+                    $titles[] = 'Дубль TITLE из шаблона #' . $k;
+                }
+                $descs = ['Короткое описание страницы для сниппета'];
+                for ($k = 2; $k <= $dc; $k++) {
+                    $descs[] = 'Лишний description из плагина / блока #' . $k;
+                }
+
                 return [
-                    'title_count' => 1 + ($j % 2),
-                    'description_count' => 2 + ($j % 2),
+                    'title_count' => $tc,
+                    'description_count' => $dc,
+                    'titles' => $titles,
+                    'descriptions' => $descs,
                 ];
             case 'missing_h1':
             case 'empty_title':
@@ -823,29 +924,104 @@ class SiteAuditDemoFixture
 
                 return ['h1' => $h, 'h2' => $h];
             case 'heading_hierarchy':
-                return [
-                    'issue_count' => 1,
-                    'issues' => [
-                        [
-                            'type' => 'skip',
-                            'from' => 1,
-                            'to' => 3,
-                            'text' => 'Подраздел без H2 #' . ($j + 1),
+                $variants = [
+                    [
+                        'issue_count' => 1,
+                        'issues' => [
+                            [
+                                'type' => 'skip',
+                                'from' => 1,
+                                'to' => 3,
+                                'text' => 'Подраздел без H2 #' . ($j + 1),
+                            ],
+                        ],
+                        'outline_sample' => [
+                            ['level' => 1, 'text' => 'H1: тема страницы #' . ($j + 1)],
+                            ['level' => 3, 'text' => 'Подраздел без H2 #' . ($j + 1)],
+                            ['level' => 3, 'text' => 'Ещё один H3'],
                         ],
                     ],
-                    'outline_sample' => [
-                        ['level' => 1, 'text' => 'H1 демо ' . ($j + 1)],
-                        ['level' => 3, 'text' => 'Подраздел без H2 #' . ($j + 1)],
+                    [
+                        'issue_count' => 1,
+                        'issues' => [
+                            [
+                                'type' => 'skip',
+                                'from' => 2,
+                                'to' => 4,
+                                'text' => 'Слишком глубокий H4 #' . ($j + 1),
+                            ],
+                        ],
+                        'outline_sample' => [
+                            ['level' => 1, 'text' => 'Главный заголовок'],
+                            ['level' => 2, 'text' => 'Раздел'],
+                            ['level' => 4, 'text' => 'Слишком глубокий H4 #' . ($j + 1)],
+                        ],
+                    ],
+                    [
+                        'issue_count' => 1,
+                        'issues' => [
+                            [
+                                'type' => 'before_h1',
+                                'level' => 2,
+                                'text' => 'Меню / блок до H1 #' . ($j + 1),
+                            ],
+                        ],
+                        'outline_sample' => [
+                            ['level' => 2, 'text' => 'Меню / блок до H1 #' . ($j + 1)],
+                            ['level' => 1, 'text' => 'Настоящий H1 страницы'],
+                            ['level' => 2, 'text' => 'Нормальный раздел'],
+                        ],
                     ],
                 ];
+
+                return $variants[$j % count($variants)];
             case 'multiple_h1':
-                return ['count' => 2 + ($j % 2)];
-            case 'noindex':
+                $n = 2 + ($j % 2);
+                $samples = ['Основной заголовок страницы'];
+                for ($k = 2; $k <= $n; $k++) {
+                    $samples[] = 'Лишний H1 из блока / виджета #' . $k;
+                }
+
                 return [
-                    'robots' => ($j % 2) ? 'noindex, follow' : 'noindex, nofollow',
+                    'count' => $n,
+                    'samples' => $samples,
                 ];
+            case 'noindex':
+                // Демо: явно meta и/или HTTP X-Robots-Tag — не путать с robots.txt.
+                $variants = [
+                    [
+                        'robots' => 'noindex, follow',
+                        'source' => 'meta',
+                        'meta_html' => '<meta name="robots" content="noindex, follow">',
+                    ],
+                    [
+                        'robots' => 'noindex, nofollow',
+                        'source' => 'meta',
+                        'meta_html' => '<meta name="robots" content="noindex, nofollow">',
+                    ],
+                    [
+                        'x_robots' => 'noindex, follow',
+                        'source' => 'header',
+                    ],
+                    [
+                        'robots' => 'noindex, follow',
+                        'x_robots' => 'noindex, follow',
+                        'source' => 'meta+header',
+                        'meta_html' => '<meta name="robots" content="noindex, follow">',
+                    ],
+                ];
+
+                return $variants[$j % count($variants)];
             case 'text_in_noindex':
-                return ['noindex_text_len' => 120 + ($j * 17) % 800];
+                return [
+                    'noindex_text_len' => 5,
+                    'sample' => 'VK TG',
+                    'links' => [
+                        ['href' => 'https://vk.com/demo', 'text' => 'VK'],
+                        ['href' => 'https://t.me/demo', 'text' => 'TG'],
+                    ],
+                    'hash' => 'demo-noindex-social',
+                ];
             case 'pages_with_iframe':
                 return ['iframe_count' => 1 + ($j % 2)];
             case 'mixed_content':
@@ -880,7 +1056,6 @@ class SiteAuditDemoFixture
                     'serp_title' => 'TITLE в выдаче ' . ($j + 1),
                 ];
             case 'index_count_mismatch':
-            case 'serp_not_indexed':
                 return ['engine' => 'yandex', 'in_index' => false];
             case 'serp_snippets':
                 $n = $j + 1;
@@ -967,11 +1142,6 @@ class SiteAuditDemoFixture
                     ],
                     'rich' => true,
                     'psi_version' => '12.x-demo',
-                ];
-            case 'landing_plagiarism_suspect':
-                return [
-                    'peer_url' => $base . '/blog/post-' . (($j % 35) + 1) . '/',
-                    'source' => 'internal',
                 ];
             case 'landing_plagiarism_external':
                 $uniq = 42 + ($j % 20);
@@ -1155,8 +1325,51 @@ class SiteAuditDemoFixture
             case 'pagination_param':
                 return ['params' => ['page']];
             case 'www_both_available':
+                $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?: parse_url($base, PHP_URL_HOST) ?: 'demo-audit.titlo.ru'));
+                $bare = preg_replace('/^www\./i', '', $host);
+                $apex = 'https://' . $bare . '/';
+                $www = 'https://www.' . $bare . '/';
+
+                return [
+                    'bare_host' => $bare,
+                    'apex_url' => $apex,
+                    'www_url' => $www,
+                    'apex_status' => 200,
+                    'www_status' => 200,
+                    'apex_final' => $apex,
+                    'www_final' => $www,
+                    'apex_host' => $bare,
+                    'www_host' => 'www.' . $bare,
+                    'apex_redirected' => false,
+                    'www_redirected' => false,
+                    'apex_redirect_statuses' => [],
+                    'www_redirect_statuses' => [],
+                    'apex_stays_on' => 'apex',
+                    'www_stays_on' => 'www',
+                    'fix_301_to_apex' => $apex,
+                    'fix_301_to_www' => $www,
+                ];
             case 'http_https_both_available':
-                return ['variants' => [$url, str_replace('https://', 'http://', $url)]];
+                $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?: parse_url($base, PHP_URL_HOST) ?: 'demo-audit.titlo.ru'));
+                $bare = preg_replace('/^www\./i', '', $host);
+                $http = 'http://' . $bare . '/';
+                $https = 'https://' . $bare . '/';
+                $httpsWww = 'https://www.' . $bare . '/';
+
+                return [
+                    'http_url' => $http,
+                    'http_status' => 200,
+                    'http_final' => $http,
+                    'http_final_scheme' => 'http',
+                    'http_redirected' => false,
+                    'http_redirect_statuses' => [],
+                    'https_apex_url' => $https,
+                    'https_www_url' => $httpsWww,
+                    'https_apex_status' => 200,
+                    'https_www_status' => 200,
+                    'https_target' => $https,
+                    'fix_301_to' => $https,
+                ];
             case 'robots_txt_closed':
                 return ['detail' => 'Disallow: /'];
             case 'robots_txt_error':
@@ -1180,7 +1393,29 @@ class SiteAuditDemoFixture
             case 'site_availability':
                 return ['detail' => 'периодические сбои 5xx'];
             case 'error_spike':
-                return ['detail' => 'рост 5xx относительно прошлой проверки'];
+                $kinds = [
+                    [
+                        'kind' => 'status_cluster',
+                        'status' => 500,
+                        'count' => 42,
+                        'error_total' => 60,
+                    ],
+                    [
+                        'kind' => 'path_cluster',
+                        'path_prefix' => '/catalog/',
+                        'count' => 28,
+                        'prefix_total' => 40,
+                        'rate' => 0.7,
+                    ],
+                    [
+                        'kind' => 'crawl_delta',
+                        'prev_count' => 5,
+                        'count' => 48,
+                        'ratio' => 9.6,
+                    ],
+                ];
+
+                return $kinds[$j % count($kinds)];
             case 'keyword_cannibalization':
                 return [
                     'query' => 'купить диван демо',
@@ -1231,9 +1466,23 @@ class SiteAuditDemoFixture
             case 'landing_not_in_sitemap':
             case 'landing_not_crawled':
             case 'landing_url_changed':
+                $oldPath = '/catalog/item-' . (($j % 10) + 1) . '/';
+                $queries = [
+                    'купить диван',
+                    'диван угловой',
+                    'кровать двуспальная',
+                    'шкаф купе',
+                    'кресло офисное',
+                    'стол письменный',
+                    'матрас ортопедический',
+                    'тумба под тв',
+                ];
+
                 return [
-                    'landing_url' => $url,
-                    'expected' => $base . '/catalog/item-' . (($j % 10) + 1) . '/',
+                    'source' => 'monitoring',
+                    'query' => $queries[$j % count($queries)] . ' ' . (($j % 5) + 1),
+                    'old_url' => $base . $oldPath,
+                    'new_url' => $url,
                 ];
             case 'landing_no_inbound_internal':
                 return ['inbound' => 0];
@@ -1250,7 +1499,18 @@ class SiteAuditDemoFixture
             case 'meta_nofollow':
                 return ['robots' => 'nofollow'];
             case 'soft_404':
-                return ['reason' => 'thin_200', 'word_count' => 12 + ($j % 20)];
+                return [
+                    'reason' => ($j % 4 === 0) ? 'title_pattern' : 'thin',
+                    'pattern' => ($j % 4 === 0) ? 'не найдена' : null,
+                    'matched_in' => ($j % 4 === 0) ? 'title' : null,
+                    'word_count' => 12 + ($j % 20),
+                    'threshold' => 40,
+                    'status' => 200,
+                    'title' => ($j % 4 === 0)
+                        ? 'Страница не найдена'
+                        : ('Короткий TITLE ' . ($j + 1)),
+                    'h1' => ($j % 4 === 0) ? 'Ошибка 404' : null,
+                ];
             case 'orphan_pages':
                 return ['inbound' => 0, 'discovered_via' => 'sitemap'];
             case 'multiple_canonical':
@@ -1265,14 +1525,51 @@ class SiteAuditDemoFixture
                     ],
                 ];
             case 'insecure_form':
+                $forms = [
+                    [
+                        'action' => 'http://demo-audit.titlo.ru/subscribe/',
+                        'id' => 'subscribe-form',
+                        'name' => 'subscribe',
+                        'class' => 'form form--newsletter',
+                        'method' => 'post',
+                        'snippet' => '<form id="subscribe-form" name="subscribe" class="form form--newsletter" method="post" action="http://demo-audit.titlo.ru/subscribe/">',
+                    ],
+                    [
+                        'action' => 'http://demo-audit.titlo.ru/feedback/',
+                        'id' => 'feedback',
+                        'name' => null,
+                        'class' => 'js-feedback-form',
+                        'method' => 'post',
+                        'snippet' => '<form id="feedback" class="js-feedback-form" method="post" action="http://demo-audit.titlo.ru/feedback/">',
+                    ],
+                    [
+                        'action' => 'http://legacy.partner.example/lead',
+                        'id' => null,
+                        'name' => 'lead',
+                        'class' => 'lead-form',
+                        'method' => 'get',
+                        'snippet' => '<form name="lead" class="lead-form" method="get" action="http://legacy.partner.example/lead">',
+                    ],
+                    [
+                        'action' => 'http://example.com/form-action',
+                        'id' => null,
+                        'name' => null,
+                        'class' => null,
+                        'method' => 'post',
+                        'snippet' => '<form method="post" action="http://example.com/form-action">',
+                    ],
+                ];
+                $pick = $forms[$j % count($forms)];
+
                 return [
                     'count' => 1,
-                    'samples' => ['http://example.com/form-action'],
+                    'samples' => [$pick],
                 ];
             case 'not_in_sitemap':
-            case 'robots_blocked':
             case 'no_outbound_internal':
                 return ['flag' => true];
+            case 'robots_blocked':
+                return self::robotsBlockedDemoMeta($url, $j);
             case 'sitemap_not_crawled':
                 return ['reason' => 'likely_robots_or_not_queued'];
             case 'missing_hsts':
@@ -1293,6 +1590,37 @@ class SiteAuditDemoFixture
                     'code' => $code,
                 ];
         }
+    }
+
+    /**
+     * Демо: разные Disallow, чтобы было видно «какое правило на что».
+     *
+     * @return array{directive:string,rule:string,agent:string,source:string}
+     */
+    private static function robotsBlockedDemoMeta(string $url, int $j): array
+    {
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?: '/');
+        if (strpos($path, '/catalog') === 0) {
+            $rule = '/catalog/';
+        } elseif (strpos($path, '/search') === 0) {
+            $rule = '/search';
+        } elseif (strpos($path, '/cart') === 0 || strpos($path, '/checkout') === 0) {
+            $rule = '/cart/';
+        } elseif (strpos($path, '/admin') === 0 || strpos($path, '/lk') === 0) {
+            $rule = '/admin/';
+        } elseif (preg_match('#\.pdf$#i', $path)) {
+            $rule = '/*.pdf$';
+        } else {
+            $pool = ['/tmp/', '/private/', '/api/', '/cgi-bin/', '/filter/', '/print/'];
+            $rule = $pool[$j % count($pool)];
+        }
+
+        return [
+            'directive' => 'Disallow',
+            'rule' => $rule,
+            'agent' => '*',
+            'source' => 'robots.txt',
+        ];
     }
 
     /** URL с query под разные сценарии risky_query_params. */

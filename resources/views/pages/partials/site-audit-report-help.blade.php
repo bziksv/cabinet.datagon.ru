@@ -71,16 +71,43 @@
     </div>
     @if($isSerpSnippetsFamily)
         <div class="cabinet-sa-help__row">
-            <span class="cabinet-sa-help__label">Сколько страниц</span>
+            <span class="cabinet-sa-help__label">Выборка</span>
             <span class="cabinet-sa-help__text">
                 @if($serpSampleDone !== null)
-                    В этой проверке посмотрели <strong>{{ number_format($serpSampleDone, 0, '', ' ') }}</strong>
-                    адресов в Яндексе и Google
-                    (один съём на URL → сниппеты, TITLE и источник).
+                    В поиске Яндекса и Google сняли
+                    <strong>{{ number_format($serpSampleDone, 0, '', ' ') }}</strong>
+                    адресов (один съём на URL → сниппеты, TITLE и источник).
                 @else
                     Обычно берём до <strong>{{ number_format($serpSampleMax, 0, '', ' ') }}</strong> адресов
                     (из мониторинга позиций и из обхода), не весь сайт.
                     На каждый адрес — один запрос к выдаче, все отчёты читают один пакет.
+                @endif
+                @if(($code ?? '') === 'serp_title_mismatch')
+                    В таблице — все снятые адреса: расхождения сверху, совпадения помечены «всё ок»
+                    @if(isset($total))
+                        (сейчас
+                        <strong>{{ number_format((int) $total, 0, '', ' ') }}</strong>
+                        @if($serpSampleDone !== null && (int) $serpSampleDone > 0)
+                            из {{ number_format($serpSampleDone, 0, '', ' ') }}
+                        @endif
+                        )
+                    @endif.
+                    В меню слева — только число проблем
+                    @php
+                        $serpMismatchN = null;
+                        if (!empty($crawl)) {
+                            $serpMismatchN = (int) (\App\Services\SiteAudit\SiteAuditSerpSnippetsProbe::countMismatchFindings((int) $crawl->id));
+                        }
+                    @endphp
+                    @if($serpMismatchN !== null)
+                        (<strong>{{ number_format($serpMismatchN, 0, '', ' ') }}</strong>).
+                    @else
+                        .
+                    @endif
+                @elseif(($code ?? '') === 'serp_snippets')
+                    Ниже — все снятые адреса (это не список ошибок).
+                @elseif(($code ?? '') === 'serp_snippet_source')
+                    Ниже — те же снятые адреса с оценкой, откуда похоже взяли текст.
                 @endif
                 Нужен свой длинный список URL —
                 <a href="{{ route('pages.index-check') }}" target="_blank" rel="noopener">Проверка индексации</a>.
@@ -102,21 +129,6 @@
                     В этой проверке замерено URL: <strong>{{ $psiSampleDone }}</strong>.
                 @endif
                 Обычно снимается в конце аудита; если пусто — кнопка «Запустить» ниже.
-            </span>
-        </div>
-    @endif
-    @if(($code ?? '') === 'landing_plagiarism_suspect' && !empty($crawl) && empty($isPublic))
-        <div class="cabinet-sa-help__row">
-            <span class="cabinet-sa-help__label">Проверить</span>
-            <span class="cabinet-sa-help__text">
-                Это внутренние дубли на своём сайте (считается при обходе).
-                Внешняя проверка vs интернет — отдельно, на вкладке Антиплагиат.
-                <div class="mt-2">
-                    <a class="btn btn-sm btn-outline-primary"
-                       href="{{ route('pages.site-audit.crawl.show', $crawl->id) }}#sa-pane-plagiarism">
-                        Открыть Антиплагиат
-                    </a>
-                </div>
             </span>
         </div>
     @endif

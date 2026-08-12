@@ -84,8 +84,6 @@
 
         @include('pages.partials.site-audit-module-nav', ['active' => 'module'])
 
-        @include('pages.partials.site-audit-beta-banner')
-
         @include('pages.partials.site-audit-breadcrumbs', [
             'crawl' => $crawl,
             'project' => $project ?? optional($crawl)->project,

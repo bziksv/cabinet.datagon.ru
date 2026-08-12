@@ -269,6 +269,16 @@ class SiteAuditTextMetrics
      */
     public static function noindexText(string $html): string
     {
+        return (string) (self::noindexInfo($html)['text'] ?? '');
+    }
+
+    /**
+     * Разбор блоков noindex: текст, ссылки, отпечаток для группировки.
+     *
+     * @return array{text:string,len:int,sample:string,links:array<int,array{href:string,text:string}>,hash:string}
+     */
+    public static function noindexInfo(string $html): array
+    {
         $chunks = [];
         if (preg_match_all('/<noindex\b[^>]*>(.*?)<\/noindex>/is', $html, $m)) {
             foreach ($m[1] as $chunk) {
@@ -280,12 +290,70 @@ class SiteAuditTextMetrics
                 $chunks[] = $chunk;
             }
         }
-        if ($chunks === []) {
-            return '';
-        }
-        $text = strip_tags(implode(' ', $chunks));
-        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        return trim(preg_replace('/\s+/u', ' ', $text));
+        if ($chunks === []) {
+            return [
+                'text' => '',
+                'len' => 0,
+                'sample' => '',
+                'links' => [],
+                'hash' => '',
+            ];
+        }
+
+        $joined = implode(' ', $chunks);
+        $links = [];
+        $seenHref = [];
+        if (preg_match_all('/<a\b[^>]*\bhref\s*=\s*["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is', $joined, $am)) {
+            foreach ($am[1] as $i => $href) {
+                $href = trim(html_entity_decode((string) $href, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                if ($href === '' || isset($seenHref[$href])) {
+                    continue;
+                }
+                $seenHref[$href] = true;
+                $label = trim(preg_replace(
+                    '/\s+/u',
+                    ' ',
+                    html_entity_decode(strip_tags((string) ($am[2][$i] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8')
+                ));
+                $links[] = [
+                    'href' => $href,
+                    'text' => $label !== '' ? $label : $href,
+                ];
+                if (count($links) >= 12) {
+                    break;
+                }
+            }
+        }
+
+        $text = strip_tags($joined);
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = trim(preg_replace('/\s+/u', ' ', $text) ?: '');
+        $sample = $text;
+        if ($sample === '' && $links !== []) {
+            $bits = [];
+            foreach (array_slice($links, 0, 4) as $l) {
+                $bits[] = (string) $l['text'];
+            }
+            $sample = implode(' · ', $bits);
+        }
+        if (mb_strlen($sample) > 120) {
+            $sample = rtrim(mb_substr($sample, 0, 119)) . '…';
+        }
+
+        $linkKey = [];
+        foreach ($links as $l) {
+            $linkKey[] = mb_strtolower((string) $l['href']);
+        }
+        sort($linkKey);
+        $hash = md5(mb_strtolower($text) . '|' . implode('|', $linkKey));
+
+        return [
+            'text' => $text,
+            'len' => mb_strlen($text),
+            'sample' => $sample,
+            'links' => $links,
+            'hash' => $hash,
+        ];
     }
 }

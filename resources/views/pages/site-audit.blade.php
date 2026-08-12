@@ -28,10 +28,6 @@
 
         @include('pages.partials.site-audit-module-nav', ['active' => 'module'])
 
-        <div class="cabinet-sa-beta-wrap" data-sa-pro>
-            @include('pages.partials.site-audit-beta-banner')
-        </div>
-
         @include('pages.partials.site-audit-launch-v' . $saPageUi)
 
             <div class="col-lg-7 cabinet-sa-projects-col">

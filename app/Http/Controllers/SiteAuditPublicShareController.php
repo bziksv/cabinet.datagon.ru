@@ -145,8 +145,19 @@ class SiteAuditPublicShareController extends Controller
                 : [$code];
             $query = SiteAuditFinding::query()
                 ->where('crawl_id', $crawl->id)
-                ->whereIn('code', $codes)
-                ->orderBy('id');
+                ->whereIn('code', $codes);
+            if ($code === 'serp_title_mismatch') {
+                $query->orderByRaw(
+                    "CASE
+                        WHEN JSON_LENGTH(COALESCE(JSON_EXTRACT(meta_json, '$.engines_mismatch'), JSON_ARRAY())) > 0 THEN 0
+                        WHEN JSON_EXTRACT(meta_json, '$.engines.yandex.indexed') = false
+                          OR JSON_EXTRACT(meta_json, '$.engines.google.indexed') = false THEN 1
+                        ELSE 2
+                     END"
+                )->orderBy('id');
+            } else {
+                $query->orderBy('id');
+            }
             SiteAuditReportFilter::applyToFindings($query, $crawl->id, $filterValues);
             $total = (clone $query)->count();
             $rows = $query->forPage($page, $perPage)->get();
@@ -183,6 +194,8 @@ class SiteAuditPublicShareController extends Controller
             'isCrawlImagesReport' => $isCrawlImages,
             'isLinkInvertedReport' => SiteAuditDuplicateGrouper::isLinkInverted($code) || $isCrawlImages,
             'isHtmlErrorReport' => SiteAuditDuplicateGrouper::isHtmlErrors($code),
+            'isInsecureFormReport' => SiteAuditDuplicateGrouper::isInsecureForm($code),
+            'isTextInNoindexReport' => SiteAuditDuplicateGrouper::isTextInNoindex($code),
             'total' => $total,
             'page' => min($page, $pagesCount),
             'perPage' => $listPerPage,

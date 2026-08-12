@@ -35,7 +35,6 @@ class SiteAuditAggregator
         'click_depth',
         'sitemap_coverage',
         'landing_coverage',
-        'landing_plagiarism',
         'landing_no_inbound',
         'cannibalization',
         'ad_cannibalization',
@@ -88,7 +87,6 @@ class SiteAuditAggregator
         'landing_not_in_sitemap',
         'landing_not_crawled',
         'landing_url_changed',
-        'landing_plagiarism_suspect',
         'landing_no_inbound_internal',
         'keyword_cannibalization',
         'ad_cannibalization',
@@ -301,8 +299,10 @@ class SiteAuditAggregator
 
                 return $more;
             case 'image_assets':
-                $this->emitImageAssets($crawl);
-                break;
+                $more = $this->emitImageAssets($crawl, $meta, $deadline);
+                $state['meta'] = $meta;
+
+                return $more;
             case 'lost_files':
                 $this->emitLostFiles($crawl);
                 break;
@@ -320,9 +320,6 @@ class SiteAuditAggregator
                 break;
             case 'landing_coverage':
                 $this->emitLandingCoverage($crawl);
-                break;
-            case 'landing_plagiarism':
-                $this->emitLandingPlagiarismLite($crawl);
                 break;
             case 'landing_no_inbound':
                 $this->emitLandingNoInbound($crawl);
@@ -398,6 +395,9 @@ class SiteAuditAggregator
             ->groupBy('code')
             ->pluck('c', 'code')
             ->all();
+
+        // TITLE ≠ выдаче: в дереве только расхождения, строки «всё ок» не считаем проблемой.
+        $byCode['serp_title_mismatch'] = SiteAuditSerpSnippetsProbe::countMismatchFindings((int) $crawl->id);
 
         $byCode['pages_with_canonical'] = (int) SiteAuditPage::query()
             ->where('crawl_id', $crawl->id)
@@ -629,13 +629,21 @@ class SiteAuditAggregator
                         ]);
                     }
 
-                    $h1Spam = SiteAuditTextMetrics::fieldSpam($page->h1);
-                    if ($h1Spam['spam']) {
-                        $findings[] = $this->row($crawlId, 'h1_spam', $page, [
-                            'word' => $h1Spam['word'],
-                            'count' => $h1Spam['count'],
-                            'h1' => $page->h1,
-                        ]);
+                    $h1Text = is_string($page->h1) ? trim($page->h1) : '';
+                    // Мусорный «H1» (JSON-LD/CSS из кривого парсинга) — не считаем переспамом
+                    $h1LooksBroken = $h1Text !== '' && (
+                        mb_strlen($h1Text) > 300
+                        || preg_match('/\{"@type"|position\s*:\s*relative|!important/i', $h1Text)
+                    );
+                    if (! $h1LooksBroken) {
+                        $h1Spam = SiteAuditTextMetrics::fieldSpam($page->h1);
+                        if ($h1Spam['spam']) {
+                            $findings[] = $this->row($crawlId, 'h1_spam', $page, [
+                                'word' => $h1Spam['word'],
+                                'count' => $h1Spam['count'],
+                                'h1' => $page->h1,
+                            ]);
+                        }
                     }
 
                     $nauseaClassicMax = (float) config('site_audit.nausea_classic_max', 8.0);
@@ -688,20 +696,27 @@ class SiteAuditAggregator
                         ]);
                     }
 
-                    $noindexMin = (int) config('site_audit.noindex_text_min', 40);
-                    if ((int) $page->noindex_text_len >= $noindexMin) {
+                    // Любой текст/ссылки внутри Яндекс-блоков noindex (соцкнопки VK/TG тоже).
+                    if ((int) $page->noindex_text_len > 0
+                        || (is_array($page->noindex_links_json ?? null) && $page->noindex_links_json !== [])
+                    ) {
+                        $sample = trim((string) ($page->noindex_sample ?? ''));
+                        $links = is_array($page->noindex_links_json ?? null) ? $page->noindex_links_json : [];
+                        $hash = trim((string) ($page->noindex_hash ?? ''));
+                        if ($hash === '') {
+                            $hash = md5(mb_strtolower($sample) . '|' . (int) $page->noindex_text_len);
+                        }
                         $findings[] = $this->row($crawlId, 'text_in_noindex', $page, [
                             'noindex_text_len' => (int) $page->noindex_text_len,
-                            'threshold' => $noindexMin,
+                            'sample' => $sample !== '' ? $sample : null,
+                            'links' => $links !== [] ? array_values(array_slice($links, 0, 8)) : null,
+                            'hash' => $hash,
                         ]);
                     }
 
-                    if ($this->looksLikeSoft404($page, $thin)) {
-                        $findings[] = $this->row($crawlId, 'soft_404', $page, [
-                            'status' => (int) $page->status_code,
-                            'word_count' => (int) $page->word_count,
-                            'title' => $page->title,
-                        ]);
+                    $softMeta = $this->soft404Meta($page, $thin);
+                    if ($softMeta !== null) {
+                        $findings[] = $this->row($crawlId, 'soft_404', $page, $softMeta);
                     }
 
                     foreach ($findings as $f) {
@@ -718,14 +733,21 @@ class SiteAuditAggregator
         return false;
     }
 
-    private function looksLikeSoft404(SiteAuditPage $page, int $thin): bool
+    /**
+     * Soft 404: 200 + паттерн «не найдено» в TITLE/H1 или крайне мало текста.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function soft404Meta(SiteAuditPage $page, int $thin): ?array
     {
         if ((int) $page->status_code !== 200) {
-            return false;
+            return null;
         }
 
-        $title = mb_strtolower((string) $page->title);
-        $h1 = mb_strtolower((string) $page->h1);
+        $title = trim((string) $page->title);
+        $h1 = trim((string) $page->h1);
+        $titleL = mb_strtolower($title);
+        $h1L = mb_strtolower($h1);
         $patterns = config('site_audit.soft_404_title_patterns', [
             '404',
             'not found',
@@ -734,20 +756,46 @@ class SiteAuditAggregator
             'не найдена',
             'ошибка 404',
         ]);
+
+        $base = [
+            'status' => 200,
+            'word_count' => $page->word_count !== null ? (int) $page->word_count : null,
+            'title' => $title !== '' ? $title : null,
+            'h1' => $h1 !== '' ? $h1 : null,
+        ];
+
         foreach ($patterns as $p) {
-            $p = mb_strtolower((string) $p);
-            if ($p !== '' && (mb_strpos($title, $p) !== false || mb_strpos($h1, $p) !== false)) {
-                return true;
+            $p = trim((string) $p);
+            if ($p === '') {
+                continue;
+            }
+            $pL = mb_strtolower($p);
+            if ($titleL !== '' && mb_strpos($titleL, $pL) !== false) {
+                return array_merge($base, [
+                    'reason' => 'title_pattern',
+                    'pattern' => $p,
+                    'matched_in' => 'title',
+                ]);
+            }
+            if ($h1L !== '' && mb_strpos($h1L, $pL) !== false) {
+                return array_merge($base, [
+                    'reason' => 'h1_pattern',
+                    'pattern' => $p,
+                    'matched_in' => 'h1',
+                ]);
             }
         }
 
         // очень тощий ответ при 200 — кандидат soft-404 (жёстче обычного thin)
         $softThin = max(20, (int) floor($thin / 3));
         if ($page->word_count !== null && (int) $page->word_count > 0 && (int) $page->word_count < $softThin) {
-            return true;
+            return array_merge($base, [
+                'reason' => 'thin',
+                'threshold' => $softThin,
+            ]);
         }
 
-        return false;
+        return null;
     }
 
     private function emitSitemapCoverage(SiteAuditCrawl $crawl): void
@@ -908,76 +956,6 @@ class SiteAuditAggregator
                     $notCrawled++;
                 }
             }
-        }
-    }
-
-    /**
-     * Lite «плагиат» на посадочных: внутренний duplicate_content / similar_pages.
-     * Внешний антиплагиат API — вне скоупа.
-     */
-    private function emitLandingPlagiarismLite(SiteAuditCrawl $crawl): void
-    {
-        $resolved = (new SiteAuditLandingResolver())->forCrawl($crawl);
-        $landings = $resolved['urls'];
-        if ($landings === []) {
-            return;
-        }
-
-        $max = (int) config('site_audit.landing_plagiarism_max', 200);
-        $cfg = config('site_audit.findings.landing_plagiarism_suspect', []);
-        $severity = $cfg['severity'] ?? 'warning';
-        $emitted = 0;
-
-        $landingHashes = [];
-        foreach ($landings as $url) {
-            $landingHashes[SiteAuditUrlNormalizer::hash($url)] = $url;
-        }
-
-        $suspectHashes = SiteAuditFinding::query()
-            ->where('crawl_id', $crawl->id)
-            ->whereIn('code', ['duplicate_content', 'similar_pages'])
-            ->whereIn('url_hash', array_keys($landingHashes))
-            ->get(['url', 'url_hash', 'code', 'meta_json']);
-
-        $seen = [];
-        foreach ($suspectHashes as $row) {
-            if ($emitted >= $max) {
-                break;
-            }
-            $hash = (string) $row->url_hash;
-            if (isset($seen[$hash])) {
-                continue;
-            }
-            $meta = is_array($row->meta_json) ? $row->meta_json : [];
-            $peer = (string) ($meta['similar_url'] ?? $meta['duplicate_url'] ?? $meta['peer_url'] ?? '');
-            if ($peer === '' && (string) $row->code === 'duplicate_content') {
-                $page = SiteAuditPage::query()
-                    ->where('crawl_id', $crawl->id)
-                    ->where('url_hash', $hash)
-                    ->first(['content_hash']);
-                if ($page && $page->content_hash) {
-                    $peer = (string) (SiteAuditPage::query()
-                        ->where('crawl_id', $crawl->id)
-                        ->where('content_hash', $page->content_hash)
-                        ->where('url_hash', '!=', $hash)
-                        ->value('url') ?: '');
-                }
-            }
-
-            SiteAuditFinding::query()->create([
-                'crawl_id' => $crawl->id,
-                'code' => 'landing_plagiarism_suspect',
-                'severity' => $severity,
-                'url' => $row->url ?: ($landingHashes[$hash] ?? ''),
-                'url_hash' => $hash,
-                'meta_json' => [
-                    'source' => (string) $row->code,
-                    'peer_url' => $peer !== '' ? $peer : null,
-                    'note' => 'internal_only',
-                ],
-            ]);
-            $seen[$hash] = true;
-            $emitted++;
         }
     }
 
@@ -1998,51 +1976,127 @@ class SiteAuditAggregator
     }
 
     /**
-     * Битые / тяжёлые изображения: HEAD по уникальным img src (бюджет на краул).
-     * Результат пишется обратно в img_srcs_json (status, size_bytes, ok) для инвентаря.
+     * Битые / тяжёлые изображения: проба уникальных img src (бюджет на краул).
+     * Результат пишется в img_srcs_json (status, size_bytes, ok) для инвентаря.
+     * Этап чанкуется: probe → apply, чтобы не упереться в tick timeout.
+     *
+     * @param  array<string,mixed>  $meta
+     * @return bool true = ещё есть работа
      */
-    private function emitImageAssets(SiteAuditCrawl $crawl): void
+    private function emitImageAssets(SiteAuditCrawl $crawl, array &$meta = [], ?float $deadline = null): bool
     {
+        $maxHead = max(0, (int) config('site_audit.broken_image_head_max', 8000));
+        $chunk = max(20, (int) config('site_audit.aggregate_image_head_chunk', 80));
+        $heavyBytes = (int) config('site_audit.heavy_image_bytes', 500_000);
+        $cacheKey = 'sa_img_head:' . (int) $crawl->id;
+        $listKey = $cacheKey . ':list';
+
+        $phase = (string) ($meta['phase'] ?? 'collect');
+        if ($phase === 'collect') {
+            $urls = $this->collectUniqueImageSrcs($crawl);
+            Cache::put($listKey, $urls, now()->addHours(6));
+            Cache::put($cacheKey, [], now()->addHours(6));
+            $meta = [
+                'phase' => 'probe',
+                'offset' => 0,
+                'budget' => $maxHead,
+                'total' => count($urls),
+            ];
+            $phase = 'probe';
+        }
+
+        if ($phase === 'probe') {
+            $urls = Cache::get($listKey);
+            if (! is_array($urls)) {
+                $urls = $this->collectUniqueImageSrcs($crawl);
+                Cache::put($listKey, $urls, now()->addHours(6));
+            }
+            $cache = Cache::get($cacheKey);
+            if (! is_array($cache)) {
+                $cache = [];
+            }
+            $offset = (int) ($meta['offset'] ?? 0);
+            $budget = array_key_exists('budget', $meta) ? (int) $meta['budget'] : $maxHead;
+            $checker = new SiteAuditLinkChecker();
+            $n = count($urls);
+            $done = 0;
+
+            while ($offset < $n && $budget > 0) {
+                if ($deadline !== null && microtime(true) >= $deadline) {
+                    Cache::put($cacheKey, $cache, now()->addHours(6));
+                    $meta['offset'] = $offset;
+                    $meta['budget'] = $budget;
+                    $meta['phase'] = 'probe';
+
+                    return true;
+                }
+                if ($done >= $chunk) {
+                    Cache::put($cacheKey, $cache, now()->addHours(6));
+                    $meta['offset'] = $offset;
+                    $meta['budget'] = $budget;
+                    $meta['phase'] = 'probe';
+
+                    return true;
+                }
+
+                $src = (string) ($urls[$offset] ?? '');
+                $offset++;
+                if ($src === '' || isset($cache[$src])) {
+                    continue;
+                }
+                $cache[$src] = $checker->check($src);
+                $budget--;
+                $done++;
+            }
+
+            Cache::put($cacheKey, $cache, now()->addHours(6));
+            $meta = [
+                'phase' => 'apply',
+                'after_id' => 0,
+                'probed' => count($cache),
+            ];
+
+            return true;
+        }
+
+        // apply: обогатить img_srcs_json + findings
+        $cache = Cache::get($cacheKey);
+        if (! is_array($cache) || $cache === []) {
+            Cache::forget($cacheKey);
+            Cache::forget($listKey);
+            $meta = [];
+
+            return false;
+        }
+
+        $brokenSev = config('site_audit.findings.broken_image.severity', 'warning');
+        $heavySev = config('site_audit.findings.heavy_image.severity', 'info');
+        $afterId = (int) ($meta['after_id'] ?? 0);
+        $pageChunk = max(40, (int) config('site_audit.aggregate_from_pages_chunk', 200));
+
         $q = SiteAuditPage::query()
             ->where('crawl_id', $crawl->id)
-            ->whereNotNull('img_srcs_json');
+            ->whereNotNull('img_srcs_json')
+            ->where('id', '>', $afterId)
+            ->orderBy('id')
+            ->limit($pageChunk);
         if (config('site_audit.incremental_by_content_hash', true)
             && Schema::hasColumn('site_audit_pages', 'content_unchanged')) {
-            $q->where('content_unchanged', false);
+            // На apply обогащаем все страницы с картинками — иначе инвентарь «хвоста» пустой.
+            // probe уже ограничен бюджетом; content_unchanged режем только на collect/probe.
         }
         $pages = $q->get(['id', 'url', 'url_hash', 'img_srcs_json']);
 
         if ($pages->isEmpty()) {
-            return;
-        }
+            Cache::forget($cacheKey);
+            Cache::forget($listKey);
+            $meta = [];
 
-        $maxHead = (int) config('site_audit.broken_image_head_max', 500);
-        $heavyBytes = (int) config('site_audit.heavy_image_bytes', 500_000);
-        $checker = new SiteAuditLinkChecker();
-        /** @var array<string,array{ok:bool,status:?int,error:?string,size_bytes:?int,content_type:?string}> $cache */
-        $cache = [];
-        $budget = $maxHead;
-
-        $brokenSev = config('site_audit.findings.broken_image.severity', 'warning');
-        $heavySev = config('site_audit.findings.heavy_image.severity', 'info');
-
-        // Сначала уникальные src — чтобы бюджет не съели первые страницы.
-        foreach ($pages as $page) {
-            $items = SiteAuditImageItem::normalizeList($page->img_srcs_json);
-            foreach (array_slice($items, 0, 20) as $item) {
-                $src = (string) ($item['src'] ?? '');
-                if ($src === '' || isset($cache[$src])) {
-                    continue;
-                }
-                if ($budget <= 0) {
-                    break 2;
-                }
-                $cache[$src] = $checker->check($src);
-                $budget--;
-            }
+            return false;
         }
 
         foreach ($pages as $page) {
+            $afterId = (int) $page->id;
             $items = SiteAuditImageItem::normalizeList($page->img_srcs_json);
             if ($items === []) {
                 continue;
@@ -2114,7 +2168,53 @@ class SiteAuditAggregator
                     ],
                 ]);
             }
+
+            if ($deadline !== null && microtime(true) >= $deadline) {
+                $meta['after_id'] = $afterId;
+                $meta['phase'] = 'apply';
+
+                return true;
+            }
         }
+
+        $meta['after_id'] = $afterId;
+        $meta['phase'] = 'apply';
+
+        return true;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function collectUniqueImageSrcs(SiteAuditCrawl $crawl): array
+    {
+        $q = SiteAuditPage::query()
+            ->where('crawl_id', $crawl->id)
+            ->whereNotNull('img_srcs_json');
+        if (config('site_audit.incremental_by_content_hash', true)
+            && Schema::hasColumn('site_audit_pages', 'content_unchanged')) {
+            $q->where(function ($w) {
+                $w->where('content_unchanged', false)->orWhereNull('content_unchanged');
+            });
+        }
+
+        $seen = [];
+        $urls = [];
+        $q->orderBy('id')->chunkById(200, function ($pages) use (&$seen, &$urls) {
+            foreach ($pages as $page) {
+                $items = SiteAuditImageItem::normalizeList($page->img_srcs_json);
+                foreach (array_slice($items, 0, 40) as $item) {
+                    $src = (string) ($item['src'] ?? '');
+                    if ($src === '' || isset($seen[$src])) {
+                        continue;
+                    }
+                    $seen[$src] = true;
+                    $urls[] = $src;
+                }
+            }
+        });
+
+        return $urls;
     }
 
     /**

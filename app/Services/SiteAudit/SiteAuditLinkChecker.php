@@ -118,8 +118,7 @@ class SiteAuditLinkChecker
             $code = $response->getStatusCode();
             // 206 Partial Content — нормальный ответ на Range.
             $ok = ($code >= 200 && $code < 400) || $code === 206;
-            $len = $response->getHeaderLine('Content-Length');
-            $size = ($len !== '' && ctype_digit($len)) ? (int) $len : null;
+            $size = $this->extractSizeBytes($response, $withRange && strtoupper($method) === 'GET');
             $ct = trim((string) $response->getHeaderLine('Content-Type'));
             if ($ct !== '') {
                 $ct = explode(';', $ct, 2)[0];
@@ -128,9 +127,12 @@ class SiteAuditLinkChecker
                 $ct = null;
             }
 
+            // Для инвентаря 206 от нашего Range = файл доступен → показываем как 200.
+            $status = ($ok && $code === 206) ? 200 : $code;
+
             return [
                 'ok' => $ok,
-                'status' => $code,
+                'status' => $status,
                 'error' => null,
                 'size_bytes' => $size,
                 'content_type' => $ct,
@@ -152,5 +154,33 @@ class SiteAuditLinkChecker
                 'content_type' => null,
             ];
         }
+    }
+
+    /**
+     * Размер файла: при Range смотрим Content-Range (bytes 0-0/12345),
+     * иначе Content-Length. Content-Length=1 при 206 — мусор от bytes=0-0.
+     *
+     * @param  \Psr\Http\Message\ResponseInterface  $response
+     */
+    private function extractSizeBytes($response, bool $fromRange): ?int
+    {
+        if ($fromRange) {
+            $range = trim((string) $response->getHeaderLine('Content-Range'));
+            if ($range !== '' && preg_match('/\/(\d+)\s*$/', $range, $m)) {
+                return (int) $m[1];
+            }
+        }
+
+        $len = trim((string) $response->getHeaderLine('Content-Length'));
+        if ($len === '' || ! ctype_digit($len)) {
+            return null;
+        }
+        $n = (int) $len;
+        // Range-проба часто отвечает 206 + Content-Length: 1 — это длина куска, не файла.
+        if ($fromRange && (int) $response->getStatusCode() === 206 && $n <= 1) {
+            return null;
+        }
+
+        return $n;
     }
 }

@@ -11,6 +11,24 @@
     <div class="cabinet-sa-page cabinet-sa-admin-page">
         @include('pages.partials.site-audit-module-nav', ['active' => 'admin'])
 
+        @if(session('status'))
+            <div class="alert alert-success py-2">{{ session('status') }}</div>
+        @endif
+        @if($errors->any())
+            <div class="alert alert-danger py-2">
+                <ul class="mb-0 ps-3">
+                    @foreach($errors->all() as $err)
+                        <li>{{ $err }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        @include('pages.partials.site-audit-admin-capacity', [
+            'capacity' => $capacity ?? [],
+            'fields' => $fields ?? [],
+        ])
+
         <div class="row g-3 align-items-start mb-3">
             <div class="col-xl-8">
                 <div class="card shadow-sm border-0">

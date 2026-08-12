@@ -9,7 +9,6 @@ class CabinetModuleBeta
 {
     /** @var list<string> фрагменты path в link модуля */
     private const LINK_MARKERS = [
-        'site-audit',
         'seo-checklist',
         'checklist',
         'seo-reports',
@@ -35,7 +34,7 @@ class CabinetModuleBeta
     }
 
     /**
-     * Короткий ключ для текстов баннера: site-audit | seo-checklist | seo-reports.
+     * Короткий ключ для текстов баннера: seo-checklist | seo-reports.
      */
     public static function keyFromLink(?string $link): ?string
     {

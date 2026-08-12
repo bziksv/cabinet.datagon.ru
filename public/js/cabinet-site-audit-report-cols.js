@@ -1,9 +1,6 @@
 (function () {
   'use strict';
 
-  var STORAGE_KEY = 'cabinet_sa_crawl_images_cols_v3';
-  var LEGACY_KEY = 'cabinet_sa_crawl_images_cols_v2';
-
   function $(sel, root) {
     return (root || document).querySelector(sel);
   }
@@ -12,43 +9,37 @@
     return Array.prototype.slice.call((root || document).querySelectorAll(sel));
   }
 
-  function loadState() {
-    try {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        var parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          return {
-            visible: Array.isArray(parsed.visible) ? parsed.visible : null,
-            order: Array.isArray(parsed.order) ? parsed.order : null
-          };
-        }
-        if (Array.isArray(parsed)) {
-          return { visible: parsed, order: null };
-        }
-      }
-      var legacy = localStorage.getItem(LEGACY_KEY);
-      if (legacy) {
-        var old = JSON.parse(legacy);
-        if (Array.isArray(old)) return { visible: old, order: null };
-      }
-    } catch (e) { /* ignore */ }
-    return null;
+  function storageKey(code) {
+    return 'cabinet_sa_report_cols_v1:' + (code || 'default');
   }
 
-  function saveState(visible, order) {
+  function loadState(code) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      var raw = localStorage.getItem(storageKey(code));
+      if (!raw) return null;
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      return {
+        visible: Array.isArray(parsed.visible) ? parsed.visible : null,
+        order: Array.isArray(parsed.order) ? parsed.order : null
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveState(code, visible, order) {
+    try {
+      localStorage.setItem(storageKey(code), JSON.stringify({
         visible: visible,
         order: order
       }));
     } catch (e) { /* ignore */ }
   }
 
-  function clearState() {
+  function clearState(code) {
     try {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(LEGACY_KEY);
+      localStorage.removeItem(storageKey(code));
     } catch (e) { /* ignore */ }
   }
 
@@ -57,12 +48,9 @@
     return attr.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
   }
 
-  function presetsMap(table) {
-    try {
-      return JSON.parse(table.getAttribute('data-sa-cols-presets') || '{}') || {};
-    } catch (e) {
-      return {};
-    }
+  function pinnedEndKeys(root) {
+    var attr = root.getAttribute('data-sa-cols-pinned-end') || '';
+    return attr.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
   }
 
   function catalogOrder(root) {
@@ -77,7 +65,26 @@
     return keys.length ? keys : catalogOrder(root);
   }
 
-  function mergeOrder(preferred, catalog) {
+  function withPinnedEnd(order, pinned) {
+    var pinSet = {};
+    (pinned || []).forEach(function (k) { pinSet[k] = true; });
+    var body = [];
+    var tail = [];
+    (order || []).forEach(function (k) {
+      if (!k) return;
+      if (pinSet[k]) {
+        if (tail.indexOf(k) === -1) tail.push(k);
+      } else if (body.indexOf(k) === -1) {
+        body.push(k);
+      }
+    });
+    (pinned || []).forEach(function (k) {
+      if (tail.indexOf(k) === -1) tail.push(k);
+    });
+    return body.concat(tail);
+  }
+
+  function mergeOrder(preferred, catalog, pinned) {
     var seen = {};
     var out = [];
     (preferred || []).forEach(function (k) {
@@ -90,13 +97,18 @@
       seen[k] = true;
       out.push(k);
     });
-    return out;
+    return withPinnedEnd(out, pinned);
   }
 
   function applyVisibility(root, table, keys) {
     var set = {};
     (keys || []).forEach(function (k) { set[k] = true; });
     set.url = true;
+    if (table.querySelector('[data-sa-col="details"]')) {
+      // Детали — часть отчёта; если колонка есть в таблице, не прячем скрытым пресетом без details
+      var detailsToggle = root.querySelector('[data-sa-col-toggle="details"]');
+      if (detailsToggle && detailsToggle.disabled) set.details = true;
+    }
 
     $$('[data-sa-col]', table).forEach(function (el) {
       var key = el.getAttribute('data-sa-col');
@@ -110,14 +122,6 @@
       if (!key || input.disabled) return;
       input.checked = !!set[key];
     });
-
-    $$('[data-sa-cols-preset]', root).forEach(function (btn) {
-      var presetKey = btn.getAttribute('data-sa-cols-preset');
-      var presets = presetsMap(table);
-      var cols = presets[presetKey] || [];
-      var active = cols.length === keys.length && cols.every(function (c) { return set[c]; });
-      btn.classList.toggle('is-active', active);
-    });
   }
 
   function applyOrder(table, order) {
@@ -128,15 +132,18 @@
       var th = headRow.querySelector('[data-sa-col="' + key + '"]');
       if (th) headRow.appendChild(th);
       bodyRows.forEach(function (tr) {
-        var td = Array.prototype.find.call(tr.children, function (ch) {
-          return ch.getAttribute && ch.getAttribute('data-sa-col') === key;
-        });
+        var td = tr.querySelector(':scope > [data-sa-col="' + key + '"]');
+        if (!td) {
+          td = Array.prototype.find.call(tr.children, function (ch) {
+            return ch.getAttribute && ch.getAttribute('data-sa-col') === key;
+          });
+        }
         if (td) tr.appendChild(td);
       });
     });
   }
 
-  function applyOrderList(root, order) {
+  function applyOrderList(root, order, pinned) {
     var panel = $('[data-sa-cols-order-list]', root);
     if (!panel) return;
     var byKey = {};
@@ -144,12 +151,22 @@
       byKey[el.getAttribute('data-sa-col-order')] = el;
     });
     var hint = panel.querySelector('.cabinet-sa-report-cols__hint');
+    var pinnedBox = panel.querySelector('[data-sa-cols-pinned]');
     var foot = panel.querySelector('[data-sa-cols-foot]');
-    order.forEach(function (key) {
+    var ordered = withPinnedEnd(order, pinned);
+
+    ordered.forEach(function (key) {
       var el = byKey[key];
-      if (el) panel.appendChild(el);
+      if (!el) return;
+      if (el.getAttribute('data-sa-col-pinned-end') === '1' && pinnedBox) {
+        pinnedBox.appendChild(el);
+      } else {
+        panel.appendChild(el);
+      }
     });
+
     if (hint) panel.insertBefore(hint, panel.firstChild);
+    if (pinnedBox) panel.appendChild(pinnedBox);
     if (foot) panel.appendChild(foot);
   }
 
@@ -160,14 +177,19 @@
       .filter(Boolean);
   }
 
-  function persist(root) {
-    saveState(visibleKeys(root), catalogOrder(root));
+  function currentOrder(root, pinned) {
+    return withPinnedEnd(catalogOrder(root), pinned);
   }
 
-  function bindDrag(root, table) {
+  function persist(root, table, code, pinned) {
+    saveState(code, visibleKeys(root), currentOrder(root, pinned));
+  }
+
+  function bindDrag(root, table, code, pinned) {
     var panel = $('[data-sa-cols-order-list]', root);
     if (!panel) return;
     var dragEl = null;
+    var pinnedBox = panel.querySelector('[data-sa-cols-pinned]');
 
     $$('[data-sa-col-order]', panel).forEach(function (el) {
       if (el.getAttribute('draggable') !== 'true') return;
@@ -184,95 +206,101 @@
       el.addEventListener('dragend', function () {
         el.classList.remove('is-dragging');
         dragEl = null;
-        applyOrder(table, catalogOrder(root));
-        persist(root);
+        var order = currentOrder(root, pinned);
+        applyOrderList(root, order, pinned);
+        applyOrder(table, order);
+        persist(root, table, code, pinned);
       });
 
       el.addEventListener('dragover', function (e) {
         if (!dragEl || dragEl === el) return;
+        if (el.getAttribute('data-sa-col-pinned-end') === '1') return;
         e.preventDefault();
         var rect = el.getBoundingClientRect();
         var before = (e.clientY - rect.top) < rect.height / 2;
         if (before) panel.insertBefore(dragEl, el);
         else panel.insertBefore(dragEl, el.nextSibling);
+        // pinned-блок всегда ниже списка
+        if (pinnedBox) panel.appendChild(pinnedBox);
+        var foot = panel.querySelector('[data-sa-cols-foot]');
+        if (foot) panel.appendChild(foot);
       });
     });
   }
 
-  function resetToDefault(root, table) {
-    clearState();
-    var order = catalogDefaultOrder(root);
+  function ensureActionsInPreset(cols, root) {
+    var pinned = pinnedEndKeys(root);
+    var out = (cols || []).slice();
+    pinned.forEach(function (k) {
+      if (out.indexOf(k) === -1
+        && root.querySelector('[data-sa-col-toggle="' + k + '"]')) {
+        out.push(k);
+      }
+    });
+    return withPinnedEnd(out, pinned);
+  }
+
+  function resetToDefault(root, table, code, pinned) {
+    clearState(code);
+    var order = withPinnedEnd(catalogDefaultOrder(root), pinned);
     var visible = defaultKeys(table).filter(function (k) {
       return order.indexOf(k) !== -1;
     });
     if (visible.indexOf('url') === -1) visible.unshift('url');
-    applyOrderList(root, order);
+    applyOrderList(root, order, pinned);
     applyOrder(table, order);
     applyVisibility(root, table, visible);
   }
 
-  function applyPerPageChange(sel) {
-    if (!sel) return;
-    var url = new URL(window.location.href);
-    url.searchParams.set('per_page', sel.value);
-    url.searchParams.set('page', '1');
-    window.location = url.toString();
-  }
-
   function init() {
-    var root = $('[data-sa-crawl-images-cols]');
-    var table = $('[data-sa-crawl-images-table]');
+    var root = $('[data-sa-report-cols]');
+    var table = $('[data-sa-report-table]');
     if (!root || !table) return;
 
-    var catalog = catalogDefaultOrder(root);
-    var state = loadState();
-    var order = mergeOrder(state && state.order, catalog);
+    var code = table.getAttribute('data-sa-report-code') || 'default';
+    var pinned = pinnedEndKeys(root);
+    var catalog = withPinnedEnd(catalogDefaultOrder(root), pinned);
+    var state = loadState(code);
+    var order = mergeOrder(state && state.order, catalog, pinned);
     var visible = (state && state.visible) || defaultKeys(table);
     visible = visible.filter(function (k) { return catalog.indexOf(k) !== -1; });
     if (visible.indexOf('url') === -1) visible.unshift('url');
 
-    applyOrderList(root, order);
+    applyOrderList(root, order, pinned);
     applyOrder(table, order);
     applyVisibility(root, table, visible);
 
     root.addEventListener('change', function (e) {
       var t = e.target;
-      if (!t || !t.getAttribute) return;
-      if (t.getAttribute('data-sa-per-page') !== null) {
-        applyPerPageChange(t);
-        return;
-      }
-      if (!t.getAttribute('data-sa-col-toggle')) return;
+      if (!t || !t.getAttribute || !t.getAttribute('data-sa-col-toggle')) return;
       var next = visibleKeys(root);
       if (next.indexOf('url') === -1) next.unshift('url');
       applyVisibility(root, table, next);
-      persist(root);
+      persist(root, table, code, pinned);
     });
 
     root.addEventListener('click', function (e) {
       var resetBtn = e.target.closest('[data-sa-cols-reset]');
       if (resetBtn && root.contains(resetBtn)) {
         e.preventDefault();
-        resetToDefault(root, table);
+        resetToDefault(root, table, code, pinned);
         return;
       }
 
       var btn = e.target.closest('[data-sa-cols-preset]');
       if (!btn || !root.contains(btn)) return;
       e.preventDefault();
-      var presetKey = btn.getAttribute('data-sa-cols-preset');
-      var presets = presetsMap(table);
-      var cols = (presets[presetKey] || []).slice();
+      var colsAttr = btn.getAttribute('data-sa-cols-preset-cols') || '';
+      var cols = colsAttr.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      if (!cols.length) return;
       if (cols.indexOf('url') === -1) cols.unshift('url');
-      // пресет задаёт и видимость, и порядок выбранных колонок
-      var order = mergeOrder(cols, catalogDefaultOrder(root));
-      applyOrderList(root, order);
-      applyOrder(table, order);
+      // пресет не выкидывает «Действия», если колонка есть в отчёте
+      cols = ensureActionsInPreset(cols, root);
       applyVisibility(root, table, cols);
-      persist(root);
+      persist(root, table, code, pinned);
     });
 
-    bindDrag(root, table);
+    bindDrag(root, table, code, pinned);
   }
 
   if (document.readyState === 'loading') {

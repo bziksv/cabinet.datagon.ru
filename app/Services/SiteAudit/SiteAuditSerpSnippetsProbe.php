@@ -15,7 +15,10 @@ class SiteAuditSerpSnippetsProbe
         'serp_snippets',
         'serp_title_mismatch',
         'serp_snippet_source',
-        // legacy: дубль Вебмастера — больше не пишем, только чистим при пересъёме
+    ];
+
+    /** Старые code, которые чистим при пересъёме сниппетов (больше не пишем). */
+    private const LEGACY_CODES = [
         'serp_not_indexed',
     ];
 
@@ -37,7 +40,7 @@ class SiteAuditSerpSnippetsProbe
 
         SiteAuditFinding::query()
             ->where('crawl_id', $crawl->id)
-            ->whereIn('code', self::CODES)
+            ->whereIn('code', array_merge(self::CODES, self::LEGACY_CODES))
             ->delete();
 
         $batch = (new SiteAuditSerpUrlBatch())->ensure($crawl, $force);
@@ -120,27 +123,56 @@ class SiteAuditSerpSnippetsProbe
                 }
             }
 
-            if ($titleMismatches !== []) {
-                $primaryEngine = array_key_first($titleMismatches);
-                $primary = $titleMismatches[$primaryEngine];
-                $cfg = config('site_audit.findings.serp_title_mismatch', []);
-                SiteAuditFinding::query()->create([
-                    'crawl_id' => $crawl->id,
-                    'code' => 'serp_title_mismatch',
-                    'severity' => $cfg['severity'] ?? 'warning',
-                    'url' => $url,
-                    'url_hash' => SiteAuditUrlNormalizer::hash($url),
-                    'meta_json' => [
-                        'engine' => $primaryEngine,
-                        'engines_mismatch' => array_keys($titleMismatches),
-                        'source' => $source,
-                        'page_title' => $pageTitle,
-                        'serp_title' => $primary['serp_title'],
-                        'snippet' => $primary['snippet'],
-                        'engines' => $engineMeta,
-                    ],
-                ]);
+            // Все снятые URL: расхождения / совпало / нет в выдаче.
+            $hasMismatch = $titleMismatches !== [];
+            $hasAnyMatch = false;
+            foreach ($engineMeta as $block) {
+                if (is_array($block) && ! empty($block['title_match'])) {
+                    $hasAnyMatch = true;
+                    break;
+                }
             }
+            if ($hasMismatch) {
+                $serpStatus = 'mismatch';
+            } elseif ($hasAnyMatch) {
+                $serpStatus = 'ok';
+            } else {
+                $serpStatus = 'missing';
+            }
+            $primaryEngine = $hasMismatch
+                ? array_key_first($titleMismatches)
+                : (array_key_first($engineMeta) ?: 'yandex');
+            $primary = $hasMismatch
+                ? $titleMismatches[$primaryEngine]
+                : [
+                    'serp_title' => is_array($engineMeta[$primaryEngine] ?? null)
+                        ? ($engineMeta[$primaryEngine]['title'] ?? null)
+                        : null,
+                    'snippet' => is_array($engineMeta[$primaryEngine] ?? null)
+                        ? ($engineMeta[$primaryEngine]['snippet'] ?? null)
+                        : null,
+                ];
+            $cfg = config('site_audit.findings.serp_title_mismatch', []);
+            SiteAuditFinding::query()->create([
+                'crawl_id' => $crawl->id,
+                'code' => 'serp_title_mismatch',
+                'severity' => $hasMismatch
+                    ? ($cfg['severity'] ?? 'warning')
+                    : 'info',
+                'url' => $url,
+                'url_hash' => SiteAuditUrlNormalizer::hash($url),
+                'meta_json' => [
+                    'engine' => $primaryEngine,
+                    'engines_mismatch' => array_keys($titleMismatches),
+                    'serp_status' => $serpStatus,
+                    'title_ok' => $serpStatus === 'ok',
+                    'source' => $source,
+                    'page_title' => $pageTitle,
+                    'serp_title' => $primary['serp_title'],
+                    'snippet' => $primary['snippet'],
+                    'engines' => $engineMeta,
+                ],
+            ]);
 
             $cfg = config('site_audit.findings.serp_snippets', []);
             SiteAuditFinding::query()->create([
@@ -169,6 +201,7 @@ class SiteAuditSerpSnippetsProbe
             'skipped' => false,
             'max_urls' => (int) ($batch['max_urls'] ?? 0),
             'sampled' => count($rowsOut),
+            'mismatch' => self::countMismatchFindings((int) $crawl->id),
             'errors' => (int) ($batch['errors'] ?? 0),
             'engines' => $engines,
             'rows' => $rowsOut,
@@ -176,6 +209,32 @@ class SiteAuditSerpSnippetsProbe
         ];
         $crawl->progress_json = $progress;
         $crawl->save();
+    }
+
+    /**
+     * В дереве/счётчиках — только реальные расхождения (без «всё ок» и «нет в выдаче»).
+     */
+    public static function countMismatchFindings(int $crawlId): int
+    {
+        return (int) SiteAuditFinding::query()
+            ->where('crawl_id', $crawlId)
+            ->where('code', 'serp_title_mismatch')
+            ->whereRaw(
+                "JSON_LENGTH(COALESCE(JSON_EXTRACT(meta_json, '$.engines_mismatch'), JSON_ARRAY())) > 0"
+            )
+            ->count();
+    }
+
+    /**
+     * SQL: title_ok = true/false (MySQL JSON boolean + legacy без ключа).
+     */
+    public static function titleOkSql(bool $ok): string
+    {
+        if ($ok) {
+            return "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(meta_json, '$.title_ok')), '0') IN ('true', '1')";
+        }
+
+        return "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(meta_json, '$.title_ok')), '0') NOT IN ('true', '1')";
     }
 
     /**

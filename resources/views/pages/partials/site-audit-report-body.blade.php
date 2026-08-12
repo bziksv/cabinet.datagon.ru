@@ -128,7 +128,7 @@
             <div class="mt-1 mb-0">
                 Сниппеты — общий набор до <strong>{{ (int) config('site_audit.serp_snippets_max_urls', 30) }}</strong> URL
                 (посадочные и добор из обхода), Яндекс и Google; один съём на адрес.
-                В «TITLE ≠ выдаче» попадают только расхождения: совпавшая ПС в таблицу не пишется.
+                В «TITLE ≠ выдаче» — все снятые URL: расхождения и совпадения («всё ок»).
                 Нормально снимать <strong>при аудите</strong> (вкл. по умолчанию) или кнопкой ниже.
             </div>
         @endif
@@ -487,6 +487,22 @@
             @if(($viewMode ?? '') === 'groups' && !empty($groupTotal))
                 <span class="text-muted small ms-2">паттернов: {{ number_format((int) $groupTotal, 0, '', ' ') }} · URL: {{ number_format((int) $total, 0, '', ' ') }}</span>
             @endif
+        @elseif(!empty($isTextInNoindexReport))
+            <a class="cabinet-sa-view-toggle__btn {{ ($viewMode ?? '') === 'groups' ? 'is-active' : '' }}"
+               href="{{ request()->fullUrlWithQuery(['view' => 'groups', 'page' => 1]) }}">По содержимому</a>
+            <a class="cabinet-sa-view-toggle__btn {{ ($viewMode ?? '') === 'list' ? 'is-active' : '' }}"
+               href="{{ request()->fullUrlWithQuery(['view' => 'list', 'page' => 1]) }}">По страницам</a>
+            @if(($viewMode ?? '') === 'groups' && !empty($groupTotal))
+                <span class="text-muted small ms-2">блоков: {{ number_format((int) $groupTotal, 0, '', ' ') }} · URL: {{ number_format((int) $total, 0, '', ' ') }}</span>
+            @endif
+        @elseif(!empty($isInsecureFormReport))
+            <a class="cabinet-sa-view-toggle__btn {{ ($viewMode ?? '') === 'groups' ? 'is-active' : '' }}"
+               href="{{ request()->fullUrlWithQuery(['view' => 'groups', 'page' => 1]) }}">По формам</a>
+            <a class="cabinet-sa-view-toggle__btn {{ ($viewMode ?? '') === 'list' ? 'is-active' : '' }}"
+               href="{{ request()->fullUrlWithQuery(['view' => 'list', 'page' => 1]) }}">По страницам</a>
+            @if(($viewMode ?? '') === 'groups' && !empty($groupTotal))
+                <span class="text-muted small ms-2">форм: {{ number_format((int) $groupTotal, 0, '', ' ') }} · стр.: {{ number_format((int) $total, 0, '', ' ') }}</span>
+            @endif
         @elseif(!empty($isCrawlImagesReport))
             <a class="cabinet-sa-view-toggle__btn {{ ($viewMode ?? '') === 'groups' ? 'is-active' : '' }}"
                href="{{ request()->fullUrlWithQuery(['view' => 'groups', 'page' => 1]) }}">По картинкам</a>
@@ -527,7 +543,23 @@
 
 @if(!empty($htmlSitewide) && is_array($htmlSitewide))
     <div class="alert alert-warning border small mb-3 cabinet-sa-html-sitewide">
-        @if(!empty($isCrawlImagesReport))
+        @if(!empty($isTextInNoindexReport))
+            <strong>Скорее общий блок</strong>
+            (шапка / подвал / соцсети) —
+            одно и то же содержимое noindex на
+            <strong>{{ number_format((int) $htmlSitewide['pages'], 0, '', ' ') }}</strong>
+            из {{ number_format((int) $htmlSitewide['total'], 0, '', ' ') }} стр.
+            ({{ (int) $htmlSitewide['pct'] }}%):
+            @if(!empty($htmlSitewide['label']))
+                <code class="cabinet-sa-html-sitewide__code">{{ $htmlSitewide['label'] }}</code>.
+            @endif
+            <div class="mt-1 mb-0">
+                Не разбирайте каждую страницу: правьте шаблон один раз.
+                @if(($viewMode ?? '') === 'list')
+                    <a href="{{ request()->fullUrlWithQuery(['view' => 'groups', 'page' => 1]) }}">Смотреть по содержимому →</a>
+                @endif
+            </div>
+        @elseif(!empty($isCrawlImagesReport))
             <strong>Скорее общий блок</strong>
             (шапка / счётчик / шаблон) —
             одна и та же картинка на
@@ -557,6 +589,22 @@
                 Не разбирайте каждую страницу: уберите или разметьте ссылку в общем шаблоне один раз.
                 @if(($viewMode ?? '') === 'list')
                     <a href="{{ request()->fullUrlWithQuery(['view' => 'groups', 'page' => 1]) }}">{{ in_array($code ?? '', ['page_has_broken_links', 'page_has_broken_external_links'], true) ? 'Смотреть по целям →' : 'Смотреть по ссылкам →' }}</a>
+                @endif
+            </div>
+        @elseif(!empty($isInsecureFormReport))
+            <strong>Скорее общий блок</strong>
+            (шапка / подвал / попап) —
+            одна и та же форма на
+            <strong>{{ number_format((int) $htmlSitewide['pages'], 0, '', ' ') }}</strong>
+            из {{ number_format((int) $htmlSitewide['total'], 0, '', ' ') }} стр.
+            ({{ (int) $htmlSitewide['pct'] }}%):
+            @if(!empty($htmlSitewide['label']))
+                <code class="cabinet-sa-html-sitewide__code">{{ $htmlSitewide['label'] }}</code>.
+            @endif
+            <div class="mt-1 mb-0">
+                Не правьте каждую страницу: смените action в шаблоне формы один раз.
+                @if(($viewMode ?? '') === 'list')
+                    <a href="{{ request()->fullUrlWithQuery(['view' => 'groups', 'page' => 1]) }}">Смотреть по формам →</a>
                 @endif
             </div>
         @else
@@ -625,11 +673,16 @@
                             <span class="cabinet-sa-dup-group__scope cabinet-sa-dup-group__scope--{{ $group['scope'] }}">{{ ($group['scope'] ?? '') === 'internal' ? 'внутренняя' : 'внешняя' }}</span>
                         @endif
                         @if(!empty($group['likely_template']))
-                            <span class="cabinet-sa-dup-group__badge">{{ (!empty($isCrawlImagesReport) || !empty($isImagesWithoutAltReport) || !empty($isLinkInvertedReport)) ? 'общий блок' : 'сквозной' }}</span>
+                            <span class="cabinet-sa-dup-group__badge">{{ (!empty($isCrawlImagesReport) || !empty($isImagesWithoutAltReport) || !empty($isLinkInvertedReport) || !empty($isInsecureFormReport)) ? 'общий блок' : 'сквозной' }}</span>
                         @endif
                     </div>
                     <div class="cabinet-sa-dup-group__label">
-                        @if(!empty($group['href']))
+                        @if(!empty($isInsecureFormReport))
+                            <div class="cabinet-sa-dup-group__form-label">{{ $group['label'] }}</div>
+                            @if(!empty($group['href']))
+                                <a href="{{ $group['href'] }}" target="_blank" rel="noopener noreferrer" class="cabinet-sa-url-break">{{ $group['href'] }}</a>
+                            @endif
+                        @elseif(!empty($group['href']))
                             @if(!empty($group['host']))
                                 <span class="cabinet-sa-dup-group__host">{{ $group['host'] }}</span>
                             @endif
@@ -718,6 +771,10 @@
         $isRedirectReport = in_array($code ?? '', ['redirect', 'redirect_chain_long', 'redirect_loop'], true);
         $isBrokenTarget = !empty($showReferrers) && ! $isRedirectReport;
         $isSerpTitleReport = ($code ?? '') === 'serp_title_mismatch';
+        $isHeadingHierarchyReport = ($code ?? '') === 'heading_hierarchy';
+        $isMetaLenReport = in_array($code ?? '', [
+            'title_too_short', 'title_too_long', 'description_too_short', 'description_too_long',
+        ], true);
         $isHeavyImageReport = ($code ?? '') === 'heavy_image';
         $isImagesWithoutAltReport = ($code ?? '') === 'images_without_alt';
         $isImageCardReport = $isHeavyImageReport || $isImagesWithoutAltReport;
@@ -776,11 +833,20 @@
             ? 'URL'
             : ($isBrokenTarget ? 'Битый URL' : ($isImageCardReport ? 'Страница' : ($isAffiliateReport ? 'Страница' : 'URL')))));
         $detailsColLabel = $isSerpTitleReport ? 'Сравнение title'
+            : ($isHeadingHierarchyReport ? 'Иерархия H1–H6'
+            : ($isMetaLenReport
+                ? (strpos((string) ($code ?? ''), 'description_') === 0 ? 'Description' : 'TITLE')
             : ($isImageCardReport ? 'Изображение'
                 : ($isAffiliateReport ? 'Партнёрки'
-                    : ($isIndexMismatchReport ? 'В проверке' : 'Детали')));
+                    : ($isIndexMismatchReport ? 'В проверке' : 'Детали')))));
         $detailsColTip = $isSerpTitleReport
             ? "Слева — TITLE в HTML, справа — заголовок в сниппете ПС."
+            : ($isHeadingHierarchyReport
+                ? "Какое нарушение (пропуск уровня или заголовок до H1) и кусок структуры страницы.\n«Сюда прыжок» — проблемный заголовок."
+            : ($isMetaLenReport
+                ? (strpos((string) ($code ?? ''), 'description_') === 0
+                    ? "Какой meta description сейчас на странице и его длина относительно порога."
+                    : "Какой TITLE сейчас на странице и его длина относительно порога.")
             : ($isHeavyImageReport
                 ? "Файл картинки: превью, вес, имя и полный URL.\nИменно его нужно сжать или заменить."
                 : ($isImagesWithoutAltReport
@@ -789,7 +855,7 @@
                         ? "Какие исходящие ссылки похожи на партнёрские: сеть, хост и полный URL."
                         : ($isIndexMismatchReport
                             ? "Как URL попал в эту проверку, глубина, раздел и есть ли ?параметры.\nВсе строки — нет в индексе Вебмастера."
-                            : "Кратко что не так: код ответа, какой дубль, какой запрос и т.д."))));
+                            : "Кратко что не так: код ответа, какой дубль, какой запрос и т.д."))))));
         $refColTip = $isRedirectReport
             ? "Откуда URL попал в проверка: sitemap.xml, посев, главная или страница со ссылкой."
             : "Откуда URL попал в проверка или страницы со ссылкой.";
@@ -799,66 +865,89 @@
     @elseif(!empty($isCrawlImagesReport))
         @include('pages.partials.site-audit-crawl-images-table')
     @else
-    <div class="cabinet-sa-table-wrap{{ $isSerpTitleReport ? ' cabinet-sa-table-wrap--serp-title' : '' }}{{ $isBrokenTarget ? ' cabinet-sa-table-wrap--broken' : '' }}{{ $isImageCardReport ? ' cabinet-sa-table-wrap--heavy' : '' }}{{ $isAffiliateReport ? ' cabinet-sa-table-wrap--aff' : '' }}{{ !empty($isIndexMismatchReport) ? ' cabinet-sa-table-wrap--index-mismatch' : '' }}{{ $isCannibalReport ? ' cabinet-sa-table-wrap--cannibal' : '' }}">
-        <table class="table table-sm table-hover mb-0 cabinet-sa-findings-table">
-            <colgroup>
-                <col class="cabinet-sa-col-url">
-                @if($showSeverityCol)
-                    <col class="cabinet-sa-col-sev">
-                @endif
-                @if($isCannibalReport)
-                    <col class="cabinet-sa-col-query">
-                    <col class="cabinet-sa-col-landing">
-                    <col class="cabinet-sa-col-title">
-                @else
-                    <col class="cabinet-sa-col-details">
-                @endif
-                @if(!empty($showReferrers))
-                    <col class="cabinet-sa-col-from">
-                @endif
-                @if($showActions)
-                    <col class="cabinet-sa-col-actions">
-                @endif
-            </colgroup>
+    @php
+        $reportColKeys = ['url'];
+        if (!empty($showSeverityCol)) {
+            $reportColKeys[] = 'severity';
+        }
+        if (!empty($isCannibalReport)) {
+            $reportColKeys[] = 'query';
+            $reportColKeys[] = 'landing';
+            $reportColKeys[] = 'comp_title';
+        } else {
+            $reportColKeys[] = 'details';
+        }
+        if (!empty($showReferrers)) {
+            $reportColKeys[] = 'from';
+        }
+        if (!empty($showActions)) {
+            $reportColKeys[] = 'actions';
+        }
+        $reportColKeys = array_merge($reportColKeys, \App\Services\SiteAudit\SiteAuditReportColumns::pageColumnKeys());
+        $reportColKeys = array_values(array_unique($reportColKeys));
+        $rcDefaultVisible = array_values(array_filter(
+            \App\Services\SiteAudit\SiteAuditReportColumns::defaultKeys(),
+            function ($k) use ($reportColKeys) {
+                return in_array($k, $reportColKeys, true);
+            }
+        ));
+        $pageColKeys = \App\Services\SiteAudit\SiteAuditReportColumns::pageColumnKeys();
+        $pageColMeta = [];
+        foreach (\App\Services\SiteAudit\SiteAuditReportColumns::catalog() as $col) {
+            if (($col['source'] ?? '') === 'page') {
+                $pageColMeta[$col['key']] = $col;
+            }
+        }
+    @endphp
+    @include('pages.partials.site-audit-report-cols-toolbar', ['reportColKeys' => $reportColKeys])
+    <div class="cabinet-sa-table-wrap{{ $isSerpTitleReport ? ' cabinet-sa-table-wrap--serp-title' : '' }}{{ $isBrokenTarget ? ' cabinet-sa-table-wrap--broken' : '' }}{{ $isRedirectReport ? ' cabinet-sa-table-wrap--redirect' : '' }}{{ $isImageCardReport ? ' cabinet-sa-table-wrap--heavy' : '' }}{{ $isAffiliateReport ? ' cabinet-sa-table-wrap--aff' : '' }}{{ !empty($isIndexMismatchReport) ? ' cabinet-sa-table-wrap--index-mismatch' : '' }}{{ $isCannibalReport ? ' cabinet-sa-table-wrap--cannibal' : '' }}">
+        <table class="table table-sm table-hover mb-0 cabinet-sa-findings-table"
+               data-sa-report-table
+               data-sa-report-code="{{ $code }}"
+               data-sa-cols-default="{{ implode(',', $rcDefaultVisible) }}">
             <thead class="table-light">
             <tr>
-                <th>
+                <th data-sa-col="url">
                     {{ $urlColLabel }}
                     @include('pages.partials.site-audit-tip', ['tip' => $urlTip])
                 </th>
                 @if($showSeverityCol)
-                    <th>
+                    <th data-sa-col="severity">
                         Приор.
                         @include('pages.partials.site-audit-tip', ['tip' => "Срочность разных типов в сводке.\nГрубые — чинить в первую очередь.\nИнфо — просто знать.\nВ обычном отчёте (один тип) колонка скрыта: все строки одного уровня."])
                     </th>
                 @endif
                 @if($isCannibalReport)
-                    <th class="cabinet-sa-th-cannibal" title="Запрос из мониторинга позиций">
+                    <th class="cabinet-sa-th-cannibal" data-sa-col="query" title="Запрос из мониторинга позиций">
                         <span class="cabinet-sa-th-cannibal__main">
                             Запрос
                             @include('pages.partials.site-audit-tip', ['tip' => "Запрос из модуля мониторинга позиций.\nЕго нашли в TITLE/H1 у лишней страницы слева."])
                         </span>
                         <span class="cabinet-sa-th-cannibal__sub">из мониторинга</span>
                     </th>
-                    <th class="cabinet-sa-th-cannibal" title="Посадочная из мониторинга позиций — куда запрос должен вести">
+                    <th class="cabinet-sa-th-cannibal" data-sa-col="landing" title="Посадочная из мониторинга позиций — куда запрос должен вести">
                         <span class="cabinet-sa-th-cannibal__main">
                             Посадочная
                             @include('pages.partials.site-audit-tip', ['tip' => "Целевой URL запроса в мониторинге позиций.\nСюда ключ должен вести; слева — страница, которая с ним конкурирует."])
                         </span>
                         <span class="cabinet-sa-th-cannibal__sub">из мониторинга позиций</span>
                     </th>
-                    <th title="TITLE страницы слева">
+                    <th data-sa-col="comp_title" title="TITLE страницы слева">
                         TITLE
                         @include('pages.partials.site-audit-tip', ['tip' => "TITLE лишней страницы — по нему видно, почему сработало совпадение."])
                     </th>
                 @else
-                    <th title="{{ $isAffiliateReport ? 'Партнёрские ссылки: сеть и URL' : ($isImageCardReport ? 'Файл изображения: превью и URL' : ($isSerpTitleReport ? 'Сравнение TITLE на сайте и в выдаче ПС' : 'Коротко: что именно не так (код ответа, дубль и т.п.).')) }}">
+                    <th data-sa-col="details" title="{{ $isAffiliateReport ? 'Партнёрские ссылки: сеть и URL' : ($isImageCardReport ? 'Файл изображения: превью и URL' : ($isSerpTitleReport ? 'Сравнение TITLE на сайте и в выдаче ПС' : 'Коротко: что именно не так (код ответа, дубль и т.п.).')) }}">
                         {{ $detailsColLabel }}
                         @include('pages.partials.site-audit-tip', ['tip' => $detailsColTip])
                     </th>
                 @endif
+                @foreach($pageColKeys as $pKey)
+                    @php $pCol = $pageColMeta[$pKey] ?? ['label' => $pKey]; @endphp
+                    <th data-sa-col="{{ $pKey }}" class="is-col-hidden">{{ $pCol['label'] }}</th>
+                @endforeach
                 @if(!empty($showReferrers))
-                    <th title="Откуда URL попал в очередь проверки">
+                    <th data-sa-col="from" title="Откуда URL попал в очередь проверки">
                         {{ $isBrokenTarget ? 'Страница со ссылкой' : 'Откуда' }}
                         @include('pages.partials.site-audit-tip', [
                             'tip' => $refColTip,
@@ -866,7 +955,7 @@
                     </th>
                 @endif
                 @if($showActions)
-                    <th class="cabinet-sa-th-actions">
+                    <th class="cabinet-sa-th-actions" data-sa-col="actions">
                         Действия
                         @include('pages.partials.site-audit-tip', [
                             'tip' => "Заметка — комментарий.\nИсправлено — починили.\nИгнор — не считаем ошибкой.",
@@ -886,19 +975,16 @@
                     $rowMeta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
                     $referrers = is_array($rowMeta['referrers'] ?? null) ? $rowMeta['referrers'] : [];
                     $referrerCount = (int) ($rowMeta['referrer_count'] ?? count($referrers));
+                    $pageCols = is_array($row->page_cols ?? null) ? $row->page_cols : [];
                 @endphp
                 <tr class="{{ $isIgn ? 'cabinet-sa-row--ignored' : '' }}{{ $isFixed ? ' cabinet-sa-row--fixed' : '' }}">
-                    <td class="cabinet-sa-url">
+                    <td class="cabinet-sa-url" data-sa-col="url">
                         @php
                             $urlDisp = !empty($isBrokenTarget)
                                 ? \App\Services\SiteAudit\SiteAuditFindingPresenter::brokenUrlDisplay((string) $row->url)
                                 : ['display' => (string) $row->url, 'warn' => null];
-                            $httpStatus = isset($rowMeta['status']) ? (int) $rowMeta['status'] : 0;
                         @endphp
                         <div class="cabinet-sa-url-block{{ !empty($urlDisp['warn']) ? ' cabinet-sa-url-block--warn' : '' }}">
-                            @if(!empty($isBrokenTarget) && $httpStatus >= 400)
-                                <span class="cabinet-sa-status-pill {{ $httpStatus >= 500 ? 'cabinet-sa-status-pill--5xx' : 'cabinet-sa-status-pill--4xx' }}">{{ $httpStatus }}</span>
-                            @endif
                             <a href="{{ $row->url }}" target="_blank" rel="noopener noreferrer" class="cabinet-sa-url-break">{{ $urlDisp['display'] }}</a>
                             @if(!empty($urlDisp['warn']))
                                 <div class="cabinet-sa-url-block__warn" title="{{ $row->url }}">{{ $urlDisp['warn'] }}</div>
@@ -912,7 +998,7 @@
                         </div>
                     </td>
                     @if(!empty($showSeverityCol))
-                        <td class="cabinet-sa-sev-cell">
+                        <td class="cabinet-sa-sev-cell" data-sa-col="severity">
                             @php $sevKey = (string) ($row->severity ?? 'info'); @endphp
                             <span class="cabinet-sa-sev-badge cabinet-sa-sev-badge--{{ $sevKey }}" title="{{ \App\Services\SiteAudit\SiteAuditFindingPresenter::severityLabel($sevKey) }}">
                                 {{ \App\Services\SiteAudit\SiteAuditFindingPresenter::severityTag($sevKey) }}
@@ -925,21 +1011,21 @@
                             $cLanding = trim((string) ($rowMeta['landing_url'] ?? ''));
                             $cTitle = trim((string) ($rowMeta['competitor_title'] ?? ''));
                         @endphp
-                        <td class="small cabinet-sa-cannibal-query-cell">
+                        <td class="small cabinet-sa-cannibal-query-cell" data-sa-col="query">
                             @if($cQuery !== '')
                                 <span class="cabinet-sa-cannibal-query" title="{{ $cQuery }}">«{{ \Illuminate\Support\Str::limit($cQuery, 60) }}»</span>
                             @else
                                 <span class="text-muted">—</span>
                             @endif
                         </td>
-                        <td class="small cabinet-sa-cannibal-landing-cell">
+                        <td class="small cabinet-sa-cannibal-landing-cell" data-sa-col="landing">
                             @if($cLanding !== '')
                                 <a href="{{ $cLanding }}" target="_blank" rel="noopener noreferrer" class="cabinet-sa-url-break" title="Посадочная из мониторинга позиций">{{ $cLanding }}</a>
                             @else
                                 <span class="text-muted">—</span>
                             @endif
                         </td>
-                        <td class="small cabinet-sa-cannibal-title-cell">
+                        <td class="small cabinet-sa-cannibal-title-cell" data-sa-col="comp_title">
                             @if($cTitle !== '')
                                 <span class="cabinet-sa-cannibal-title text-muted" title="{{ $cTitle }}">{{ \Illuminate\Support\Str::limit($cTitle, 90) }}</span>
                             @else
@@ -947,7 +1033,7 @@
                             @endif
                         </td>
                     @else
-                    <td class="small cabinet-sa-details-cell">
+                    <td class="small cabinet-sa-details-cell" data-sa-col="details">
                         @if(!empty($isIndexMismatchReport))
                             @php
                                 $via = (string) ($rowMeta['page_via'] ?? '');
@@ -999,8 +1085,25 @@
                         @endif
                     </td>
                     @endif
+                    @foreach($pageColKeys as $pKey)
+                        @php
+                            $pVal = $pageCols[$pKey] ?? null;
+                            $pEmpty = $pVal === null || $pVal === '';
+                        @endphp
+                        <td class="small cabinet-sa-page-col is-col-hidden" data-sa-col="{{ $pKey }}">
+                            @if($pEmpty)
+                                <span class="text-muted">—</span>
+                            @elseif(in_array($pKey, ['final_url', 'canonical'], true) && is_string($pVal) && preg_match('#^https?://#i', $pVal))
+                                <a href="{{ $pVal }}" target="_blank" rel="noopener noreferrer" class="cabinet-sa-url-break">{{ \Illuminate\Support\Str::limit($pVal, 80) }}</a>
+                            @elseif(in_array($pKey, ['title', 'description', 'h1', 'h2', 'h3', 'keywords', 'robots'], true))
+                                <span class="cabinet-sa-page-col__text" title="{{ is_scalar($pVal) ? $pVal : '' }}">{{ \Illuminate\Support\Str::limit((string) $pVal, 120) }}</span>
+                            @else
+                                {{ is_scalar($pVal) ? $pVal : '—' }}
+                            @endif
+                        </td>
+                    @endforeach
                     @if(!empty($showReferrers))
-                        <td class="small cabinet-sa-from-cell">
+                        <td class="small cabinet-sa-from-cell" data-sa-col="from">
                             @php
                                 $originLabel = trim((string) ($rowMeta['origin_label'] ?? ''));
                                 $discoveredVia = trim((string) ($rowMeta['discovered_via'] ?? ''));
@@ -1013,9 +1116,34 @@
                                     $discoveredVia = $discoveredVia !== '' ? $discoveredVia : 'link';
                                     $discoveredFrom = trim((string) $rowMeta['from']);
                                 }
+                                $fromUrls = [];
+                                if ($discoveredVia === 'link' && $discoveredFrom !== '') {
+                                    $fromUrls[] = $discoveredFrom;
+                                }
+                                foreach ($referrers as $ref) {
+                                    $ref = trim((string) $ref);
+                                    if ($ref === '' || in_array($ref, $fromUrls, true)) {
+                                        continue;
+                                    }
+                                    $fromUrls[] = $ref;
+                                }
+                                $fromShow = array_slice($fromUrls, 0, 5);
+                                $fromHidden = max(0, count($fromUrls) - count($fromShow));
+                                if ($fromHidden === 0 && $referrerCount > count($fromUrls)) {
+                                    $fromHidden = $referrerCount - count($fromUrls);
+                                }
                             @endphp
-                            @if($discoveredVia === 'link' && $discoveredFrom !== '')
-                                <a class="cabinet-sa-url-break" href="{{ $discoveredFrom }}" target="_blank" rel="noopener noreferrer">{{ $discoveredFrom }}</a>
+                            @if($fromShow !== [])
+                                <ul class="cabinet-sa-from-list">
+                                    @foreach($fromShow as $ref)
+                                        <li>
+                                            <a class="cabinet-sa-from-link" href="{{ $ref }}" target="_blank" rel="noopener noreferrer">{{ \App\Services\SiteAudit\SiteAuditFindingPresenter::compactUrlLabel($ref) }}</a>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                                @if($fromHidden > 0)
+                                    <div class="cabinet-sa-from-more">ещё {{ number_format($fromHidden, 0, '', ' ') }}…</div>
+                                @endif
                             @elseif(in_array($discoveredVia, ['sitemap', 'seed', 'home'], true) && $originLabel !== '')
                                 @php
                                     $sitemapHref = trim((string) ($rowMeta['sitemap_href'] ?? ''));
@@ -1024,31 +1152,21 @@
                                         || stripos($originLabel, 'sitemap') !== false;
                                 @endphp
                                 @if($isSitemapOrigin && $sitemapHref !== '')
-                                    <a class="cabinet-sa-url-break" href="{{ $sitemapHref }}" target="_blank" rel="noopener noreferrer">{{ $originLabel }}</a>
+                                    <a class="cabinet-sa-from-link" href="{{ $sitemapHref }}" target="_blank" rel="noopener noreferrer">{{ $originLabel }}</a>
                                 @elseif($discoveredVia === 'home' && !empty($project->domain))
-                                    <a class="cabinet-sa-url-break" href="https://{{ $project->domain }}/" target="_blank" rel="noopener noreferrer">{{ $originLabel }}</a>
+                                    <a class="cabinet-sa-from-link" href="https://{{ $project->domain }}/" target="_blank" rel="noopener noreferrer">{{ $originLabel }}</a>
                                 @else
                                     {{ $originLabel }}
                                 @endif
                             @elseif($originLabel !== '')
                                 {{ $originLabel }}
-                            @elseif($referrerCount === 0)
+                            @else
                                 <span class="text-muted">—</span>
-                            @endif
-                            @if($referrerCount > 1)
-                                <ul class="list-unstyled mb-0 cabinet-sa-referrers mt-1">
-                                    @foreach(array_slice($referrers, 0, 5) as $ref)
-                                        @if($discoveredVia === 'link' && $ref === $discoveredFrom)
-                                            @continue
-                                        @endif
-                                        <li><a class="cabinet-sa-url-break" href="{{ $ref }}" target="_blank" rel="noopener noreferrer">{{ $ref }}</a></li>
-                                    @endforeach
-                                </ul>
                             @endif
                         </td>
                     @endif
                     @if($showActions)
-                        <td class="cabinet-sa-actions-cell">
+                        <td class="cabinet-sa-actions-cell" data-sa-col="actions">
                             @if(!empty($canNote) && $isFixed)
                                 <span class="cabinet-sa-note-flag">исправлено</span>
                             @endif

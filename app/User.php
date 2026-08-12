@@ -12,6 +12,7 @@ use App\Notifications\RegisterPasswordEmail;
 use App\Notifications\RepairDomainNotification;
 use App\Notifications\sendNotificationAboutChangeDNS;
 use App\Notifications\sendNotificationAboutExpirationRegistrationPeriod;
+use App\Support\CabinetMail;
 use App\Support\NotificationDispatchLogger;
 use App\Support\NotificationLocale;
 use Carbon\Carbon;
@@ -82,11 +83,11 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function sendEmailVerificationNotification()
     {
-        $user = User::latest()->first();
+        $user = $this;
         $verificationUrl = $this->verificationUrl($user);
         $verificationCode = $this->verificationCode($verificationUrl);
 
-        Mail::to($user->email)->send(new VerifyEmail($user, $verificationUrl, $verificationCode));
+        CabinetMail::send($user->email, new VerifyEmail($user, $verificationUrl, $verificationCode));
         NotificationDispatchLogger::log('auth-verify-email', NotificationDispatchLogger::CHANNEL_EMAIL, (int) $this->id);
     }
 

@@ -133,4 +133,18 @@ return [
 
     'log_channel' => env('MAIL_LOG_CHANNEL', 'mailer'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Local recipient domains (same host MX)
+    |--------------------------------------------------------------------------
+    |
+    | Письма на эти домены уходят через sendmail, без внешнего SMTP:
+    | иначе smtp.bz → MX на этом же сервере режется ACL Exim.
+    |
+    */
+    'local_recipient_domains' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('MAIL_LOCAL_RECIPIENT_DOMAINS', 'prime-ltd.su,s3.prime-ltd.su'))
+    ))),
+
 ];

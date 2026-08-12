@@ -1,0 +1,34 @@
+---
+description: Подсказки UI только в стилистике кабинета — запрет native title/browser tooltips
+alwaysApply: true
+---
+
+# Подсказки в UI кабинета (tooltips)
+
+**Запрещено** использовать браузерный `title="…"` / `data-bs-toggle="tooltip"` / голый Bootstrap tooltip для подсказок к кнопкам, иконкам действий, заголовкам колонок и полям форм в кабинете.
+
+Пользователь это уже много раз отклонял: системные жёлтые/серые `title` выглядят чужеродно.
+
+## Как правильно
+
+### Site Audit и модули с «?»
+
+1. Формы / заголовки таблиц: partial `pages.partials.site-audit-tip` (`cabinet-sa-tip` + `ui_tooltip` / `ui_tooltip_content`).
+2. Кнопки строки (Заметка / Исправлено / Игнор / Сохранить): partial `pages.partials.site-audit-action-help` — тёмный пузырь `.cabinet-sa-act__popover` (фон `#111827`, белый текст, скругление 8px).
+3. В компактном ряду иконок «?» можно визуально спрятать, но **подсказка должна появляться на hover всей кнопки** (`.cabinet-sa-act:hover > .cabinet-sa-act__popover`), не через `title` на `<button>` / `<label>`.
+
+### Общий кабинет
+
+Если уже есть общий паттерн `ui_tooltip` / `ui_tooltip_w` — использовать его. Не изобретать третий вид пузыря и не откатываться на `title`.
+
+## Чеклист при правках UI
+
+- [ ] Нет `title="…"` на кнопках действий / иконках помощи (исключение: реально нужный a11y-only через `aria-label`, без видимого native tooltip).
+- [ ] Текст подсказки — через наш partial или тот же CSS-класс пузыря.
+- [ ] Пузырь не обрезается `overflow` родителя (z-index строки / `overflow: visible` на ячейке при hover — как в `cabinet-site-audit.css`).
+
+## Референсы
+
+- `resources/views/pages/partials/site-audit-tip.blade.php`
+- `resources/views/pages/partials/site-audit-action-help.blade.php`
+- CSS: `.cabinet-sa-tip`, `.ui_tooltip_content`, `.cabinet-sa-act__popover` в `public/css/cabinet-site-audit.css`

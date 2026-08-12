@@ -45,14 +45,13 @@
 
             <div class="tab-content">
                 <div class="tab-pane fade show active" id="sa-pub-all" role="tabpanel">
-                    <div class="cabinet-sa-buckets mb-4">
-                        @foreach($bucketLabels as $key => $label)
-                            <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}">
-                                <div class="cabinet-sa-bucket__label">{{ $label }}</div>
-                                <div class="cabinet-sa-bucket__value">{{ (int) (($bucketsAll ?? $buckets)[$key] ?? 0) }}</div>
-                            </div>
-                        @endforeach
-                    </div>
+                    @include('pages.partials.site-audit-buckets', [
+                        'bucketLabels' => $bucketLabels,
+                        'bucketValues' => $bucketsAll ?? $buckets,
+                        'crawl' => $crawl,
+                        'isPublic' => true,
+                        'token' => $token,
+                    ])
                     <div class="cabinet-sa-layout">
                         <aside class="cabinet-sa-tree">
                             <div class="px-3 py-2 border-bottom fw-semibold small">Все замечания</div>
@@ -85,14 +84,13 @@
                 </div>
 
                 <div class="tab-pane fade" id="sa-pub-tech" role="tabpanel">
-                    <div class="cabinet-sa-buckets mb-4">
-                        @foreach($bucketLabels as $key => $label)
-                            <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}">
-                                <div class="cabinet-sa-bucket__label">{{ $label }}</div>
-                                <div class="cabinet-sa-bucket__value">{{ (int) ($buckets[$key] ?? 0) }}</div>
-                            </div>
-                        @endforeach
-                    </div>
+                    @include('pages.partials.site-audit-buckets', [
+                        'bucketLabels' => $bucketLabels,
+                        'bucketValues' => $buckets,
+                        'crawl' => $crawl,
+                        'isPublic' => true,
+                        'token' => $token,
+                    ])
                     <div class="cabinet-sa-layout">
                         <aside class="cabinet-sa-tree">
                             <div class="px-3 py-2 border-bottom fw-semibold small">Тех. аудит</div>
@@ -124,14 +122,13 @@
                 </div>
 
                 <div class="tab-pane fade" id="sa-pub-seo" role="tabpanel">
-                    <div class="cabinet-sa-buckets mb-4">
-                        @foreach($bucketLabels as $key => $label)
-                            <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}">
-                                <div class="cabinet-sa-bucket__label">{{ $label }}</div>
-                                <div class="cabinet-sa-bucket__value">{{ (int) (($bucketsSeo ?? [])[$key] ?? 0) }}</div>
-                            </div>
-                        @endforeach
-                    </div>
+                    @include('pages.partials.site-audit-buckets', [
+                        'bucketLabels' => $bucketLabels,
+                        'bucketValues' => $bucketsSeo ?? [],
+                        'crawl' => $crawl,
+                        'isPublic' => true,
+                        'token' => $token,
+                    ])
                     <div class="cabinet-sa-layout">
                         <aside class="cabinet-sa-tree">
                             <div class="px-3 py-2 border-bottom fw-semibold small">SEO-аудит</div>

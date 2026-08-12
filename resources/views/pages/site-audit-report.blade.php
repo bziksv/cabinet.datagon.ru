@@ -3,6 +3,10 @@
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('css/cabinet-site-audit.css') }}?v={{ @filemtime(public_path('css/cabinet-site-audit.css')) ?: time() }}">
+        @if(in_array(($code ?? ''), ['crawl_pages', 'crawl_images'], true))
+            <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
+            <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
+        @endif
     @endslot
 
     @slot('tools')
@@ -41,13 +45,19 @@
 
         <div class="mb-2 text-secondary small d-flex flex-wrap align-items-center" style="gap:8px">
             <span>
-                {{ optional($project)->domain }} ·
                 @if(!empty($isExternalModule))
+                    {{ optional($project)->domain }} ·
                     <span class="badge text-bg-light border">отдельный модуль</span>
                     — не счётчик ошибок этой проверки
+                @elseif(!empty($meta['inventory']))
+                    В таблице: <strong>{{ number_format((int) $total, 0, '', ' ') }}</strong>
+                    @if(!empty($filtersActive))
+                        <span class="text-primary">(с фильтром)</span>
+                    @endif
                 @else
+                    {{ optional($project)->domain }} ·
                     приоритет: <strong>{{ \App\Services\SiteAudit\SiteAuditFindingPresenter::severityLabel($meta['severity'] ?? '') }}</strong>
-                    · находок: <strong>{{ $total }}</strong>
+                    · находок: <strong>{{ number_format((int) $total, 0, '', ' ') }}</strong>
                     @if(!empty($filtersActive))
                         <span class="text-primary">(с фильтром)</span>
                     @endif
@@ -56,7 +66,7 @@
                     @endif
                 @endif
             </span>
-            @if(empty($isExternalModule))
+            @if(empty($isExternalModule) && empty($meta['inventory']))
             <span class="ms-auto d-flex flex-wrap" style="gap:6px">
                 @if(!empty($showIgnored))
                     <a class="btn btn-sm btn-outline-secondary" href="{{ request()->fullUrlWithQuery(['ignored' => null, 'page' => 1]) }}"
@@ -125,15 +135,14 @@
 
         <div class="tab-content">
             <div class="tab-pane fade {{ $activeGroup === 'all' ? 'show active' : '' }}" id="sa-pane-all" role="tabpanel">
-                <div class="cabinet-sa-buckets mb-4" id="sa-buckets">
-                    @foreach($bucketLabels as $key => $label)
-                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}"
-                             title="@if($key === 'critical')Самые срочные ошибки — чинить первыми@elseif($key === 'other')Средняя срочность@elseif($key === 'warning')Желательно починить@elseПросто знать, не всегда срочно@endif. Клик — отфильтровать меню слева.">
-                            <div class="cabinet-sa-bucket__label">{{ $label }}</div>
-                            <div class="cabinet-sa-bucket__value" data-bucket="{{ $key }}" data-sa-live-bucket="{{ $key }}">{{ (int) (($bucketsAll ?? [])[$key] ?? 0) }}</div>
-                        </div>
-                    @endforeach
-                </div>
+                @include('pages.partials.site-audit-buckets', [
+                    'bucketLabels' => $bucketLabels,
+                    'bucketValues' => $bucketsAll ?? [],
+                    'crawl' => $crawl,
+                    'bucketsId' => 'sa-buckets',
+                    'bucketsClickable' => true,
+                    'bucketsLive' => true,
+                ])
 
                 <div class="cabinet-sa-layout">
                     @include('pages.partials.site-audit-report-tree', [
@@ -151,15 +160,12 @@
             </div>
 
             <div class="tab-pane fade {{ $activeGroup === 'tech' ? 'show active' : '' }}" id="sa-pane-tech" role="tabpanel">
-                <div class="cabinet-sa-buckets mb-4">
-                    @foreach($bucketLabels as $key => $label)
-                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}"
-                             title="@if($key === 'critical')Самые срочные ошибки — чинить первыми@elseif($key === 'other')Средняя срочность@elseif($key === 'warning')Желательно починить@elseПросто знать, не всегда срочно@endif. Клик — отфильтровать меню слева.">
-                            <div class="cabinet-sa-bucket__label">{{ $label }}</div>
-                            <div class="cabinet-sa-bucket__value">{{ (int) (($buckets ?? [])[$key] ?? 0) }}</div>
-                        </div>
-                    @endforeach
-                </div>
+                @include('pages.partials.site-audit-buckets', [
+                    'bucketLabels' => $bucketLabels,
+                    'bucketValues' => $buckets ?? [],
+                    'crawl' => $crawl,
+                    'bucketsClickable' => true,
+                ])
 
                 <div class="cabinet-sa-layout">
                     @include('pages.partials.site-audit-report-tree', [
@@ -180,15 +186,12 @@
             </div>
 
             <div class="tab-pane fade {{ $activeGroup === 'seo' ? 'show active' : '' }}" id="sa-pane-seo" role="tabpanel">
-                <div class="cabinet-sa-buckets mb-4">
-                    @foreach($bucketLabels as $key => $label)
-                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}"
-                             title="@if($key === 'critical')Самые срочные ошибки — чинить первыми@elseif($key === 'other')Средняя срочность@elseif($key === 'warning')Желательно починить@elseПросто знать, не всегда срочно@endif. Клик — отфильтровать меню слева.">
-                            <div class="cabinet-sa-bucket__label">{{ $label }}</div>
-                            <div class="cabinet-sa-bucket__value">{{ (int) (($bucketsSeo ?? [])[$key] ?? 0) }}</div>
-                        </div>
-                    @endforeach
-                </div>
+                @include('pages.partials.site-audit-buckets', [
+                    'bucketLabels' => $bucketLabels,
+                    'bucketValues' => $bucketsSeo ?? [],
+                    'crawl' => $crawl,
+                    'bucketsClickable' => true,
+                ])
 
                 <div class="cabinet-sa-layout">
                     @include('pages.partials.site-audit-report-tree', [
@@ -216,6 +219,44 @@
         @include('pages.partials.site-audit-crawl-live-js')
         @if(($code ?? '') === 'index_count_mismatch')
             <script src="{{ asset('js/cabinet-site-audit-index-extra.js') }}?v={{ @filemtime(public_path('js/cabinet-site-audit-index-extra.js')) ?: time() }}" defer></script>
+        @endif
+        @if(in_array(($code ?? ''), ['crawl_pages', 'crawl_images'], true))
+            <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
+            <script src="{{ asset('js/cabinet-site-audit-crawl-filters.js') }}?v={{ @filemtime(public_path('js/cabinet-site-audit-crawl-filters.js')) ?: time() }}"></script>
+            <script>
+                (function () {
+                    function initSaMulti() {
+                        if (!window.jQuery || !jQuery.fn.select2) return;
+                        var $gearPanel = jQuery('.cabinet-sa-filters-gear__panel').first();
+                        jQuery('[data-sa-select2-multi]').each(function () {
+                            var $el = jQuery(this);
+                            if ($el.hasClass('select2-hidden-accessible')) {
+                                $el.select2('destroy');
+                            }
+                            var opts = {
+                                theme: 'bootstrap4',
+                                width: '100%',
+                                placeholder: $el.attr('data-placeholder') || 'Выберите…',
+                                allowClear: true,
+                                closeOnSelect: false,
+                                language: {
+                                    noResults: function () { return 'Ничего не найдено'; },
+                                    searching: function () { return 'Поиск…'; }
+                                }
+                            };
+                            if ($gearPanel.length && $el.closest('.cabinet-sa-filters-gear__panel').length) {
+                                opts.dropdownParent = $gearPanel;
+                            }
+                            $el.select2(opts);
+                        });
+                    }
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', initSaMulti);
+                    } else {
+                        initSaMulti();
+                    }
+                })();
+            </script>
         @endif
     @endslot
 @endcomponent

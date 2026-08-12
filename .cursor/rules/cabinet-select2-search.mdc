@@ -1,0 +1,27 @@
+---
+description: Select2 с поиском для селектов от 10 опций (в т.ч. в модалках)
+alwaysApply: true
+---
+
+# Select2 / умный поиск в селектах
+
+В кабинете **нельзя** оставлять голый `<select>`, если у пользователя реально бывает **≥ 10 опций** (домены сайтов, регионы, проекты мониторинга и т.п.) — без поиска выбрать нельзя.
+
+## Обязательно
+
+1. Подключить Select2 CSS/JS на странице (как в SEO-чеклисте / мониторинге):
+   - `plugins/select2/css/select2.min.css`
+   - `plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css`
+   - `plugins/select2/js/select2.full.min.js`
+2. Инициализировать с `theme: 'bootstrap4'`, `width: '100%'`.
+3. **В Bootstrap-модалке** всегда `dropdownParent: $('#modalId')` — иначе поиск/dropdown ломаются (клик, z-index, «нихуя не найдешь»).
+4. Пустой placeholder-option: `<option value=""></option>` + `placeholder` / `allowClear` при необходимости.
+5. Инициализировать на `shown.bs.modal`, destroy на `hidden.bs.modal` для селектов внутри модалки.
+
+## Референсы в коде
+
+- Создание чеклиста: `seo-checklist.blade.php` + `cabinet-seo-checklist-hub.js` (`data-sc-domain-select`)
+- SEO-отчёты: `seo-reports.blade.php` (`#cabinetSrDomain`, `#cabinetSrCreateModal`)
+- Дефолты фокуса поиска: `public/js/cabinet-select2-defaults.js`
+
+Порог «от 10 штук» — продуктовое правило пользователя; при новых формах с длинными списками ставь Select2 сразу, не жди жалобы.

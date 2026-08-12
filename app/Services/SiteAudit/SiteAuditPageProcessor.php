@@ -285,8 +285,11 @@ class SiteAuditPageProcessor
             'description_hash' => null,
             'h1' => null,
             'h1_count' => 0,
+            'h2_count' => 0,
+            'headings_json' => null,
             'canonical' => null,
             'robots_meta' => null,
+            'keywords_meta' => null,
             'noindex' => false,
             'word_count' => null,
             'content_hash' => null,
@@ -371,8 +374,12 @@ class SiteAuditPageProcessor
                 $pageData['h1'] = $parsed['h1'];
                 $pageData['h1_count'] = $parsed['h1_count'];
                 $pageData['h2_count'] = $parsed['h2_count'] ?? 0;
+                $pageData['headings_json'] = ! empty($parsed['headings']) && is_array($parsed['headings'])
+                    ? $parsed['headings']
+                    : null;
                 $pageData['canonical'] = $parsed['canonical'];
                 $pageData['robots_meta'] = $parsed['robots_meta'];
+                $pageData['keywords_meta'] = $parsed['keywords_meta'] ?? null;
                 $pageData['noindex'] = $parsed['noindex'];
                 $pageData['word_count'] = $parsed['word_count'];
                 $pageData['text_len'] = $parsed['text_len'] ?? null;

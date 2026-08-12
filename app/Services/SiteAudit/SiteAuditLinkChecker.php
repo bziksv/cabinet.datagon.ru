@@ -28,7 +28,7 @@ class SiteAuditLinkChecker
     }
 
     /**
-     * @return array{ok:bool,status:?int,error:?string,size_bytes:?int}
+     * @return array{ok:bool,status:?int,error:?string,size_bytes:?int,content_type:?string}
      */
     public function check(string $url): array
     {
@@ -46,10 +46,29 @@ class SiteAuditLinkChecker
             $ok = $code >= 200 && $code < 400;
             $len = $response->getHeaderLine('Content-Length');
             $size = ($len !== '' && ctype_digit($len)) ? (int) $len : null;
+            $ct = trim((string) $response->getHeaderLine('Content-Type'));
+            if ($ct !== '') {
+                $ct = explode(';', $ct, 2)[0];
+                $ct = trim($ct);
+            } else {
+                $ct = null;
+            }
 
-            return ['ok' => $ok, 'status' => $code, 'error' => null, 'size_bytes' => $size];
+            return [
+                'ok' => $ok,
+                'status' => $code,
+                'error' => null,
+                'size_bytes' => $size,
+                'content_type' => $ct,
+            ];
         } catch (\Throwable $e) {
-            return ['ok' => false, 'status' => null, 'error' => $e->getMessage(), 'size_bytes' => null];
+            return [
+                'ok' => false,
+                'status' => null,
+                'error' => $e->getMessage(),
+                'size_bytes' => null,
+                'content_type' => null,
+            ];
         }
     }
 }

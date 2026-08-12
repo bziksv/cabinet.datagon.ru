@@ -34,7 +34,12 @@ class SiteAuditFindingPresenter
      */
     public static function metaDetailsHtml(string $code, $meta, ?string $url = null): ?string
     {
-        if (! is_array($meta) || ! $meta) {
+        if (! is_array($meta)) {
+            $meta = [];
+        }
+
+        // Пустая meta ок для кодов, которые достают детали из URL.
+        if ($meta === [] && ! in_array($code, ['risky_query_params'], true)) {
             return null;
         }
 
@@ -48,6 +53,14 @@ class SiteAuditFindingPresenter
 
         if ($code === 'heavy_image') {
             return self::heavyImageDetailsHtml($meta);
+        }
+
+        if ($code === 'broken_image') {
+            return self::brokenImageDetailsHtml($meta);
+        }
+
+        if ($code === 'risky_query_params') {
+            return self::riskyQueryParamsDetailsHtml($meta, $url);
         }
 
         if ($code === 'duplicate_url_variants') {
@@ -120,6 +133,15 @@ class SiteAuditFindingPresenter
         }
 
         if (in_array($code, [
+            'title_too_short',
+            'title_too_long',
+            'description_too_short',
+            'description_too_long',
+        ], true)) {
+            return self::metaLengthDetailsHtml($code, $meta);
+        }
+
+        if (in_array($code, [
             'text_trigram_spam',
             'text_bigram_spam',
             'h1_spam',
@@ -135,24 +157,34 @@ class SiteAuditFindingPresenter
         }
 
         if (in_array($code, ['redirect', 'redirect_chain_long', 'redirect_loop'], true)) {
-            return self::redirectDetailsHtml($meta, $code);
+            return self::redirectDetailsHtml($meta, $code, $url);
+        }
+
+        if ($code === 'keyword_cannibalization') {
+            return null;
+        }
+
+        if ($code === 'mixed_content') {
+            return self::mixedContentDetailsHtml($meta);
+        }
+
+        if ($code === 'page_has_broken_links') {
+            return self::pageHasBrokenLinksDetailsHtml($meta);
         }
 
         if (in_array($code, [
             'canonical_foreign',
             'canonical_not_self',
             'pages_with_canonical',
+            'crawl_pages',
+            'crawl_images',
             'similar_pages',
             'landing_url_changed',
             'landing_plagiarism_suspect',
-            'mixed_content',
             'insecure_form',
-            'broken_image',
             'www_both_available',
             'http_https_both_available',
-            'page_has_broken_links',
             'duplicate_links',
-            'keyword_cannibalization',
             'ad_cannibalization',
             'robots_txt_error',
         ], true)) {
@@ -434,6 +466,505 @@ class SiteAuditFindingPresenter
         $html .= '</div>';
 
         return $html;
+    }
+
+    /**
+     * Битые img: URL файла, имя, HTTP-статус — чтобы найти в коде страницы.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private static function brokenImageDetailsHtml(array $meta): ?string
+    {
+        $samples = self::brokenImageSamples($meta);
+        if ($samples === []) {
+            return null;
+        }
+
+        $html = '<div class="cabinet-sa-broken-img">';
+        foreach (array_slice($samples, 0, 5) as $sample) {
+            $img = (string) $sample['img'];
+            $status = $sample['status'];
+            $error = (string) $sample['error'];
+            $name = self::heavyImageBasename($img);
+
+            $html .= '<div class="cabinet-sa-broken-img__card">';
+            $html .= '<div class="cabinet-sa-broken-img__badge" aria-hidden="true"><i class="fa fa-picture-o"></i></div>';
+            $html .= '<div class="cabinet-sa-broken-img__body">';
+
+            $statusBits = [];
+            if ($status !== null && $status > 0) {
+                $statusBits[] = 'HTTP ' . $status;
+            } elseif ($error !== '') {
+                $statusBits[] = self::clip($error, 60);
+            } else {
+                $statusBits[] = 'не отдаётся';
+            }
+            $html .= '<div class="cabinet-sa-broken-img__status">' . e(implode(' · ', $statusBits)) . '</div>';
+
+            if ($name !== '') {
+                $html .= '<div class="cabinet-sa-broken-img__name" title="' . e($name) . '">'
+                    . 'файл: <code>' . e($name) . '</code></div>';
+            }
+
+            $html .= '<div class="cabinet-sa-broken-img__label">src</div>';
+            $html .= '<a class="cabinet-sa-broken-img__url cabinet-sa-url-break" href="' . e($img)
+                . '" target="_blank" rel="noopener noreferrer">' . e($img) . '</a>';
+            $html .= '</div></div>';
+        }
+
+        $shown = min(5, count($samples));
+        $extra = max(count($samples) - $shown, (int) ($meta['count'] ?? 0) - $shown);
+        if ($extra > 0) {
+            $html .= '<div class="cabinet-sa-broken-img__more">и ещё '
+                . number_format($extra, 0, '', ' ') . ' на этой странице</div>';
+        }
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return list<array{img:string,status:?int,error:string}>
+     */
+    private static function brokenImageSamples(array $meta): array
+    {
+        $out = [];
+        $raw = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+        foreach ($raw as $sample) {
+            if (! is_array($sample)) {
+                continue;
+            }
+            $img = trim((string) ($sample['img'] ?? $sample['src'] ?? $sample['url'] ?? ''));
+            if ($img === '') {
+                continue;
+            }
+            $status = isset($sample['status']) && $sample['status'] !== null && $sample['status'] !== ''
+                ? (int) $sample['status']
+                : null;
+            $out[] = [
+                'img' => $img,
+                'status' => $status,
+                'error' => trim((string) ($sample['error'] ?? '')),
+            ];
+        }
+        if ($out === []) {
+            $img = trim((string) ($meta['src'] ?? $meta['img'] ?? ''));
+            if ($img !== '') {
+                $status = isset($meta['status']) && $meta['status'] !== null && $meta['status'] !== ''
+                    ? (int) $meta['status']
+                    : null;
+                $out[] = [
+                    'img' => $img,
+                    'status' => $status,
+                    'error' => trim((string) ($meta['error'] ?? '')),
+                ];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Нормализация meta risky_query_params (+ разбор query из URL, если meta пустая).
+     *
+     * @param  array<string, mixed>  $meta
+     * @return array{keys:list<string>,key_count:int,query_len:int,many_keys:bool,long_query:bool,query:string,reasons:list<string>}
+     */
+    private static function riskyQueryParamsNormalize(array $meta, ?string $url): array
+    {
+        $keys = [];
+        if (! empty($meta['keys']) && is_array($meta['keys'])) {
+            $keys = array_values(array_filter(array_map('strval', $meta['keys'])));
+        } elseif (! empty($meta['params']) && is_array($meta['params'])) {
+            $keys = array_values(array_filter(array_map('strval', $meta['params'])));
+        }
+
+        $query = trim((string) ($meta['query'] ?? ''));
+        if ($query === '' && is_string($url) && $url !== '') {
+            $q = parse_url($url, PHP_URL_QUERY);
+            if (is_string($q) && $q !== '') {
+                $query = $q;
+            }
+        }
+
+        $allKeys = [];
+        if ($query !== '') {
+            $params = [];
+            parse_str($query, $params);
+            $allKeys = array_map('strtolower', array_keys($params));
+        }
+
+        $riskyCfg = config('site_audit.risky_query_keys', [
+            'phpsessid', 'sid', 'sessionid', 'session_id', 'jsessionid',
+            'sort', 'order', 'orderby', 'sortby',
+        ]);
+        $riskyCfg = is_array($riskyCfg) ? array_map('strtolower', $riskyCfg) : [];
+
+        if ($keys === [] && $allKeys !== []) {
+            $keys = array_values(array_intersect($allKeys, $riskyCfg));
+        }
+
+        $keyCount = isset($meta['key_count'])
+            ? (int) $meta['key_count']
+            : ($allKeys !== [] ? count($allKeys) : count($keys));
+        $queryLen = isset($meta['query_len'])
+            ? (int) $meta['query_len']
+            : strlen($query);
+        $manyKeys = ! empty($meta['many_keys'])
+            || $keyCount >= (int) config('site_audit.risky_query_key_count', 8);
+        $longQuery = ! empty($meta['long_query'])
+            || $queryLen >= (int) config('site_audit.risky_query_len', 120);
+
+        $sessionKeys = ['phpsessid', 'sid', 'sessionid', 'session_id', 'jsessionid'];
+        $sortKeys = ['sort', 'order', 'orderby', 'sortby'];
+        $keysLower = array_map('strtolower', $keys);
+        $reasons = [];
+        if (array_intersect($keysLower, $sessionKeys) !== []) {
+            $reasons[] = 'session';
+        }
+        if (array_intersect($keysLower, $sortKeys) !== []) {
+            $reasons[] = 'sort';
+        }
+        if ($manyKeys) {
+            $reasons[] = 'many_keys';
+        }
+        if ($longQuery) {
+            $reasons[] = 'long_query';
+        }
+        if ($reasons === [] && $keys !== []) {
+            $reasons[] = 'keys';
+        }
+
+        return [
+            'keys' => array_values(array_unique($keys)),
+            'key_count' => $keyCount,
+            'query_len' => $queryLen,
+            'many_keys' => $manyKeys,
+            'long_query' => $longQuery,
+            'query' => $query,
+            'reasons' => $reasons,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function riskyQueryParamsPlain(array $meta, ?string $url = null): string
+    {
+        $n = self::riskyQueryParamsNormalize(is_array($meta) ? $meta : [], $url);
+        $bits = [];
+        $reasonLabels = [
+            'session' => 'session в URL',
+            'sort' => 'сортировка в URL',
+            'many_keys' => 'много параметров (' . $n['key_count'] . ')',
+            'long_query' => 'длинный query (' . $n['query_len'] . ' симв.)',
+            'keys' => 'рисковые параметры',
+        ];
+        foreach ($n['reasons'] as $r) {
+            if (isset($reasonLabels[$r])) {
+                $bits[] = $reasonLabels[$r];
+            }
+        }
+        if ($n['keys'] !== []) {
+            $bits[] = implode(', ', array_slice($n['keys'], 0, 6));
+        }
+        if ($n['query'] !== '' && $bits === []) {
+            $bits[] = '?' . self::clip($n['query'], 60);
+        }
+
+        return $bits !== [] ? implode(' · ', $bits) : 'рисковые параметры в query';
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function riskyQueryParamsDetailsHtml(array $meta, ?string $url = null): ?string
+    {
+        $n = self::riskyQueryParamsNormalize($meta, $url);
+        if ($n['keys'] === [] && $n['query'] === '' && $n['reasons'] === []) {
+            return null;
+        }
+
+        $reasonLabels = [
+            'session' => 'Идентификатор сессии в адресе',
+            'sort' => 'Сортировка каталога в URL',
+            'many_keys' => 'Слишком много параметров',
+            'long_query' => 'Слишком длинный query',
+            'keys' => 'Рисковые параметры',
+        ];
+
+        $html = '<div class="cabinet-sa-risky-q">';
+        if ($n['reasons'] !== []) {
+            $html .= '<div class="cabinet-sa-risky-q__reasons">';
+            foreach ($n['reasons'] as $r) {
+                $label = $reasonLabels[$r] ?? $r;
+                $mod = preg_replace('/[^a-z0-9_]+/i', '', $r) ?: 'keys';
+                $html .= '<span class="cabinet-sa-risky-q__chip cabinet-sa-risky-q__chip--' . e($mod) . '">'
+                    . e($label) . '</span>';
+            }
+            $html .= '</div>';
+        }
+
+        if ($n['keys'] !== []) {
+            $html .= '<div class="cabinet-sa-risky-q__row">'
+                . '<span class="cabinet-sa-risky-q__label">Параметры</span>'
+                . '<span class="cabinet-sa-risky-q__vals">';
+            foreach (array_slice($n['keys'], 0, 8) as $key) {
+                $html .= '<code class="cabinet-sa-risky-q__key">' . e((string) $key) . '</code>';
+            }
+            $html .= '</span></div>';
+        }
+
+        if ($n['many_keys'] || $n['long_query']) {
+            $metaBits = [];
+            if ($n['many_keys']) {
+                $metaBits[] = 'параметров: ' . $n['key_count'];
+            }
+            if ($n['long_query']) {
+                $metaBits[] = 'длина query: ' . $n['query_len'] . ' симв.';
+            }
+            $html .= '<div class="cabinet-sa-risky-q__meta">' . e(implode(' · ', $metaBits)) . '</div>';
+        }
+
+        if ($n['query'] !== '') {
+            $html .= '<div class="cabinet-sa-risky-q__row">'
+                . '<span class="cabinet-sa-risky-q__label">Query</span>'
+                . '<code class="cabinet-sa-risky-q__query" title="' . e($n['query']) . '">?'
+                . e(self::clip($n['query'], 160)) . '</code>'
+                . '</div>';
+        }
+
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function keywordCannibalizationPlain(array $meta): string
+    {
+        $q = ! empty($meta['query']) ? self::clip((string) $meta['query'], 40) : '';
+        $land = ! empty($meta['landing_url']) ? self::clip((string) $meta['landing_url'], 40) : '';
+        $bits = [];
+        if ($q !== '') {
+            $bits[] = 'запрос «' . $q . '»';
+        }
+        if ($land !== '') {
+            $bits[] = 'посадочная: ' . $land;
+        }
+        if (! empty($meta['full_match'])) {
+            $bits[] = 'полное совпадение в title/h1';
+        } elseif (isset($meta['hits'])) {
+            $bits[] = 'слов из запроса: ' . (int) $meta['hits'];
+        }
+
+        return $bits !== [] ? implode(' · ', $bits) : 'каннибализация запроса';
+    }
+
+    /**
+     * Код эвристики probe → короткая подпись в таблице (не путь URL).
+     */
+    private static function adCannibalizationHintLabel(string $hint): string
+    {
+        $hint = trim($hint);
+        if ($hint === '') {
+            return '';
+        }
+
+        $map = [
+            'path_promo' => 'промо-путь',
+            'path_promo_prefix' => 'промо-путь',
+            'thin_cta' => 'тонкая CTA-страница',
+            'cta_heavy' => 'много CTA, мало текста',
+        ];
+        if (isset($map[$hint])) {
+            return $map[$hint];
+        }
+        // Старое демо писало в ad_hint буквальный «/promo/» — не путать с URL слева.
+        if ($hint === '/promo/' || $hint[0] === '/') {
+            return 'промо-путь';
+        }
+
+        return $hint;
+    }
+
+    /**
+     * Mixed content: спокойный список http:// ресурсов на HTTPS-странице.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private static function mixedContentDetailsHtml(array $meta): ?string
+    {
+        $n = (int) ($meta['count'] ?? 0);
+        $samples = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+        $urls = [];
+        foreach ($samples as $sample) {
+            if (is_string($sample) && trim($sample) !== '') {
+                $urls[] = trim($sample);
+            } elseif (is_array($sample) && ! empty($sample['url'])) {
+                $urls[] = trim((string) $sample['url']);
+            }
+        }
+        $urls = array_values(array_unique($urls));
+        if ($n < 1 && $urls === []) {
+            return null;
+        }
+        if ($n < 1) {
+            $n = count($urls);
+        }
+
+        $noun = 'ресурсов';
+        if ($n % 10 === 1 && $n % 100 !== 11) {
+            $noun = 'ресурс';
+        } elseif (in_array($n % 10, [2, 3, 4], true) && ! in_array($n % 100, [12, 13, 14], true)) {
+            $noun = 'ресурса';
+        }
+
+        $html = '<div class="cabinet-sa-mixed">';
+        $html .= '<div class="cabinet-sa-mixed__head">'
+            . '<span class="cabinet-sa-mixed__count">' . $n . ' http-' . $noun . '</span>'
+            . '<span class="cabinet-sa-mixed__hint">на HTTPS-странице</span>'
+            . '</div>';
+
+        if ($urls !== []) {
+            $html .= '<ul class="cabinet-sa-mixed__list">';
+            foreach (array_slice($urls, 0, 5) as $httpUrl) {
+                $kind = self::mixedContentKindLabel($httpUrl);
+                $name = self::mixedContentFileName($httpUrl);
+                $html .= '<li class="cabinet-sa-mixed__item">';
+                if ($kind !== '') {
+                    $html .= '<span class="cabinet-sa-mixed__kind">' . e($kind) . '</span>';
+                }
+                $html .= '<div class="cabinet-sa-mixed__body">';
+                if ($name !== '') {
+                    $html .= '<code class="cabinet-sa-mixed__file">' . e($name) . '</code>';
+                }
+                $html .= '<a class="cabinet-sa-mixed__url" href="' . e($httpUrl) . '" target="_blank" rel="noopener noreferrer">'
+                    . e($httpUrl) . '</a>';
+                $html .= '</div></li>';
+            }
+            $html .= '</ul>';
+            if ($n > count($urls)) {
+                $more = $n - count($urls);
+                $html .= '<div class="cabinet-sa-mixed__more">ещё '
+                    . $more . ' в HTML страницы</div>';
+            }
+        }
+
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    private static function mixedContentKindLabel(string $url): string
+    {
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?: '');
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $map = [
+            'js' => 'скрипт',
+            'mjs' => 'скрипт',
+            'css' => 'стиль',
+            'png' => 'картинка',
+            'jpg' => 'картинка',
+            'jpeg' => 'картинка',
+            'gif' => 'картинка',
+            'svg' => 'картинка',
+            'webp' => 'картинка',
+            'ico' => 'иконка',
+            'woff' => 'шрифт',
+            'woff2' => 'шрифт',
+            'ttf' => 'шрифт',
+            'otf' => 'шрифт',
+        ];
+
+        return $map[$ext] ?? 'ресурс';
+    }
+
+    private static function mixedContentFileName(string $url): string
+    {
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?: '');
+        $base = basename($path);
+
+        return $base !== '' && $base !== '/' ? $base : '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function keywordCannibalizationDetailsHtml(array $meta): ?string
+    {
+        $query = trim((string) ($meta['query'] ?? ''));
+        $landing = trim((string) ($meta['landing_url'] ?? ''));
+        $title = trim((string) ($meta['competitor_title'] ?? ''));
+        if ($query === '' && $landing === '') {
+            return null;
+        }
+
+        $html = '<div class="cabinet-sa-cannibal">';
+        $html .= '<div class="cabinet-sa-cannibal__chip">Лишняя страница под чужой запрос</div>';
+
+        if ($query !== '') {
+            $html .= '<div class="cabinet-sa-cannibal__row">'
+                . '<span class="cabinet-sa-cannibal__label">Запрос из мониторинга</span>'
+                . '<span class="cabinet-sa-cannibal__query">«' . e($query) . '»</span>'
+                . '</div>';
+        }
+
+        if ($landing !== '') {
+            $html .= '<div class="cabinet-sa-cannibal__row">'
+                . '<span class="cabinet-sa-cannibal__label">Посадочная из мониторинга позиций</span>'
+                . self::urlLinkHtml($landing)
+                . '</div>';
+        }
+
+        $html .= '<div class="cabinet-sa-cannibal__row">'
+            . '<span class="cabinet-sa-cannibal__label">Эта строка (URL слева)</span>'
+            . '<span class="cabinet-sa-cannibal__note">конкурирует: в её TITLE/H1 нашёлся этот запрос</span>'
+            . '</div>';
+
+        if ($title !== '') {
+            $html .= '<div class="cabinet-sa-cannibal__row">'
+                . '<span class="cabinet-sa-cannibal__label">TITLE этой страницы</span>'
+                . '<span class="cabinet-sa-cannibal__title" title="' . e($title) . '">'
+                . e(self::clip($title, 120)) . '</span>'
+                . '</div>';
+        }
+
+        $how = [];
+        if (! empty($meta['full_match'])) {
+            $how[] = 'запрос целиком есть в TITLE или H1';
+        } elseif (isset($meta['hits'])) {
+            $how[] = 'совпало слов из запроса: ' . (int) $meta['hits'];
+        }
+        if ($how !== []) {
+            $html .= '<div class="cabinet-sa-cannibal__meta">' . e(implode(' · ', $how)) . '</div>';
+        }
+
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function brokenImagePlain(array $meta): string
+    {
+        $samples = self::brokenImageSamples($meta);
+        if ($samples === []) {
+            return 'битое изображение';
+        }
+        $n = max((int) ($meta['count'] ?? 0), count($samples));
+        $first = $samples[0];
+        $bits = ['битых img: ' . $n];
+        if ($first['status'] !== null && $first['status'] > 0) {
+            $bits[] = 'HTTP ' . $first['status'];
+        }
+        $bits[] = self::clip($first['img'], 80);
+
+        return implode(' · ', $bits);
     }
 
     /**
@@ -794,6 +1325,11 @@ class SiteAuditFindingPresenter
                 }
                 if (isset($meta['max'])) {
                     $bits[] = 'макс: ' . (int) $meta['max'];
+                }
+                $field = strpos($code, 'description_') === 0 ? 'description' : 'title';
+                $text = trim((string) ($meta[$field] ?? ''));
+                if ($text !== '') {
+                    $bits[] = self::clip($text, 120);
                 }
 
                 return $bits ? implode(' · ', $bits) : '—';
@@ -1164,6 +1700,30 @@ class SiteAuditFindingPresenter
             case 'pages_with_canonical':
                 return ! empty($meta['canonical']) ? self::clip((string) $meta['canonical'], 100) : '—';
 
+            case 'crawl_pages':
+                $bits = [];
+                if (isset($meta['status_code']) && $meta['status_code'] !== null && $meta['status_code'] !== '') {
+                    $bits[] = (string) (int) $meta['status_code'];
+                }
+                if (! empty($meta['title'])) {
+                    $bits[] = self::clip((string) $meta['title'], 48);
+                }
+                $img = (int) ($meta['img_count'] ?? 0);
+                if ($img > 0) {
+                    $bits[] = 'img: ' . number_format($img, 0, '', ' ');
+                }
+                $words = (int) ($meta['word_count'] ?? 0);
+                if ($words > 0) {
+                    $bits[] = 'слов: ' . number_format($words, 0, '', ' ');
+                }
+
+                return $bits !== [] ? implode(' · ', $bits) : 'страница проверки';
+
+            case 'crawl_images':
+                $page = ! empty($meta['page_url']) ? (string) $meta['page_url'] : '';
+
+                return $page !== '' ? ('на странице: ' . self::clip($page, 70)) : 'изображение';
+
             case 'similar_pages':
                 $parts = [];
                 if (! empty($meta['similar_url'])) {
@@ -1342,15 +1902,11 @@ class SiteAuditFindingPresenter
                 return 'входящих внутренних: 0';
 
             case 'keyword_cannibalization':
-                $q = ! empty($meta['query']) ? self::clip((string) $meta['query'], 40) : '';
-                $land = ! empty($meta['landing_url']) ? self::clip((string) $meta['landing_url'], 35) : '';
-
-                return ($q !== '' ? ('«' . $q . '»') : 'запрос')
-                    . ($land !== '' ? (' · посадочная: ' . $land) : '');
+                return self::keywordCannibalizationPlain($meta);
 
             case 'ad_cannibalization':
                 $q = ! empty($meta['query']) ? self::clip((string) $meta['query'], 36) : '';
-                $hint = ! empty($meta['ad_hint']) ? (string) $meta['ad_hint'] : '';
+                $hint = self::adCannibalizationHintLabel((string) ($meta['ad_hint'] ?? ''));
                 $land = ! empty($meta['landing_url']) ? self::clip((string) $meta['landing_url'], 30) : '';
 
                 return ($q !== '' ? ('«' . $q . '»') : 'запрос')
@@ -1399,12 +1955,7 @@ class SiteAuditFindingPresenter
                 return 'нет отзывов';
 
             case 'broken_image':
-                $n = (int) ($meta['count'] ?? 0);
-                $img = ! empty($meta['samples'][0]['img'])
-                    ? self::clip((string) $meta['samples'][0]['img'], 50)
-                    : '';
-
-                return $n ? ('битых img: ' . $n . ($img !== '' ? ' · ' . $img : '')) : 'битое изображение';
+                return self::brokenImagePlain($meta);
 
             case 'heavy_image':
                 return self::heavyImagePlain($meta);
@@ -1655,18 +2206,7 @@ class SiteAuditFindingPresenter
                 return 'нет исходящих внутренних ссылок';
 
             case 'risky_query_params':
-                $bits = [];
-                if (! empty($meta['keys']) && is_array($meta['keys'])) {
-                    $bits[] = 'keys: ' . implode(', ', array_slice($meta['keys'], 0, 5));
-                }
-                if (! empty($meta['many_keys'])) {
-                    $bits[] = 'параметров: ' . (int) ($meta['key_count'] ?? 0);
-                }
-                if (! empty($meta['long_query'])) {
-                    $bits[] = 'query ' . (int) ($meta['query_len'] ?? 0) . ' симв.';
-                }
-
-                return $bits ? implode(' · ', $bits) : 'рисковые параметры';
+                return self::riskyQueryParamsPlain($meta, $url);
 
             case 'pagination_param':
                 $bits = [];
@@ -1907,7 +2447,7 @@ class SiteAuditFindingPresenter
     }
 
     /**
-     * Список плохих ссылок на странице: href / текст / фрагмент тега.
+     * Список плохих ссылок на странице: проблема / текст / фрагмент тега для поиска в коде.
      *
      * @param array<string,mixed> $meta
      */
@@ -1918,42 +2458,81 @@ class SiteAuditFindingPresenter
             return null;
         }
 
-        $n = (int) ($meta['count'] ?? count($samples));
-        $parts = [];
-        if ($n > 0) {
-            $parts[] = '<div class="mb-1"><strong>плохих: ' . $n . '</strong></div>';
+        $n = max((int) ($meta['count'] ?? 0), count($samples));
+        $html = '<div class="cabinet-sa-bad-links">';
+        if ($n > 1) {
+            $html .= '<div class="cabinet-sa-bad-links__count">на странице: '
+                . number_format($n, 0, '', ' ') . '</div>';
         }
-        $parts[] = '<ul class="mb-0 ps-3">';
-        foreach (array_slice($samples, 0, 10) as $sample) {
+
+        foreach (array_slice($samples, 0, 8) as $sample) {
             if (! is_array($sample)) {
                 continue;
             }
-            $reason = self::badLinkReasonLabel((string) ($sample['reason'] ?? ''));
+            $reasonCode = (string) ($sample['reason'] ?? '');
+            $reason = self::badLinkReasonLabel($reasonCode);
             $href = trim((string) ($sample['href'] ?? ''));
+            // null из парсера / пустая строка из демо
+            if ($href === '' && array_key_exists('href', $sample) && $sample['href'] === null) {
+                $href = '';
+            }
             $text = trim((string) ($sample['text'] ?? ''));
             $snippet = trim((string) ($sample['snippet'] ?? ''));
 
-            $line = [];
+            $html .= '<div class="cabinet-sa-bad-links__card">';
             if ($reason !== '') {
-                $line[] = e($reason);
+                $mod = preg_replace('/[^a-z0-9_]+/i', '', $reasonCode) ?: 'other';
+                $html .= '<div class="cabinet-sa-bad-links__chip cabinet-sa-bad-links__chip--'
+                    . e($mod) . '">' . e($reason) . '</div>';
             }
-            if ($href !== '') {
-                $line[] = 'href=' . self::urlLinkHtml($href);
-            }
-            if ($text !== '') {
-                $line[] = 'текст «' . e(self::clip($text, 60)) . '»';
-            }
-            if ($snippet !== '' && ($href === '' || $text === '')) {
-                $line[] = '<code class="small">' . e(self::clip($snippet, 100)) . '</code>';
-            }
-            if ($line === []) {
-                $line[] = 'плохая ссылка';
-            }
-            $parts[] = '<li>' . implode(' · ', $line) . '</li>';
-        }
-        $parts[] = '</ul>';
 
-        return implode('', $parts);
+            if ($text !== '') {
+                $html .= '<div class="cabinet-sa-bad-links__row">'
+                    . '<span class="cabinet-sa-bad-links__label">Текст ссылки</span>'
+                    . '<span class="cabinet-sa-bad-links__text" title="' . e($text) . '">«'
+                    . e(self::clip($text, 80)) . '»</span>'
+                    . '<span class="cabinet-sa-bad-links__hint">найдите этот текст в HTML страницы</span>'
+                    . '</div>';
+            }
+
+            if ($href !== '') {
+                $html .= '<div class="cabinet-sa-bad-links__row">'
+                    . '<span class="cabinet-sa-bad-links__label">href</span>'
+                    . '<code class="cabinet-sa-bad-links__href" title="' . e($href) . '">'
+                    . e(self::clip($href, 120)) . '</code>'
+                    . '</div>';
+            } elseif ($reasonCode === 'missing_href') {
+                $html .= '<div class="cabinet-sa-bad-links__row">'
+                    . '<span class="cabinet-sa-bad-links__label">href</span>'
+                    . '<span class="cabinet-sa-bad-links__missing">атрибута нет</span>'
+                    . '</div>';
+            }
+
+            if ($snippet !== '') {
+                $html .= '<div class="cabinet-sa-bad-links__row">'
+                    . '<span class="cabinet-sa-bad-links__label">В коде</span>'
+                    . '<code class="cabinet-sa-bad-links__snippet" title="' . e($snippet) . '">'
+                    . e(self::clip($snippet, 180)) . '</code>'
+                    . '</div>';
+            } elseif ($text !== '') {
+                $html .= '<div class="cabinet-sa-bad-links__hint-block">'
+                    . 'В исходнике страницы ищите: <code>&lt;a</code> рядом с текстом «'
+                    . e(self::clip($text, 40)) . '»'
+                    . '</div>';
+            }
+
+            $html .= '</div>';
+        }
+
+        $shown = min(8, count($samples));
+        $extra = $n - $shown;
+        if ($extra > 0) {
+            $html .= '<div class="cabinet-sa-bad-links__more">и ещё '
+                . number_format($extra, 0, '', ' ') . ' на этой странице</div>';
+        }
+        $html .= '</div>';
+
+        return $html;
     }
 
     /**
@@ -2264,12 +2843,13 @@ class SiteAuditFindingPresenter
     private static function badLinkReasonLabel(string $reason): string
     {
         $map = [
-            'missing_href' => 'нет href',
-            'empty_or_hash' => 'пустой href / #',
-            'javascript' => 'javascript:',
-            'whitespace' => 'пробел в href',
-            'quotes' => 'кавычки в href',
-            'nested_url' => 'два URL в одном href',
+            'missing_href' => 'Нет атрибута href',
+            'empty_or_hash' => 'Пустой href или только #',
+            'javascript' => 'javascript: вместо URL',
+            'whitespace' => 'Пробел в href',
+            'quotes' => 'Кавычки в href',
+            'nested_url' => 'Два URL в одном href',
+            'unresolvable' => 'Неразбираемый URL',
         ];
 
         return $map[$reason] ?? ($reason !== '' ? $reason : '');
@@ -2597,6 +3177,73 @@ class SiteAuditFindingPresenter
     }
 
     /**
+     * Страница с битыми внутренними ссылками: список целей + HTTP.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private static function pageHasBrokenLinksDetailsHtml(array $meta): ?string
+    {
+        $samples = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+        $n = (int) ($meta['count'] ?? count($samples));
+        if ($n < 1 && $samples === []) {
+            return null;
+        }
+        if ($n < 1) {
+            $n = count($samples);
+        }
+
+        $noun = 'битых ссылок';
+        if ($n % 10 === 1 && $n % 100 !== 11) {
+            $noun = 'битая ссылка';
+        } elseif (in_array($n % 10, [2, 3, 4], true) && ! in_array($n % 100, [12, 13, 14], true)) {
+            $noun = 'битые ссылки';
+        }
+
+        $html = '<div class="cabinet-sa-broken-page">';
+        $html .= '<div class="cabinet-sa-broken-page__head">'
+            . '<span class="cabinet-sa-broken-page__count">' . $n . ' ' . $noun . '</span>'
+            . '<span class="cabinet-sa-broken-page__hint">с этой страницы</span>'
+            . '</div>';
+
+        if ($samples !== []) {
+            $html .= '<ul class="cabinet-sa-broken-page__list">';
+            foreach (array_slice($samples, 0, 5) as $sample) {
+                if (! is_array($sample)) {
+                    continue;
+                }
+                $target = trim((string) ($sample['url'] ?? $sample['href'] ?? ''));
+                if ($target === '') {
+                    continue;
+                }
+                $text = trim((string) ($sample['text'] ?? ''));
+                $status = isset($sample['status']) ? (int) $sample['status'] : 0;
+                $html .= '<li class="cabinet-sa-broken-page__item">';
+                if ($status > 0) {
+                    $html .= self::httpStatusPillHtml($status, (string) $status);
+                } else {
+                    $html .= '<span class="cabinet-sa-status-pill">ошибка</span>';
+                }
+                $html .= '<div class="cabinet-sa-broken-page__body">';
+                if ($text !== '') {
+                    $html .= '<span class="cabinet-sa-broken-page__anchor" title="' . e($text) . '">«'
+                        . e(self::clip($text, 50)) . '»</span>';
+                }
+                $html .= self::urlLinkHtml($target);
+                $html .= '</div></li>';
+            }
+            $html .= '</ul>';
+            if ($n > min(5, count($samples))) {
+                $html .= '<div class="cabinet-sa-broken-page__more">ещё '
+                    . ($n - min(5, count($samples))) . ' на странице</div>';
+            }
+        }
+
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /**
      * @param array<string,mixed> $meta
      */
     private static function brokenInternalLinkDetailsHtml(array $meta): string
@@ -2732,11 +3379,92 @@ class SiteAuditFindingPresenter
     /**
      * @param array<string,mixed> $meta
      */
-    private static function redirectDetailsHtml(array $meta, string $code): string
+    private static function redirectDetailsHtml(array $meta, string $code, ?string $url = null): string
     {
-        $plain = self::metaLine($code, $meta, null);
+        $chain = ! empty($meta['chain']) && is_array($meta['chain']) ? $meta['chain'] : [];
+        $final = ! empty($meta['final'])
+            ? (string) $meta['final']
+            : (! empty($meta['to']) ? (string) $meta['to'] : null);
+        $start = trim((string) ($url ?: ''));
+        if ($start === '' && ! empty($meta['path'][0])) {
+            $start = (string) $meta['path'][0];
+        }
 
-        return self::linkifyUrlsInText($plain !== '' ? $plain : '—');
+        // Demo/старые meta кладут старт внутрь chain — вынесем хопы после старта.
+        $hops = [];
+        foreach ($chain as $hop) {
+            $hop = trim((string) $hop);
+            if ($hop === '') {
+                continue;
+            }
+            if ($start !== '' && SiteAuditRedirectChain::normalize($hop) === SiteAuditRedirectChain::normalize($start)) {
+                continue;
+            }
+            $hops[] = $hop;
+        }
+
+        if ($start === '' && $hops !== []) {
+            $start = (string) array_shift($hops);
+        }
+
+        $info = $start !== ''
+            ? SiteAuditRedirectChain::analyze($start, $hops, $final)
+            : ['path' => $hops, 'loop' => ! empty($meta['loop']), 'at' => null];
+        $path = $info['path'] ?? [];
+        if ($path === []) {
+            $plain = self::metaLine($code, $meta, $url);
+
+            return self::linkifyUrlsInText($plain !== '' ? $plain : '—');
+        }
+
+        $from = (string) $path[0];
+        $to = (string) end($path);
+        $hopCount = max(0, count($path) - 1);
+        $isLoop = $code === 'redirect_loop' || ! empty($info['loop']);
+        $slashOnly = $hopCount === 1 && SiteAuditRedirectChain::isSlashOnlyRedirect($from, $to);
+
+        $html = '<div class="cabinet-sa-redir">';
+        $html .= '<div class="cabinet-sa-redir__row">'
+            . '<span class="cabinet-sa-redir__label">Было</span>'
+            . self::urlLinkHtml($from)
+            . '</div>';
+        $html .= '<div class="cabinet-sa-redir__row">'
+            . '<span class="cabinet-sa-redir__label">Стало</span>'
+            . self::urlLinkHtml($to)
+            . '</div>';
+
+        $bits = [];
+        if ($isLoop) {
+            $bits[] = 'цикл';
+        } elseif ($slashOnly) {
+            $bits[] = 'только слэш';
+        } elseif ($hopCount > 1) {
+            $bits[] = 'редиректов: ' . $hopCount;
+        } elseif ($hopCount === 1) {
+            $bits[] = '1 редирект';
+        }
+        if (! empty($meta['status'])) {
+            $bits[] = 'HTTP ' . (int) $meta['status'];
+        }
+        if ($bits !== []) {
+            $html .= '<div class="cabinet-sa-redir__meta">' . e(implode(' · ', $bits)) . '</div>';
+        }
+
+        if ($hopCount > 1) {
+            $html .= '<div class="cabinet-sa-redir__chain-label">Цепочка</div>';
+            $html .= '<div class="cabinet-sa-redir__chain">';
+            foreach ($path as $i => $step) {
+                if ($i > 0) {
+                    $html .= '<span class="cabinet-sa-redir__arrow" aria-hidden="true">→</span>';
+                }
+                $html .= '<span class="cabinet-sa-redir__step">' . self::urlLinkHtml((string) $step) . '</span>';
+            }
+            $html .= '</div>';
+        }
+
+        $html .= '</div>';
+
+        return $html;
     }
 
     /**
@@ -2899,6 +3627,50 @@ class SiteAuditFindingPresenter
         return $html;
     }
 
+    /**
+     * TITLE / Description: длина + полный текст («Сейчас»).
+     */
+    private static function metaLengthDetailsHtml(string $code, array $meta): ?string
+    {
+        $isDesc = strpos($code, 'description_') === 0;
+        $field = $isDesc ? 'description' : 'title';
+        $text = trim((string) ($meta[$field] ?? ''));
+        $len = isset($meta['length']) ? (int) $meta['length'] : ($text !== '' ? mb_strlen($text) : 0);
+        $min = isset($meta['min']) ? (int) $meta['min'] : null;
+        $max = isset($meta['max']) ? (int) $meta['max'] : null;
+
+        if ($text === '' && $len < 1) {
+            return null;
+        }
+
+        $metaBits = [];
+        if ($len > 0) {
+            $metaBits[] = 'длина: ' . $len;
+        }
+        if ($min !== null) {
+            $metaBits[] = 'мин: ' . $min;
+        }
+        if ($max !== null) {
+            $metaBits[] = 'макс: ' . $max;
+        }
+
+        $html = '<div class="cabinet-sa-meta-len">';
+        if ($metaBits !== []) {
+            $html .= '<div class="cabinet-sa-meta-len__meta">' . e(implode(' · ', $metaBits)) . '</div>';
+        }
+
+        if ($text !== '') {
+            $html .= '<div class="cabinet-sa-meta-len__block">'
+                . '<div class="cabinet-sa-meta-len__label">Сейчас</div>'
+                . '<div class="cabinet-sa-meta-len__text" title="' . e($text) . '">' . e($text) . '</div>'
+                . '</div>';
+        }
+
+        $html .= '</div>';
+
+        return $html;
+    }
+
     /** Фраза переспама / тошнота — читаемая «чип» вместо сырой строки. */
     private static function spamPhraseDetailsHtml(string $code, array $meta): ?string
     {
@@ -2983,21 +3755,29 @@ class SiteAuditFindingPresenter
             $phrase = $w;
             $metaBits[] = '×' . (int) ($meta['samples'][0]['count'] ?? $meta['count'] ?? 0);
         } elseif ($code === 'meta_spam') {
-            $bits = [];
-            if (! empty($meta['title']['word'])) {
-                $bits[] = 'title «' . e(self::clip((string) $meta['title']['word'], 28)) . '»×'
-                    . (int) ($meta['title']['count'] ?? 0);
+            $rows = [];
+            foreach (['title' => 'TITLE', 'description' => 'Description'] as $field => $label) {
+                $block = is_array($meta[$field] ?? null) ? $meta[$field] : null;
+                if (! $block || empty($block['word'])) {
+                    continue;
+                }
+                $word = self::clip((string) $block['word'], 40);
+                $count = (int) ($block['count'] ?? 0);
+                $rows[] = '<div class="cabinet-sa-meta-spam__row">'
+                    . '<span class="cabinet-sa-meta-spam__field">' . e($label) . '</span>'
+                    . '<span class="cabinet-sa-meta-spam__word" title="' . e((string) $block['word']) . '">«'
+                    . e($word) . '»</span>'
+                    . '<span class="cabinet-sa-meta-spam__count" title="Сколько раз слово встречается в поле">×'
+                    . $count . '</span>'
+                    . '</div>';
             }
-            if (! empty($meta['description']['word'])) {
-                $bits[] = 'desc «' . e(self::clip((string) $meta['description']['word'], 28)) . '»×'
-                    . (int) ($meta['description']['count'] ?? 0);
-            }
-            if ($bits === []) {
+            if ($rows === []) {
                 return null;
             }
 
-            return '<div class="cabinet-sa-spam-phrase">'
-                . '<div class="cabinet-sa-spam-phrase__lines">' . implode('<br>', $bits) . '</div>'
+            return '<div class="cabinet-sa-meta-spam">'
+                . '<div class="cabinet-sa-meta-spam__note">частое слово в мета</div>'
+                . implode('', $rows)
                 . '</div>';
         } elseif ($code === 'text_nausea') {
             $bits = [];

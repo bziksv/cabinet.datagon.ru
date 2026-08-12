@@ -11,7 +11,7 @@ class SiteAuditDemoFixture
 {
     public const DOMAIN = 'demo-audit.titlo.ru';
     public const PROJECT_NAME = 'Демо: полный аудит (фикстура)';
-    public const DEMO_VERSION = 17;
+    public const DEMO_VERSION = 23;
     public const SHARE_TOKEN = 'demo-site-audit-rich';
 
     /**
@@ -182,7 +182,10 @@ class SiteAuditDemoFixture
                 'content_unchanged' => 0,
                 'simhash' => null,
                 'out_links_json' => json_encode([$base . '/', $base . '/catalog/'], JSON_UNESCAPED_UNICODE),
-                'img_srcs_json' => null,
+                'img_srcs_json' => json_encode([
+                    'https://picsum.photos/id/' . (10 + ($i % 40)) . '/800/600',
+                    'https://picsum.photos/id/' . (50 + ($i % 30)) . '/400/300',
+                ], JSON_UNESCAPED_UNICODE),
                 'asset_srcs_json' => null,
                 'click_depth' => min(8, (int) floor($i / 15)),
                 'discovered_via' => $i === 0 ? 'seed' : (($i % 5 === 0) ? 'sitemap' : 'link'),
@@ -261,6 +264,21 @@ class SiteAuditDemoFixture
                 $url = $brokenTarget
                     ? ($base . '/missing/page-' . ($j + 1) . '/')
                     : $urls[$j % count($urls)];
+                if ($code === 'risky_query_params') {
+                    $url = self::riskyQueryDemoUrl($urls[$j % count($urls)], $j);
+                }
+                if ($code === 'ad_cannibalization') {
+                    // URL слева = «лишняя» промо-страница, не случайный /catalog/item-N.
+                    $promoPaths = [
+                        '/promo/',
+                        '/promo/offer-' . (($j % 15) + 1) . '/',
+                        '/lp/sofa-' . (($j % 8) + 1) . '/',
+                        '/offer/demo-' . (($j % 6) + 1) . '/',
+                        '/actions/sale-' . (($j % 5) + 1) . '/',
+                        '/ppc/divan-' . (($j % 4) + 1) . '/',
+                    ];
+                    $url = $base . $promoPaths[$j % count($promoPaths)];
+                }
                 $push($code, $sev, $url, self::metaFor($code, $base, $url, $j));
             }
         }
@@ -293,6 +311,9 @@ class SiteAuditDemoFixture
             'progress_json' => json_encode([
                 'demo' => true,
                 'demo_version' => self::DEMO_VERSION,
+                'images_total' => array_sum(array_map(static function ($p) {
+                    return (int) ($p['img_count'] ?? 0);
+                }, $pages)),
                 'robots' => ['ok' => true],
                 'sitemap' => ['found' => true, 'url_count' => count($urls)],
                 // Чтобы в дереве не было «не было» у probe-вкладок
@@ -442,16 +463,18 @@ class SiteAuditDemoFixture
                 return [
                     'to' => $base . '/catalog/',
                     'status' => 301,
-                    'chain' => [$url, $base . '/catalog/'],
+                    'final' => $base . '/catalog/',
+                    'chain' => [$base . '/catalog/'],
                 ];
             case 'redirect_chain_long':
                 return [
-                    'chain' => [$url, $base . '/a/', $base . '/b/', $base . '/c/', $base . '/'],
+                    'final' => $base . '/',
+                    'chain' => [$base . '/a/', $base . '/b/', $base . '/c/', $base . '/'],
                     'hops' => 4,
                 ];
             case 'redirect_loop':
                 return [
-                    'chain' => [$url, $base . '/loop-a/', $url],
+                    'chain' => [$base . '/loop-a/', $url],
                     'loop' => true,
                 ];
             case 'duplicate_title':
@@ -518,11 +541,19 @@ class SiteAuditDemoFixture
                     'img_count' => $imgCount,
                 ];
             case 'page_has_broken_links':
+                $count = 1 + ($j % 3);
+                $samples = [];
+                for ($s = 0; $s < min(2, $count); $s++) {
+                    $samples[] = [
+                        'url' => $base . '/missing/page-' . ($j + 1 + $s) . '/',
+                        'status' => ($s === 0) ? 404 : 500,
+                        'text' => $s === 0 ? 'битая ссылка' : 'ещё одна',
+                    ];
+                }
+
                 return [
-                    'count' => 1 + ($j % 3),
-                    'samples' => [
-                        ['url' => $base . '/missing/page-' . ($j + 1) . '/', 'status' => 404, 'text' => 'битая'],
-                    ],
+                    'count' => $count,
+                    'samples' => $samples,
                 ];
             case 'too_many_strong':
                 return [
@@ -572,7 +603,13 @@ class SiteAuditDemoFixture
                     ],
                 ];
             case 'broken_image':
-                return ['src' => $base . '/img/broken-' . ($j + 1) . '.jpg', 'status' => 404];
+                return [
+                    'count' => 1,
+                    'samples' => [[
+                        'img' => $base . '/img/broken-' . ($j + 1) . '.jpg',
+                        'status' => 404,
+                    ]],
+                ];
             case 'external_assets':
                 return [
                     'count' => 3,
@@ -598,9 +635,31 @@ class SiteAuditDemoFixture
                     'referrers' => [$url],
                 ];
             case 'page_has_bad_links':
+                $variants = [
+                    [
+                        'href' => null,
+                        'reason' => 'missing_href',
+                        'text' => 'клик',
+                        'snippet' => '<a class="btn">клик</a>',
+                    ],
+                    [
+                        'href' => '#',
+                        'reason' => 'empty_or_hash',
+                        'text' => 'Подробнее',
+                        'snippet' => '<a href="#">Подробнее</a>',
+                    ],
+                    [
+                        'href' => 'javascript:void(0)',
+                        'reason' => 'javascript',
+                        'text' => 'Открыть',
+                        'snippet' => '<a href="javascript:void(0)">Открыть</a>',
+                    ],
+                ];
+                $one = $variants[$j % count($variants)];
+
                 return [
                     'count' => 1,
-                    'samples' => [['href' => '', 'reason' => 'missing_href', 'text' => 'клик']],
+                    'samples' => [$one],
                 ];
             case 'canonical_not_self':
                 return ['canonical' => $base . '/'];
@@ -688,12 +747,25 @@ class SiteAuditDemoFixture
             case 'pages_with_iframe':
                 return ['iframe_count' => 1 + ($j % 2)];
             case 'mixed_content':
-                return [
-                    'count' => 2 + ($j % 3),
-                    'samples' => [
+                $sets = [
+                    [
                         'http://cdn.example/logo.svg',
                         'http://stats.example/counter.js',
                     ],
+                    [
+                        'http://cdn.example/assets/app.css',
+                        'http://fonts.example/demo.woff2',
+                        'http://img.example/hero.jpg',
+                    ],
+                    [
+                        'http://widget.example/chat.js',
+                    ],
+                ];
+                $pick = $sets[$j % count($sets)];
+
+                return [
+                    'count' => count($pick) + ($j % 2),
+                    'samples' => $pick,
                 ];
             case 'bad_doctype':
                 return ($j % 2)
@@ -977,7 +1049,7 @@ class SiteAuditDemoFixture
             case 'duplicate_url_variants':
                 return ['variants' => [$url, rtrim($url, '/') . '?utm=1']];
             case 'risky_query_params':
-                return ['params' => ['session_id', 'token']];
+                return self::riskyQueryDemoMeta($url, $j);
             case 'pagination_param':
                 return ['params' => ['page']];
             case 'www_both_available':
@@ -1004,13 +1076,27 @@ class SiteAuditDemoFixture
                 return [
                     'query' => 'купить диван демо',
                     'landing_url' => $base . '/catalog/',
-                    'urls' => [$url, $base . '/catalog/'],
+                    'hits' => 2,
+                    'full_match' => true,
+                    'competitor_title' => 'Купить диван демо — ' . ($j === 0 ? 'главная' : 'страница ' . ($j + 1)),
                 ];
             case 'ad_cannibalization':
+                $hints = ['path_promo', 'path_promo_prefix', 'thin_cta', 'cta_heavy'];
+                $queries = [
+                    'купить диван демо',
+                    'диван москва недорого',
+                    'кухня под ключ',
+                    'шкаф купе на заказ',
+                ];
+
                 return [
-                    'query' => 'купить диван демо',
-                    'ad_hint' => '/promo/',
+                    'query' => $queries[$j % count($queries)],
+                    'ad_hint' => $hints[$j % count($hints)],
                     'landing_url' => $base . '/catalog/',
+                    'full_match' => ($j % 3) !== 0,
+                    'hits' => 2 + ($j % 3),
+                    'competitor_title' => 'Купить диван — акция демо #' . ($j + 1),
+                    'word_count' => 40 + ($j % 80),
                 ];
             case 'serp_snippet_cannibalization':
                 return [
@@ -1092,5 +1178,56 @@ class SiteAuditDemoFixture
                     'code' => $code,
                 ];
         }
+    }
+
+    /** URL с query под разные сценарии risky_query_params. */
+    private static function riskyQueryDemoUrl(string $cleanUrl, int $j): string
+    {
+        $base = rtrim($cleanUrl, '?&');
+        switch ($j % 4) {
+            case 0:
+                return $base . (strpos($base, '?') === false ? '?' : '&') . 'session_id=abc' . ($j + 1) . 'def';
+            case 1:
+                return $base . (strpos($base, '?') === false ? '?' : '&') . 'sort=price&order=desc';
+            case 2:
+                $parts = [];
+                for ($i = 1; $i <= 9; $i++) {
+                    $parts[] = 'p' . $i . '=v' . $i;
+                }
+
+                return $base . (strpos($base, '?') === false ? '?' : '&') . implode('&', $parts);
+            default:
+                return $base . (strpos($base, '?') === false ? '?' : '&')
+                    . 'q=' . str_repeat('x', 130) . '&ref=demo';
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function riskyQueryDemoMeta(string $url, int $j): array
+    {
+        $query = parse_url($url, PHP_URL_QUERY);
+        $params = [];
+        if (is_string($query) && $query !== '') {
+            parse_str($query, $params);
+        }
+        $allKeys = array_map('strtolower', array_keys($params));
+        $risky = array_values(array_intersect($allKeys, [
+            'phpsessid', 'sid', 'sessionid', 'session_id', 'jsessionid',
+            'sort', 'order', 'orderby', 'sortby',
+        ]));
+        $many = count($allKeys) >= 8;
+        $long = is_string($query) && strlen($query) >= 120;
+
+        return [
+            'keys' => $risky,
+            'key_count' => count($allKeys),
+            'query_len' => is_string($query) ? strlen($query) : 0,
+            'many_keys' => $many,
+            'long_query' => $long,
+            'query' => is_string($query) ? $query : '',
+            'reason' => $j % 4 === 0 ? 'session' : ($j % 4 === 1 ? 'sort' : ($j % 4 === 2 ? 'many_keys' : 'long_query')),
+        ];
     }
 }

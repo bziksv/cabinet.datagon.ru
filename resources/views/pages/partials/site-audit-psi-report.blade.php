@@ -291,7 +291,9 @@
                             <div class="cabinet-sa-actions">
                                 @if(!empty($canNote))
                                     <div class="cabinet-sa-act cabinet-sa-act--note">
-                                        <label class="cabinet-sa-act__main" for="sa-note-{{ (int) $row->id }}">Заметка</label>
+                                        <label class="cabinet-sa-act__main" for="sa-note-{{ (int) $row->id }}">
+                                            <i class="fa fa-comment" aria-hidden="true"></i><span>Заметка</span>
+                                        </label>
                                     </div>
                                     @if(!$isFixed)
                                         <form method="POST" action="{{ route('pages.site-audit.note', $crawl->id) }}" class="cabinet-sa-act-form">
@@ -299,7 +301,9 @@
                                             <input type="hidden" name="finding_id" value="{{ $row->id }}">
                                             <input type="hidden" name="comment" value="{{ $noteComment }}">
                                             <div class="cabinet-sa-act cabinet-sa-act--fixed">
-                                                <button type="submit" name="status" value="fixed" class="cabinet-sa-act__main">Исправлено</button>
+                                                <button type="submit" name="status" value="fixed" class="cabinet-sa-act__main">
+                                                    <i class="fa fa-check" aria-hidden="true"></i><span>Исправлено</span>
+                                                </button>
                                             </div>
                                         </form>
                                     @else
@@ -308,7 +312,9 @@
                                             <input type="hidden" name="finding_id" value="{{ $row->id }}">
                                             <input type="hidden" name="comment" value="{{ $noteComment }}">
                                             <div class="cabinet-sa-act cabinet-sa-act--open">
-                                                <button type="submit" name="status" value="open" class="cabinet-sa-act__main">Открыть</button>
+                                                <button type="submit" name="status" value="open" class="cabinet-sa-act__main">
+                                                    <i class="fa fa-undo" aria-hidden="true"></i><span>Открыть</span>
+                                                </button>
                                             </div>
                                         </form>
                                     @endif
@@ -319,7 +325,9 @@
                                             @csrf
                                             <input type="hidden" name="finding_id" value="{{ $row->id }}">
                                             <div class="cabinet-sa-act cabinet-sa-act--restore">
-                                                <button type="submit" class="cabinet-sa-act__main">Вернуть</button>
+                                                <button type="submit" class="cabinet-sa-act__main">
+                                                    <i class="fa fa-undo" aria-hidden="true"></i><span>Вернуть</span>
+                                                </button>
                                             </div>
                                         </form>
                                     @else
@@ -327,7 +335,9 @@
                                             @csrf
                                             <input type="hidden" name="finding_id" value="{{ $row->id }}">
                                             <div class="cabinet-sa-act cabinet-sa-act--ignore">
-                                                <button type="submit" class="cabinet-sa-act__main">Игнор</button>
+                                                <button type="submit" class="cabinet-sa-act__main">
+                                                    <i class="fa fa-ban" aria-hidden="true"></i><span>Игнор</span>
+                                                </button>
                                             </div>
                                         </form>
                                     @endif

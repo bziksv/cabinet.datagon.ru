@@ -14,6 +14,11 @@
     var hintEl = document.getElementById('sa-progress-hint');
     var track = wrap.querySelector('.cabinet-sa-progress');
 
+    function formatSaNum(n) {
+        n = parseInt(n, 10) || 0;
+        return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    }
+
     function tick() {
         fetch(url, { headers: { 'Accept': 'application/json' } })
             .then(function (r) { return r.json(); })
@@ -52,8 +57,13 @@
                 if (j.buckets) {
                     Object.keys(j.buckets).forEach(function (k) {
                         document.querySelectorAll('#sa-buckets [data-bucket="' + k + '"], [data-sa-live-bucket="' + k + '"]').forEach(function (el) {
-                            el.textContent = j.buckets[k];
+                            el.textContent = formatSaNum(j.buckets[k]);
                         });
+                    });
+                }
+                if (j.pages_fetched != null) {
+                    document.querySelectorAll('[data-sa-live-pages]').forEach(function (el) {
+                        el.textContent = formatSaNum(j.pages_fetched);
                     });
                 }
                 if (j.finished) {

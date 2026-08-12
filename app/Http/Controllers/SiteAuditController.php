@@ -6,12 +6,14 @@ use App\Exports\SiteAuditCanonicalSheet;
 use App\Exports\SiteAuditCrawlSummaryExport;
 use App\Exports\SiteAuditFindingsExport;
 use App\Services\SiteAudit\SiteAuditActionPlanBuilder;
+use App\Services\SiteAudit\SiteAuditBatchUrlLookup;
 use App\Services\SiteAudit\SiteAuditClickDepth;
 use App\Services\SiteAudit\SiteAuditCrawlStarter;
 use App\Services\SiteAudit\SiteAuditCrawlStorage;
 use App\Services\SiteAudit\SiteAuditDuplicateGrouper;
 use App\Services\SiteAudit\SiteAuditFindingNoteService;
 use App\Services\SiteAudit\SiteAuditIgnoreService;
+use App\Services\SiteAudit\SiteAuditInventory;
 use App\Services\SiteAudit\SiteAuditPruner;
 use App\Services\SiteAudit\SiteAuditReportFilter;
 use App\Services\SiteAudit\SiteAuditRelevanceBridge;
@@ -289,6 +291,7 @@ class SiteAuditController extends Controller
             'bucketsAll' => $bucketsAll,
             'bucketsSeo' => $bucketsSeo,
             'bucketLabels' => self::BUCKET_LABELS,
+            'crawlScale' => $crawl->scaleStats(),
             'tree' => $tree,
             'treeSeo' => $treeSeo,
             'treeAll' => $treeAll,
@@ -418,10 +421,10 @@ class SiteAuditController extends Controller
 
     public function showReport(Request $request, int $id, string $code)
     {
-        // index_count_mismatch читает progress_json.serp_index.deep — без progress сводка 0/0.
-        // Slim: без landings/sitemap/robots (тяжёлые), serp_index остаётся.
-        $needProgress = $code === 'index_count_mismatch';
-        $crawl = $this->ownedCrawl($id, $needProgress, $needProgress);
+        // Slim progress на любом отчёте: дерево слева рисует probe-бейджи
+        // (антиплагиат/PSI/SERP…), плюс блоки вроде «Проверили» читают progress_json.
+        // Без progress — ложное «не было» и пустой список проверенных URL.
+        $crawl = $this->ownedCrawl($id, true, true);
         $crawl->load('project');
 
         $meta = config('site_audit.findings.' . $code);
@@ -444,9 +447,10 @@ class SiteAuditController extends Controller
 
         $page = max(1, (int) $request->input('page', 1));
         $perPage = 50;
-        $filterFields = $isExternalModule ? [] : SiteAuditReportFilter::fieldsForCode($code);
-        $filterValues = $isExternalModule ? [] : SiteAuditReportFilter::valuesFromRequest($request, $code);
-        $groupable = ! $isExternalModule && SiteAuditDuplicateGrouper::isGroupable($code);
+        $filterFields = $isExternalModule ? [] : SiteAuditReportFilter::fieldsForCode($code, (int) $crawl->id);
+        $filterValues = $isExternalModule ? [] : SiteAuditReportFilter::valuesFromRequest($request, $code, (int) $crawl->id);
+        $isCrawlImages = $code === 'crawl_images';
+        $groupable = ! $isExternalModule && (SiteAuditDuplicateGrouper::isGroupable($code) || $isCrawlImages);
         $viewMode = $request->input('view', $groupable ? 'groups' : 'list');
         if (! in_array($viewMode, ['groups', 'list'], true) || ! $groupable) {
             $viewMode = $groupable ? 'groups' : 'list';
@@ -474,28 +478,61 @@ class SiteAuditController extends Controller
         $rows = collect();
         $total = 0;
         $pages = 1;
+        $invSort = null;
+        $invDir = null;
+        $batchStats = null;
 
         if ($isExternalModule) {
             // пустой отчёт — тело заменит карточка модуля
-        } elseif (($meta['source'] ?? '') === 'pages_canonical') {
-            $query = SiteAuditPage::query()
-                ->where('crawl_id', $crawl->id)
-                ->whereNotNull('canonical')
-                ->where('canonical', '!=', '')
-                ->orderBy('id');
-            SiteAuditReportFilter::applyToPages($query, $filterValues);
-            $total = (clone $query)->count();
-            $rows = $query->forPage($page, $perPage)->get()->map(function (SiteAuditPage $p) use ($meta) {
-                return (object) [
-                    'id' => null,
-                    'url' => $p->url,
-                    'url_hash' => null,
-                    'severity' => $meta['severity'] ?? 'info',
-                    'code' => 'pages_with_canonical',
-                    'meta_json' => ['canonical' => $p->canonical],
-                ];
-            });
-            $pages = max(1, (int) ceil($total / $perPage));
+        } elseif (SiteAuditInventory::isInventorySource($meta['source'] ?? null)) {
+            [$invSort, $invDir] = \App\Services\SiteAudit\SiteAuditCrawlPagesColumns::normalizeSort(
+                $request->input('sort'),
+                $request->input('dir')
+            );
+            if ((string) $meta['source'] === SiteAuditInventory::SOURCE_IMAGES) {
+                [$invSort, $invDir] = \App\Services\SiteAudit\SiteAuditCrawlImagesColumns::normalizeSort(
+                    $request->input('sort'),
+                    $request->input('dir')
+                );
+            }
+            $batchStats = null;
+            if ((string) $meta['source'] === SiteAuditInventory::SOURCE_PAGES
+                && ! empty($filterValues['batch'])
+            ) {
+                [$total, $rows, $batchStats] = SiteAuditBatchUrlLookup::paginate(
+                    $crawl,
+                    (string) $filterValues['batch'],
+                    $page,
+                    $perPage,
+                    $invSort,
+                    $invDir
+                );
+                $pages = max(1, (int) ceil($total / $perPage));
+            } elseif ($isCrawlImages && $viewMode === 'groups') {
+                $perPage = 20;
+                [$total, $groups, $groupTotal, $htmlSitewide] = SiteAuditInventory::paginateImageGroups(
+                    $crawl,
+                    $page,
+                    $perPage,
+                    $filterValues,
+                    $invSort,
+                    $invDir
+                );
+                $rows = collect();
+                $pages = max(1, (int) ceil(max(1, $groupTotal) / $perPage));
+                $page = min($page, $pages);
+            } else {
+                [$total, $rows] = SiteAuditInventory::paginate(
+                    $crawl,
+                    (string) $meta['source'],
+                    $page,
+                    $perPage,
+                    $filterValues,
+                    $invSort,
+                    $invDir
+                );
+                $pages = max(1, (int) ceil($total / $perPage));
+            }
         } else {
             $codes = $this->reportCodes($code, $meta);
             $query = SiteAuditFinding::query()
@@ -559,6 +596,14 @@ class SiteAuditController extends Controller
             if ($code === 'index_count_mismatch' && $rows instanceof \Illuminate\Support\Collection && $rows->isNotEmpty()) {
                 $rows = $this->enrichIndexMismatchRows((int) $crawl->id, $rows);
             }
+            if (in_array($code, [
+                'title_too_short',
+                'title_too_long',
+                'description_too_short',
+                'description_too_long',
+            ], true) && $rows instanceof \Illuminate\Support\Collection && $rows->isNotEmpty()) {
+                $rows = $this->enrichMetaLengthTexts((int) $crawl->id, $code, $rows);
+            }
         }
 
         $filterParams = SiteAuditReportFilter::queryParams($filterValues);
@@ -570,6 +615,10 @@ class SiteAuditController extends Controller
         }
         if ($showFixed) {
             $filterParams['fixed'] = 1;
+        }
+        if (SiteAuditInventory::isInventorySource($meta['source'] ?? null)) {
+            $filterParams['sort'] = $invSort ?? 'url';
+            $filterParams['dir'] = $invDir ?? 'asc';
         }
 
         $sideCounts = $this->countsForCrawlDisplay($crawl);
@@ -698,7 +747,8 @@ class SiteAuditController extends Controller
             'groupTotal' => $groupTotal,
             'htmlSitewide' => $htmlSitewide,
             'isHtmlErrorReport' => SiteAuditDuplicateGrouper::isHtmlErrors($code),
-            'isLinkInvertedReport' => SiteAuditDuplicateGrouper::isLinkInverted($code),
+            'isLinkInvertedReport' => SiteAuditDuplicateGrouper::isLinkInverted($code) || $isCrawlImages,
+            'isCrawlImagesReport' => $isCrawlImages,
             'total' => $total,
             'page' => $page,
             'perPage' => $perPage,
@@ -732,6 +782,7 @@ class SiteAuditController extends Controller
             'buckets' => $buckets,
             'bucketsSeo' => $bucketsSeo,
             'bucketsAll' => $bucketsAll,
+            'crawlScale' => $crawl->scaleStats(),
             'activeGroup' => $activeGroup,
             'itemGroup' => $itemGroup,
             'showReferrers' => $showReferrers,
@@ -742,10 +793,13 @@ class SiteAuditController extends Controller
                 : [],
             'canIgnore' => ! $isExternalModule
                 && ! DemoCabinet::isCurrentUser()
-                && ($meta['source'] ?? '') !== 'pages_canonical',
+                && ! SiteAuditInventory::isInventorySource($meta['source'] ?? null),
             'canNote' => ! $isExternalModule
                 && ! DemoCabinet::isCurrentUser()
-                && ($meta['source'] ?? '') !== 'pages_canonical',
+                && ! SiteAuditInventory::isInventorySource($meta['source'] ?? null),
+            'crawlPagesSort' => $invSort ?? null,
+            'crawlPagesDir' => $invDir ?? null,
+            'batchStats' => $batchStats,
         ]);
     }
 
@@ -1670,25 +1724,120 @@ class SiteAuditController extends Controller
             abort(404);
         }
         $filename = 'site-audit-' . $crawl->id . '-' . $code . '.csv';
-        $filterValues = SiteAuditReportFilter::valuesFromRequest($request, $code);
+        $filterValues = SiteAuditReportFilter::valuesFromRequest($request, $code, (int) $crawl->id);
 
-        if (($meta['source'] ?? '') === 'pages_canonical') {
-            return response()->streamDownload(function () use ($crawl, $filterValues) {
+        if (SiteAuditInventory::isInventorySource($meta['source'] ?? null)) {
+            $source = (string) $meta['source'];
+            [$invSort, $invDir] = \App\Services\SiteAudit\SiteAuditCrawlPagesColumns::normalizeSort(
+                $request->input('sort'),
+                $request->input('dir')
+            );
+            if ($source === SiteAuditInventory::SOURCE_IMAGES) {
+                [$invSort, $invDir] = \App\Services\SiteAudit\SiteAuditCrawlImagesColumns::normalizeSort(
+                    $request->input('sort'),
+                    $request->input('dir')
+                );
+            }
+
+            return response()->streamDownload(function () use ($crawl, $filterValues, $source, $invSort, $invDir) {
                 $out = fopen('php://output', 'w');
                 fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
-                fputcsv($out, ['url', 'canonical'], ';');
-
-                $query = SiteAuditPage::query()
-                    ->where('crawl_id', $crawl->id)
-                    ->whereNotNull('canonical')
-                    ->where('canonical', '!=', '')
-                    ->orderBy('id');
-                SiteAuditReportFilter::applyToPages($query, $filterValues);
-                $query->chunk(200, function ($rows) use ($out) {
-                    foreach ($rows as $row) {
-                        fputcsv($out, [$row->url, $row->canonical], ';');
+                $useBatch = $source === SiteAuditInventory::SOURCE_PAGES && ! empty($filterValues['batch']);
+                if ($source === SiteAuditInventory::SOURCE_IMAGES) {
+                    fputcsv($out, [
+                        'img_src', 'page_url', 'status', 'ok', 'size_bytes', 'width', 'height',
+                        'ext', 'https', 'external', 'alt', 'has_alt', 'loading', 'content_type', 'url_len', 'file',
+                    ], ';');
+                } elseif ($source === SiteAuditInventory::SOURCE_CANONICAL) {
+                    fputcsv($out, ['url', 'canonical'], ';');
+                } else {
+                    $headers = [
+                        'url', 'status', 'title', 'description', 'h1', 'h1_count', 'h2_count',
+                        'word_count', 'internal_links', 'external_links', 'img_count',
+                        'canonical', 'noindex', 'click_depth', 'size_bytes',
+                    ];
+                    if ($useBatch) {
+                        array_unshift($headers, 'batch_status', 'batch_query');
                     }
-                });
+                    fputcsv($out, $headers, ';');
+                }
+
+                $page = 1;
+                $perPage = 200;
+                do {
+                    if ($useBatch) {
+                        [$total, $rows] = SiteAuditBatchUrlLookup::paginate(
+                            $crawl,
+                            (string) $filterValues['batch'],
+                            $page,
+                            $perPage,
+                            $invSort,
+                            $invDir
+                        );
+                    } else {
+                        [$total, $rows] = SiteAuditInventory::paginate(
+                            $crawl,
+                            $source,
+                            $page,
+                            $perPage,
+                            $filterValues,
+                            $invSort,
+                            $invDir
+                        );
+                    }
+                    foreach ($rows as $row) {
+                        $m = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+                        if ($source === SiteAuditInventory::SOURCE_IMAGES) {
+                            fputcsv($out, [
+                                $row->url,
+                                $m['page_url'] ?? '',
+                                $m['status'] ?? '',
+                                isset($m['ok']) ? ($m['ok'] ? 1 : 0) : '',
+                                $m['size_bytes'] ?? '',
+                                $m['width'] ?? '',
+                                $m['height'] ?? '',
+                                $m['ext'] ?? '',
+                                ! empty($m['https']) ? 1 : 0,
+                                ! empty($m['external']) ? 1 : 0,
+                                $m['alt'] ?? '',
+                                isset($m['has_alt']) ? ($m['has_alt'] ? 1 : 0) : '',
+                                $m['loading'] ?? '',
+                                $m['content_type'] ?? '',
+                                $m['url_len'] ?? '',
+                                $m['file'] ?? '',
+                            ], ';');
+                        } elseif ($source === SiteAuditInventory::SOURCE_CANONICAL) {
+                            fputcsv($out, [$row->url, $m['canonical'] ?? ''], ';');
+                        } else {
+                            $line = [
+                                $row->url,
+                                $m['status_code'] ?? '',
+                                $m['title'] ?? '',
+                                $m['description'] ?? '',
+                                $m['h1'] ?? '',
+                                $m['h1_count'] ?? '',
+                                $m['h2_count'] ?? '',
+                                $m['word_count'] ?? '',
+                                $m['out_links'] ?? '',
+                                $m['ext_links'] ?? '',
+                                $m['img_count'] ?? '',
+                                $m['canonical'] ?? '',
+                                ! empty($m['noindex']) ? 1 : 0,
+                                $m['click_depth'] ?? '',
+                                $m['size_bytes'] ?? '',
+                            ];
+                            if ($useBatch) {
+                                array_unshift(
+                                    $line,
+                                    $m['batch_status'] ?? '',
+                                    $m['batch_query'] ?? ''
+                                );
+                            }
+                            fputcsv($out, $line, ';');
+                        }
+                    }
+                    $page++;
+                } while (($page - 1) * $perPage < $total);
 
                 fclose($out);
             }, $filename, [
@@ -1744,10 +1893,31 @@ class SiteAuditController extends Controller
 
         $filename = 'site-audit-' . $crawl->id . '-' . $code . '.xlsx';
         $title = (string) ($meta['title'] ?? $code);
-        $filterValues = SiteAuditReportFilter::valuesFromRequest($request, $code);
+        $filterValues = SiteAuditReportFilter::valuesFromRequest($request, $code, (int) $crawl->id);
 
-        if (($meta['source'] ?? '') === 'pages_canonical') {
-            return Excel::download(new SiteAuditCanonicalSheet($crawl->id, $filterValues), $filename);
+        if (SiteAuditInventory::isInventorySource($meta['source'] ?? null)) {
+            [$invSort, $invDir] = \App\Services\SiteAudit\SiteAuditCrawlPagesColumns::normalizeSort(
+                $request->input('sort'),
+                $request->input('dir')
+            );
+            if ((string) $meta['source'] === SiteAuditInventory::SOURCE_IMAGES) {
+                [$invSort, $invDir] = \App\Services\SiteAudit\SiteAuditCrawlImagesColumns::normalizeSort(
+                    $request->input('sort'),
+                    $request->input('dir')
+                );
+            }
+
+            return Excel::download(
+                new \App\Exports\SiteAuditInventorySheet(
+                    $crawl->id,
+                    (string) $meta['source'],
+                    $filterValues,
+                    $title,
+                    $invSort,
+                    $invDir
+                ),
+                $filename
+            );
         }
 
         $codes = $this->reportCodes($code, $meta);
@@ -2080,6 +2250,62 @@ class SiteAuditController extends Controller
             $meta['has_query'] = strpos($url, '?') !== false;
             $path = parse_url($url, PHP_URL_PATH);
             $meta['path_section'] = self::indexMismatchPathSection(is_string($path) ? $path : '');
+            $row->meta_json = $meta;
+
+            return $row;
+        });
+    }
+
+    /**
+     * Старые findings без title/description в meta — подтянуть текст со страницы обхода.
+     *
+     * @param  \Illuminate\Support\Collection  $rows
+     * @return \Illuminate\Support\Collection
+     */
+    private function enrichMetaLengthTexts(int $crawlId, string $code, $rows)
+    {
+        $field = strpos($code, 'description_') === 0 ? 'description' : 'title';
+        $need = [];
+        foreach ($rows as $row) {
+            $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+            if (trim((string) ($meta[$field] ?? '')) !== '') {
+                continue;
+            }
+            $h = (string) ($row->url_hash ?? '');
+            if ($h !== '') {
+                $need[$h] = true;
+            }
+        }
+        if ($need === []) {
+            return $rows;
+        }
+
+        $pages = SiteAuditPage::query()
+            ->where('crawl_id', $crawlId)
+            ->whereIn('url_hash', array_keys($need))
+            ->get(['url_hash', 'title', 'description']);
+        $byHash = [];
+        foreach ($pages as $p) {
+            $byHash[(string) $p->url_hash] = $p;
+        }
+
+        return $rows->map(function ($row) use ($byHash, $field) {
+            $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+            if (trim((string) ($meta[$field] ?? '')) !== '') {
+                return $row;
+            }
+            $page = $byHash[(string) ($row->url_hash ?? '')] ?? null;
+            if (! $page) {
+                return $row;
+            }
+            $text = trim((string) ($page->{$field} ?? ''));
+            if ($text === '') {
+                return $row;
+            }
+            $meta[$field] = $text;
+            if (! isset($meta['length'])) {
+                $meta['length'] = mb_strlen($text);
+            }
             $row->meta_json = $meta;
 
             return $row;

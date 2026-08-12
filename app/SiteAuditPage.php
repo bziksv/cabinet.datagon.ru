@@ -24,8 +24,10 @@ class SiteAuditPage extends Model
         'h1',
         'h1_count',
         'h2_count',
+        'headings_json',
         'canonical',
         'robots_meta',
+        'keywords_meta',
         'noindex',
         'word_count',
         'text_len',
@@ -64,6 +66,7 @@ class SiteAuditPage extends Model
         'ext_links_json' => 'array',
         'img_srcs_json' => 'array',
         'asset_srcs_json' => 'array',
+        'headings_json' => 'array',
         'noindex' => 'boolean',
         'content_unchanged' => 'boolean',
     ];

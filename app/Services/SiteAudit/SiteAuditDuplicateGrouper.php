@@ -15,6 +15,7 @@ class SiteAuditDuplicateGrouper
         'external_assets',
         'links_nofollow',
         'page_has_broken_external_links',
+        'page_has_broken_links',
     ];
 
     /** Инверсия: группа = исходящая ссылка/ассет, внутри — страницы с ней. */
@@ -23,6 +24,7 @@ class SiteAuditDuplicateGrouper
         'external_assets',
         'links_nofollow',
         'page_has_broken_external_links',
+        'page_has_broken_links',
     ];
 
     public static function isGroupable(string $code): bool
@@ -182,7 +184,10 @@ class SiteAuditDuplicateGrouper
     {
         $buckets = [];
         $pageTotal = 0;
-        $kindNoun = $code === 'external_assets' ? 'файл' : 'ссылка';
+        $isBrokenTarget = in_array($code, ['page_has_broken_links', 'page_has_broken_external_links'], true);
+        $kindNoun = $code === 'external_assets'
+            ? 'файл'
+            : ($isBrokenTarget ? 'битая цель' : 'ссылка');
 
         foreach ($rows as $row) {
             $pageTotal++;
@@ -223,12 +228,16 @@ class SiteAuditDuplicateGrouper
                 $target = '';
                 $kind = '';
                 $scope = '';
+                $status = null;
                 if (is_string($sample)) {
                     $target = trim($sample);
                 } elseif (is_array($sample)) {
                     $target = trim((string) ($sample['url'] ?? $sample['href'] ?? $sample['src'] ?? ''));
                     $kind = trim((string) ($sample['kind'] ?? ''));
                     $scope = trim((string) ($sample['scope'] ?? ''));
+                    if (isset($sample['status']) && $sample['status'] !== '' && $sample['status'] !== null) {
+                        $status = (int) $sample['status'];
+                    }
                 }
                 if ($target === '') {
                     continue;
@@ -258,22 +267,34 @@ class SiteAuditDuplicateGrouper
                     if ($scope === '' && in_array($code, ['broken_external_link', 'page_has_broken_external_links'], true)) {
                         $scope = 'external';
                     }
+                    if ($scope === '' && $code === 'page_has_broken_links') {
+                        $scope = 'internal';
+                    }
+                    $hint = $isBrokenTarget
+                        ? 'Одна и та же битая цель на многих страницах — чаще всего мёртвая ссылка в общем блоке (шапка, подвал, меню).'
+                        : ('Одинаковая исходящая ' . $kindNoun
+                            . ' на многих URL — чаще всего общий блок (шапка, подвал, сайдбар).');
                     $buckets[$sig] = [
                         'hash' => $sig,
                         'size' => 0,
                         'label' => $label,
                         'severity' => $severity,
                         'urls' => [],
-                        'hint' => 'Одинаковая исходящая ' . $kindNoun
-                            . ' на многих URL — чаще всего общий блок (шапка, подвал, сайдбар).',
+                        'hint' => $hint,
                         'likely_template' => false,
                         'href' => $target,
                         'host' => $host,
                         'scope' => $scope,
+                        'status' => $status,
                         '_urls' => [],
                     ];
-                } elseif ($scope !== '' && ($buckets[$sig]['scope'] ?? '') === '') {
-                    $buckets[$sig]['scope'] = $scope;
+                } else {
+                    if ($scope !== '' && ($buckets[$sig]['scope'] ?? '') === '') {
+                        $buckets[$sig]['scope'] = $scope;
+                    }
+                    if ($status && empty($buckets[$sig]['status'])) {
+                        $buckets[$sig]['status'] = $status;
+                    }
                 }
 
                 if ($pageUrl !== '' && ! isset($buckets[$sig]['_urls'][$pageUrl])) {

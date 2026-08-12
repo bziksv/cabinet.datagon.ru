@@ -176,7 +176,45 @@ class SiteAuditLinkExtractor
                 if (! $abs) {
                     continue;
                 }
-                $imgSrcs[$abs] = true;
+                if (! isset($imgSrcs[$abs])) {
+                    $altRaw = null;
+                    $hasAltAttr = false;
+                    if (preg_match('/\balt\s*=\s*("([^"]*)"|\'([^\']*)\')/i', $attrs, $am)) {
+                        $hasAltAttr = true;
+                        $altRaw = html_entity_decode(trim(
+                            (isset($am[2]) && $am[2] !== '') ? $am[2] : ($am[3] ?? '')
+                        ), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    }
+                    $width = null;
+                    $height = null;
+                    if (preg_match('/\bwidth\s*=\s*("([^"]*)"|\'([^\']*)\'|([^\s>]+))/i', $attrs, $wm)) {
+                        $width = SiteAuditImageItem::parsePxAttr(
+                            (isset($wm[2]) && $wm[2] !== '') ? $wm[2] : ((isset($wm[3]) && $wm[3] !== '') ? $wm[3] : ($wm[4] ?? ''))
+                        );
+                    }
+                    if (preg_match('/\bheight\s*=\s*("([^"]*)"|\'([^\']*)\'|([^\s>]+))/i', $attrs, $hm)) {
+                        $height = SiteAuditImageItem::parsePxAttr(
+                            (isset($hm[2]) && $hm[2] !== '') ? $hm[2] : ((isset($hm[3]) && $hm[3] !== '') ? $hm[3] : ($hm[4] ?? ''))
+                        );
+                    }
+                    $loading = null;
+                    if (preg_match('/\bloading\s*=\s*("([^"]*)"|\'([^\']*)\')/i', $attrs, $lm)) {
+                        $loading = strtolower(trim(
+                            (isset($lm[2]) && $lm[2] !== '') ? $lm[2] : ($lm[3] ?? '')
+                        ));
+                        if ($loading === '') {
+                            $loading = null;
+                        }
+                    }
+                    $imgSrcs[$abs] = [
+                        'src' => $abs,
+                        'alt' => $altRaw,
+                        'has_alt' => $hasAltAttr && $altRaw !== '',
+                        'width' => $width,
+                        'height' => $height,
+                        'loading' => $loading,
+                    ];
+                }
                 if (count($externalAssetItems) < 25) {
                     $addExternalAsset($abs, 'img');
                 }
@@ -244,7 +282,7 @@ class SiteAuditLinkExtractor
                 return $c > 1;
             })),
             'bad_links' => $badLinks,
-            'img_srcs' => array_keys($imgSrcs),
+            'img_srcs' => array_values($imgSrcs),
             'asset_srcs' => array_keys($assetSrcs),
         ];
     }

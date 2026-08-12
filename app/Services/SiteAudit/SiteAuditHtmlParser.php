@@ -19,6 +19,17 @@ class SiteAuditHtmlParser
         $robots = $this->metaContents($html, 'robots');
         $robotsMeta = $robots[0] ?? null;
 
+        $keywordsList = $this->metaContents($html, 'keywords');
+        $keywordsMeta = $keywordsList[0] ?? null;
+        if ($keywordsMeta !== null) {
+            $keywordsMeta = trim(preg_replace('/\s+/u', ' ', $keywordsMeta) ?: $keywordsMeta);
+            if ($keywordsMeta === '') {
+                $keywordsMeta = null;
+            } else {
+                $keywordsMeta = mb_substr($keywordsMeta, 0, 500);
+            }
+        }
+
         $canonical = $this->canonical($html);
         $canonicalCount = $this->canonicalCount($html);
         $h1s = $this->allMatches('/<h1\b[^>]*>(.*?)<\/h1>/is', $html);
@@ -133,6 +144,7 @@ class SiteAuditHtmlParser
         $htmlErrors = $this->collectHtmlErrors($html);
         $headingOutline = $this->headingOutline($html);
         $headingIssues = $this->headingHierarchyIssues($headingOutline);
+        $headingsByLevel = $this->headingsByLevel($headingOutline, $h1s, $h2s);
 
         return [
             'title' => $title !== '' ? $title : null,
@@ -144,11 +156,13 @@ class SiteAuditHtmlParser
             'h2' => $h2s[0] ?? null,
             'h2_count' => $h2Count,
             'h2s' => array_slice($h2s, 0, 20),
+            'headings' => $headingsByLevel,
             'heading_outline' => $headingOutline,
             'heading_issues' => $headingIssues,
             'canonical' => $canonical,
             'canonical_count' => $canonicalCount,
             'robots_meta' => $robotsMeta,
+            'keywords_meta' => $keywordsMeta,
             'noindex' => $noindex,
             'word_count' => $wordCount,
             'text_len' => mb_strlen($text),
@@ -333,6 +347,47 @@ class SiteAuditHtmlParser
         }
 
         return $samples;
+    }
+
+    /**
+     * Первые тексты h1–h6 для инвентаря страниц.
+     *
+     * @param  list<array{level:int, text:string}>  $outline
+     * @param  list<string>  $h1s
+     * @param  list<string>  $h2s
+     * @return array<string, list<string>>
+     */
+    private function headingsByLevel(array $outline, array $h1s, array $h2s): array
+    {
+        $by = [
+            'h1' => array_values(array_filter(array_map(function ($t) {
+                return mb_substr(trim((string) $t), 0, 160);
+            }, array_slice($h1s, 0, 5)))),
+            'h2' => array_values(array_filter(array_map(function ($t) {
+                return mb_substr(trim((string) $t), 0, 160);
+            }, array_slice($h2s, 0, 8)))),
+            'h3' => [],
+            'h4' => [],
+            'h5' => [],
+            'h6' => [],
+        ];
+        foreach ($outline as $h) {
+            $lvl = (int) ($h['level'] ?? 0);
+            if ($lvl < 3 || $lvl > 6) {
+                continue;
+            }
+            $key = 'h' . $lvl;
+            if (count($by[$key]) >= 5) {
+                continue;
+            }
+            $text = mb_substr(trim((string) ($h['text'] ?? '')), 0, 160);
+            if ($text === '') {
+                continue;
+            }
+            $by[$key][] = $text;
+        }
+
+        return $by;
     }
 
     /**

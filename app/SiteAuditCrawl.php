@@ -59,6 +59,29 @@ class SiteAuditCrawl extends Model
         return $this->hasMany(SiteAuditPage::class, 'crawl_id');
     }
 
+    /**
+     * Масштаб проверки для карточек сводки: страницы + сумма img на HTML.
+     *
+     * @return array{pages:int,images:int}
+     */
+    public function scaleStats(): array
+    {
+        $pages = (int) $this->pages_fetched;
+        $progress = is_array($this->progress_json) ? $this->progress_json : [];
+        if (array_key_exists('images_total', $progress) && $progress['images_total'] !== null) {
+            $images = (int) $progress['images_total'];
+        } else {
+            $images = (int) SiteAuditPage::query()
+                ->where('crawl_id', $this->id)
+                ->sum('img_count');
+        }
+
+        return [
+            'pages' => $pages,
+            'images' => $images,
+        ];
+    }
+
     public function findings()
     {
         return $this->hasMany(SiteAuditFinding::class, 'crawl_id');

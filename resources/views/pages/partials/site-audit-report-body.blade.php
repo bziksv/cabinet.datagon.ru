@@ -6,9 +6,106 @@
 @php
     $isRedirectReport = in_array($code ?? '', ['redirect', 'redirect_chain_long', 'redirect_loop'], true);
     $probeSkipped = is_array($probeStatus ?? null) && ($probeStatus['status'] ?? '') === 'skipped';
+    $probePending = is_array($probeStatus ?? null) && ($probeStatus['status'] ?? '') === 'pending';
+    $probeRan = is_array($probeStatus ?? null) && ($probeStatus['status'] ?? '') === 'ran';
     $isIndexMismatch = ($code ?? '') === 'index_count_mismatch';
+    $plagProgress = null;
+    if (($probeStatus['probe'] ?? '') === 'plagiarism_external' && !empty($crawl)) {
+        $plagProgress = is_array($crawl->progress_json['plagiarism_external'] ?? null)
+            ? $crawl->progress_json['plagiarism_external']
+            : null;
+    }
+    $plagChecked = is_array($plagProgress) ? (int) ($plagProgress['done'] ?? count($plagProgress['rows'] ?? [])) : 0;
+    $plagTotal = is_array($plagProgress) ? (int) ($plagProgress['total'] ?? $plagChecked) : 0;
+    $plagRows = is_array($plagProgress['rows'] ?? null) ? $plagProgress['rows'] : [];
+    $plagRoles = is_array($plagProgress['roles'] ?? null) ? $plagProgress['roles'] : [];
+    $plagWarnBelow = (float) config('site_audit.plagiarism_external_warn_below', 70);
+    $plagRoleLabels = [
+        'home' => 'главная',
+        'category' => 'категория',
+        'product' => 'товар',
+        'service' => 'услуга',
+        'sample' => 'добор',
+    ];
+    $plagShowChecked = ($probeStatus['probe'] ?? '') === 'plagiarism_external'
+        && ($probeRan || $probePending)
+        && ($plagRows !== [] || $probePending);
 @endphp
-@if($probeSkipped && ! $isIndexMismatch)
+@if($plagShowChecked)
+    <div class="cabinet-sa-plag-checked mb-3">
+        <div class="cabinet-sa-plag-checked__head">
+            <div>
+                <div class="cabinet-sa-plag-checked__title">
+                    @if($probePending)
+                        Идёт проверка уникальности
+                        @if($plagTotal > 0)
+                            <span class="cabinet-sa-plag-checked__count">
+                                {{ number_format($plagChecked, 0, '', ' ') }}
+                                из {{ number_format($plagTotal, 0, '', ' ') }}
+                            </span>
+                        @endif
+                    @else
+                        Проверили уникальность
+                        <span class="cabinet-sa-plag-checked__count">
+                            {{ number_format(count($plagRows), 0, '', ' ') }}
+                            {{ count($plagRows) === 1 ? 'страница' : (count($plagRows) < 5 ? 'страницы' : 'страниц') }}
+                        </span>
+                    @endif
+                </div>
+                <div class="cabinet-sa-plag-checked__note">
+                    В таблицу замечаний ниже попадают только страницы
+                    ниже {{ rtrim(rtrim(number_format($plagWarnBelow, 1, ',', ' '), '0'), ',') }}%.
+                    Здесь — все URL, которые реально сверили.
+                </div>
+            </div>
+            @if(empty($isPublic) && !empty($crawl))
+                <a class="btn btn-sm btn-outline-primary flex-shrink-0"
+                   href="{{ route('pages.site-audit.crawl.show', $crawl->id) }}#sa-pane-plagiarism">
+                    Антиплагиат
+                </a>
+            @endif
+        </div>
+        @if($plagRows !== [])
+            <ul class="cabinet-sa-plag-checked__list">
+                @foreach($plagRows as $plagRow)
+                    @php
+                        $pUrl = trim((string) ($plagRow['url'] ?? ''));
+                        if ($pUrl === '') {
+                            continue;
+                        }
+                        $pUniq = array_key_exists('uniqueness_pct', $plagRow) && $plagRow['uniqueness_pct'] !== null
+                            ? (float) $plagRow['uniqueness_pct']
+                            : null;
+                        $pErr = trim((string) ($plagRow['error'] ?? ''));
+                        $pRole = (string) ($plagRoles[$pUrl] ?? '');
+                        $pRoleLabel = $plagRoleLabels[$pRole] ?? '';
+                        $pBad = $pUniq !== null && $pUniq < $plagWarnBelow;
+                        $pOk = $pUniq !== null && $pUniq >= $plagWarnBelow && $pErr === '';
+                    @endphp
+                    <li class="cabinet-sa-plag-checked__item{{ $pBad ? ' is-bad' : ($pOk ? ' is-ok' : '') }}">
+                        <div class="cabinet-sa-plag-checked__url">
+                            @if($pRoleLabel !== '')
+                                <span class="cabinet-sa-plag-checked__role">{{ $pRoleLabel }}</span>
+                            @endif
+                            <a href="{{ $pUrl }}" target="_blank" rel="noopener noreferrer">{{ $pUrl }}</a>
+                        </div>
+                        <div class="cabinet-sa-plag-checked__meta">
+                            @if($pErr !== '')
+                                <span class="cabinet-sa-plag-checked__err" title="{{ $pErr }}">ошибка</span>
+                            @elseif($pUniq === null)
+                                <span class="text-muted">…</span>
+                            @else
+                                <span class="cabinet-sa-plag-checked__pct{{ $pBad ? ' is-bad' : ' is-ok' }}">
+                                    {{ rtrim(rtrim(number_format($pUniq, 1, ',', ' '), '0'), ',') }}%
+                                </span>
+                            @endif
+                        </div>
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+    </div>
+@elseif($probeSkipped && ! $isIndexMismatch)
     @if(($probeStatus['probe'] ?? '') === 'plagiarism_external')
         <div class="alert alert-warning border small mb-3 cabinet-sa-probe-cta d-flex flex-wrap align-items-center justify-content-between" style="gap:10px">
             <div>
@@ -390,15 +487,29 @@
             @if(($viewMode ?? '') === 'groups' && !empty($groupTotal))
                 <span class="text-muted small ms-2">паттернов: {{ number_format((int) $groupTotal, 0, '', ' ') }} · URL: {{ number_format((int) $total, 0, '', ' ') }}</span>
             @endif
+        @elseif(!empty($isCrawlImagesReport))
+            <a class="cabinet-sa-view-toggle__btn {{ ($viewMode ?? '') === 'groups' ? 'is-active' : '' }}"
+               href="{{ request()->fullUrlWithQuery(['view' => 'groups', 'page' => 1]) }}">По картинкам</a>
+            <a class="cabinet-sa-view-toggle__btn {{ ($viewMode ?? '') === 'list' ? 'is-active' : '' }}"
+               href="{{ request()->fullUrlWithQuery(['view' => 'list', 'page' => 1]) }}">По вхождениям</a>
+            @if(($viewMode ?? '') === 'groups' && !empty($groupTotal))
+                <span class="text-muted small ms-2">картинок: {{ number_format((int) $groupTotal, 0, '', ' ') }} · вхождений: {{ number_format((int) $total, 0, '', ' ') }}</span>
+            @endif
         @elseif(!empty($isLinkInvertedReport))
+            @php
+                $isBrokenLinksReport = in_array($code ?? '', [
+                    'page_has_broken_links',
+                    'page_has_broken_external_links',
+                ], true);
+            @endphp
             <a class="cabinet-sa-view-toggle__btn {{ ($viewMode ?? '') === 'groups' ? 'is-active' : '' }}"
                href="{{ request()->fullUrlWithQuery(['view' => 'groups', 'page' => 1]) }}"
-               title="Одинаковые исходящие вместе — видно общий блок (шапка/подвал/соцсети)">По ссылкам</a>
+               title="{{ $isBrokenLinksReport ? 'Одинаковые битые цели вместе — видно мёртвую ссылку в общем блоке' : 'Одинаковые исходящие вместе — видно общий блок (шапка/подвал/соцсети)' }}">{{ $isBrokenLinksReport ? 'По целям' : 'По ссылкам' }}</a>
             <a class="cabinet-sa-view-toggle__btn {{ ($viewMode ?? '') === 'list' ? 'is-active' : '' }}"
                href="{{ request()->fullUrlWithQuery(['view' => 'list', 'page' => 1]) }}"
-               title="Каждая страница со своим списком исходящих">По страницам</a>
+               title="{{ $isBrokenLinksReport ? 'Каждая страница со своим списком битых ссылок' : 'Каждая страница со своим списком исходящих' }}">По страницам</a>
             @if(($viewMode ?? '') === 'groups' && !empty($groupTotal))
-                <span class="text-muted small ms-2">целей: {{ number_format((int) $groupTotal, 0, '', ' ') }} · стр.: {{ number_format((int) $total, 0, '', ' ') }}</span>
+                <span class="text-muted small ms-2">{{ $isBrokenLinksReport ? 'целей' : 'целей' }}: {{ number_format((int) $groupTotal, 0, '', ' ') }} · стр.: {{ number_format((int) $total, 0, '', ' ') }}</span>
             @endif
         @else
             <a class="cabinet-sa-view-toggle__btn {{ ($viewMode ?? '') === 'groups' ? 'is-active' : '' }}"
@@ -416,7 +527,23 @@
 
 @if(!empty($htmlSitewide) && is_array($htmlSitewide))
     <div class="alert alert-warning border small mb-3 cabinet-sa-html-sitewide">
-        @if(!empty($isLinkInvertedReport))
+        @if(!empty($isCrawlImagesReport))
+            <strong>Скорее общий блок</strong>
+            (шапка / счётчик / шаблон) —
+            одна и та же картинка на
+            <strong>{{ number_format((int) $htmlSitewide['pages'], 0, '', ' ') }}</strong>
+            из {{ number_format((int) $htmlSitewide['total'], 0, '', ' ') }} стр.
+            ({{ (int) $htmlSitewide['pct'] }}%):
+            @if(!empty($htmlSitewide['label']))
+                <code class="cabinet-sa-html-sitewide__code">{{ $htmlSitewide['label'] }}</code>.
+            @endif
+            <div class="mt-1 mb-0">
+                Не разбирайте каждую страницу: уберите или замените файл в общем шаблоне один раз.
+                @if(($viewMode ?? '') === 'list')
+                    <a href="{{ request()->fullUrlWithQuery(['view' => 'groups', 'page' => 1]) }}">Смотреть по картинкам →</a>
+                @endif
+            </div>
+        @elseif(!empty($isLinkInvertedReport))
             <strong>Скорее общий блок</strong>
             (шапка / подвал / соцсети) —
             одна и та же исходящая на
@@ -429,7 +556,7 @@
             <div class="mt-1 mb-0">
                 Не разбирайте каждую страницу: уберите или разметьте ссылку в общем шаблоне один раз.
                 @if(($viewMode ?? '') === 'list')
-                    <a href="{{ request()->fullUrlWithQuery(['view' => 'groups', 'page' => 1]) }}">Смотреть по ссылкам →</a>
+                    <a href="{{ request()->fullUrlWithQuery(['view' => 'groups', 'page' => 1]) }}">{{ in_array($code ?? '', ['page_has_broken_links', 'page_has_broken_external_links'], true) ? 'Смотреть по целям →' : 'Смотреть по ссылкам →' }}</a>
                 @endif
             </div>
         @else
@@ -452,12 +579,32 @@
 @endif
 
 @if(!empty($canNote))
-    <div class="alert alert-light border small mb-3 cabinet-sa-note-legend{{ ($code ?? '') === 'index_count_mismatch' ? ' cabinet-sa-note-legend--compact' : '' }}">
-        <strong>Заметка</strong> — комментарий к строке.
-        <strong>Исправлено</strong> — починили, строка уходит из счётчиков.
-        <strong>Игнор</strong> — не ошибка / ложное срабатывание.
+    <div class="cabinet-sa-note-legend{{ ($code ?? '') === 'index_count_mismatch' ? ' cabinet-sa-note-legend--compact' : '' }}" role="note">
+        <div class="cabinet-sa-note-legend__title">Действия со строкой</div>
+        <div class="cabinet-sa-note-legend__items">
+            <div class="cabinet-sa-note-legend__item">
+                <span class="cabinet-sa-note-legend__chip cabinet-sa-note-legend__chip--note">
+                    <i class="fa fa-comment" aria-hidden="true"></i> Заметка
+                </span>
+                <span class="cabinet-sa-note-legend__desc">свой комментарий</span>
+            </div>
+            <div class="cabinet-sa-note-legend__item">
+                <span class="cabinet-sa-note-legend__chip cabinet-sa-note-legend__chip--fixed">
+                    <i class="fa fa-check" aria-hidden="true"></i> Исправлено
+                </span>
+                <span class="cabinet-sa-note-legend__desc">починили — уходит из счётчиков</span>
+            </div>
+            <div class="cabinet-sa-note-legend__item">
+                <span class="cabinet-sa-note-legend__chip cabinet-sa-note-legend__chip--ignore">
+                    <i class="fa fa-ban" aria-hidden="true"></i> Игнор
+                </span>
+                <span class="cabinet-sa-note-legend__desc">не ошибка / ложное срабатывание</span>
+            </div>
+        </div>
         @if(($code ?? '') !== 'index_count_mismatch')
-            Пометки помнятся для этого сайта (тот же тип замечания + тот же адрес) в следующих проверках, пока сами не снимете.
+            <div class="cabinet-sa-note-legend__foot">
+                Пометки помнятся для этого сайта (тот же тип + тот же URL), пока сами не снимете.
+            </div>
         @endif
     </div>
 @endif
@@ -470,11 +617,15 @@
                 <div class="cabinet-sa-dup-group__head">
                     <div class="cabinet-sa-dup-group__meta">
                         <span class="cabinet-sa-dup-group__count">{{ number_format((int) $group['size'], 0, '', ' ') }} стр.</span>
+                        @if(!empty($group['status']))
+                            @php $gStatus = (int) $group['status']; @endphp
+                            <span class="cabinet-sa-status-pill {{ $gStatus >= 500 ? 'cabinet-sa-status-pill--5xx' : ($gStatus >= 400 ? 'cabinet-sa-status-pill--4xx' : '') }}">{{ $gStatus }}</span>
+                        @endif
                         @if(!empty($isLinkInvertedReport) && (($group['scope'] ?? '') === 'external' || ($group['scope'] ?? '') === 'internal'))
                             <span class="cabinet-sa-dup-group__scope cabinet-sa-dup-group__scope--{{ $group['scope'] }}">{{ ($group['scope'] ?? '') === 'internal' ? 'внутренняя' : 'внешняя' }}</span>
                         @endif
                         @if(!empty($group['likely_template']))
-                            <span class="cabinet-sa-dup-group__badge" title="{{ !empty($isLinkInvertedReport) ? 'Одинаковая исходящая на многих URL — почти наверняка общий блок' : 'Одинаковая ошибка на многих URL — почти наверняка общий шаблон' }}">{{ !empty($isLinkInvertedReport) ? 'общий блок' : 'сквозной' }}</span>
+                            <span class="cabinet-sa-dup-group__badge">{{ !empty($isCrawlImagesReport) ? 'общий блок' : (!empty($isLinkInvertedReport) ? 'общий блок' : 'сквозной') }}</span>
                         @endif
                     </div>
                     <div class="cabinet-sa-dup-group__label">
@@ -514,7 +665,7 @@
                 @if($groupUrlsTail !== [] || $groupUrlsHidden > 0)
                     <details class="cabinet-sa-dup-group__more">
                         <summary class="cabinet-sa-dup-group__more-sum">
-                            Ещё {{ number_format($groupUrlTotal - $groupUrlPreview, 0, '', ' ') }} URL
+                            Ещё {{ number_format($groupUrlTotal - $groupUrlPreview, 0, '', ' ') }} {{ !empty($isCrawlImagesReport) ? 'стр.' : 'URL' }}
                         </summary>
                         @if($groupUrlsTail !== [])
                             <ul class="cabinet-sa-dup-group__urls cabinet-sa-dup-group__urls--more">
@@ -531,7 +682,7 @@
                                 из {{ number_format($groupUrlTotal, 0, '', ' ') }}.
                                 Остальные {{ number_format($groupUrlsHidden, 0, '', ' ') }} —
                                 в режиме
-                                <a href="{{ request()->fullUrlWithQuery(['view' => 'list', 'page' => 1]) }}">По страницам</a>.
+                                <a href="{{ request()->fullUrlWithQuery(['view' => 'list', 'page' => 1]) }}">{{ !empty($isCrawlImagesReport) ? 'По вхождениям' : 'По страницам' }}</a>.
                             </div>
                         @endif
                     </details>
@@ -545,6 +696,8 @@
                     @else
                         Находок нет — проверка ещё не запускалась. Нажмите «Запустить» выше.
                     @endif
+                @elseif(($probeStatus['probe'] ?? '') === 'plagiarism_external')
+                    Замечаний нет — все проверенные страницы выше порога (список с процентами — в блоке «Проверили» выше).
                 @else
                     Находок нет — проверка выполнена, замечаний по этому отчёту нет.
                 @endif
@@ -559,7 +712,7 @@
         @include('pages.partials.site-audit-psi-report')
     @else
     @php
-        $colspan = 2; // URL + Детали
+        $colspan = 2; // URL + Детали (по умолчанию)
         if (!empty($showReferrers)) { $colspan++; }
         if (!empty($canIgnore) || !empty($canNote)) { $colspan++; }
         $isRedirectReport = in_array($code ?? '', ['redirect', 'redirect_chain_long', 'redirect_loop'], true);
@@ -568,6 +721,22 @@
         $isHeavyImageReport = ($code ?? '') === 'heavy_image';
         $isAffiliateReport = ($code ?? '') === 'probable_affiliate';
         $isIndexMismatchReport = ($code ?? '') === 'index_count_mismatch';
+        $isCannibalReport = ($code ?? '') === 'keyword_cannibalization';
+        $isCrawlPagesReport = ($code ?? '') === 'crawl_pages';
+        $isCrawlImagesReport = ($code ?? '') === 'crawl_images';
+        if ($isCannibalReport) {
+            // URL + Запрос + Посадочная + TITLE (+ действия)
+            $colspan = 4;
+            if (!empty($canIgnore) || !empty($canNote)) { $colspan++; }
+        }
+        if ($isCrawlPagesReport) {
+            // URL + код + title + desc + h1 + h1/h2 + слов + внутр + внеш + img + canonical + индекс + глубина
+            $colspan = 13;
+            if (!empty($canIgnore) || !empty($canNote)) { $colspan++; }
+        }
+        if ($isCrawlImagesReport) {
+            $colspan = 7;
+        }
         $showActions = !empty($canNote) || !empty($canIgnore);
         // Срочность задаётся на тип ошибки в конфиге. В обычном отчёте все строки одинаковые —
         // колонку «Приор.» показываем только в сводных (virtual), где реально смешаны уровни.
@@ -582,7 +751,11 @@
         if ($showSeverityCol) {
             $colspan++;
         }
-        $urlTip = $isRedirectReport
+        $urlTip = $isCrawlPagesReport
+            ? "Адрес страницы из этой проверки.\nНажмите — откроется сайт в новой вкладке."
+            : ($isCannibalReport
+            ? "Страница, у которой в TITLE/H1 нашёлся чужой запрос из мониторинга.\nПравильная посадочная — в соседней колонке."
+            : ($isRedirectReport
             ? "URL, который сам отвечает редиректом.\nГде на него ссылаются — колонка «Откуда ссылаются» (меню, HTML, sitemap)."
             : ($isBrokenTarget
                 ? "Это URL, который сам ответил ошибкой при обходе (404 и т.п.).\nНе путать со страницей, где стоит ссылка — она в колонке «Откуда ссылаются»."
@@ -590,13 +763,14 @@
                     ? "Страница HTML, на которой стоит тяжёлая картинка.\nСама картинка (файл) — в колонке «Изображение»."
                     : ($isAffiliateReport
                         ? "Страница, на которой стоят исходящие ссылки, похожие на партнёрские.\nСами ссылки — в колонке «Партнёрки»."
-                        : "Адрес страницы с проблемой.\nНажмите ссылку — откроется сайт в новой вкладке.")));
-        $urlColTitle = $isRedirectReport
-            ? 'URL с редиректом'
-            : ($isBrokenTarget ? 'Битый URL (цель)' : ($isHeavyImageReport ? 'Страница с картинкой' : ($isAffiliateReport ? 'Страница со ссылками' : 'Адрес страницы с проблемой')));
-        $urlColLabel = $isRedirectReport
+                        : "Адрес страницы с проблемой.\nНажмите ссылку — откроется сайт в новой вкладке.")))));
+        $urlColLabel = $isCrawlPagesReport
             ? 'URL'
-            : ($isBrokenTarget ? 'Битый URL' : ($isHeavyImageReport ? 'Страница' : ($isAffiliateReport ? 'Страница' : 'URL')));
+            : ($isCannibalReport
+            ? 'Лишняя страница'
+            : ($isRedirectReport
+            ? 'URL'
+            : ($isBrokenTarget ? 'Битый URL' : ($isHeavyImageReport ? 'Страница' : ($isAffiliateReport ? 'Страница' : 'URL')))));
         $detailsColLabel = $isSerpTitleReport ? 'Сравнение title'
             : ($isHeavyImageReport ? 'Изображение'
                 : ($isAffiliateReport ? 'Партнёрки'
@@ -614,14 +788,25 @@
             ? "Откуда URL попал в проверка: sitemap.xml, посев, главная или страница со ссылкой."
             : "Откуда URL попал в проверка или страницы со ссылкой.";
     @endphp
-    <div class="cabinet-sa-table-wrap{{ $isSerpTitleReport ? ' cabinet-sa-table-wrap--serp-title' : '' }}{{ $isBrokenTarget ? ' cabinet-sa-table-wrap--broken' : '' }}{{ $isHeavyImageReport ? ' cabinet-sa-table-wrap--heavy' : '' }}{{ $isAffiliateReport ? ' cabinet-sa-table-wrap--aff' : '' }}{{ !empty($isIndexMismatchReport) ? ' cabinet-sa-table-wrap--index-mismatch' : '' }}">
+    @if($isCrawlPagesReport)
+        @include('pages.partials.site-audit-crawl-pages-table')
+    @elseif(!empty($isCrawlImagesReport))
+        @include('pages.partials.site-audit-crawl-images-table')
+    @else
+    <div class="cabinet-sa-table-wrap{{ $isSerpTitleReport ? ' cabinet-sa-table-wrap--serp-title' : '' }}{{ $isBrokenTarget ? ' cabinet-sa-table-wrap--broken' : '' }}{{ $isHeavyImageReport ? ' cabinet-sa-table-wrap--heavy' : '' }}{{ $isAffiliateReport ? ' cabinet-sa-table-wrap--aff' : '' }}{{ !empty($isIndexMismatchReport) ? ' cabinet-sa-table-wrap--index-mismatch' : '' }}{{ $isCannibalReport ? ' cabinet-sa-table-wrap--cannibal' : '' }}">
         <table class="table table-sm table-hover mb-0 cabinet-sa-findings-table">
             <colgroup>
                 <col class="cabinet-sa-col-url">
                 @if($showSeverityCol)
                     <col class="cabinet-sa-col-sev">
                 @endif
-                <col class="cabinet-sa-col-details">
+                @if($isCannibalReport)
+                    <col class="cabinet-sa-col-query">
+                    <col class="cabinet-sa-col-landing">
+                    <col class="cabinet-sa-col-title">
+                @else
+                    <col class="cabinet-sa-col-details">
+                @endif
                 @if(!empty($showReferrers))
                     <col class="cabinet-sa-col-from">
                 @endif
@@ -631,20 +816,41 @@
             </colgroup>
             <thead class="table-light">
             <tr>
-                <th title="{{ $urlColTitle }}">
+                <th>
                     {{ $urlColLabel }}
                     @include('pages.partials.site-audit-tip', ['tip' => $urlTip])
                 </th>
                 @if($showSeverityCol)
-                    <th title="В этом сводном отчёте смешаны разные типы ошибок — разная срочность.">
+                    <th>
                         Приор.
                         @include('pages.partials.site-audit-tip', ['tip' => "Срочность разных типов в сводке.\nГрубые — чинить в первую очередь.\nИнфо — просто знать.\nВ обычном отчёте (один тип) колонка скрыта: все строки одного уровня."])
                     </th>
                 @endif
-                <th title="{{ $isAffiliateReport ? 'Партнёрские ссылки: сеть и URL' : ($isHeavyImageReport ? 'Файл изображения: вес и URL' : ($isSerpTitleReport ? 'Сравнение TITLE на сайте и в выдаче ПС' : 'Коротко: что именно не так (код ответа, дубль и т.п.).')) }}">
-                    {{ $detailsColLabel }}
-                    @include('pages.partials.site-audit-tip', ['tip' => $detailsColTip])
-                </th>
+                @if($isCannibalReport)
+                    <th class="cabinet-sa-th-cannibal" title="Запрос из мониторинга позиций">
+                        <span class="cabinet-sa-th-cannibal__main">
+                            Запрос
+                            @include('pages.partials.site-audit-tip', ['tip' => "Запрос из модуля мониторинга позиций.\nЕго нашли в TITLE/H1 у лишней страницы слева."])
+                        </span>
+                        <span class="cabinet-sa-th-cannibal__sub">из мониторинга</span>
+                    </th>
+                    <th class="cabinet-sa-th-cannibal" title="Посадочная из мониторинга позиций — куда запрос должен вести">
+                        <span class="cabinet-sa-th-cannibal__main">
+                            Посадочная
+                            @include('pages.partials.site-audit-tip', ['tip' => "Целевой URL запроса в мониторинге позиций.\nСюда ключ должен вести; слева — страница, которая с ним конкурирует."])
+                        </span>
+                        <span class="cabinet-sa-th-cannibal__sub">из мониторинга позиций</span>
+                    </th>
+                    <th title="TITLE страницы слева">
+                        TITLE
+                        @include('pages.partials.site-audit-tip', ['tip' => "TITLE лишней страницы — по нему видно, почему сработало совпадение."])
+                    </th>
+                @else
+                    <th title="{{ $isAffiliateReport ? 'Партнёрские ссылки: сеть и URL' : ($isHeavyImageReport ? 'Файл изображения: вес и URL' : ($isSerpTitleReport ? 'Сравнение TITLE на сайте и в выдаче ПС' : 'Коротко: что именно не так (код ответа, дубль и т.п.).')) }}">
+                        {{ $detailsColLabel }}
+                        @include('pages.partials.site-audit-tip', ['tip' => $detailsColTip])
+                    </th>
+                @endif
                 @if(!empty($showReferrers))
                     <th title="Откуда URL попал в очередь проверки">
                         {{ $isBrokenTarget ? 'Страница со ссылкой' : 'Откуда' }}
@@ -654,8 +860,12 @@
                     </th>
                 @endif
                 @if($showActions)
-                    <th class="cabinet-sa-th-actions" title="Заметка — комментарий. Исправлено — починили. Игнор — не считаем ошибкой. «?» у кнопки — подробнее.">
+                    <th class="cabinet-sa-th-actions">
                         Действия
+                        @include('pages.partials.site-audit-tip', [
+                            'tip' => "Заметка — комментарий.\nИсправлено — починили.\nИгнор — не считаем ошибкой.",
+                            'tipSide' => 'left',
+                        ])
                     </th>
                 @endif
             </tr>
@@ -703,6 +913,34 @@
                             </span>
                         </td>
                     @endif
+                    @if($isCannibalReport)
+                        @php
+                            $cQuery = trim((string) ($rowMeta['query'] ?? ''));
+                            $cLanding = trim((string) ($rowMeta['landing_url'] ?? ''));
+                            $cTitle = trim((string) ($rowMeta['competitor_title'] ?? ''));
+                        @endphp
+                        <td class="small cabinet-sa-cannibal-query-cell">
+                            @if($cQuery !== '')
+                                <span class="cabinet-sa-cannibal-query" title="{{ $cQuery }}">«{{ \Illuminate\Support\Str::limit($cQuery, 60) }}»</span>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
+                        <td class="small cabinet-sa-cannibal-landing-cell">
+                            @if($cLanding !== '')
+                                <a href="{{ $cLanding }}" target="_blank" rel="noopener noreferrer" class="cabinet-sa-url-break" title="Посадочная из мониторинга позиций">{{ $cLanding }}</a>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
+                        <td class="small cabinet-sa-cannibal-title-cell">
+                            @if($cTitle !== '')
+                                <span class="cabinet-sa-cannibal-title text-muted" title="{{ $cTitle }}">{{ \Illuminate\Support\Str::limit($cTitle, 90) }}</span>
+                            @else
+                                <span class="text-muted">—</span>
+                            @endif
+                        </td>
+                    @else
                     <td class="small cabinet-sa-details-cell">
                         @if(!empty($isIndexMismatchReport))
                             @php
@@ -754,6 +992,7 @@
                             @endif
                         @endif
                     </td>
+                    @endif
                     @if(!empty($showReferrers))
                         <td class="small cabinet-sa-from-cell">
                             @php
@@ -813,7 +1052,9 @@
                             <div class="cabinet-sa-actions">
                                 @if(!empty($canNote) && !empty($row->id))
                                     <div class="cabinet-sa-act cabinet-sa-act--note">
-                                        <label class="cabinet-sa-act__main" for="sa-note-{{ (int) $row->id }}">Заметка</label>
+                                        <label class="cabinet-sa-act__main" for="sa-note-{{ (int) $row->id }}">
+                                            <i class="fa fa-comment" aria-hidden="true"></i><span>Заметка</span>
+                                        </label>
                                         @include('pages.partials.site-audit-action-help', [
                                             'tip' => "Комментарий к ошибке.\nСохраняется навсегда (тип + URL).\nОткройте → текст → «Сохранить».",
                                         ])
@@ -824,7 +1065,9 @@
                                             <input type="hidden" name="finding_id" value="{{ $row->id }}">
                                             <input type="hidden" name="comment" value="{{ $noteComment }}">
                                             <div class="cabinet-sa-act cabinet-sa-act--fixed">
-                                                <button type="submit" name="status" value="fixed" class="cabinet-sa-act__main">Исправлено</button>
+                                                <button type="submit" name="status" value="fixed" class="cabinet-sa-act__main">
+                                                    <i class="fa fa-check" aria-hidden="true"></i><span>Исправлено</span>
+                                                </button>
                                                 @include('pages.partials.site-audit-action-help', [
                                                     'tip' => "Починили — спрятать из счётчиков.\nВернуть: «Открыть» или «Показать исправленные».\nНе путать с «Игнор».",
                                                 ])
@@ -836,7 +1079,9 @@
                                             <input type="hidden" name="finding_id" value="{{ $row->id }}">
                                             <input type="hidden" name="comment" value="{{ $noteComment }}">
                                             <div class="cabinet-sa-act cabinet-sa-act--open">
-                                                <button type="submit" name="status" value="open" class="cabinet-sa-act__main">Открыть</button>
+                                                <button type="submit" name="status" value="open" class="cabinet-sa-act__main">
+                                                    <i class="fa fa-undo" aria-hidden="true"></i><span>Открыть</span>
+                                                </button>
                                                 @include('pages.partials.site-audit-action-help', [
                                                     'tip' => "Снова учитывать в счётчиках (снять «Исправлено»).",
                                                 ])
@@ -850,7 +1095,9 @@
                                             @csrf
                                             <input type="hidden" name="finding_id" value="{{ $row->id }}">
                                             <div class="cabinet-sa-act cabinet-sa-act--restore">
-                                                <button type="submit" class="cabinet-sa-act__main">Вернуть</button>
+                                                <button type="submit" class="cabinet-sa-act__main">
+                                                    <i class="fa fa-undo" aria-hidden="true"></i><span>Вернуть</span>
+                                                </button>
                                                 @include('pages.partials.site-audit-action-help', [
                                                     'tip' => "Снова считать ошибкой (снять игнор).",
                                                 ])
@@ -861,7 +1108,9 @@
                                             @csrf
                                             <input type="hidden" name="finding_id" value="{{ $row->id }}">
                                             <div class="cabinet-sa-act cabinet-sa-act--ignore">
-                                                <button type="submit" class="cabinet-sa-act__main">Игнор</button>
+                                                <button type="submit" class="cabinet-sa-act__main">
+                                                    <i class="fa fa-ban" aria-hidden="true"></i><span>Игнор</span>
+                                                </button>
                                                 @include('pages.partials.site-audit-action-help', [
                                                     'tip' => "Не ошибка / ложное срабатывание.\nУбираем из отчёта навсегда, пока не нажмёте «Вернуть».\nИгнор ≠ Исправлено.",
                                                 ])
@@ -879,7 +1128,9 @@
                                                       placeholder="Текст заметки…">{{ $noteComment }}</textarea>
                                             <div class="cabinet-sa-act cabinet-sa-act--save">
                                                 <button type="submit" name="status" value="{{ $isFixed ? 'fixed' : 'open' }}"
-                                                        class="cabinet-sa-act__main">Сохранить</button>
+                                                        class="cabinet-sa-act__main">
+                                                    <i class="fa fa-save" aria-hidden="true"></i><span>Сохранить</span>
+                                                </button>
                                                 @include('pages.partials.site-audit-action-help', [
                                                     'tip' => "Только текст заметки.\n«Исправлено» и «Игнор» — кнопки выше.",
                                                 ])
@@ -899,6 +1150,8 @@
                         @else
                             Находок нет — проверка ещё не запускалась. Нажмите «Запустить» выше.
                         @endif
+                    @elseif(($probeStatus['probe'] ?? '') === 'plagiarism_external')
+                        Замечаний нет — все проверенные страницы выше порога (список с процентами — в блоке «Проверили» выше).
                     @else
                         Находок нет — проверка выполнена, замечаний по этому отчёту нет.
                     @endif
@@ -907,6 +1160,7 @@
             </tbody>
         </table>
     </div>
+    @endif {{-- /isCrawlPagesReport --}}
     @endif {{-- /isPsiReport --}}
 @endif
 

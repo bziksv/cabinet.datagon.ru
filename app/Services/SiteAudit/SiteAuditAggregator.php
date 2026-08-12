@@ -406,6 +406,13 @@ class SiteAuditAggregator
 
         $byCode['click_depth_max'] = (int) ($depthMeta['click_depth_max'] ?? 0);
 
+        $imagesTotal = (int) SiteAuditPage::query()
+            ->where('crawl_id', $crawl->id)
+            ->sum('img_count');
+        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+        $progress['images_total'] = $imagesTotal;
+        $crawl->progress_json = $progress;
+
         foreach ($buckets as $bucket => $value) {
             SiteAuditCrawlStat::query()->updateOrCreate(
                 ['crawl_id' => $crawl->id, 'bucket' => $bucket],
@@ -526,11 +533,13 @@ class SiteAuditAggregator
                             $findings[] = $this->row($crawlId, 'description_too_short', $page, [
                                 'length' => $len,
                                 'min' => $descMin,
+                                'description' => $page->description,
                             ]);
                         } elseif ($len > $descMax) {
                             $findings[] = $this->row($crawlId, 'description_too_long', $page, [
                                 'length' => $len,
                                 'max' => $descMax,
+                                'description' => $page->description,
                             ]);
                         }
                     }
@@ -1909,7 +1918,8 @@ class SiteAuditAggregator
     }
 
     /**
-     * Битые / тяжёлые изображения: HEAD-сэмпл по img_srcs_json (бюджет на краул).
+     * Битые / тяжёлые изображения: HEAD по уникальным img src (бюджет на краул).
+     * Результат пишется обратно в img_srcs_json (status, size_bytes, ok) для инвентаря.
      */
     private function emitImageAssets(SiteAuditCrawl $crawl): void
     {
@@ -1926,50 +1936,75 @@ class SiteAuditAggregator
             return;
         }
 
-        $maxHead = (int) config('site_audit.broken_image_head_max', 50);
+        $maxHead = (int) config('site_audit.broken_image_head_max', 500);
         $heavyBytes = (int) config('site_audit.heavy_image_bytes', 500_000);
         $checker = new SiteAuditLinkChecker();
+        /** @var array<string,array{ok:bool,status:?int,error:?string,size_bytes:?int,content_type:?string}> $cache */
         $cache = [];
         $budget = $maxHead;
 
         $brokenSev = config('site_audit.findings.broken_image.severity', 'warning');
         $heavySev = config('site_audit.findings.heavy_image.severity', 'info');
 
+        // Сначала уникальные src — чтобы бюджет не съели первые страницы.
         foreach ($pages as $page) {
-            $srcs = is_array($page->img_srcs_json) ? $page->img_srcs_json : [];
-            if ($srcs === []) {
+            $items = SiteAuditImageItem::normalizeList($page->img_srcs_json);
+            foreach (array_slice($items, 0, 20) as $item) {
+                $src = (string) ($item['src'] ?? '');
+                if ($src === '' || isset($cache[$src])) {
+                    continue;
+                }
+                if ($budget <= 0) {
+                    break 2;
+                }
+                $cache[$src] = $checker->check($src);
+                $budget--;
+            }
+        }
+
+        foreach ($pages as $page) {
+            $items = SiteAuditImageItem::normalizeList($page->img_srcs_json);
+            if ($items === []) {
                 continue;
             }
 
             $brokenSamples = [];
             $heavySamples = [];
+            $enriched = [];
+            $changed = false;
 
-            foreach (array_slice($srcs, 0, 15) as $src) {
-                $src = (string) $src;
-                if ($src === '') {
-                    continue;
-                }
-                if (! isset($cache[$src])) {
-                    if ($budget <= 0) {
-                        break;
+            foreach ($items as $item) {
+                $src = (string) ($item['src'] ?? '');
+                if ($src !== '' && isset($cache[$src])) {
+                    $res = $cache[$src];
+                    $item['status'] = $res['status'];
+                    $item['size_bytes'] = $res['size_bytes'];
+                    $item['ok'] = $res['ok'];
+                    if (! empty($res['content_type'])) {
+                        $item['content_type'] = $res['content_type'];
                     }
-                    $cache[$src] = $checker->check($src);
-                    $budget--;
+                    $changed = true;
+
+                    if (! $res['ok']) {
+                        $brokenSamples[] = [
+                            'img' => $src,
+                            'status' => $res['status'] ?? null,
+                            'error' => $res['error'] ?? null,
+                        ];
+                    } elseif (! empty($res['size_bytes']) && (int) $res['size_bytes'] >= $heavyBytes) {
+                        $heavySamples[] = [
+                            'img' => $src,
+                            'size_bytes' => (int) $res['size_bytes'],
+                            'threshold' => $heavyBytes,
+                        ];
+                    }
                 }
-                $res = $cache[$src];
-                if (! $res['ok']) {
-                    $brokenSamples[] = [
-                        'img' => $src,
-                        'status' => $res['status'] ?? null,
-                        'error' => $res['error'] ?? null,
-                    ];
-                } elseif (! empty($res['size_bytes']) && (int) $res['size_bytes'] >= $heavyBytes) {
-                    $heavySamples[] = [
-                        'img' => $src,
-                        'size_bytes' => (int) $res['size_bytes'],
-                        'threshold' => $heavyBytes,
-                    ];
-                }
+                $enriched[] = $item;
+            }
+
+            if ($changed) {
+                $page->img_srcs_json = $enriched;
+                $page->save();
             }
 
             if ($brokenSamples) {

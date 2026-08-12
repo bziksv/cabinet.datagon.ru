@@ -222,15 +222,14 @@
 
         <div class="tab-content">
             <div class="tab-pane fade show active" id="sa-pane-all" role="tabpanel">
-                <div class="cabinet-sa-buckets mb-4" id="sa-buckets">
-                    @foreach($bucketLabels as $key => $label)
-                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}"
-                             title="@if($key === 'critical')Самые срочные ошибки — чинить первыми@elseif($key === 'other')Средняя срочность@elseif($key === 'warning')Желательно починить@elseПросто знать, не всегда срочно@endif. Клик — отфильтровать меню слева.">
-                            <div class="cabinet-sa-bucket__label">{{ $label }}</div>
-                            <div class="cabinet-sa-bucket__value" data-bucket="{{ $key }}">{{ (int) (($bucketsAll ?? $buckets)[$key] ?? 0) }}</div>
-                        </div>
-                    @endforeach
-                </div>
+                @include('pages.partials.site-audit-buckets', [
+                    'bucketLabels' => $bucketLabels,
+                    'bucketValues' => $bucketsAll ?? $buckets,
+                    'crawl' => $crawl,
+                    'bucketsId' => 'sa-buckets',
+                    'bucketsClickable' => true,
+                    'bucketsLive' => true,
+                ])
 
                 <div class="cabinet-sa-layout">
                     <aside class="cabinet-sa-tree" data-sa-tree>
@@ -259,15 +258,12 @@
             </div>
 
             <div class="tab-pane fade" id="sa-pane-tech" role="tabpanel">
-                <div class="cabinet-sa-buckets mb-4">
-                    @foreach($bucketLabels as $key => $label)
-                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}"
-                             title="@if($key === 'critical')Самые срочные ошибки — чинить первыми@elseif($key === 'other')Средняя срочность@elseif($key === 'warning')Желательно починить@elseПросто знать, не всегда срочно@endif. Клик — отфильтровать меню слева.">
-                            <div class="cabinet-sa-bucket__label">{{ $label }}</div>
-                            <div class="cabinet-sa-bucket__value">{{ (int) ($buckets[$key] ?? 0) }}</div>
-                        </div>
-                    @endforeach
-                </div>
+                @include('pages.partials.site-audit-buckets', [
+                    'bucketLabels' => $bucketLabels,
+                    'bucketValues' => $buckets,
+                    'crawl' => $crawl,
+                    'bucketsClickable' => true,
+                ])
 
                 <div class="cabinet-sa-layout">
                     <aside class="cabinet-sa-tree" data-sa-tree>
@@ -296,15 +292,12 @@
             </div>
 
             <div class="tab-pane fade" id="sa-pane-seo" role="tabpanel">
-                <div class="cabinet-sa-buckets mb-4">
-                    @foreach($bucketLabels as $key => $label)
-                        <div class="cabinet-sa-bucket cabinet-sa-bucket--{{ $key }}" data-sa-bucket-preset="{{ $key }}"
-                             title="@if($key === 'critical')Самые срочные ошибки — чинить первыми@elseif($key === 'other')Средняя срочность@elseif($key === 'warning')Желательно починить@elseПросто знать, не всегда срочно@endif. Клик — отфильтровать меню слева.">
-                            <div class="cabinet-sa-bucket__label">{{ $label }}</div>
-                            <div class="cabinet-sa-bucket__value">{{ (int) (($bucketsSeo ?? [])[$key] ?? 0) }}</div>
-                        </div>
-                    @endforeach
-                </div>
+                @include('pages.partials.site-audit-buckets', [
+                    'bucketLabels' => $bucketLabels,
+                    'bucketValues' => $bucketsSeo ?? [],
+                    'crawl' => $crawl,
+                    'bucketsClickable' => true,
+                ])
 
                 <div class="cabinet-sa-layout">
                     <aside class="cabinet-sa-tree" data-sa-tree>

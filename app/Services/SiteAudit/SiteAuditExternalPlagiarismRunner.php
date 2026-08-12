@@ -460,19 +460,40 @@ class SiteAuditExternalPlagiarismRunner
             }
 
             $urls = array_values(array_filter(array_map('strval', $state['urls'] ?? [])));
+            // Resume: не сбрасываем уже посчитанные URL (stuck job / повторный dispatch).
+            $prevDoneRows = [];
+            foreach (is_array($state['rows'] ?? null) ? $state['rows'] : [] as $prevRow) {
+                if (! is_array($prevRow)) {
+                    continue;
+                }
+                $prevUrl = (string) ($prevRow['url'] ?? '');
+                if ($prevUrl === '') {
+                    continue;
+                }
+                $hasResult = isset($prevRow['uniqueness_pct'])
+                    || (! empty($prevRow['error']) && is_string($prevRow['error']));
+                if ($hasResult) {
+                    $prevDoneRows[$prevUrl] = $prevRow;
+                }
+            }
             $state['status'] = 'running';
-            $state['done'] = 0;
-            $state['rows'] = [];
-            $state['cost_spent'] = 0;
+            $state['rows'] = array_values($prevDoneRows);
+            $state['done'] = count($state['rows']);
+            $state['cost_spent'] = (int) ($state['cost_spent'] ?? 0);
             $state['error'] = null;
             $this->saveState($crawl, $state);
 
-            SiteAuditFinding::query()
-                ->where('crawl_id', $crawl->id)
-                ->where('code', self::FINDING_CODE)
-                ->whereIn('url', $urls)
-                ->delete();
+            $pendingUrls = array_values(array_filter($urls, static function ($u) use ($prevDoneRows) {
+                return ! isset($prevDoneRows[$u]);
+            }));
 
+            if ($pendingUrls !== []) {
+                SiteAuditFinding::query()
+                    ->where('crawl_id', $crawl->id)
+                    ->where('code', self::FINDING_CODE)
+                    ->whereIn('url', $pendingUrls)
+                    ->delete();
+            }
             $warnBelow = (float) config('site_audit.plagiarism_external_warn_below', 70);
             $cfg = config('site_audit.findings.' . self::FINDING_CODE, []);
             $severity = $cfg['severity'] ?? 'warning';
@@ -493,7 +514,7 @@ class SiteAuditExternalPlagiarismRunner
                 ->get(['url', 'url_hash', 'title'])
                 ->keyBy('url');
 
-            foreach ($urls as $url) {
+            foreach ($pendingUrls as $url) {
                 $row = [
                     'url' => $url,
                     'uniqueness_pct' => null,

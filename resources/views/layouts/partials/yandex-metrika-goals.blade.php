@@ -3,16 +3,29 @@
     @php
         $ymCounter = 89500732;
         $ymRegistered = session()->pull('ym_registered');
-        $ymVerified = session()->pull('verified') || session()->pull('ym_verified');
+        $ymVerified = session()->pull('ym_verified') || session()->pull('verified');
     @endphp
     @if($ymRegistered || $ymVerified)
         <script type="text/javascript">
             (function () {
                 var counter = {{ $ymCounter }};
                 function reach(goal) {
-                    if (typeof ym === 'function') {
-                        ym(counter, 'reachGoal', goal);
+                    var tries = 0;
+                    function fire() {
+                        if (typeof ym === 'function') {
+                            ym(counter, 'reachGoal', goal);
+                            return true;
+                        }
+                        return false;
                     }
+                    if (fire()) {
+                        return;
+                    }
+                    var timer = setInterval(function () {
+                        if (fire() || ++tries > 40) {
+                            clearInterval(timer);
+                        }
+                    }, 50);
                 }
                 @if($ymRegistered)
                 reach('novaja_registracija_1231');

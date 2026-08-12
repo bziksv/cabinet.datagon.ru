@@ -4,6 +4,8 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Auth\Middleware\EnsureEmailIsVerified as Middleware;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Support\Facades\Redirect;
 
 class EnsureEmailIsVerified extends Middleware
 {
@@ -13,6 +15,21 @@ class EnsureEmailIsVerified extends Middleware
             return $next($request);
         }
 
-        return parent::handle($request, $next, $redirectToRoute);
+        $user = $request->user();
+        if ($user
+            && $user instanceof MustVerifyEmail
+            && ! $user->hasVerifiedEmail()
+        ) {
+            // Flash целей Метрики живёт один hop: без keep сгорает на этом 302.
+            if ($request->hasSession()) {
+                $request->session()->keep(['ym_registered', 'ym_verified', 'verified']);
+            }
+
+            return $request->expectsJson()
+                ? abort(403, 'Your email address is not verified.')
+                : Redirect::route($redirectToRoute ?: 'verification.notice');
+        }
+
+        return $next($request);
     }
 }

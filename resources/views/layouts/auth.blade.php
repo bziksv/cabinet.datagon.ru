@@ -16,6 +16,9 @@
     <script src="{{ asset('plugins/jquery/jquery.min.js') }}"></script>
 </head>
 <body class="login-page bg-body-secondary">
+{{-- Счётчик и цели сразу: после register/verify flash не должен ждать конец страницы --}}
+@include('layouts.partials.yandex-metrika')
+@include('layouts.partials.yandex-metrika-goals')
 @yield('content')
 
 @if(config('app.env') !== 'local')
@@ -26,8 +29,5 @@
 <script src="{{ asset('js/cabinet-bs5-shim.js') }}"></script>
 <script src="{{ asset('js/cabinet-select2-defaults.js') }}"></script>
 @yield('js')
-
-@include('layouts.partials.yandex-metrika')
-@include('layouts.partials.yandex-metrika-goals')
 </body>
 </html>

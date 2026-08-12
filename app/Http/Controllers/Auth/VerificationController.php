@@ -70,7 +70,7 @@ class VerificationController extends Controller
             event(new Verified($request->user()));
         }
 
-        return redirect($this->redirectPath())->with('verified', true);
+        return $this->redirectAfterVerified();
     }
 
     /**
@@ -98,7 +98,17 @@ class VerificationController extends Controller
         $request->user()->read_letter = 1;
         $request->user()->save();
 
-        return redirect($this->redirectPath())->with('verified', true);
+        return $this->redirectAfterVerified();
+    }
+
+    /**
+     * После верификации — на главную с flash для reachGoal (verified + ym_verified).
+     */
+    protected function redirectAfterVerified(): RedirectResponse
+    {
+        return redirect($this->redirectPath())
+            ->with('verified', true)
+            ->with('ym_verified', true);
     }
 
     protected function validateVerifyCode(Request $request): JsonResponse

@@ -20,7 +20,7 @@ class EnsureEmailIsVerified extends Middleware
             && $user instanceof MustVerifyEmail
             && ! $user->hasVerifiedEmail()
         ) {
-            // Flash целей Метрики живёт один hop: без keep сгорает на этом 302.
+            // Flash/pending целей Метрики: keep на случай одноразового flash; pending сам живёт в сессии.
             if ($request->hasSession()) {
                 $request->session()->keep(['ym_registered', 'ym_verified', 'verified']);
             }

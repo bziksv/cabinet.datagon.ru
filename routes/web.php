@@ -34,6 +34,7 @@ Route::post('demo-cabinet/exit', 'DemoCabinetController@exit')->name('demo-cabin
 Route::post('/validate-registration-form', 'Auth\RegisterController@validateData')->name('validate.registration.form');
 Route::post('/validate-verify-code', 'Auth\VerificationController@validateVerifyCode')->name('validate.verify.code');
 Route::post('email/verify/code', 'Auth\VerificationController@verifyCode')->name('verification.code');
+Route::post('ym/goal-ack', 'YandexMetrikaGoalController@ack')->name('ym.goal.ack');
 
 //Public method
 Route::get('public/http-headers/{id}', 'PublicController@httpHeaders');

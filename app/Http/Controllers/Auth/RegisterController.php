@@ -122,11 +122,14 @@ class RegisterController extends Controller
 
     /**
      * Цель Метрики novaja_registracija_1231 — только после успешного создания аккаунта.
-     * Редирект сразу на verify: `/` закрыт middleware verified, flash иначе сгорает.
+     * Редирект сразу на verify: `/` закрыт middleware verified.
+     * Pending в сессии (не flash): flash + pull сгорает, если tag.js не успел до ухода со страницы.
      */
     protected function registered(Request $request, $user)
     {
-        return redirect()->route('verification.notice')->with('ym_registered', true);
+        $request->session()->put('ym_pending_registered', true);
+
+        return redirect()->route('verification.notice');
     }
 
     protected function prepareMetrics($metrics)

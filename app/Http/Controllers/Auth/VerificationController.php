@@ -102,13 +102,14 @@ class VerificationController extends Controller
     }
 
     /**
-     * После верификации — на главную с flash для reachGoal (verified + ym_verified).
+     * После верификации — на главную; pending до ack из reachGoal (см. yandex-metrika-goals).
      */
     protected function redirectAfterVerified(): RedirectResponse
     {
+        session()->put('ym_pending_verified', true);
+
         return redirect($this->redirectPath())
-            ->with('verified', true)
-            ->with('ym_verified', true);
+            ->with('verified', true);
     }
 
     protected function validateVerifyCode(Request $request): JsonResponse

@@ -2322,7 +2322,8 @@ label.cabinet-sa-act__main {
 }
 
 .cabinet-sa-findings-table--crawl-pages {
-  min-width: 1400px;
+  /* Не форсить 1400px: на пресете «Основные» URL раздувался в пустоту */
+  min-width: 100%;
   width: max-content;
   max-width: none;
   table-layout: auto;
@@ -2341,15 +2342,19 @@ label.cabinet-sa-act__main {
 
 /* Sticky URL: только непрозрачный фон (как home-sites-domain).
    rgba hover / BS accent box-shadow → чужие ячейки просвечивают при scrollX.
-   border-right при border-collapse «мигает» через ряд — разделитель = 1px opaque shadow. */
+   border-right при border-collapse «мигает» через ряд — разделитель = 1px opaque shadow.
+   Селектор с `>` бьёт общее правило width:34% у .cabinet-sa-findings-table. */
+.cabinet-sa-findings-table.cabinet-sa-findings-table--crawl-pages > thead > tr > th[data-sa-col="url"],
+.cabinet-sa-findings-table.cabinet-sa-findings-table--crawl-pages > tbody > tr > td[data-sa-col="url"],
 .cabinet-sa-findings-table--crawl-pages th[data-sa-col="url"],
 .cabinet-sa-findings-table--crawl-pages td[data-sa-col="url"] {
   position: sticky;
   left: 0;
   z-index: 2;
-  min-width: 280px;
-  width: 320px;
-  max-width: 420px;
+  width: 220px;
+  min-width: 200px;
+  max-width: 260px;
+  box-sizing: border-box;
   white-space: normal;
   word-break: break-word;
   overflow-wrap: break-word;
@@ -2407,10 +2412,18 @@ label.cabinet-sa-act__main {
 .cabinet-sa-findings-table--crawl-pages th[data-sa-col="file"],
 .cabinet-sa-findings-table--crawl-pages td[data-sa-col="file"] {
   white-space: normal;
-  min-width: 160px;
-  max-width: 280px;
+  min-width: 200px;
+  max-width: 420px;
   word-break: break-word;
   overflow-wrap: break-word;
+}
+
+.cabinet-sa-findings-table--crawl-pages th[data-sa-col="status"],
+.cabinet-sa-findings-table--crawl-pages td[data-sa-col="status"] {
+  width: 4.25rem;
+  min-width: 4.25rem;
+  max-width: 4.75rem;
+  white-space: nowrap;
 }
 
 .cabinet-sa-findings-table [data-sa-col].is-col-hidden {

@@ -121,6 +121,7 @@ class SiteAuditAdminStats
                 'pages_total' => (int) $crawl->pages_total,
                 'critical' => (int) ($buckets['critical'] ?? 0),
                 'other' => (int) ($buckets['other'] ?? 0),
+                'important' => (int) ($buckets['important'] ?? 0),
                 'warning' => (int) ($buckets['warning'] ?? 0),
                 'info' => (int) ($buckets['info'] ?? 0),
                 'started_at' => $started ? $started->format('d.m.Y H:i') : null,

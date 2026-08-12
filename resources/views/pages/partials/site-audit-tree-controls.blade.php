@@ -15,6 +15,8 @@
                 title="Только самые срочные ошибки (красные)">Грубые</button>
         <button type="button" class="cabinet-sa-tree-preset" data-preset="other"
                 title="Средняя срочность">Прочие</button>
+        <button type="button" class="cabinet-sa-tree-preset" data-preset="important"
+                title="Важные замечания — в первую очередь смотреть">Важные замечания</button>
         <button type="button" class="cabinet-sa-tree-preset" data-preset="warning"
                 title="Предупреждения — желательно починить">Замечания</button>
         <button type="button" class="cabinet-sa-tree-preset" data-preset="info"

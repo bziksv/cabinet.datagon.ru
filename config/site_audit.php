@@ -4,13 +4,21 @@ return [
     /*
     |--------------------------------------------------------------------------
     | Site Audit — реестр finding codes (фаза A must-have + заготовки)
-    | severity: critical|other|warning|info
+    | severity: critical|other|important|warning|info
+    |   important = «Важные замечания» (similar_pages, sitemap_missing, broken_external_link), warning = обычные «Замечания»/Предупреждения
     | phase: A|B|C|D
     |--------------------------------------------------------------------------
     */
     // local + remote MySQL: не класть jobs в общий site_audit — prod съест тик без локального crawl_N.json.
     'queue' => env('SITE_AUDIT_QUEUE') ?: (env('APP_ENV') === 'local' ? 'site_audit_local' : 'site_audit'),
     'user_agent' => env('SITE_AUDIT_UA', 'TitloSiteAuditBot/1.0 (+https://titlo.ru)'),
+    // Повтор внешней проверки без слова Bot в UA — иначе WAF рвёт TLS (пример: almamed.su).
+    'link_check_browser_ua' => env(
+        'SITE_AUDIT_LINK_CHECK_BROWSER_UA',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    ),
+    'link_check_timeout' => (float) env('SITE_AUDIT_LINK_CHECK_TIMEOUT', 12),
+    'link_check_connect_timeout' => (float) env('SITE_AUDIT_LINK_CHECK_CONNECT_TIMEOUT', 6),
     'request_timeout' => (int) env('SITE_AUDIT_TIMEOUT', 15),
     'max_redirects' => (int) env('SITE_AUDIT_MAX_REDIRECTS', 10),
     'per_host_rps' => (float) env('SITE_AUDIT_HOST_RPS', 1),
@@ -57,9 +65,15 @@ return [
     'simhash_hamming_max' => (int) env('SITE_AUDIT_SIMHASH_HAMMING', 6),
     // Второй проход: 5-граммы. Кандидат с Hamming≤max остаётся только если доля общих шинголов ≥ порога.
     'simhash_shingle_size' => (int) env('SITE_AUDIT_SIMHASH_SHINGLE_SIZE', 5),
-    'simhash_shingle_min_overlap' => (float) env('SITE_AUDIT_SIMHASH_SHINGLE_OVERLAP', 0.10),
+    // 0.15: при общем меню 10% слишком легко набиралось на шаблоне.
+    'simhash_shingle_min_overlap' => (float) env('SITE_AUDIT_SIMHASH_SHINGLE_OVERLAP', 0.15),
     'simhash_shingle_store_max' => (int) env('SITE_AUDIT_SIMHASH_SHINGLE_STORE', 120),
     'simhash_max_pairs' => (int) env('SITE_AUDIT_SIMHASH_MAX_PAIRS', 200),
+    // Токен на ≥ этой доли страниц = шаблон (меню/бренд) — не считаем «смысловым» пересечением.
+    'simhash_chrome_token_share' => (float) env('SITE_AUDIT_SIMHASH_CHROME_SHARE', 0.20),
+    'simhash_chrome_min_pages' => (int) env('SITE_AUDIT_SIMHASH_CHROME_MIN', 8),
+    // Минимум нешаблонных общих слов; иначе пара с Hamming>2 отбрасывается.
+    'simhash_min_unique_shared' => (int) env('SITE_AUDIT_SIMHASH_MIN_UNIQUE', 2),
     'share_ttl_days' => (int) env('SITE_AUDIT_SHARE_TTL_DAYS', 0), // 0 = бессрочно
     'broken_link_head_max' => (int) env('SITE_AUDIT_BROKEN_HEAD_MAX', 40),
     'broken_external_head_max' => (int) env('SITE_AUDIT_BROKEN_EXT_HEAD_MAX', 80),
@@ -399,7 +413,7 @@ return [
         ],
         'similar_pages' => [
             'phase' => 'B',
-            'severity' => 'warning',
+            'severity' => 'important',
             'title' => 'Похожие страницы',
             'description' => 'Похожие по тексту: SimHash + фильтр 5-грамм, пара A/B, общие слова/фразы.',
         ],
@@ -731,9 +745,9 @@ return [
         ],
         'sitemap_missing' => [
             'phase' => 'B',
-            'severity' => 'warning',
+            'severity' => 'important',
             'title' => 'Sitemap не найден',
-            'description' => 'Не удалось получить URL из sitemap.xml / sitemap index / Sitemap: в robots.txt.',
+            'description' => 'На сайте нет рабочей карты: sitemap.xml / sitemap index / Sitemap: в robots.txt. Не путать с «страница не в sitemap».',
         ],
         'sitemap_error' => [
             'phase' => 'B',
@@ -745,7 +759,7 @@ return [
             'phase' => 'B',
             'severity' => 'info',
             'title' => 'Страница не в sitemap',
-            'description' => 'URL обойден проверкой, но отсутствует в sitemap сайта.',
+            'description' => 'URL обойден проверкой, но отсутствует в карте сайта (sitemap).',
         ],
         'sitemap_not_crawled' => [
             'phase' => 'B',
@@ -803,7 +817,7 @@ return [
         ],
         'page_has_broken_external_links' => [
             'phase' => 'B',
-            'severity' => 'warning',
+            'severity' => 'important',
             // Дубль «Битые внешние ссылки» (там же «Откуда ссылаются») — в меню не показываем.
             'hidden' => true,
             'title' => 'Страницы с битыми внешними ссылками',
@@ -811,7 +825,7 @@ return [
         ],
         'broken_external_link' => [
             'phase' => 'B',
-            'severity' => 'warning',
+            'severity' => 'important',
             'title' => 'Битые внешние ссылки',
             'description' => 'Внешний URL отвечает 4xx/5xx или недоступен. Одна строка на битый адрес; страницы со ссылкой — в «Откуда ссылаются».',
         ],

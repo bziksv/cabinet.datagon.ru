@@ -854,7 +854,7 @@ class SiteAuditExternalPlagiarismRunner
             ->pluck('c', 'code')
             ->all();
 
-        $buckets = ['critical' => 0, 'other' => 0, 'warning' => 0, 'info' => 0];
+        $buckets = ['critical' => 0, 'other' => 0, 'important' => 0, 'warning' => 0, 'info' => 0];
         $sevCounts = SiteAuditFinding::query()
             ->where('crawl_id', $crawl->id)
             ->selectRaw('severity, count(*) as c')

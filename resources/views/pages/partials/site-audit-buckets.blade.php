@@ -1,4 +1,4 @@
-{{-- Масштаб проверки + срочность. $bucketValues — critical/other/warning/info. --}}
+{{-- Масштаб проверки + срочность. $bucketValues — critical/other/important/warning/info. --}}
 @php
     $scale = $crawlScale ?? (isset($crawl) ? $crawl->scaleStats() : ['pages' => 0, 'images' => 0]);
     $pagesN = (int) ($scale['pages'] ?? 0);

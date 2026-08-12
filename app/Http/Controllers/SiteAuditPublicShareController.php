@@ -26,6 +26,7 @@ class SiteAuditPublicShareController extends Controller
     private const BUCKET_LABELS = [
         'critical' => 'Грубые',
         'other' => 'Прочие',
+        'important' => 'Важные замечания',
         'warning' => 'Предупреждения',
         'info' => 'Инфо',
     ];
@@ -75,7 +76,8 @@ class SiteAuditPublicShareController extends Controller
         abort_if(! empty($meta['external']), 404);
 
         $page = max(1, (int) $request->input('page', 1));
-        $perPage = 50;
+        $perPage = SiteAuditInventory::normalizePerPage($request->input('per_page', SiteAuditInventory::PER_PAGE_DEFAULT));
+        $listPerPage = $perPage;
         $filterFields = SiteAuditReportFilter::fieldsForCode($code, (int) $crawl->id);
         $filterValues = SiteAuditReportFilter::valuesFromRequest($request, $code, (int) $crawl->id);
         $isCrawlImages = $code === 'crawl_images';
@@ -157,6 +159,9 @@ class SiteAuditPublicShareController extends Controller
         if (SiteAuditInventory::isInventorySource($meta['source'] ?? null)) {
             $filterParams['sort'] = $invSort;
             $filterParams['dir'] = $invDir;
+            $filterParams['per_page'] = $listPerPage;
+        } elseif ($request->filled('per_page')) {
+            $filterParams['per_page'] = $listPerPage;
         }
 
         $pagesCount = $isCrawlImages && $viewMode === 'groups'
@@ -180,7 +185,7 @@ class SiteAuditPublicShareController extends Controller
             'isHtmlErrorReport' => SiteAuditDuplicateGrouper::isHtmlErrors($code),
             'total' => $total,
             'page' => min($page, $pagesCount),
-            'perPage' => $perPage,
+            'perPage' => $listPerPage,
             'pages' => $pagesCount,
             'bucketLabels' => self::BUCKET_LABELS,
             'isPublic' => true,
@@ -415,7 +420,7 @@ class SiteAuditPublicShareController extends Controller
         $counts = (array) $counts;
         $catalog = config('site_audit.findings', []);
         $bySeverity = [
-            'critical' => [], 'other' => [], 'warning' => [], 'info' => [],
+            'critical' => [], 'other' => [], 'important' => [], 'warning' => [], 'info' => [],
         ];
 
         foreach ($catalog as $code => $meta) {
@@ -458,7 +463,27 @@ class SiteAuditPublicShareController extends Controller
         }
 
         foreach ($bySeverity as $sev => $items) {
-            usort($items, function ($a, $b) {
+            usort($items, function ($a, $b) use ($sev) {
+                if ($sev === 'important') {
+                    $pin = static function (string $code): int {
+                        if ($code === 'similar_pages') {
+                            return 0;
+                        }
+                        if ($code === 'sitemap_missing') {
+                            return 1;
+                        }
+                        if ($code === 'broken_external_link') {
+                            return 2;
+                        }
+
+                        return 3;
+                    };
+                    $aPin = $pin((string) ($a['code'] ?? ''));
+                    $bPin = $pin((string) ($b['code'] ?? ''));
+                    if ($aPin !== $bPin) {
+                        return $aPin <=> $bPin;
+                    }
+                }
                 if ($a['count'] === $b['count']) {
                     return strcmp($a['title'], $b['title']);
                 }
@@ -474,7 +499,7 @@ class SiteAuditPublicShareController extends Controller
     private function bucketsFromTree(array $tree): array
     {
         $catalog = config('site_audit.findings', []);
-        $out = ['critical' => 0, 'other' => 0, 'warning' => 0, 'info' => 0];
+        $out = ['critical' => 0, 'other' => 0, 'important' => 0, 'warning' => 0, 'info' => 0];
         foreach ($tree as $sev => $items) {
             foreach ($items as $item) {
                 if (! empty($item['external'])) {

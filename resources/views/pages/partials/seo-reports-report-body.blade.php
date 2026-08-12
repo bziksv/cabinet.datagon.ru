@@ -2090,12 +2090,13 @@
                     $bucketLabels = is_array($a['bucket_labels'] ?? null) ? $a['bucket_labels'] : [
                         'critical' => __('Critical issues'),
                         'other' => __('Other issues'),
+                        'important' => 'Важные замечания',
                         'warning' => __('Warnings'),
                         'info' => __('Info'),
                     ];
                     $topIssues = is_array($a['top_issues'] ?? null) ? $a['top_issues'] : [];
                     $pagesFetched = (int) ($a['pages_fetched'] ?? 0);
-                    $bucketTotal = max(1, (int) ($b['critical'] ?? 0) + (int) ($b['other'] ?? 0) + (int) ($b['warning'] ?? 0) + (int) ($b['info'] ?? 0));
+                    $bucketTotal = max(1, (int) ($b['critical'] ?? 0) + (int) ($b['other'] ?? 0) + (int) ($b['important'] ?? 0) + (int) ($b['warning'] ?? 0) + (int) ($b['info'] ?? 0));
                 @endphp
                 @if(!empty($a['summary']))
                     <p class="cabinet-sr-comment">{{ $a['summary'] }}</p>
@@ -2106,7 +2107,7 @@
                         <div class="cabinet-sr-kpi__label">{{ __('Pages checked') }}</div>
                         <div class="cabinet-sr-kpi__value">{{ $pagesFetched > 0 ? $fmtNum($pagesFetched) : '—' }}</div>
                     </div>
-                    @foreach(['critical' => 'is-down', 'other' => '', 'warning' => '', 'info' => ''] as $bk => $tone)
+                    @foreach(['critical' => 'is-down', 'other' => '', 'important' => '', 'warning' => '', 'info' => ''] as $bk => $tone)
                         <div class="cabinet-sr-kpi">
                             <div class="cabinet-sr-kpi__label">{{ $bucketLabels[$bk] ?? $bk }}</div>
                             <div class="cabinet-sr-kpi__value {{ $tone }}">{{ $fmtNum($b[$bk] ?? 0) }}</div>

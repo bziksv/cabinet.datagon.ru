@@ -78,6 +78,14 @@
       .filter(Boolean);
   }
 
+  function applyPerPageChange(sel) {
+    if (!sel) return;
+    var url = new URL(window.location.href);
+    url.searchParams.set('per_page', sel.value);
+    url.searchParams.set('page', '1');
+    window.location = url.toString();
+  }
+
   function init() {
     var root = $('[data-sa-crawl-images-cols]');
     var table = $('[data-sa-crawl-images-table]');
@@ -88,7 +96,12 @@
 
     root.addEventListener('change', function (e) {
       var t = e.target;
-      if (!t || !t.getAttribute || !t.getAttribute('data-sa-col-toggle')) return;
+      if (!t || !t.getAttribute) return;
+      if (t.getAttribute('data-sa-per-page') !== null) {
+        applyPerPageChange(t);
+        return;
+      }
+      if (!t.getAttribute('data-sa-col-toggle')) return;
       var next = visibleKeys(root);
       if (next.indexOf('url') === -1) next.unshift('url');
       applyCols(root, table, next);

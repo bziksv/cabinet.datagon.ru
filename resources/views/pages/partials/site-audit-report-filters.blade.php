@@ -10,6 +10,9 @@
         <input type="hidden" name="sort" value="{{ $crawlPagesSort }}">
         <input type="hidden" name="dir" value="{{ $crawlPagesDir ?? 'asc' }}">
     @endif
+    @if(!empty($perPage) && in_array(($code ?? ''), ['crawl_pages', 'crawl_images'], true))
+        <input type="hidden" name="per_page" value="{{ (int) $perPage }}">
+    @endif
     @php
         $isCrawlPagesFilters = ($code ?? '') === 'crawl_pages';
         $isCrawlImagesFilters = ($code ?? '') === 'crawl_images';

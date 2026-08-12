@@ -9,6 +9,7 @@ class SiteAuditFindingPresenter
         $map = [
             'critical' => 'Грубые',
             'other' => 'Прочие',
+            'important' => 'Важные замечания',
             'warning' => 'Предупреждения',
             'info' => 'Инфо',
         ];
@@ -16,12 +17,13 @@ class SiteAuditFindingPresenter
         return $map[$severity] ?? $severity;
     }
 
-    /** Короткая метка для дерева отчётов: (грубое), (замечание)… */
+    /** Короткая метка для дерева отчётов: (грубое), (важное), (замечание)… */
     public static function severityTag(string $severity): string
     {
         $map = [
             'critical' => 'грубое',
             'other' => 'прочие',
+            'important' => 'важное',
             'warning' => 'замечание',
             'info' => 'инфо',
         ];
@@ -1967,7 +1969,20 @@ class SiteAuditFindingPresenter
                 return 'закрыт правилом robots.txt';
 
             case 'sitemap_missing':
-                return 'sitemap не найден';
+                $tried = is_array($meta['tried'] ?? null) ? array_values(array_filter($meta['tried'])) : [];
+                if ($tried !== []) {
+                    $short = [];
+                    foreach (array_slice($tried, 0, 3) as $u) {
+                        $short[] = self::clip((string) $u, 52);
+                    }
+                    $extra = count($tried) > 3
+                        ? (' · ещё ' . number_format(count($tried) - 3, 0, '', ' '))
+                        : '';
+
+                    return 'на сайте нет рабочей карты · проверено: ' . implode(', ', $short) . $extra;
+                }
+
+                return 'на сайте нет рабочей карты (sitemap.xml / Sitemap: в robots.txt)';
 
             case 'sitemap_error':
                 $reason = (string) ($meta['reason'] ?? '');
@@ -1983,7 +1998,7 @@ class SiteAuditFindingPresenter
                 return $map[$reason] ?? ($reason !== '' ? $reason : '—');
 
             case 'not_in_sitemap':
-                return 'нет в sitemap';
+                return 'страница отсутствует в карте сайта';
 
             case 'sitemap_not_crawled':
                 $reason = (string) ($meta['reason'] ?? '');
@@ -2000,7 +2015,7 @@ class SiteAuditFindingPresenter
                 return 'не в проверке';
 
             case 'landing_not_in_sitemap':
-                return 'посадочная · нет в sitemap';
+                return 'посадочная отсутствует в карте сайта';
 
             case 'landing_not_crawled':
                 return isset($meta['pages_limit'])
@@ -2240,9 +2255,11 @@ class SiteAuditFindingPresenter
 
             case 'lost_file':
                 $asset = ! empty($meta['asset']) ? self::clip((string) $meta['asset'], 55) : '';
-                $st = isset($meta['status']) ? ('HTTP ' . (int) $meta['status']) : 'unreachable';
+                $st = isset($meta['status']) ? ('HTTP ' . (int) $meta['status']) : 'недоступен';
 
-                return $asset !== '' ? ($st . ' · ' . $asset) : $st;
+                return $asset !== ''
+                    ? ('CSS/JS не найден · ' . $st . ' · ' . $asset)
+                    : ('CSS/JS не найден · ' . $st);
 
             case 'adult_content':
                 $hits = isset($meta['hits']) && is_array($meta['hits'])
@@ -3635,7 +3652,26 @@ class SiteAuditFindingPresenter
         if ($status > 0) {
             $parts[] = self::httpStatusPillHtml($status, 'HTTP ' . $status);
         } else {
-            $parts[] = '<span class="cabinet-sa-status-pill">битая ссылка</span>';
+            $err = strtolower((string) ($meta['error'] ?? ''));
+            $label = 'нет ответа';
+            if ($err !== '') {
+                if (strpos($err, 'ssl') !== false
+                    || strpos($err, 'certificate') !== false
+                    || strpos($err, 'unexpected eof') !== false
+                    || strpos($err, 'protocol_error') !== false
+                    || strpos($err, 'http/2') !== false
+                ) {
+                    $label = 'обрыв TLS/HTTP (часто антибот)';
+                } elseif (strpos($err, 'timed out') !== false || strpos($err, 'timeout') !== false) {
+                    $label = 'таймаут';
+                } elseif (strpos($err, 'could not resolve') !== false || strpos($err, 'resolve host') !== false) {
+                    $label = 'DNS не резолвится';
+                } else {
+                    $label = 'сбой соединения';
+                }
+            }
+            $parts[] = '<span class="cabinet-sa-status-pill" title="' . e(self::clip((string) ($meta['error'] ?? ''), 160)) . '">'
+                . e($label) . '</span>';
         }
         $refN = (int) ($meta['referrer_count'] ?? 0);
         if ($refN > 1) {

@@ -21,29 +21,45 @@
                     data-sa-cols-preset="{{ $presetKey }}">{{ $preset['label'] }}</button>
         @endforeach
     </div>
-    <details class="cabinet-sa-crawl-pages-cols">
-        <summary class="btn btn-sm btn-outline-secondary">Столбцы</summary>
-        <div class="cabinet-sa-crawl-pages-cols__panel">
-            @php $groupLabels = ['base' => 'База', 'meta' => 'Meta / SEO', 'headings' => 'Заголовки', 'content' => 'Контент', 'links' => 'Ссылки']; @endphp
-            @foreach($groupLabels as $gKey => $gLabel)
-                <div class="cabinet-sa-crawl-pages-cols__group">
-                    <div class="cabinet-sa-crawl-pages-cols__group-title">{{ $gLabel }}</div>
-                    @foreach($cpCatalog as $col)
-                        @if(($col['group'] ?? '') !== $gKey)
-                            @continue
-                        @endif
-                        <label class="cabinet-sa-crawl-pages-cols__item">
-                            <input type="checkbox"
-                                   data-sa-col-toggle="{{ $col['key'] }}"
-                                   @if(!empty($col['locked'])) disabled @endif
-                                   @if(in_array($col['key'], $cpDefault, true)) checked @endif>
-                            <span>{{ $col['label'] }}</span>
-                        </label>
-                    @endforeach
-                </div>
-            @endforeach
-        </div>
-    </details>
+    <div class="cabinet-sa-crawl-pages-toolbar__end">
+        @php
+            $cpPerPage = (int) ($perPage ?? \App\Services\SiteAudit\SiteAuditInventory::PER_PAGE_DEFAULT);
+            $cpPerPageOpts = \App\Services\SiteAudit\SiteAuditInventory::PER_PAGE_OPTIONS;
+        @endphp
+        <label class="cabinet-sa-crawl-pages-perpage">
+            <span class="cabinet-sa-crawl-pages-perpage__label">Строк</span>
+            <select class="form-select form-select-sm cabinet-sa-crawl-pages-perpage__select"
+                    data-sa-per-page
+                    aria-label="Сколько строк на странице">
+                @foreach($cpPerPageOpts as $opt)
+                    <option value="{{ $opt }}" @if($cpPerPage === (int) $opt) selected @endif>{{ $opt }}</option>
+                @endforeach
+            </select>
+        </label>
+        <details class="cabinet-sa-crawl-pages-cols">
+            <summary class="btn btn-sm btn-outline-secondary">Столбцы</summary>
+            <div class="cabinet-sa-crawl-pages-cols__panel">
+                @php $groupLabels = ['base' => 'База', 'meta' => 'Meta / SEO', 'headings' => 'Заголовки', 'content' => 'Контент', 'links' => 'Ссылки']; @endphp
+                @foreach($groupLabels as $gKey => $gLabel)
+                    <div class="cabinet-sa-crawl-pages-cols__group">
+                        <div class="cabinet-sa-crawl-pages-cols__group-title">{{ $gLabel }}</div>
+                        @foreach($cpCatalog as $col)
+                            @if(($col['group'] ?? '') !== $gKey)
+                                @continue
+                            @endif
+                            <label class="cabinet-sa-crawl-pages-cols__item">
+                                <input type="checkbox"
+                                       data-sa-col-toggle="{{ $col['key'] }}"
+                                       @if(!empty($col['locked'])) disabled @endif
+                                       @if(in_array($col['key'], $cpDefault, true)) checked @endif>
+                                <span>{{ $col['label'] }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                @endforeach
+            </div>
+        </details>
+    </div>
 </div>
 
 <div class="cabinet-sa-table-wrap cabinet-sa-table-wrap--crawl-pages">

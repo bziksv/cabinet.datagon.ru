@@ -55,6 +55,7 @@ class SeoReportTitloModulesCollector
         $buckets = is_array($crawl->buckets_json) ? $crawl->buckets_json : [];
         $critical = (int) ($buckets['critical'] ?? 0);
         $other = (int) ($buckets['other'] ?? 0);
+        $important = (int) ($buckets['important'] ?? 0);
         $warning = (int) ($buckets['warning'] ?? 0);
         $info = (int) ($buckets['info'] ?? 0);
         $pages = (int) ($crawl->pages_fetched ?: $crawl->pages_total ?: 0);
@@ -78,12 +79,14 @@ class SeoReportTitloModulesCollector
                 'buckets' => [
                     'critical' => $critical,
                     'other' => $other,
+                    'important' => $important,
                     'warning' => $warning,
                     'info' => $info,
                 ],
                 'bucket_labels' => [
                     'critical' => SiteAuditFindingPresenter::severityLabel('critical'),
                     'other' => SiteAuditFindingPresenter::severityLabel('other'),
+                    'important' => SiteAuditFindingPresenter::severityLabel('important'),
                     'warning' => SiteAuditFindingPresenter::severityLabel('warning'),
                     'info' => SiteAuditFindingPresenter::severityLabel('info'),
                 ],
@@ -435,7 +438,7 @@ class SeoReportTitloModulesCollector
             }
         }
 
-        $rank = ['critical' => 0, 'other' => 1, 'warning' => 2, 'info' => 3];
+        $rank = ['critical' => 0, 'other' => 1, 'important' => 2, 'warning' => 3, 'info' => 4];
         usort($rows, static function (array $a, array $b) use ($rank) {
             $ra = $rank[$a['severity']] ?? 9;
             $rb = $rank[$b['severity']] ?? 9;

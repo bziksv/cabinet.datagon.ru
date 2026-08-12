@@ -122,7 +122,7 @@ class SiteAuditCrawlDiff
         $bucketsAfter = is_array($current->buckets_json) ? $current->buckets_json : [];
         $bucketsBefore = is_array($baseline->buckets_json) ? $baseline->buckets_json : [];
         $bucketDiff = [];
-        foreach (['critical', 'other', 'warning', 'info'] as $b) {
+        foreach (['critical', 'other', 'important', 'warning', 'info'] as $b) {
             $before = (int) ($bucketsBefore[$b] ?? 0);
             $after = (int) ($bucketsAfter[$b] ?? 0);
             $bucketDiff[$b] = [

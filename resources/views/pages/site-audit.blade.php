@@ -372,16 +372,18 @@
                         var sevClass = {
                             critical: 'is-critical',
                             other: 'is-other',
+                            important: 'is-important',
                             warning: 'is-warning',
                             info: 'is-info'
                         };
                         var sevTitle = {
                             critical: 'Грубые',
                             other: 'Прочие',
+                            important: 'Важные замечания',
                             warning: 'Предупреждения',
                             info: 'Инфо'
                         };
-                        ['critical', 'other', 'warning', 'info'].forEach(function (k) {
+                        ['critical', 'other', 'important', 'warning', 'info'].forEach(function (k) {
                             var cell = row.querySelector('[data-sa-bucket="' + k + '"]');
                             if (cell && typeof j.buckets[k] !== 'undefined') {
                                 var n = parseInt(j.buckets[k], 10);
@@ -390,7 +392,7 @@
                                     return;
                                 }
                                 cell.textContent = String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-                                cell.classList.remove('is-critical', 'is-other', 'is-warning', 'is-info', 'is-zero');
+                                cell.classList.remove('is-critical', 'is-other', 'is-important', 'is-warning', 'is-info', 'is-zero');
                                 cell.classList.add(n > 0 ? sevClass[k] : 'is-zero');
                                 cell.title = (sevTitle[k] || k) + ': ' + n;
                             }

@@ -52,6 +52,7 @@
                             <th>Размер</th>
                             <th>Грубые</th>
                             <th>Прочие</th>
+                            <th>Важн.</th>
                             <th>Пред.</th>
                             <th>Инфо</th>
                             <th class="text-end"></th>
@@ -191,6 +192,7 @@
                                 </td>
                                 <td data-sa-bucket="critical">{{ $b['critical'] ?? '—' }}</td>
                                 <td data-sa-bucket="other">{{ $b['other'] ?? '—' }}</td>
+                                <td data-sa-bucket="important">{{ $b['important'] ?? '—' }}</td>
                                 <td data-sa-bucket="warning">{{ $b['warning'] ?? '—' }}</td>
                                 <td data-sa-bucket="info">{{ $b['info'] ?? '—' }}</td>
                                 <td class="text-end text-nowrap">

@@ -2,6 +2,7 @@
 .cabinet-sa-page {
   --sa-critical: #c0392b;
   --sa-other: #d68910;
+  --sa-important: #7c3aed;
   --sa-warning: #2980b9;
   --sa-info: #7f8c8d;
   --sa-border: #e5e7eb;
@@ -1079,7 +1080,7 @@
 
 .cabinet-sa-buckets {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1121,6 +1122,7 @@ a.cabinet-sa-bucket--link:hover {
 .cabinet-sa-bucket--images { border-top-color: #b45309; }
 .cabinet-sa-bucket--critical { border-top-color: var(--sa-critical); }
 .cabinet-sa-bucket--other { border-top-color: var(--sa-other); }
+.cabinet-sa-bucket--important { border-top-color: var(--sa-important); }
 .cabinet-sa-bucket--warning { border-top-color: var(--sa-warning); }
 .cabinet-sa-bucket--info { border-top-color: var(--sa-info); }
 
@@ -1261,6 +1263,11 @@ a.cabinet-sa-bucket--link:hover {
 .cabinet-sa-badge--other {
   background: #ffedd5;
   color: #9a3412;
+}
+
+.cabinet-sa-badge--important {
+  background: #ede9fe;
+  color: #5b21b6;
 }
 
 .cabinet-sa-badge--warning {
@@ -2129,6 +2136,12 @@ label.cabinet-sa-act__main {
   border-color: #fde68a;
 }
 
+.cabinet-sa-sev-badge--important {
+  background: #ede9fe;
+  color: #5b21b6;
+  border-color: #ddd6fe;
+}
+
 .cabinet-sa-sev-badge--warning {
   background: #dbeafe;
   color: #1e40af;
@@ -2294,6 +2307,33 @@ label.cabinet-sa-act__main {
   min-width: 0;
 }
 
+.cabinet-sa-crawl-pages-toolbar__end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.cabinet-sa-crawl-pages-perpage {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  font-size: 12.5px;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.cabinet-sa-crawl-pages-perpage__select {
+  width: auto;
+  min-width: 4.25rem;
+  padding-top: 0.2rem;
+  padding-bottom: 0.2rem;
+  font-size: 12.5px;
+}
+
 .cabinet-sa-crawl-pages-preset.is-active {
   background: #eef2ff;
   border-color: #6366f1;
@@ -2302,7 +2342,6 @@ label.cabinet-sa-act__main {
 
 .cabinet-sa-crawl-pages-cols {
   position: relative;
-  margin-left: auto;
   flex: 0 0 auto;
 }
 
@@ -5989,11 +6028,13 @@ html.sa-tour-active body {
 
 .cabinet-sa-ht-num.is-critical { color: #b91c1c; }
 .cabinet-sa-ht-num.is-other { color: #c2410c; }
+.cabinet-sa-ht-num.is-important { color: #6d28d9; }
 .cabinet-sa-ht-num.is-warning { color: #b45309; }
 .cabinet-sa-ht-num.is-info { color: #475569; }
 
 .cabinet-sa-history-table thead th.cabinet-sa-ht-num.is-critical { color: #b91c1c; }
 .cabinet-sa-history-table thead th.cabinet-sa-ht-num.is-other { color: #c2410c; }
+.cabinet-sa-history-table thead th.cabinet-sa-ht-num.is-important { color: #6d28d9; }
 .cabinet-sa-history-table thead th.cabinet-sa-ht-num.is-warning { color: #b45309; }
 .cabinet-sa-history-table thead th.cabinet-sa-ht-num.is-info { color: #64748b; }
 

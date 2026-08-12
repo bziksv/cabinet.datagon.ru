@@ -57,6 +57,7 @@ class SiteAuditDocxBuilder
         $paras[] = $this->p('Приоритеты', true, 22);
         $paras[] = $this->p('Грубые: ' . (int) ($buckets['critical'] ?? 0));
         $paras[] = $this->p('Прочие: ' . (int) ($buckets['other'] ?? 0));
+        $paras[] = $this->p('Важные замечания: ' . (int) ($buckets['important'] ?? 0));
         $paras[] = $this->p('Предупреждения: ' . (int) ($buckets['warning'] ?? 0));
         $paras[] = $this->p('Инфо: ' . (int) ($buckets['info'] ?? 0));
 

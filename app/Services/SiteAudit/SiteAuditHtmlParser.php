@@ -471,15 +471,78 @@ class SiteAuditHtmlParser
         return $this->visibleText($html);
     }
 
+    /**
+     * Текст для SimHash / шинголов / тошноты: без <head>, с упором на <main>/<article>,
+     * иначе вырезаем header/nav/footer/aside — иначе бренд из TITLE и меню тянут «похожие».
+     */
     private function visibleText(string $html): string
     {
-        $html = preg_replace('/<script\b[^>]*>.*?<\/script>/is', ' ', $html);
-        $html = preg_replace('/<style\b[^>]*>.*?<\/style>/is', ' ', $html);
-        $html = preg_replace('/<noscript\b[^>]*>.*?<\/noscript>/is', ' ', $html);
+        $html = preg_replace('/<script\b[^>]*>.*?<\/script>/is', ' ', $html) ?? $html;
+        $html = preg_replace('/<style\b[^>]*>.*?<\/style>/is', ' ', $html) ?? $html;
+        $html = preg_replace('/<noscript\b[^>]*>.*?<\/noscript>/is', ' ', $html) ?? $html;
+        // TITLE/meta в head — не контент: «| Blog | Prime» иначе попадает в simhash через strip_tags.
+        $html = preg_replace('/<head\b[^>]*>.*?<\/head>/is', ' ', $html) ?? $html;
+        $html = preg_replace('/<title\b[^>]*>.*?<\/title>/is', ' ', $html) ?? $html;
+
+        $root = $this->contentRootHtml($html);
+        if ($root !== null) {
+            $html = $root;
+        } else {
+            for ($pass = 0; $pass < 3; $pass++) {
+                $next = preg_replace('/<(header|nav|footer|aside)\b[^>]*>.*?<\/\1>/is', ' ', $html);
+                if ($next === null || $next === $html) {
+                    break;
+                }
+                $html = $next;
+            }
+        }
+
         $text = strip_tags($html);
         $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        return trim(preg_replace('/\s+/u', ' ', $text));
+        return trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
+    }
+
+    /**
+     * Основной контент: <main>, [role=main] или самый длинный <article>.
+     */
+    private function contentRootHtml(string $html): ?string
+    {
+        $minLen = 120;
+
+        if (preg_match('/<main\b[^>]*>(.*?)<\/main>/is', $html, $m)) {
+            $inner = $m[1];
+            if (mb_strlen(strip_tags($inner)) >= $minLen) {
+                return $inner;
+            }
+        }
+
+        if (preg_match(
+            '/<([a-z][a-z0-9]*)\b[^>]*\brole\s*=\s*["\']main["\'][^>]*>(.*?)<\/\1>/is',
+            $html,
+            $m
+        )) {
+            $inner = $m[2];
+            if (mb_strlen(strip_tags($inner)) >= $minLen) {
+                return $inner;
+            }
+        }
+
+        if (! preg_match_all('/<article\b[^>]*>(.*?)<\/article>/is', $html, $mm) || empty($mm[1])) {
+            return null;
+        }
+
+        $best = '';
+        $bestLen = 0;
+        foreach ($mm[1] as $chunk) {
+            $len = mb_strlen(strip_tags($chunk));
+            if ($len > $bestLen) {
+                $best = $chunk;
+                $bestLen = $len;
+            }
+        }
+
+        return $bestLen >= $minLen ? $best : null;
     }
 
     /**

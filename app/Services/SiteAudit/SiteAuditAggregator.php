@@ -376,6 +376,7 @@ class SiteAuditAggregator
         $buckets = [
             'critical' => 0,
             'other' => 0,
+            'important' => 0,
             'warning' => 0,
             'info' => 0,
         ];
@@ -1885,6 +1886,10 @@ class SiteAuditAggregator
     /**
      * Для страниц с тем же content_hash: переносим HEAD-findings с прошлого краула
      * (бюджет HEAD на них не тратим).
+     *
+     * lost_file / broken_image не копируем вслепую: URL ассета должен всё ещё
+     * быть в текущих asset_srcs / img_srcs страницы. Иначе тянем ложные 404 после
+     * фикса нормализации (пример: fonts.googleapis.com → свой /css2).
      */
     private function copyIncrementalHeadFindings(SiteAuditCrawl $crawl): void
     {
@@ -1895,11 +1900,42 @@ class SiteAuditAggregator
             return;
         }
 
-        $unchangedHashes = SiteAuditPage::query()
+        $unchangedPages = SiteAuditPage::query()
             ->where('crawl_id', $crawl->id)
             ->where('content_unchanged', true)
-            ->pluck('url_hash')
-            ->all();
+            ->get(['url_hash', 'asset_srcs_json', 'img_srcs_json']);
+        if ($unchangedPages->isEmpty()) {
+            return;
+        }
+
+        $unchangedHashes = [];
+        /** @var array<string,array<string,true>> $assetsByHash */
+        $assetsByHash = [];
+        /** @var array<string,array<string,true>> $imgsByHash */
+        $imgsByHash = [];
+        foreach ($unchangedPages as $page) {
+            $hash = (string) $page->url_hash;
+            if ($hash === '') {
+                continue;
+            }
+            $unchangedHashes[] = $hash;
+            $assetSet = [];
+            foreach (is_array($page->asset_srcs_json) ? $page->asset_srcs_json : [] as $src) {
+                $src = (string) $src;
+                if ($src !== '') {
+                    $assetSet[$src] = true;
+                }
+            }
+            $assetsByHash[$hash] = $assetSet;
+            $imgSet = [];
+            foreach (SiteAuditImageItem::normalizeList($page->img_srcs_json) as $item) {
+                $src = (string) ($item['src'] ?? '');
+                if ($src !== '') {
+                    $imgSet[$src] = true;
+                }
+            }
+            $imgsByHash[$hash] = $imgSet;
+        }
         if ($unchangedHashes === []) {
             return;
         }
@@ -1927,6 +1963,29 @@ class SiteAuditAggregator
             ->get(['code', 'severity', 'url', 'url_hash', 'meta_json']);
 
         foreach ($rows as $row) {
+            $hash = (string) $row->url_hash;
+            $meta = is_array($row->meta_json) ? $row->meta_json : [];
+            if ($row->code === 'lost_file') {
+                $asset = (string) ($meta['asset'] ?? '');
+                if ($asset === '' || empty($assetsByHash[$hash][$asset])) {
+                    continue;
+                }
+            }
+            if ($row->code === 'broken_image' || $row->code === 'heavy_image') {
+                $samples = is_array($meta['samples'] ?? null) ? $meta['samples'] : [];
+                $stillPresent = false;
+                foreach ($samples as $sample) {
+                    $src = (string) ($sample['src'] ?? '');
+                    if ($src !== '' && ! empty($imgsByHash[$hash][$src])) {
+                        $stillPresent = true;
+                        break;
+                    }
+                }
+                if (! $stillPresent) {
+                    continue;
+                }
+            }
+
             SiteAuditFinding::query()->create([
                 'crawl_id' => $crawl->id,
                 'code' => $row->code,
@@ -2460,8 +2519,11 @@ class SiteAuditAggregator
     {
         $threshold = (int) config('site_audit.simhash_hamming_max', 6);
         $maxPairs = (int) config('site_audit.simhash_max_pairs', 200);
-        $shingleMinOverlap = (float) config('site_audit.simhash_shingle_min_overlap', 0.10);
+        $shingleMinOverlap = (float) config('site_audit.simhash_shingle_min_overlap', 0.15);
         $shingleSize = max(2, (int) config('site_audit.simhash_shingle_size', 5));
+        $chromeShare = (float) config('site_audit.simhash_chrome_token_share', 0.20);
+        $chromeMinPages = (int) config('site_audit.simhash_chrome_min_pages', 8);
+        $minUniqueShared = max(1, (int) config('site_audit.simhash_min_unique_shared', 2));
 
         $cols = [
             'id', 'url', 'url_hash', 'simhash', 'title', 'h1', 'description',
@@ -2497,7 +2559,61 @@ class SiteAuditAggregator
             $n = $pages->count();
         }
 
-        $severity = config('site_audit.findings.similar_pages.severity', 'warning');
+        $titleSuffixes = SiteAuditTitleChrome::detectCommonSuffixes(
+            $pages->pluck('title')->all(),
+            $n,
+            0.35
+        );
+        $crawl = SiteAuditCrawl::query()->with('project:id,domain')->find($crawlId);
+        $domain = $crawl && $crawl->project ? (string) $crawl->project->domain : '';
+        $brandTokens = SiteAuditTitleChrome::domainBrandTokens($domain);
+
+        // DF по токенам страниц + бренд домена + слова из частых хвостов TITLE.
+        $df = [];
+        $bags = [];
+        foreach ($pages as $idx => $page) {
+            $bag = self::pageTokenBag($page);
+            $bags[$idx] = $bag;
+            foreach (array_unique($bag) as $t) {
+                $df[$t] = ($df[$t] ?? 0) + 1;
+            }
+        }
+        foreach ($brandTokens as $t) {
+            $df[$t] = max($df[$t] ?? 0, $n);
+        }
+        foreach ($titleSuffixes as $suf) {
+            foreach (preg_split('/[^\p{L}\p{N}]+/u', $suf, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $w) {
+                $w = mb_strtolower($w);
+                if (mb_strlen($w) >= 3) {
+                    $df[$w] = max($df[$w] ?? 0, (int) ceil($n * 0.5));
+                }
+            }
+        }
+
+        $chromeNeed = max($chromeMinPages, (int) ceil($n * $chromeShare));
+        $chrome = [];
+        foreach ($df as $t => $c) {
+            if ($c >= $chromeNeed) {
+                $chrome[$t] = true;
+            }
+        }
+        // Служебные EN/RU слова — не «смысл статьи», даже если DF низкий на маленьком сэмпле.
+        foreach ([
+            'without', 'with', 'other', 'from', 'this', 'that', 'your', 'have', 'been', 'been',
+            'more', 'most', 'also', 'into', 'over', 'only', 'such', 'than', 'then', 'them',
+            'they', 'what', 'when', 'will', 'would', 'could', 'should', 'about', 'after',
+            'before', 'between', 'under', 'again', 'there', 'these', 'those', 'their',
+            'which', 'while', 'where', 'whose', 'being', 'doing', 'just', 'like', 'make',
+            'made', 'many', 'some', 'same', 'very', 'even', 'back', 'well', 'blog',
+            'page', 'site', 'home', 'menu', 'cookie', 'privacy', 'policy',
+            'для', 'или', 'как', 'это', 'при', 'все', 'ещё', 'еще', 'уже', 'если',
+            'также', 'после', 'перед', 'через', 'между', 'только', 'можно', 'нужно',
+            'сайт', 'страница', 'блог', 'меню', 'главная',
+        ] as $fill) {
+            $chrome[$fill] = true;
+        }
+
+        $severity = config('site_audit.findings.similar_pages.severity', 'important');
         $emitted = 0;
         $seen = [];
 
@@ -2525,6 +2641,20 @@ class SiteAuditAggregator
                     }
                 }
 
+                $tokensA = $bags[$i] ?? self::pageTokenBag($a);
+                $tokensB = $bags[$j] ?? self::pageTokenBag($b);
+                $sharedAll = SiteAuditTextMetrics::sharedTokenList($tokensA, $tokensB, 36);
+                $sharedUnique = [];
+                foreach ($sharedAll as $w) {
+                    if (! isset($chrome[$w])) {
+                        $sharedUnique[] = $w;
+                    }
+                }
+                // Пара только на бренде/меню («blog», «prime») — не «похожий контент».
+                if (count($sharedUnique) < $minUniqueShared && $dist > 2) {
+                    continue;
+                }
+
                 // не дублируем exact content_hash пары — они в duplicate_content
                 foreach ([$a, $b] as $page) {
                     $key = $page->url_hash;
@@ -2532,9 +2662,6 @@ class SiteAuditAggregator
                         continue;
                     }
                     $other = $page->id === $a->id ? $b : $a;
-                    $tokensA = self::pageTokenBag($page);
-                    $tokensB = self::pageTokenBag($other);
-                    $shared = SiteAuditTextMetrics::sharedTokenList($tokensA, $tokensB, 24);
                     $sharedSource = (! empty($page->token_top_json) && ! empty($other->token_top_json))
                         ? 'body'
                         : 'meta';
@@ -2544,8 +2671,13 @@ class SiteAuditAggregator
                         'title' => $page->title,
                         'word_count' => (int) ($page->word_count ?? 0),
                         'similar_word_count' => (int) ($other->word_count ?? 0),
-                        'shared_words' => $shared,
+                        'shared_words' => array_slice(
+                            $sharedUnique !== [] ? $sharedUnique : $sharedAll,
+                            0,
+                            24
+                        ),
                         'shared_source' => $sharedSource,
+                        'chrome_filtered' => max(0, count($sharedAll) - count($sharedUnique)),
                     ];
                     if ($overlap !== null) {
                         $meta['shingle_size'] = $shingleSize;

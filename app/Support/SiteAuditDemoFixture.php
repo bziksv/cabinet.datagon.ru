@@ -11,7 +11,7 @@ class SiteAuditDemoFixture
 {
     public const DOMAIN = 'demo-audit.titlo.ru';
     public const PROJECT_NAME = 'Демо: полный аудит (фикстура)';
-    public const DEMO_VERSION = 29;
+    public const DEMO_VERSION = 33;
     public const SHARE_TOKEN = 'demo-site-audit-rich';
 
     /**
@@ -29,7 +29,7 @@ class SiteAuditDemoFixture
         'duplicate_title' => 'critical',
         'duplicate_description' => 'critical',
         'duplicate_content' => 'critical',
-        'similar_pages' => 'warning',
+        'similar_pages' => 'important',
         'empty_title' => 'critical',
         'empty_description' => 'warning',
         'multiple_title_or_description' => 'critical',
@@ -74,7 +74,7 @@ class SiteAuditDemoFixture
         'external_assets' => 'info',
         'soft_404' => 'other',
         'orphan_pages' => 'warning',
-        'sitemap_missing' => 'warning',
+        'sitemap_missing' => 'important',
         'sitemap_error' => 'warning',
         'not_in_sitemap' => 'info',
         'sitemap_not_crawled' => 'info',
@@ -86,8 +86,8 @@ class SiteAuditDemoFixture
         'http_https_both_available' => 'critical',
         'page_has_broken_links' => 'warning',
         'broken_internal_link' => 'critical',
-        'page_has_broken_external_links' => 'warning',
-        'broken_external_link' => 'warning',
+        'page_has_broken_external_links' => 'important',
+        'broken_external_link' => 'important',
         'page_has_bad_links' => 'warning',
         'lost_file' => 'warning',
         'adult_content' => 'warning',
@@ -211,7 +211,7 @@ class SiteAuditDemoFixture
         $urls = array_column($pages, 'url');
         $findings = [];
         $counts = [];
-        $buckets = ['critical' => 0, 'other' => 0, 'warning' => 0, 'info' => 0];
+        $buckets = ['critical' => 0, 'other' => 0, 'important' => 0, 'warning' => 0, 'info' => 0];
 
         $push = static function (string $code, string $severity, string $url, ?array $meta) use (&$findings, &$counts, &$buckets, $now) {
             $findings[] = [
@@ -275,6 +275,21 @@ class SiteAuditDemoFixture
                         '/ppc/divan-' . (($j % 4) + 1) . '/',
                     ];
                     $url = $base . $promoPaths[$j % count($promoPaths)];
+                }
+                if ($code === 'sitemap_missing'
+                    || $code === 'www_both_available'
+                    || $code === 'http_https_both_available'
+                    || $code === 'site_availability'
+                    || $code === 'error_spike'
+                ) {
+                    $url = $base . '/';
+                }
+                if ($code === 'robots_txt_closed' || $code === 'robots_txt_error') {
+                    $url = $base . '/robots.txt';
+                }
+                if ($code === 'sitemap_error') {
+                    $smPaths = ['/sitemap.xml', '/sitemap_index.xml', '/sitemap-news.xml'];
+                    $url = $base . $smPaths[$j % count($smPaths)];
                 }
                 $push($code, $sev, $url, self::metaFor($code, $base, $url, $j));
             }
@@ -382,11 +397,25 @@ class SiteAuditDemoFixture
         ];
     }
 
-    /** Стабильно 10…100 на код; SERP-выборки — как боевой лимит. */
+    /** Стабильно 10…100 на код; SERP-выборки — как боевой лимит; site-level — одна запись. */
     private static function countForCode(string $code): int
     {
+        if (in_array($code, [
+            'sitemap_missing',
+            'robots_txt_closed',
+            'robots_txt_error',
+            'www_both_available',
+            'http_https_both_available',
+            'site_availability',
+            'error_spike',
+        ], true)) {
+            return 1;
+        }
         if (in_array($code, ['serp_snippets', 'serp_title_mismatch', 'serp_snippet_source'], true)) {
             return 30;
+        }
+        if ($code === 'sitemap_error') {
+            return 3;
         }
         $n = 10 + (abs(crc32($code)) % 91);
 
@@ -1136,10 +1165,17 @@ class SiteAuditDemoFixture
                     'status' => 500,
                 ];
             case 'sitemap_missing':
-                return ['reason' => 'missing'];
+                return [
+                    'tried' => [
+                        $base . '/sitemap.xml',
+                        $base . '/sitemap_index.xml',
+                        $base . '/robots.txt',
+                    ],
+                ];
             case 'sitemap_error':
                 return [
                     'reason' => ($j % 2) ? 'not_xml' : 'fetch_failed',
+                    'sitemap' => $url,
                 ];
             case 'site_availability':
                 return ['detail' => 'периодические сбои 5xx'];

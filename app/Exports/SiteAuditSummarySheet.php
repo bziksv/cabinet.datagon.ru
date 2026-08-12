@@ -35,6 +35,7 @@ class SiteAuditSummarySheet implements FromArray, WithTitle
             ['URL обработано', $this->crawl->pages_fetched],
             ['Грубые', (int) ($buckets['critical'] ?? 0)],
             ['Прочие', (int) ($buckets['other'] ?? 0)],
+            ['Важные замечания', (int) ($buckets['important'] ?? 0)],
             ['Предупреждения', (int) ($buckets['warning'] ?? 0)],
             ['Инфо', (int) ($buckets['info'] ?? 0)],
             [],

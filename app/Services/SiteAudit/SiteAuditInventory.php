@@ -18,6 +18,11 @@ class SiteAuditInventory
 
     public const SOURCE_CANONICAL = 'pages_canonical';
 
+    /** @var list<int> */
+    public const PER_PAGE_OPTIONS = [25, 50, 100, 200];
+
+    public const PER_PAGE_DEFAULT = 50;
+
     public static function isInventorySource(?string $source): bool
     {
         return in_array((string) $source, [
@@ -25,6 +30,16 @@ class SiteAuditInventory
             self::SOURCE_IMAGES,
             self::SOURCE_CANONICAL,
         ], true);
+    }
+
+    /**
+     * @param  mixed  $value
+     */
+    public static function normalizePerPage($value): int
+    {
+        $n = (int) $value;
+
+        return in_array($n, self::PER_PAGE_OPTIONS, true) ? $n : self::PER_PAGE_DEFAULT;
     }
 
     /**

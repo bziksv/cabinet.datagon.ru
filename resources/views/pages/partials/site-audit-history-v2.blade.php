@@ -49,6 +49,7 @@
                 <th class="cabinet-sa-ht-when">Конец</th>
                 <th class="cabinet-sa-ht-num is-critical" title="Грубые ошибки — чинить первыми">Грубые</th>
                 <th class="cabinet-sa-ht-num is-other" title="Прочие ошибки">Прочие</th>
+                <th class="cabinet-sa-ht-num is-important" title="Важные замечания">Важн.</th>
                 <th class="cabinet-sa-ht-num is-warning" title="Предупреждения">Пред.</th>
                 <th class="cabinet-sa-ht-num is-info" title="Информация">Инфо</th>
                 <th></th>
@@ -114,6 +115,7 @@
                         : null;
                     $crit = (int) ($b['critical'] ?? 0);
                     $other = (int) ($b['other'] ?? 0);
+                    $important = (int) ($b['important'] ?? 0);
                     $warn = (int) ($b['warning'] ?? 0);
                     $info = (int) ($b['info'] ?? 0);
                     $canAssignTeam = $isCrawlOwner && !empty($teamAccessReady) && $project;
@@ -200,6 +202,7 @@
                     </td>
                     <td class="cabinet-sa-ht-num {{ $crit > 0 ? 'is-critical' : 'is-zero' }}" data-sa-bucket="critical" title="Грубые: {{ $crit }}">{{ number_format($crit, 0, '', ' ') }}</td>
                     <td class="cabinet-sa-ht-num {{ $other > 0 ? 'is-other' : 'is-zero' }}" data-sa-bucket="other" title="Прочие: {{ $other }}">{{ number_format($other, 0, '', ' ') }}</td>
+                    <td class="cabinet-sa-ht-num {{ $important > 0 ? 'is-important' : 'is-zero' }}" data-sa-bucket="important" title="Важные замечания: {{ $important }}">{{ number_format($important, 0, '', ' ') }}</td>
                     <td class="cabinet-sa-ht-num {{ $warn > 0 ? 'is-warning' : 'is-zero' }}" data-sa-bucket="warning" title="Предупреждения: {{ $warn }}">{{ number_format($warn, 0, '', ' ') }}</td>
                     <td class="cabinet-sa-ht-num {{ $info > 0 ? 'is-info' : 'is-zero' }}" data-sa-bucket="info" title="Инфо: {{ $info }}">{{ number_format($info, 0, '', ' ') }}</td>
                     <td class="cabinet-sa-ht-actions">

@@ -88,6 +88,7 @@ class SiteAuditCrawlCompletedNotification extends Notification implements EmailP
             'total' => (int) $crawl->pages_total,
             'critical' => (int) ($buckets['critical'] ?? 0),
             'other' => (int) ($buckets['other'] ?? 0),
+            'important' => (int) ($buckets['important'] ?? 0),
             'warning' => (int) ($buckets['warning'] ?? 0),
             'info' => (int) ($buckets['info'] ?? 0),
             'module_url' => $moduleUrl,
@@ -124,6 +125,7 @@ class SiteAuditCrawlCompletedNotification extends Notification implements EmailP
         return __('Site audit crawl done mail buckets', [
             'critical' => (int) ($buckets['critical'] ?? 0),
             'other' => (int) ($buckets['other'] ?? 0),
+            'important' => (int) ($buckets['important'] ?? 0),
             'warning' => (int) ($buckets['warning'] ?? 0),
             'info' => (int) ($buckets['info'] ?? 0),
         ]);

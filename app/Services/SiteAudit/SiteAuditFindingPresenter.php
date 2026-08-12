@@ -3688,17 +3688,23 @@ class SiteAuditFindingPresenter
             $err = strtolower((string) ($meta['error'] ?? ''));
             $label = 'нет ответа';
             if ($err !== '') {
-                if (strpos($err, 'ssl') !== false
-                    || strpos($err, 'certificate') !== false
-                    || strpos($err, 'unexpected eof') !== false
+                if (strpos($err, 'certificate subject') !== false
+                    || strpos($err, 'alternative certificate') !== false
+                    || strpos($err, 'does not match') !== false
+                    || strpos($err, 'ssl certificate problem') !== false
+                ) {
+                    $label = 'SSL-сертификат не подходит';
+                } elseif (strpos($err, 'could not resolve') !== false || strpos($err, 'resolve host') !== false) {
+                    $label = 'DNS не резолвится';
+                } elseif (strpos($err, 'timed out') !== false || strpos($err, 'timeout') !== false) {
+                    $label = 'таймаут';
+                } elseif (strpos($err, 'unexpected eof') !== false
                     || strpos($err, 'protocol_error') !== false
                     || strpos($err, 'http/2') !== false
                 ) {
                     $label = 'обрыв TLS/HTTP (часто антибот)';
-                } elseif (strpos($err, 'timed out') !== false || strpos($err, 'timeout') !== false) {
-                    $label = 'таймаут';
-                } elseif (strpos($err, 'could not resolve') !== false || strpos($err, 'resolve host') !== false) {
-                    $label = 'DNS не резолвится';
+                } elseif (strpos($err, 'ssl') !== false) {
+                    $label = 'ошибка SSL';
                 } else {
                     $label = 'сбой соединения';
                 }

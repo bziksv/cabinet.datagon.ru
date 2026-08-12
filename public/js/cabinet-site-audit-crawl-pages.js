@@ -111,6 +111,10 @@
       else el.classList.add('is-col-hidden');
     });
 
+    // table-layout:fixed + width:100% — при куче столбцов задаём min-width под скролл
+    var visibleCount = Object.keys(set).length;
+    table.style.minWidth = visibleCount > 8 ? (Math.max(100, visibleCount * 9) + 'rem') : '';
+
     $$('[data-sa-col-toggle]', root).forEach(function (input) {
       var key = input.getAttribute('data-sa-col-toggle');
       if (!key || input.disabled) return;

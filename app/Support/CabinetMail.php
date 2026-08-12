@@ -50,11 +50,15 @@ class CabinetMail
             'encryption' => config('mail.encryption'),
             'username' => config('mail.username'),
             'password' => config('mail.password'),
+            'sendmail' => config('mail.sendmail'),
         ];
 
         try {
             config([
                 'mail.driver' => 'sendmail',
+                // -bs говорит SMTP с localhost → ACL «Not allowed sender».
+                // -t -i — pipe в Exim (acl_check_not_smtp → accept).
+                'mail.sendmail' => '/usr/sbin/sendmail -t -i',
                 'mail.host' => null,
                 'mail.port' => null,
                 'mail.encryption' => null,
@@ -74,6 +78,7 @@ class CabinetMail
                 'mail.encryption' => $previous['encryption'],
                 'mail.username' => $previous['username'],
                 'mail.password' => $previous['password'],
+                'mail.sendmail' => $previous['sendmail'],
             ]);
             SmtpSettingsRegistry::applyToConfig();
             self::flushMailer();

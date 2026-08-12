@@ -11,7 +11,7 @@ class SiteAuditDemoFixture
 {
     public const DOMAIN = 'demo-audit.titlo.ru';
     public const PROJECT_NAME = 'Демо: полный аудит (фикстура)';
-    public const DEMO_VERSION = 23;
+    public const DEMO_VERSION = 29;
     public const SHARE_TOKEN = 'demo-site-audit-rich';
 
     /**
@@ -182,10 +182,7 @@ class SiteAuditDemoFixture
                 'content_unchanged' => 0,
                 'simhash' => null,
                 'out_links_json' => json_encode([$base . '/', $base . '/catalog/'], JSON_UNESCAPED_UNICODE),
-                'img_srcs_json' => json_encode([
-                    'https://picsum.photos/id/' . (10 + ($i % 40)) . '/800/600',
-                    'https://picsum.photos/id/' . (50 + ($i % 30)) . '/400/300',
-                ], JSON_UNESCAPED_UNICODE),
+                'img_srcs_json' => json_encode(self::demoImgSrcs($i), JSON_UNESCAPED_UNICODE),
                 'asset_srcs_json' => null,
                 'click_depth' => min(8, (int) floor($i / 15)),
                 'discovered_via' => $i === 0 ? 'seed' : (($i % 5 === 0) ? 'sitemap' : 'link'),
@@ -442,6 +439,31 @@ class SiteAuditDemoFixture
     }
 
     /**
+     * Картинки страницы в формате SiteAuditImageItem (с has_alt).
+     *
+     * @return list<array{src:string,alt:?string,has_alt:bool,width:?int,height:?int}>
+     */
+    private static function demoImgSrcs(int $pageIndex): array
+    {
+        $without = $pageIndex % 4;
+        $total = 2 + ($pageIndex % 5);
+        $items = [];
+        for ($k = 0; $k < $total; $k++) {
+            $id = 10 + (($pageIndex * 3 + $k * 7) % 80);
+            $hasAlt = $k >= $without;
+            $items[] = [
+                'src' => 'https://picsum.photos/id/' . $id . '/800/600',
+                'alt' => $hasAlt ? ('Демо фото ' . ($k + 1)) : '',
+                'has_alt' => $hasAlt,
+                'width' => 800,
+                'height' => 600,
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
      * @return array<string,mixed>|null
      */
     public static function metaFor(string $code, string $base, string $url, int $j): ?array
@@ -525,20 +547,58 @@ class SiteAuditDemoFixture
                     'title' => $label,
                 ];
             case 'similar_pages':
+                $w = 800 + ($j * 37) % 2200;
+                $sw = max(200, $w + (($j % 7) - 3) * 80);
+                $sharedPool = [
+                    ['диван', 'мебель', 'доставка', 'москва', 'цена', 'каталог'],
+                    ['матрас', 'ортопедический', 'кровать', 'доставка', 'размер'],
+                    ['шкаф', 'купе', 'заказ', 'замер', 'москва', 'сборка'],
+                    ['стол', 'письменный', 'офис', 'самовывоз', 'наличие'],
+                    ['кресло', 'массив', 'дуб', 'гостиная', 'доставка'],
+                ];
+                $shared = $sharedPool[$j % count($sharedPool)];
+                $shingleSamples = [
+                    implode(' ', array_slice($shared, 0, 5)),
+                    implode(' ', array_merge(array_slice($shared, 1, 4), ['качество'])),
+                ];
+                $overlap = 0.18 + (($j % 5) * 0.04);
+
                 return [
                     'similar_url' => $base . '/catalog/item-' . (($j % 40) + 1) . '/',
                     'hamming' => 3 + ($j % 5),
                     'distance' => 3 + ($j % 5),
+                    'word_count' => $w,
+                    'similar_word_count' => $sw,
+                    'shared_words' => $shared,
+                    'shared_source' => 'body',
+                    'shingle_size' => 5,
+                    'shingle_overlap' => round($overlap, 4),
+                    'shingle_shared' => 12 + ($j % 9),
+                    'shared_shingles' => $shingleSamples,
                 ];
             case 'thin_content':
                 return ['word_count' => 40 + ($j % 30), 'threshold' => 150];
             case 'images_without_alt':
                 $imgCount = 3 + ($j % 4);
-                $without = 1 + ($j % $imgCount);
+                $without = max(1, 1 + ($j % $imgCount));
+                $samples = [];
+                for ($s = 0; $s < $without; $s++) {
+                    $id = (($j + $s * 5) % 20) + 20;
+                    $src = 'https://picsum.photos/id/' . $id . '/800/600';
+                    $samples[] = [
+                        'src' => $src,
+                        'url' => $src,
+                        'img' => $src,
+                        'width' => 800,
+                        'height' => 600,
+                    ];
+                }
 
                 return [
                     'img_without_alt' => $without,
                     'img_count' => $imgCount,
+                    'count' => $without,
+                    'samples' => $samples,
                 ];
             case 'page_has_broken_links':
                 $count = 1 + ($j % 3);
@@ -690,21 +750,33 @@ class SiteAuditDemoFixture
                     'description' => str_repeat('Длинное описание демо. ', 8) . '#' . ($j + 1),
                 ];
             case 'title_equals_h1':
-                $text = 'Купить диван в Москве — доставка';
+                $text = 'Купить диван в Москве — доставка за 1 день';
 
                 return [
                     'title' => $text,
                     'h1' => $text,
                 ];
             case 'description_equals_h1':
-                $text = 'Интернет-магазин мебели' . ($j > 0 ? ' #' . ($j + 1) : '');
+                $text = 'Интернет-магазин мебели с доставкой по РФ'
+                    . ($j > 0 ? ' · серия ' . ($j + 1) : '');
 
                 return [
                     'description' => $text,
                     'h1' => $text,
                 ];
             case 'title_equals_description':
-                $t = 'Одинаковый TITLE и description — витрина #' . ($j + 1);
+                // Реалистичный одинаковый текст (не «подсказка системы»).
+                $products = [
+                    'Купить угловой диван «Комфорт» — цена от 24 900 ₽',
+                    'Матрас ортопедический 160×200 — бесплатная доставка',
+                    'Кресло-качалка из массива дуба — в наличии',
+                    'Шкаф-купе на заказ в Москве — замер бесплатно',
+                    'Письменный стол с ящиками — самовывоз сегодня',
+                ];
+                $t = $products[$j % count($products)];
+                if ($j >= count($products)) {
+                    $t .= ' · вариант ' . ($j + 1);
+                }
 
                 return ['title' => $t, 'description' => $t];
             case 'multiple_title_or_description':
@@ -717,7 +789,8 @@ class SiteAuditDemoFixture
             case 'empty_description':
                 return ['missing' => true];
             case 'h1_equals_h2':
-                $h = 'Одинаковый заголовок раздела #' . (($j % 20) + 1);
+                $h = 'Каталог мебели для гостиной'
+                    . ($j > 0 ? ' · блок ' . (($j % 20) + 1) : '');
 
                 return ['h1' => $h, 'h2' => $h];
             case 'heading_hierarchy':
@@ -1129,7 +1202,13 @@ class SiteAuditDemoFixture
             case 'landing_no_inbound_internal':
                 return ['inbound' => 0];
             case 'no_unique_images':
-                return ['img_count' => 2 + ($j % 3), 'unique_img_src_count' => 0];
+                $imgCount = 2 + ($j % 3);
+
+                return [
+                    'img_count' => $imgCount,
+                    'unique_img_src_count' => 0,
+                    'reason' => ($j % 3 === 0) ? 'no_img' : 'no_src',
+                ];
             case 'deep_pages':
                 return ['click_depth' => 6 + ($j % 4), 'threshold' => 5];
             case 'meta_nofollow':

@@ -625,7 +625,7 @@
                             <span class="cabinet-sa-dup-group__scope cabinet-sa-dup-group__scope--{{ $group['scope'] }}">{{ ($group['scope'] ?? '') === 'internal' ? 'внутренняя' : 'внешняя' }}</span>
                         @endif
                         @if(!empty($group['likely_template']))
-                            <span class="cabinet-sa-dup-group__badge">{{ !empty($isCrawlImagesReport) ? 'общий блок' : (!empty($isLinkInvertedReport) ? 'общий блок' : 'сквозной') }}</span>
+                            <span class="cabinet-sa-dup-group__badge">{{ (!empty($isCrawlImagesReport) || !empty($isImagesWithoutAltReport) || !empty($isLinkInvertedReport)) ? 'общий блок' : 'сквозной' }}</span>
                         @endif
                     </div>
                     <div class="cabinet-sa-dup-group__label">
@@ -719,6 +719,8 @@
         $isBrokenTarget = !empty($showReferrers) && ! $isRedirectReport;
         $isSerpTitleReport = ($code ?? '') === 'serp_title_mismatch';
         $isHeavyImageReport = ($code ?? '') === 'heavy_image';
+        $isImagesWithoutAltReport = ($code ?? '') === 'images_without_alt';
+        $isImageCardReport = $isHeavyImageReport || $isImagesWithoutAltReport;
         $isAffiliateReport = ($code ?? '') === 'probable_affiliate';
         $isIndexMismatchReport = ($code ?? '') === 'index_count_mismatch';
         $isCannibalReport = ($code ?? '') === 'keyword_cannibalization';
@@ -759,8 +761,10 @@
             ? "URL, который сам отвечает редиректом.\nГде на него ссылаются — колонка «Откуда ссылаются» (меню, HTML, sitemap)."
             : ($isBrokenTarget
                 ? "Это URL, который сам ответил ошибкой при обходе (404 и т.п.).\nНе путать со страницей, где стоит ссылка — она в колонке «Откуда ссылаются»."
-                : ($isHeavyImageReport
-                    ? "Страница HTML, на которой стоит тяжёлая картинка.\nСама картинка (файл) — в колонке «Изображение»."
+                : ($isImageCardReport
+                    ? ($isImagesWithoutAltReport
+                        ? "Страница HTML, на которой стоит картинка без alt.\nСама картинка (файл) — в колонке «Изображение»."
+                        : "Страница HTML, на которой стоит тяжёлая картинка.\nСама картинка (файл) — в колонке «Изображение».")
                     : ($isAffiliateReport
                         ? "Страница, на которой стоят исходящие ссылки, похожие на партнёрские.\nСами ссылки — в колонке «Партнёрки»."
                         : "Адрес страницы с проблемой.\nНажмите ссылку — откроется сайт в новой вкладке.")))));
@@ -770,20 +774,22 @@
             ? 'Лишняя страница'
             : ($isRedirectReport
             ? 'URL'
-            : ($isBrokenTarget ? 'Битый URL' : ($isHeavyImageReport ? 'Страница' : ($isAffiliateReport ? 'Страница' : 'URL')))));
+            : ($isBrokenTarget ? 'Битый URL' : ($isImageCardReport ? 'Страница' : ($isAffiliateReport ? 'Страница' : 'URL')))));
         $detailsColLabel = $isSerpTitleReport ? 'Сравнение title'
-            : ($isHeavyImageReport ? 'Изображение'
+            : ($isImageCardReport ? 'Изображение'
                 : ($isAffiliateReport ? 'Партнёрки'
                     : ($isIndexMismatchReport ? 'В проверке' : 'Детали')));
         $detailsColTip = $isSerpTitleReport
             ? "Слева — TITLE в HTML, справа — заголовок в сниппете ПС."
             : ($isHeavyImageReport
                 ? "Файл картинки: превью, вес, имя и полный URL.\nИменно его нужно сжать или заменить."
-                : ($isAffiliateReport
-                    ? "Какие исходящие ссылки похожи на партнёрские: сеть, хост и полный URL."
-                    : ($isIndexMismatchReport
-                        ? "Как URL попал в эту проверку, глубина, раздел и есть ли ?параметры.\nВсе строки — нет в индексе Вебмастера."
-                        : "Кратко что не так: код ответа, какой дубль, какой запрос и т.д.")));
+                : ($isImagesWithoutAltReport
+                    ? "Файл картинки без alt: превью, размер в вёрстке, имя и полный URL.\nДобавьте осмысленный alt (или alt=\"\" для декора)."
+                    : ($isAffiliateReport
+                        ? "Какие исходящие ссылки похожи на партнёрские: сеть, хост и полный URL."
+                        : ($isIndexMismatchReport
+                            ? "Как URL попал в эту проверку, глубина, раздел и есть ли ?параметры.\nВсе строки — нет в индексе Вебмастера."
+                            : "Кратко что не так: код ответа, какой дубль, какой запрос и т.д."))));
         $refColTip = $isRedirectReport
             ? "Откуда URL попал в проверка: sitemap.xml, посев, главная или страница со ссылкой."
             : "Откуда URL попал в проверка или страницы со ссылкой.";
@@ -793,7 +799,7 @@
     @elseif(!empty($isCrawlImagesReport))
         @include('pages.partials.site-audit-crawl-images-table')
     @else
-    <div class="cabinet-sa-table-wrap{{ $isSerpTitleReport ? ' cabinet-sa-table-wrap--serp-title' : '' }}{{ $isBrokenTarget ? ' cabinet-sa-table-wrap--broken' : '' }}{{ $isHeavyImageReport ? ' cabinet-sa-table-wrap--heavy' : '' }}{{ $isAffiliateReport ? ' cabinet-sa-table-wrap--aff' : '' }}{{ !empty($isIndexMismatchReport) ? ' cabinet-sa-table-wrap--index-mismatch' : '' }}{{ $isCannibalReport ? ' cabinet-sa-table-wrap--cannibal' : '' }}">
+    <div class="cabinet-sa-table-wrap{{ $isSerpTitleReport ? ' cabinet-sa-table-wrap--serp-title' : '' }}{{ $isBrokenTarget ? ' cabinet-sa-table-wrap--broken' : '' }}{{ $isImageCardReport ? ' cabinet-sa-table-wrap--heavy' : '' }}{{ $isAffiliateReport ? ' cabinet-sa-table-wrap--aff' : '' }}{{ !empty($isIndexMismatchReport) ? ' cabinet-sa-table-wrap--index-mismatch' : '' }}{{ $isCannibalReport ? ' cabinet-sa-table-wrap--cannibal' : '' }}">
         <table class="table table-sm table-hover mb-0 cabinet-sa-findings-table">
             <colgroup>
                 <col class="cabinet-sa-col-url">
@@ -846,7 +852,7 @@
                         @include('pages.partials.site-audit-tip', ['tip' => "TITLE лишней страницы — по нему видно, почему сработало совпадение."])
                     </th>
                 @else
-                    <th title="{{ $isAffiliateReport ? 'Партнёрские ссылки: сеть и URL' : ($isHeavyImageReport ? 'Файл изображения: вес и URL' : ($isSerpTitleReport ? 'Сравнение TITLE на сайте и в выдаче ПС' : 'Коротко: что именно не так (код ответа, дубль и т.п.).')) }}">
+                    <th title="{{ $isAffiliateReport ? 'Партнёрские ссылки: сеть и URL' : ($isImageCardReport ? 'Файл изображения: превью и URL' : ($isSerpTitleReport ? 'Сравнение TITLE на сайте и в выдаче ПС' : 'Коротко: что именно не так (код ответа, дубль и т.п.).')) }}">
                         {{ $detailsColLabel }}
                         @include('pages.partials.site-audit-tip', ['tip' => $detailsColTip])
                     </th>

@@ -562,6 +562,9 @@ class SiteAuditController extends Controller
 
             if ($viewMode === 'groups') {
                 $allRows = $query->get();
+                if ($code === 'images_without_alt') {
+                    $allRows = $this->enrichImagesWithoutAltRows((int) $crawl->id, $allRows);
+                }
                 $allGroups = SiteAuditDuplicateGrouper::group($allRows, $code);
                 $allGroupsForSummary = $allGroups;
                 $groupTotal = count($allGroups);
@@ -577,12 +580,19 @@ class SiteAuditController extends Controller
             } else {
                 $rows = $query->forPage($page, $perPage)->get();
                 $pages = max(1, (int) ceil($total / $perPage));
+                if ($code === 'images_without_alt') {
+                    $rows = $this->enrichImagesWithoutAltRows((int) $crawl->id, $rows);
+                }
                 $ignoredMap = $ignoreSvc->ignoredMapForFindings($projectId, $rows);
                 $notesMap = $noteSvc->mapForFindings($projectId, $rows);
 
                 // В списке страниц всё равно ловим доминантный паттерн (сквозной блок).
                 if ($needsSitewide && $total >= 3 && $total <= $groupsMax) {
-                    $allGroupsForSummary = SiteAuditDuplicateGrouper::group((clone $query)->get(), $code);
+                    $allForSummary = (clone $query)->get();
+                    if ($code === 'images_without_alt') {
+                        $allForSummary = $this->enrichImagesWithoutAltRows((int) $crawl->id, $allForSummary);
+                    }
+                    $allGroupsForSummary = SiteAuditDuplicateGrouper::group($allForSummary, $code);
                 }
             }
 
@@ -603,6 +613,9 @@ class SiteAuditController extends Controller
                 'description_too_long',
             ], true) && $rows instanceof \Illuminate\Support\Collection && $rows->isNotEmpty()) {
                 $rows = $this->enrichMetaLengthTexts((int) $crawl->id, $code, $rows);
+            }
+            if ($code === 'similar_pages' && $rows instanceof \Illuminate\Support\Collection && $rows->isNotEmpty()) {
+                $rows = $this->enrichSimilarPagesWordCounts((int) $crawl->id, $rows);
             }
         }
 
@@ -749,6 +762,7 @@ class SiteAuditController extends Controller
             'isHtmlErrorReport' => SiteAuditDuplicateGrouper::isHtmlErrors($code),
             'isLinkInvertedReport' => SiteAuditDuplicateGrouper::isLinkInverted($code) || $isCrawlImages,
             'isCrawlImagesReport' => $isCrawlImages,
+            'isImagesWithoutAltReport' => $code === 'images_without_alt',
             'total' => $total,
             'page' => $page,
             'perPage' => $perPage,
@@ -2328,6 +2342,199 @@ class SiteAuditController extends Controller
         $first = mb_substr($first, 0, 32);
 
         return $first !== '' ? $first : 'прочее';
+    }
+
+    /**
+     * Число слов + общие токены для similar_pages (старые findings / без token_top).
+     *
+     * @param  \Illuminate\Support\Collection  $rows
+     * @return \Illuminate\Support\Collection
+     */
+    private function enrichSimilarPagesWordCounts(int $crawlId, $rows)
+    {
+        $needHashes = [];
+        $needUrls = [];
+        foreach ($rows as $row) {
+            $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+            $words = (int) ($meta['word_count'] ?? 0);
+            $simWords = (int) ($meta['similar_word_count'] ?? 0);
+            $hasShared = ! empty($meta['shared_words']) && is_array($meta['shared_words']);
+            $hash = (string) ($row->url_hash ?? '');
+            $simUrl = trim((string) ($meta['similar_url'] ?? ''));
+            if ($hash !== '' && ($words <= 0 || ! $hasShared)) {
+                $needHashes[$hash] = true;
+            }
+            if ($simUrl !== '' && ($simWords <= 0 || ! $hasShared)) {
+                $needUrls[$simUrl] = true;
+            }
+        }
+        if ($needHashes === [] && $needUrls === []) {
+            return $rows;
+        }
+
+        $cols = [
+            'url_hash', 'url', 'word_count', 'title', 'h1', 'description',
+            'top_word', 'top_bigram', 'top_trigram',
+        ];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('site_audit_pages', 'token_top_json')) {
+            $cols[] = 'token_top_json';
+        }
+
+        $byHash = [];
+        $byUrl = [];
+        if ($needHashes !== []) {
+            foreach (SiteAuditPage::query()
+                ->where('crawl_id', $crawlId)
+                ->whereIn('url_hash', array_keys($needHashes))
+                ->get($cols) as $page) {
+                $byHash[(string) $page->url_hash] = $page;
+                $byUrl[(string) $page->url] = $page;
+            }
+        }
+        if ($needUrls !== []) {
+            $missing = array_diff_key($needUrls, $byUrl);
+            if ($missing !== []) {
+                foreach (SiteAuditPage::query()
+                    ->where('crawl_id', $crawlId)
+                    ->whereIn('url', array_keys($missing))
+                    ->get($cols) as $page) {
+                    $byUrl[(string) $page->url] = $page;
+                }
+            }
+        }
+
+        return $rows->map(function ($row) use ($byHash, $byUrl) {
+            $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+            $changed = false;
+            $pageA = $byHash[(string) ($row->url_hash ?? '')] ?? null;
+            $simUrl = trim((string) ($meta['similar_url'] ?? ''));
+            $pageB = $simUrl !== '' ? ($byUrl[$simUrl] ?? null) : null;
+
+            if ((int) ($meta['word_count'] ?? 0) <= 0 && $pageA) {
+                $meta['word_count'] = (int) ($pageA->word_count ?? 0);
+                $changed = true;
+            }
+            if ((int) ($meta['similar_word_count'] ?? 0) <= 0 && $pageB) {
+                $meta['similar_word_count'] = (int) ($pageB->word_count ?? 0);
+                $changed = true;
+            }
+            if ((empty($meta['shared_words']) || ! is_array($meta['shared_words'])) && $pageA && $pageB) {
+                $tokensA = $this->similarPageTokenBag($pageA);
+                $tokensB = $this->similarPageTokenBag($pageB);
+                $shared = \App\Services\SiteAudit\SiteAuditTextMetrics::sharedTokenList($tokensA, $tokensB, 24);
+                if ($shared !== []) {
+                    $meta['shared_words'] = $shared;
+                    $meta['shared_source'] = (! empty($pageA->token_top_json) && ! empty($pageB->token_top_json))
+                        ? 'body'
+                        : 'meta';
+                    $changed = true;
+                }
+            }
+            if ($changed) {
+                $row->meta_json = $meta;
+            }
+
+            return $row;
+        });
+    }
+
+    /**
+     * @param  \App\SiteAuditPage  $page
+     * @return list<string>
+     */
+    private function similarPageTokenBag($page): array
+    {
+        $raw = $page->token_top_json ?? null;
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            $raw = is_array($decoded) ? $decoded : null;
+        }
+        if (is_array($raw) && $raw !== []) {
+            $out = [];
+            foreach ($raw as $item) {
+                if (is_string($item) && trim($item) !== '') {
+                    $out[] = mb_strtolower(trim($item));
+                }
+            }
+            if ($out !== []) {
+                return array_values(array_unique($out));
+            }
+        }
+
+        return \App\Services\SiteAudit\SiteAuditTextMetrics::weakTokenBagFromPage($page);
+    }
+
+    /**
+     * Подтянуть samples img без alt из img_srcs_json (старые findings без сэмплов).
+     *
+     * @param  \Illuminate\Support\Collection  $rows
+     * @return \Illuminate\Support\Collection
+     */
+    private function enrichImagesWithoutAltRows(int $crawlId, $rows)
+    {
+        $needHashes = [];
+        foreach ($rows as $row) {
+            $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+            $samples = is_array($meta['samples'] ?? null) ? $meta['samples'] : [];
+            if ($samples !== []) {
+                continue;
+            }
+            $hash = (string) ($row->url_hash ?? '');
+            if ($hash !== '') {
+                $needHashes[$hash] = true;
+            }
+        }
+        if ($needHashes === []) {
+            return $rows;
+        }
+
+        $pages = SiteAuditPage::query()
+            ->where('crawl_id', $crawlId)
+            ->whereIn('url_hash', array_keys($needHashes))
+            ->get(['url_hash', 'img_srcs_json']);
+        $byHash = [];
+        foreach ($pages as $page) {
+            $byHash[(string) $page->url_hash] = $page;
+        }
+
+        return $rows->map(function ($row) use ($byHash) {
+            $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+            $samples = is_array($meta['samples'] ?? null) ? $meta['samples'] : [];
+            if ($samples !== []) {
+                return $row;
+            }
+            $hash = (string) ($row->url_hash ?? '');
+            $page = $byHash[$hash] ?? null;
+            if ($page === null) {
+                return $row;
+            }
+            $missing = [];
+            foreach (\App\Services\SiteAudit\SiteAuditImageItem::normalizeList($page->img_srcs_json) as $item) {
+                if (($item['has_alt'] ?? null) !== false) {
+                    continue;
+                }
+                $missing[] = [
+                    'src' => $item['src'],
+                    'url' => $item['src'],
+                    'width' => $item['width'] ?? null,
+                    'height' => $item['height'] ?? null,
+                    'loading' => $item['loading'] ?? null,
+                ];
+                if (count($missing) >= 15) {
+                    break;
+                }
+            }
+            if ($missing === []) {
+                return $row;
+            }
+            $meta['samples'] = $missing;
+            if (! isset($meta['count'])) {
+                $meta['count'] = (int) ($meta['img_without_alt'] ?? count($missing));
+            }
+            $row->meta_json = $meta;
+
+            return $row;
+        });
     }
 
     /**

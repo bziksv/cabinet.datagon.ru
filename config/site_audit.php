@@ -55,6 +55,10 @@ return [
     'incremental_by_content_hash' => (bool) env('SITE_AUDIT_INCREMENTAL', true),
     'robots_max_bytes' => (int) env('SITE_AUDIT_ROBOTS_MAX_BYTES', 512000),
     'simhash_hamming_max' => (int) env('SITE_AUDIT_SIMHASH_HAMMING', 6),
+    // Второй проход: 5-граммы. Кандидат с Hamming≤max остаётся только если доля общих шинголов ≥ порога.
+    'simhash_shingle_size' => (int) env('SITE_AUDIT_SIMHASH_SHINGLE_SIZE', 5),
+    'simhash_shingle_min_overlap' => (float) env('SITE_AUDIT_SIMHASH_SHINGLE_OVERLAP', 0.10),
+    'simhash_shingle_store_max' => (int) env('SITE_AUDIT_SIMHASH_SHINGLE_STORE', 120),
     'simhash_max_pairs' => (int) env('SITE_AUDIT_SIMHASH_MAX_PAIRS', 200),
     'share_ttl_days' => (int) env('SITE_AUDIT_SHARE_TTL_DAYS', 0), // 0 = бессрочно
     'broken_link_head_max' => (int) env('SITE_AUDIT_BROKEN_HEAD_MAX', 40),
@@ -397,7 +401,7 @@ return [
             'phase' => 'B',
             'severity' => 'warning',
             'title' => 'Похожие страницы',
-            'description' => 'Страницы со схожим текстом (SimHash, порог Hamming).',
+            'description' => 'Похожие по тексту: SimHash + фильтр 5-грамм, пара A/B, общие слова/фразы.',
         ],
         'empty_title' => [
             'phase' => 'A',
@@ -600,8 +604,8 @@ return [
         'no_unique_images' => [
             'phase' => 'B',
             'severity' => 'info',
-            'title' => 'Нет уникальных изображений',
-            'description' => 'На странице нет изображений с уникальным src.',
+            'title' => 'Нет изображений с src',
+            'description' => 'На странице нет картинок с нормальным адресом (src), либо img нет совсем.',
         ],
         'text_in_noindex' => [
             'phase' => 'B',
@@ -613,7 +617,7 @@ return [
             'phase' => 'A',
             'severity' => 'warning',
             'title' => 'Изображения без alt',
-            'description' => 'На странице есть img без атрибута alt или с пустым alt.',
+            'description' => 'Img без alt или с пустым alt: в деталях превью и src.',
         ],
 
         // —— Фаза B (lite) ——

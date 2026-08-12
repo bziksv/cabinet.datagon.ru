@@ -33,6 +33,8 @@ class SiteAuditPage extends Model
         'text_len',
         'content_hash',
         'simhash',
+        'token_top_json',
+        'shingles_json',
         'out_links_json',
         'ext_links_json',
         'img_srcs_json',
@@ -67,6 +69,8 @@ class SiteAuditPage extends Model
         'img_srcs_json' => 'array',
         'asset_srcs_json' => 'array',
         'headings_json' => 'array',
+        'token_top_json' => 'array',
+        'shingles_json' => 'array',
         'noindex' => 'boolean',
         'content_unchanged' => 'boolean',
     ];

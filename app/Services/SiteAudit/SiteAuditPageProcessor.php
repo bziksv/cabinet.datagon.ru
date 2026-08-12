@@ -404,6 +404,18 @@ class SiteAuditPageProcessor
                 $pageData['top_bigram_count'] = $parsed['top_bigram_count'] ?? 0;
                 $pageData['top_trigram'] = $parsed['top_trigram'] ?? null;
                 $pageData['top_trigram_count'] = $parsed['top_trigram_count'] ?? 0;
+                if (Schema::hasColumn('site_audit_pages', 'token_top_json')) {
+                    $tok = isset($parsed['token_top']) && is_array($parsed['token_top'])
+                        ? array_values(array_slice($parsed['token_top'], 0, 40))
+                        : [];
+                    $pageData['token_top_json'] = $tok !== [] ? $tok : null;
+                }
+                if (Schema::hasColumn('site_audit_pages', 'shingles_json')) {
+                    $sh = isset($parsed['shingles']) && is_array($parsed['shingles'])
+                        ? array_values($parsed['shingles'])
+                        : [];
+                    $pageData['shingles_json'] = $sh !== [] ? $sh : null;
+                }
                 $pageData['noindex_text_len'] = $parsed['noindex_text_len'] ?? 0;
                 $pageData['charset'] = $parsed['charset'] ?? null;
 

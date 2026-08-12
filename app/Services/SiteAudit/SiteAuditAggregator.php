@@ -557,6 +557,7 @@ class SiteAuditAggregator
                         if (mb_strtolower(trim($page->title)) === mb_strtolower(trim($page->description))) {
                             $findings[] = $this->row($crawlId, 'title_equals_description', $page, [
                                 'title' => $page->title,
+                                'description' => $page->description,
                             ]);
                         }
                     }
@@ -579,16 +580,36 @@ class SiteAuditAggregator
                     }
 
                     if ((int) $page->img_without_alt > 0) {
+                        $missingSamples = [];
+                        foreach (SiteAuditImageItem::normalizeList($page->img_srcs_json) as $imgItem) {
+                            if (($imgItem['has_alt'] ?? null) !== false) {
+                                continue;
+                            }
+                            $missingSamples[] = [
+                                'src' => $imgItem['src'],
+                                'url' => $imgItem['src'],
+                                'width' => $imgItem['width'] ?? null,
+                                'height' => $imgItem['height'] ?? null,
+                                'loading' => $imgItem['loading'] ?? null,
+                            ];
+                            if (count($missingSamples) >= 15) {
+                                break;
+                            }
+                        }
                         $findings[] = $this->row($crawlId, 'images_without_alt', $page, [
                             'img_without_alt' => (int) $page->img_without_alt,
                             'img_count' => (int) $page->img_count,
+                            'count' => (int) $page->img_without_alt,
+                            'samples' => $missingSamples,
                         ]);
                     }
 
                     if ((int) $page->unique_img_src_count === 0 && ! $page->noindex) {
+                        $imgCount = (int) $page->img_count;
                         $findings[] = $this->row($crawlId, 'no_unique_images', $page, [
-                            'img_count' => (int) $page->img_count,
+                            'img_count' => $imgCount,
                             'unique_img_src_count' => 0,
+                            'reason' => $imgCount > 0 ? 'no_src' : 'no_img',
                         ]);
                     }
 
@@ -2439,13 +2460,27 @@ class SiteAuditAggregator
     {
         $threshold = (int) config('site_audit.simhash_hamming_max', 6);
         $maxPairs = (int) config('site_audit.simhash_max_pairs', 200);
+        $shingleMinOverlap = (float) config('site_audit.simhash_shingle_min_overlap', 0.10);
+        $shingleSize = max(2, (int) config('site_audit.simhash_shingle_size', 5));
 
+        $cols = [
+            'id', 'url', 'url_hash', 'simhash', 'title', 'h1', 'description',
+            'word_count', 'top_word', 'top_bigram', 'top_trigram',
+            'redirect_chain', 'final_url',
+        ];
+        if (Schema::hasColumn('site_audit_pages', 'token_top_json')) {
+            $cols[] = 'token_top_json';
+        }
+        $hasShinglesCol = Schema::hasColumn('site_audit_pages', 'shingles_json');
+        if ($hasShinglesCol) {
+            $cols[] = 'shingles_json';
+        }
         $pages = SiteAuditPage::query()
             ->where('crawl_id', $crawlId)
             ->whereNotNull('simhash')
             ->where('simhash', '!=', '')
             ->orderBy('id')
-            ->get(['id', 'url', 'url_hash', 'simhash', 'title', 'redirect_chain', 'final_url']);
+            ->get($cols);
 
         $pages = $pages->filter(function ($page) {
             return ! $this->pageHadRedirect($page);
@@ -2468,12 +2503,28 @@ class SiteAuditAggregator
 
         for ($i = 0; $i < $n && $emitted < $maxPairs; $i++) {
             $a = $pages[$i];
+            $shinglesA = $hasShinglesCol
+                ? SiteAuditSimhash::normalizeShingleList($a->shingles_json ?? null)
+                : [];
             for ($j = $i + 1; $j < $n && $emitted < $maxPairs; $j++) {
                 $b = $pages[$j];
                 $dist = SiteAuditSimhash::hamming($a->simhash, $b->simhash);
                 if ($dist > $threshold) {
                     continue;
                 }
+
+                $shinglesB = $hasShinglesCol
+                    ? SiteAuditSimhash::normalizeShingleList($b->shingles_json ?? null)
+                    : [];
+                $overlap = null;
+                // Второй проход: есть шинголовы у обеих — требуем долю общих ≥ порога.
+                if (count($shinglesA) >= $shingleSize && count($shinglesB) >= $shingleSize) {
+                    $overlap = SiteAuditSimhash::shingleOverlap($shinglesA, $shinglesB, 8);
+                    if ($overlap['ratio'] < $shingleMinOverlap) {
+                        continue;
+                    }
+                }
+
                 // не дублируем exact content_hash пары — они в duplicate_content
                 foreach ([$a, $b] as $page) {
                     $key = $page->url_hash;
@@ -2481,17 +2532,34 @@ class SiteAuditAggregator
                         continue;
                     }
                     $other = $page->id === $a->id ? $b : $a;
+                    $tokensA = self::pageTokenBag($page);
+                    $tokensB = self::pageTokenBag($other);
+                    $shared = SiteAuditTextMetrics::sharedTokenList($tokensA, $tokensB, 24);
+                    $sharedSource = (! empty($page->token_top_json) && ! empty($other->token_top_json))
+                        ? 'body'
+                        : 'meta';
+                    $meta = [
+                        'similar_url' => $other->url,
+                        'hamming' => $dist,
+                        'title' => $page->title,
+                        'word_count' => (int) ($page->word_count ?? 0),
+                        'similar_word_count' => (int) ($other->word_count ?? 0),
+                        'shared_words' => $shared,
+                        'shared_source' => $sharedSource,
+                    ];
+                    if ($overlap !== null) {
+                        $meta['shingle_size'] = $shingleSize;
+                        $meta['shingle_overlap'] = $overlap['ratio'];
+                        $meta['shingle_shared'] = $overlap['shared'];
+                        $meta['shared_shingles'] = $overlap['samples'];
+                    }
                     SiteAuditFinding::query()->create([
                         'crawl_id' => $crawlId,
                         'code' => 'similar_pages',
                         'severity' => $severity,
                         'url' => $page->url,
                         'url_hash' => $page->url_hash,
-                        'meta_json' => [
-                            'similar_url' => $other->url,
-                            'hamming' => $dist,
-                            'title' => $page->title,
-                        ],
+                        'meta_json' => $meta,
                     ]);
                     $seen[$key] = true;
                     $emitted++;
@@ -2501,6 +2569,41 @@ class SiteAuditAggregator
                 }
             }
         }
+    }
+
+    /**
+     * Токены страницы для пересечения похожих: token_top_json или слабый набор из meta.
+     *
+     * @return list<string>
+     */
+    private static function pageTokenBag($page): array
+    {
+        $raw = $page->token_top_json ?? null;
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            $raw = is_array($decoded) ? $decoded : null;
+        }
+        if (is_array($raw) && $raw !== []) {
+            $out = [];
+            foreach ($raw as $item) {
+                if (is_string($item)) {
+                    $w = mb_strtolower(trim($item));
+                    if ($w !== '') {
+                        $out[] = $w;
+                    }
+                } elseif (is_array($item) && isset($item['word'])) {
+                    $w = mb_strtolower(trim((string) $item['word']));
+                    if ($w !== '') {
+                        $out[] = $w;
+                    }
+                }
+            }
+            if ($out !== []) {
+                return array_values(array_unique($out));
+            }
+        }
+
+        return SiteAuditTextMetrics::weakTokenBagFromPage($page);
     }
 
     private function emitDuplicates(int $crawlId, string $hashColumn, string $code): void

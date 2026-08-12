@@ -175,6 +175,7 @@ class SiteAuditHtmlParser
             'top_bigram_count' => $textMetrics['top_bigram_count'],
             'top_trigram' => $textMetrics['top_trigram'],
             'top_trigram_count' => $textMetrics['top_trigram_count'],
+            'token_top' => $textMetrics['top_tokens'] ?? [],
             'noindex_text_len' => mb_strlen($noindexText),
             'img_count' => $imgCount,
             'img_without_alt' => $imgWithoutAlt,
@@ -197,6 +198,7 @@ class SiteAuditHtmlParser
                 'product_offer' => $looksProduct,
             ],
             'simhash' => SiteAuditSimhash::fromText($text),
+            'shingles' => SiteAuditSimhash::shinglesFromText($text),
             'final_url' => $finalUrl,
         ];
     }

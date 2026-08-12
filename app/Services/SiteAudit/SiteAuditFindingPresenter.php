@@ -59,6 +59,14 @@ class SiteAuditFindingPresenter
             return self::brokenImageDetailsHtml($meta);
         }
 
+        if ($code === 'images_without_alt') {
+            return self::imagesWithoutAltDetailsHtml($meta);
+        }
+
+        if ($code === 'no_unique_images') {
+            return self::noUniqueImagesDetailsHtml($meta);
+        }
+
         if ($code === 'risky_query_params') {
             return self::riskyQueryParamsDetailsHtml($meta, $url);
         }
@@ -69,6 +77,10 @@ class SiteAuditFindingPresenter
 
         if (in_array($code, ['duplicate_content', 'duplicate_title', 'duplicate_description'], true)) {
             return self::duplicatePeersHtml($code, $meta, $url);
+        }
+
+        if ($code === 'similar_pages') {
+            return self::similarPagesDetailsHtml($meta, $url);
         }
 
         if ($code === 'page_has_bad_links') {
@@ -178,7 +190,6 @@ class SiteAuditFindingPresenter
             'pages_with_canonical',
             'crawl_pages',
             'crawl_images',
-            'similar_pages',
             'landing_url_changed',
             'landing_plagiarism_suspect',
             'insecure_form',
@@ -466,6 +477,194 @@ class SiteAuditFindingPresenter
         $html .= '</div>';
 
         return $html;
+    }
+
+    /**
+     * Img без alt: карточки как у heavy_image (превью + статус + src).
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private static function imagesWithoutAltDetailsHtml(array $meta): ?string
+    {
+        $samples = self::imagesWithoutAltSamples($meta);
+        $without = (int) ($meta['img_without_alt'] ?? $meta['count'] ?? count($samples));
+        $totalImg = (int) ($meta['img_count'] ?? 0);
+
+        if ($samples === []) {
+            if ($without <= 0) {
+                return null;
+            }
+            $line = 'без alt: ' . number_format($without, 0, '', ' ');
+            if ($totalImg > 0) {
+                $line .= ' / ' . number_format($totalImg, 0, '', ' ');
+            }
+            $line .= ' <span class="text-muted">(список src — после нового обхода)</span>';
+
+            return '<div class="cabinet-sa-heavy cabinet-sa-heavy--summary">' . $line . '</div>';
+        }
+
+        $html = '<div class="cabinet-sa-heavy">';
+        foreach (array_slice($samples, 0, 8) as $sample) {
+            $img = (string) $sample['img'];
+            $name = self::heavyImageBasename($img);
+            $w = $sample['width'];
+            $h = $sample['height'];
+            $dims = '';
+            if ($w || $h) {
+                $dims = ($w ? number_format((int) $w, 0, '', ' ') : '?')
+                    . '×'
+                    . ($h ? number_format((int) $h, 0, '', ' ') : '?')
+                    . ' px';
+            }
+
+            $html .= '<div class="cabinet-sa-heavy__card">';
+            $html .= '<a class="cabinet-sa-heavy__thumb" href="' . e($img) . '" target="_blank" rel="noopener noreferrer">';
+            $html .= '<img src="' . e($img) . '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"'
+                . ' onerror="this.parentElement.classList.add(\'is-broken\');this.remove();">';
+            $html .= '<span class="cabinet-sa-heavy__thumb-fallback" aria-hidden="true">IMG</span>';
+            $html .= '</a>';
+            $html .= '<div class="cabinet-sa-heavy__body">';
+            $html .= '<div class="cabinet-sa-heavy__size">нет alt</div>';
+            if ($dims !== '') {
+                $html .= '<div class="cabinet-sa-heavy__meta">' . e($dims) . '</div>';
+            } else {
+                $html .= '<div class="cabinet-sa-heavy__meta">атрибут alt пустой или отсутствует</div>';
+            }
+            if ($name !== '') {
+                $html .= '<div class="cabinet-sa-heavy__name" title="' . e($name) . '">' . e($name) . '</div>';
+            }
+            $html .= '<a class="cabinet-sa-heavy__url cabinet-sa-url-break" href="' . e($img)
+                . '" target="_blank" rel="noopener noreferrer">' . e($img) . '</a>';
+            $html .= '</div></div>';
+        }
+
+        $shown = min(8, count($samples));
+        $extra = max(count($samples) - $shown, $without - $shown);
+        if ($extra > 0) {
+            $html .= '<div class="cabinet-sa-heavy__more">и ещё '
+                . number_format($extra, 0, '', ' ') . ' на этой странице</div>';
+        }
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return list<array{img:string,width:?int,height:?int}>
+     */
+    private static function imagesWithoutAltSamples(array $meta): array
+    {
+        $raw = isset($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+        $out = [];
+        foreach ($raw as $sample) {
+            $img = '';
+            $w = null;
+            $h = null;
+            if (is_string($sample)) {
+                $img = trim($sample);
+            } elseif (is_array($sample)) {
+                $img = trim((string) ($sample['src'] ?? $sample['url'] ?? $sample['img'] ?? ''));
+                if (isset($sample['width']) && $sample['width'] !== null && $sample['width'] !== '') {
+                    $w = (int) $sample['width'];
+                }
+                if (isset($sample['height']) && $sample['height'] !== null && $sample['height'] !== '') {
+                    $h = (int) $sample['height'];
+                }
+            }
+            if ($img === '') {
+                continue;
+            }
+            $out[] = ['img' => $img, 'width' => $w, 'height' => $h];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function imagesWithoutAltPlain(array $meta): string
+    {
+        $without = (int) ($meta['img_without_alt'] ?? $meta['count'] ?? 0);
+        $totalImg = (int) ($meta['img_count'] ?? 0);
+        $samples = self::imagesWithoutAltSamples($meta);
+        $bits = [];
+        if ($without > 0) {
+            $bits[] = 'без alt: ' . $without . ($totalImg > 0 ? (' / ' . $totalImg) : '');
+        }
+        if ($samples !== []) {
+            $names = [];
+            foreach (array_slice($samples, 0, 3) as $s) {
+                $n = self::heavyImageBasename((string) $s['img']);
+                $names[] = $n !== '' ? $n : self::clip((string) $s['img'], 40);
+            }
+            $bits[] = implode(', ', $names);
+            if (count($samples) > 3) {
+                $bits[] = '…+' . (count($samples) - 3);
+            }
+        }
+
+        return $bits !== [] ? implode(' · ', $bits) : 'есть img без alt';
+    }
+
+    /**
+     * Нет картинок с нормальным src на странице (не «уже были на других URL»).
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private static function noUniqueImagesDetailsHtml(array $meta): ?string
+    {
+        $imgCount = (int) ($meta['img_count'] ?? 0);
+        $unique = (int) ($meta['unique_img_src_count'] ?? 0);
+        $reason = (string) ($meta['reason'] ?? '');
+        if ($reason === '') {
+            $reason = $imgCount > 0 ? 'no_src' : 'no_img';
+        }
+
+        $html = '<div class="cabinet-sa-no-uniq-img">';
+        if ($reason === 'no_src') {
+            $html .= '<div class="cabinet-sa-no-uniq-img__flag">нет картинок с адресом</div>';
+            $html .= '<div class="cabinet-sa-no-uniq-img__title">Теги &lt;img&gt; есть, но без нормального src</div>';
+            $html .= '<div class="cabinet-sa-no-uniq-img__meta">'
+                . 'тегов img: <strong>' . number_format($imgCount, 0, '', ' ') . '</strong>'
+                . ' · с рабочим src: <strong>' . number_format($unique, 0, '', ' ') . '</strong>'
+                . '</div>';
+            $html .= '<div class="cabinet-sa-no-uniq-img__hint">'
+                . 'Это не «картинки уже где-то на сайте». На этой странице у img пустой src, data-URI '
+                . 'или адрес не распознан — для индекса и сниппета таких файлов нет.'
+                . '</div>';
+        } else {
+            $html .= '<div class="cabinet-sa-no-uniq-img__flag">нет изображений</div>';
+            $html .= '<div class="cabinet-sa-no-uniq-img__title">На странице нет ни одного &lt;img&gt;</div>';
+            $html .= '<div class="cabinet-sa-no-uniq-img__hint">'
+                . 'Для контентной/карточной страницы обычно нужны свои фото или иллюстрации '
+                . 'с нормальным src и осмысленным alt — не только иконки из CSS.'
+                . '</div>';
+        }
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function noUniqueImagesPlain(array $meta): string
+    {
+        $imgCount = (int) ($meta['img_count'] ?? 0);
+        $unique = (int) ($meta['unique_img_src_count'] ?? 0);
+        $reason = (string) ($meta['reason'] ?? '');
+        if ($reason === '') {
+            $reason = $imgCount > 0 ? 'no_src' : 'no_img';
+        }
+        if ($reason === 'no_src') {
+            return 'тегов img: ' . number_format($imgCount, 0, '', ' ')
+                . ' · с src: ' . number_format($unique, 0, '', ' ')
+                . ' — нет картинок с нормальным адресом';
+        }
+
+        return 'на странице нет изображений (img: 0)';
     }
 
     /**
@@ -1152,6 +1351,156 @@ class SiteAuditFindingPresenter
     }
 
     /**
+     * Похожие страницы (SimHash): явная пара URL + сколько слов + насколько близки.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    private static function similarPagesDetailsHtml(array $meta, ?string $rowUrl = null): ?string
+    {
+        $thisUrl = trim((string) ($rowUrl ?? ''));
+        $similar = trim((string) ($meta['similar_url'] ?? ''));
+        $hamming = array_key_exists('hamming', $meta) ? (int) $meta['hamming'] : null;
+        $words = (int) ($meta['word_count'] ?? 0);
+        $simWords = (int) ($meta['similar_word_count'] ?? 0);
+        $threshold = (int) config('site_audit.simhash_hamming_max', 6);
+        $shared = [];
+        if (! empty($meta['shared_words']) && is_array($meta['shared_words'])) {
+            foreach ($meta['shared_words'] as $w) {
+                $w = trim((string) $w);
+                if ($w !== '') {
+                    $shared[] = $w;
+                }
+            }
+        }
+        $sharedSource = (string) ($meta['shared_source'] ?? '');
+
+        if ($thisUrl === '' && $similar === '' && $hamming === null && $words <= 0 && $simWords <= 0 && $shared === []) {
+            return null;
+        }
+
+        $html = '<div class="cabinet-sa-similar">';
+        $html .= '<div class="cabinet-sa-similar__head">Похожая пара страниц</div>';
+        $html .= '<div class="cabinet-sa-similar__pair">';
+
+        $html .= self::similarPagesSideHtml('A', 'Эта страница', $thisUrl, $words);
+        $html .= '<div class="cabinet-sa-similar__vs" aria-hidden="true">≈</div>';
+        $html .= self::similarPagesSideHtml('B', 'Похожая на неё', $similar, $simWords);
+
+        $html .= '</div>';
+
+        if ($hamming !== null) {
+            $closeness = self::similarPagesClosenessLabel($hamming, $threshold);
+            $html .= '<div class="cabinet-sa-similar__metric">'
+                . '<span class="cabinet-sa-similar__pill">' . e($closeness) . '</span>'
+                . '<span class="cabinet-sa-similar__metric-text">'
+                . 'отпечатки текста отличаются на <strong>' . $hamming . '</strong> бит из 64'
+                . ' · порог отчёта ≤ ' . $threshold
+                . ' (0 — почти копия, чем больше число — тем слабее сходство)'
+                . '</span></div>';
+        }
+
+        $shingleOverlap = isset($meta['shingle_overlap']) ? (float) $meta['shingle_overlap'] : null;
+        $shingleSize = (int) ($meta['shingle_size'] ?? config('site_audit.simhash_shingle_size', 5));
+        $sharedShingles = [];
+        if (! empty($meta['shared_shingles']) && is_array($meta['shared_shingles'])) {
+            foreach ($meta['shared_shingles'] as $s) {
+                $s = trim((string) $s);
+                if ($s !== '') {
+                    $sharedShingles[] = $s;
+                }
+            }
+        }
+        if ($shingleOverlap !== null) {
+            $pct = rtrim(rtrim(number_format($shingleOverlap * 100, 1, ',', ''), '0'), ',');
+            $html .= '<div class="cabinet-sa-similar__metric">'
+                . '<span class="cabinet-sa-similar__pill cabinet-sa-similar__pill--shingle">'
+                . e($shingleSize) . '-граммы: ' . e($pct) . '%'
+                . '</span>'
+                . '<span class="cabinet-sa-similar__metric-text">'
+                . 'общих фраз из ' . e((string) $shingleSize) . ' слов подряд: <strong>'
+                . number_format((int) ($meta['shingle_shared'] ?? count($sharedShingles)), 0, '', ' ')
+                . '</strong>'
+                . ' · второй фильтр отсекает пары, где совпал в основном шаблон сайта'
+                . '</span></div>';
+            if ($sharedShingles !== []) {
+                $html .= '<div class="cabinet-sa-similar__shared">'
+                    . '<div class="cabinet-sa-similar__shared-label">Общие ' . e((string) $shingleSize)
+                    . '-граммы <span class="cabinet-sa-similar__shared-note">(фразы подряд)</span></div>'
+                    . '<div class="cabinet-sa-similar__chips">';
+                foreach (array_slice($sharedShingles, 0, 8) as $s) {
+                    $html .= '<span class="cabinet-sa-similar__chip cabinet-sa-similar__chip--shingle">'
+                        . e($s) . '</span>';
+                }
+                $html .= '</div></div>';
+            }
+        }
+
+        if ($shared !== []) {
+            $html .= '<div class="cabinet-sa-similar__shared">';
+            $html .= '<div class="cabinet-sa-similar__shared-label">Общие слова'
+                . ($sharedSource === 'meta'
+                    ? ' <span class="cabinet-sa-similar__shared-note">(по title/H1/описанию — полный список из тела после нового обхода)</span>'
+                    : ' <span class="cabinet-sa-similar__shared-note">(частые в тексте обеих страниц)</span>')
+                . '</div>';
+            $html .= '<div class="cabinet-sa-similar__chips">';
+            foreach (array_slice($shared, 0, 24) as $w) {
+                $html .= '<span class="cabinet-sa-similar__chip">' . e($w) . '</span>';
+            }
+            $html .= '</div>';
+            $html .= '</div>';
+        } else {
+            $html .= '<div class="cabinet-sa-similar__shared cabinet-sa-similar__shared--empty">'
+                . 'Общие слова не сохранены — сделайте новый обход, чтобы увидеть пересечение лексики.'
+                . '</div>';
+        }
+
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /**
+     * @param  ?int  $wordCount
+     */
+    private static function similarPagesSideHtml(string $mark, string $label, string $url, int $wordCount): string
+    {
+        $html = '<div class="cabinet-sa-similar__side">';
+        $html .= '<div class="cabinet-sa-similar__side-top">'
+            . '<span class="cabinet-sa-similar__mark">' . e($mark) . '</span>'
+            . '<span class="cabinet-sa-similar__side-label">' . e($label) . '</span>';
+        if ($wordCount > 0) {
+            $html .= '<span class="cabinet-sa-similar__wc">'
+                . number_format($wordCount, 0, '', ' ') . ' слов</span>';
+        }
+        $html .= '</div>';
+        if ($url !== '') {
+            $html .= '<a class="cabinet-sa-similar__link cabinet-sa-url-break" href="'
+                . e($url) . '" target="_blank" rel="noopener noreferrer">'
+                . e($url) . '</a>';
+        } else {
+            $html .= '<span class="cabinet-sa-similar__missing">URL не сохранён</span>';
+        }
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    private static function similarPagesClosenessLabel(int $hamming, int $threshold): string
+    {
+        if ($hamming <= 0) {
+            return 'почти идентичны';
+        }
+        if ($hamming <= max(1, (int) floor($threshold / 3))) {
+            return 'очень похожи';
+        }
+        if ($hamming <= $threshold) {
+            return 'похожи';
+        }
+
+        return 'слабое сходство';
+    }
+
+    /**
      * @param  array<string, mixed>  $meta
      */
     private static function duplicatePeersPlain(string $code, array $meta, ?string $rowUrl = null): string
@@ -1339,8 +1688,15 @@ class SiteAuditFindingPresenter
 
             case 'title_equals_description':
                 $t = ! empty($meta['title']) ? self::clip((string) $meta['title'], 70) : '';
+                $d = ! empty($meta['description']) ? self::clip((string) $meta['description'], 70) : $t;
+                if ($t === '' && $d === '') {
+                    return 'TITLE = Description';
+                }
+                if ($t !== '' && $d !== '' && mb_strtolower($t) === mb_strtolower($d)) {
+                    return 'TITLE = DESC · «' . $t . '»';
+                }
 
-                return $t !== '' ? ('TITLE=DESC: ' . $t) : 'TITLE = Description';
+                return 'TITLE: «' . $t . '» · DESC: «' . $d . '»';
 
             case 'description_equals_h1':
                 return ! empty($meta['h1']) ? ('H1: ' . self::clip($meta['h1'], 80)) : '—';
@@ -1470,7 +1826,7 @@ class SiteAuditFindingPresenter
                 return '—';
 
             case 'no_unique_images':
-                return 'img: ' . (int) ($meta['img_count'] ?? 0) . ' · unique src: 0';
+                return self::noUniqueImagesPlain($meta);
 
             case 'text_in_noindex':
                 return isset($meta['noindex_text_len'])
@@ -1478,9 +1834,7 @@ class SiteAuditFindingPresenter
                     : '—';
 
             case 'images_without_alt':
-                return isset($meta['img_without_alt'])
-                    ? ('без alt: ' . (int) $meta['img_without_alt'] . ' / ' . (int) ($meta['img_count'] ?? 0))
-                    : '—';
+                return self::imagesWithoutAltPlain($meta);
 
             case 'redirect':
             case 'redirect_chain_long':
@@ -1726,11 +2080,39 @@ class SiteAuditFindingPresenter
 
             case 'similar_pages':
                 $parts = [];
-                if (! empty($meta['similar_url'])) {
-                    $parts[] = '≈ ' . self::clip((string) $meta['similar_url'], 80);
+                $sim = trim((string) ($meta['similar_url'] ?? ''));
+                if ($sim !== '') {
+                    $parts[] = 'пара с ' . self::clip($sim, 80);
                 }
                 if (isset($meta['hamming'])) {
-                    $parts[] = 'hamming: ' . (int) $meta['hamming'];
+                    $h = (int) $meta['hamming'];
+                    $parts[] = 'отличаются на ' . $h . ' бит из 64';
+                }
+                $words = (int) ($meta['word_count'] ?? 0);
+                $simWords = (int) ($meta['similar_word_count'] ?? 0);
+                if ($words > 0 || $simWords > 0) {
+                    $parts[] = 'слов: '
+                        . number_format($words, 0, '', ' ')
+                        . ' / '
+                        . number_format($simWords, 0, '', ' ')
+                        . ' (эта / похожая)';
+                }
+                if (! empty($meta['shared_words']) && is_array($meta['shared_words'])) {
+                    $sw = [];
+                    foreach (array_slice($meta['shared_words'], 0, 8) as $w) {
+                        $w = trim((string) $w);
+                        if ($w !== '') {
+                            $sw[] = $w;
+                        }
+                    }
+                    if ($sw !== []) {
+                        $parts[] = 'общие: ' . implode(', ', $sw);
+                    }
+                }
+                if (isset($meta['shingle_overlap'])) {
+                    $parts[] = '5-граммы: '
+                        . rtrim(rtrim(number_format((float) $meta['shingle_overlap'] * 100, 1, ',', ''), '0'), ',')
+                        . '%';
                 }
 
                 return $parts ? implode(' · ', $parts) : '—';
@@ -3596,32 +3978,34 @@ class SiteAuditFindingPresenter
 
         $same = mb_strtolower($left) === mb_strtolower($right);
 
+        $pairHint = 'Текст в обоих полях один и тот же — так на сайте и записано (это не подпись системы).';
+        if ($code === 'title_equals_description') {
+            $pairHint = 'В HTML страницы TITLE и meta description совпадают — ниже этот общий текст.';
+        } elseif ($code === 'title_equals_h1') {
+            $pairHint = 'TITLE и H1 на странице совпадают — ниже этот общий текст.';
+        } elseif ($code === 'description_equals_h1') {
+            $pairHint = 'Description и H1 совпадают — ниже этот общий текст.';
+        } elseif ($code === 'h1_equals_h2') {
+            $pairHint = 'H1 и H2 совпадают — ниже этот общий текст.';
+        }
+
         $html = '<div class="cabinet-sa-head-pair">';
         $html .= '<div class="cabinet-sa-head-pair__flag'
             . ($same ? ' is-same' : '') . '">'
             . ($same ? 'совпадают' : 'почти одинаковые')
             . '</div>';
+        $html .= '<div class="cabinet-sa-head-pair__hint">' . e($pairHint) . '</div>';
 
-        if ($same) {
-            // Один текст + оба тега — не дублировать одинаковую строку дважды.
-            $html .= '<div class="cabinet-sa-head-pair__same">'
-                . '<span class="cabinet-sa-head-pair__tags">'
-                . '<span class="cabinet-sa-head-pair__tag">' . e($leftTag) . '</span>'
-                . '<span class="cabinet-sa-head-pair__eq" aria-hidden="true">=</span>'
-                . '<span class="cabinet-sa-head-pair__tag cabinet-sa-head-pair__tag--alt">' . e($rightTag) . '</span>'
-                . '</span>'
-                . '<span class="cabinet-sa-head-pair__text" title="' . e($left) . '">' . e($left) . '</span>'
-                . '</div>';
-        } else {
-            $html .= '<div class="cabinet-sa-head-pair__row">'
-                . '<span class="cabinet-sa-head-pair__tag">' . e($leftTag) . '</span>'
-                . '<span class="cabinet-sa-head-pair__text" title="' . e($left) . '">' . e($left) . '</span>'
-                . '</div>';
-            $html .= '<div class="cabinet-sa-head-pair__row">'
-                . '<span class="cabinet-sa-head-pair__tag cabinet-sa-head-pair__tag--alt">' . e($rightTag) . '</span>'
-                . '<span class="cabinet-sa-head-pair__text" title="' . e($right) . '">' . e($right) . '</span>'
-                . '</div>';
-        }
+        // Всегда две строки с подписями полей — даже если текст один:
+        // иначе кажется, что строка — пояснение системы, а не контент страницы.
+        $html .= '<div class="cabinet-sa-head-pair__row">'
+            . '<span class="cabinet-sa-head-pair__tag">' . e($leftTag) . '</span>'
+            . '<span class="cabinet-sa-head-pair__text">' . e($left) . '</span>'
+            . '</div>';
+        $html .= '<div class="cabinet-sa-head-pair__row">'
+            . '<span class="cabinet-sa-head-pair__tag cabinet-sa-head-pair__tag--alt">' . e($rightTag) . '</span>'
+            . '<span class="cabinet-sa-head-pair__text">' . e($right) . '</span>'
+            . '</div>';
         $html .= '</div>';
 
         return $html;

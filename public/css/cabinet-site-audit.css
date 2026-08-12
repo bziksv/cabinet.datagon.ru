@@ -3263,6 +3263,327 @@ label.cabinet-sa-act__main {
   color: #64748b;
 }
 
+.cabinet-sa-similar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cabinet-sa-similar__head {
+  font-size: 12px;
+  font-weight: 650;
+  color: #475569;
+  letter-spacing: 0.01em;
+}
+
+.cabinet-sa-similar__pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: stretch;
+}
+
+.cabinet-sa-similar__side {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.cabinet-sa-similar__side-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.cabinet-sa-similar__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #1e293b;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.cabinet-sa-similar__side-label {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.cabinet-sa-similar__wc {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 650;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.cabinet-sa-similar__link {
+  display: block;
+  font-size: 12.5px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: #1d4ed8 !important;
+  word-break: break-all;
+}
+
+.cabinet-sa-similar__missing {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.cabinet-sa-similar__vs {
+  align-self: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #94a3b8;
+  padding: 0 2px;
+}
+
+.cabinet-sa-similar__metric {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: #334155;
+}
+
+.cabinet-sa-similar__pill {
+  display: inline-block;
+  flex: 0 0 auto;
+  background: #ffedd5;
+  color: #9a3412;
+  border: 1px solid #fdba74;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.cabinet-sa-similar__metric-text strong {
+  font-weight: 650;
+  color: #0f172a;
+}
+
+.cabinet-sa-similar__shared {
+  margin-top: 2px;
+}
+
+.cabinet-sa-similar__shared-label {
+  font-size: 12px;
+  font-weight: 650;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.cabinet-sa-similar__shared-note {
+  font-weight: 400;
+  color: #94a3b8;
+}
+
+.cabinet-sa-similar__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cabinet-sa-similar__chip {
+  display: inline-block;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.cabinet-sa-similar__pill--shingle {
+  background: #e0e7ff;
+  color: #3730a3;
+  border-color: #a5b4fc;
+}
+
+.cabinet-sa-similar__chip--shingle {
+  background: #eef2ff;
+  color: #3730a3;
+  border-color: #c7d2fe;
+  font-weight: 500;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.cabinet-sa-no-uniq-img {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  max-width: 42rem;
+}
+
+.cabinet-sa-no-uniq-img__flag {
+  display: inline-flex;
+  align-self: flex-start;
+  background: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #a5b4fc;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.cabinet-sa-no-uniq-img__title {
+  font-size: 13.5px;
+  font-weight: 650;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.cabinet-sa-no-uniq-img__meta {
+  font-size: 12.5px;
+  color: #334155;
+}
+
+.cabinet-sa-no-uniq-img__meta strong {
+  font-weight: 650;
+  color: #0f172a;
+}
+
+.cabinet-sa-no-uniq-img__hint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #64748b;
+}
+
+@media (max-width: 900px) {
+  .cabinet-sa-similar__pair {
+    grid-template-columns: 1fr;
+  }
+  .cabinet-sa-similar__vs {
+    justify-self: center;
+    transform: rotate(90deg);
+  }
+  .cabinet-sa-similar__wc {
+    margin-left: 0;
+  }
+}
+
+/* Img без alt */
+.cabinet-sa-noalt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cabinet-sa-noalt__summary {
+  font-size: 12.5px;
+  color: #334155;
+  margin-bottom: 2px;
+}
+.cabinet-sa-noalt__card {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff7ed;
+}
+.cabinet-sa-noalt__thumb {
+  position: relative;
+  flex: 0 0 64px;
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #ffedd5;
+  border: 1px solid #fdba74;
+  text-decoration: none;
+}
+.cabinet-sa-noalt__thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #fff;
+}
+.cabinet-sa-noalt__thumb.is-broken {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cabinet-sa-noalt__thumb-fallback {
+  display: none;
+  font-size: 11px;
+  font-weight: 700;
+  color: #9a3412;
+}
+.cabinet-sa-noalt__thumb.is-broken .cabinet-sa-noalt__thumb-fallback {
+  display: block;
+}
+.cabinet-sa-noalt__body {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+.cabinet-sa-noalt__badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 800;
+  color: #9a3412;
+  background: #ffedd5;
+  border: 1px solid #fdba74;
+  border-radius: 999px;
+  padding: 1px 8px;
+  line-height: 1.4;
+}
+.cabinet-sa-noalt__dims,
+.cabinet-sa-noalt__name {
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.3;
+}
+.cabinet-sa-noalt__name {
+  font-weight: 700;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cabinet-sa-noalt__url {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #1d4ed8 !important;
+  word-break: break-all;
+}
+.cabinet-sa-noalt__more {
+  font-size: 11.5px;
+  color: #64748b;
+}
+.cabinet-sa-noalt--summary {
+  font-size: 13px;
+  color: #334155;
+}
+
 /* Вероятные аффилиаты */
 .cabinet-sa-table-wrap--aff > .cabinet-sa-findings-table > colgroup > .cabinet-sa-col-url { width: 28%; }
 .cabinet-sa-table-wrap--aff > .cabinet-sa-findings-table > colgroup > .cabinet-sa-col-details { width: auto; }
@@ -4633,6 +4954,13 @@ label.cabinet-sa-act__main {
 
 .cabinet-sa-head-pair__flag.is-same {
   color: #9a3412;
+}
+
+.cabinet-sa-head-pair__hint {
+  font-size: 12px;
+  line-height: 1.35;
+  color: #64748b;
+  margin: 0 0 4px;
 }
 
 .cabinet-sa-head-pair__same {

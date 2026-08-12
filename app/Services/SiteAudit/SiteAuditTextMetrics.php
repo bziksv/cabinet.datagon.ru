@@ -33,6 +33,7 @@ class SiteAuditTextMetrics
      *   top_bigram_count: int,
      *   top_trigram: ?string,
      *   top_trigram_count: int,
+     *   top_tokens: list<string>,
      *   spam: bool,
      *   spam_word: ?string,
      *   spam_count: int
@@ -52,6 +53,7 @@ class SiteAuditTextMetrics
             'top_bigram_count' => 0,
             'top_trigram' => null,
             'top_trigram_count' => 0,
+            'top_tokens' => [],
             'spam' => false,
             'spam_word' => null,
             'spam_count' => 0,
@@ -64,6 +66,7 @@ class SiteAuditTextMetrics
         arsort($counts);
         $topWord = (string) array_key_first($counts);
         $topCount = (int) $counts[$topWord];
+        $topTokens = array_slice(array_keys($counts), 0, 40);
 
         $sumSq = 0;
         foreach ($counts as $c) {
@@ -122,10 +125,87 @@ class SiteAuditTextMetrics
             'top_bigram_count' => $bigramCount,
             'top_trigram' => $topTrigram,
             'top_trigram_count' => $trigramCount,
+            'top_tokens' => $topTokens,
             'spam' => $spam,
             'spam_word' => $spamWord,
             'spam_count' => $spamCount,
         ];
+    }
+
+    /**
+     * Топ значимых слов текста (без стоп-слов), по убыванию частоты.
+     *
+     * @return list<string>
+     */
+    public static function topTokenList(string $text, int $limit = 40, int $minLen = 3): array
+    {
+        $m = self::analyze($text, $minLen);
+        $list = isset($m['top_tokens']) && is_array($m['top_tokens']) ? $m['top_tokens'] : [];
+
+        return array_values(array_slice($list, 0, max(1, $limit)));
+    }
+
+    /**
+     * Пересечение токенов: порядок как у первой страницы (частые раньше).
+     *
+     * @param  list<string>  $a
+     * @param  list<string>  $b
+     * @return list<string>
+     */
+    public static function sharedTokenList(array $a, array $b, int $limit = 24): array
+    {
+        if ($a === [] || $b === []) {
+            return [];
+        }
+        $setB = [];
+        foreach ($b as $w) {
+            $w = mb_strtolower(trim((string) $w));
+            if ($w !== '') {
+                $setB[$w] = true;
+            }
+        }
+        $out = [];
+        $seen = [];
+        foreach ($a as $w) {
+            $w = mb_strtolower(trim((string) $w));
+            if ($w === '' || isset($seen[$w]) || ! isset($setB[$w])) {
+                continue;
+            }
+            $seen[$w] = true;
+            $out[] = $w;
+            if (count($out) >= $limit) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Слабый набор токенов из title/h1/description/top_* (когда нет token_top_json).
+     *
+     * @param  object|array  $page
+     * @return list<string>
+     */
+    public static function weakTokenBagFromPage($page): array
+    {
+        $get = static function ($page, string $key) {
+            if (is_array($page)) {
+                return $page[$key] ?? null;
+            }
+
+            return $page->{$key} ?? null;
+        };
+        $chunks = [
+            (string) ($get($page, 'title') ?? ''),
+            (string) ($get($page, 'h1') ?? ''),
+            (string) ($get($page, 'description') ?? ''),
+            (string) ($get($page, 'top_word') ?? ''),
+            (string) ($get($page, 'top_bigram') ?? ''),
+            (string) ($get($page, 'top_trigram') ?? ''),
+        ];
+
+        return self::topTokenList(implode(' ', $chunks), 30, 2);
     }
 
     /**

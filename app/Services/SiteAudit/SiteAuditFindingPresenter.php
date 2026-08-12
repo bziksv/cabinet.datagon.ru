@@ -31,6 +31,28 @@ class SiteAuditFindingPresenter
         return $map[$severity] ?? $severity;
     }
 
+    /** Подпись типа рядом с названием отчёта: «грубое», «важное замечание», «инфо»… */
+    public static function severityTypeLabel(string $severity): string
+    {
+        $map = [
+            'critical' => 'грубое',
+            'other' => 'прочие',
+            'important' => 'важное замечание',
+            'warning' => 'предупреждение',
+            'info' => 'инфо',
+        ];
+
+        return $map[$severity] ?? $severity;
+    }
+
+    public static function severityBadgeHtml(string $severity): string
+    {
+        $sev = preg_replace('/[^a-z]/', '', strtolower($severity)) ?: 'info';
+        $label = e(self::severityTypeLabel($sev));
+
+        return '<span class="cabinet-sa-sev-badge cabinet-sa-sev-badge--' . e($sev) . '">' . $label . '</span>';
+    }
+
     /**
      * Богатая ячейка «Детали» (HTML). null → рисовать обычный metaLine.
      */

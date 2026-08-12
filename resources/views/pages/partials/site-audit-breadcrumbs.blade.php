@@ -8,6 +8,7 @@
     }
     $level = $level ?? 'crawl'; // crawl|report|diff
     $reportTitle = trim((string) ($reportTitle ?? ''));
+    $reportSeverity = trim((string) ($reportSeverity ?? ''));
     $projectsUrl = route('pages.site-audit');
     $siteUrl = $domain !== 'сайт'
         ? route('pages.site-audit', ['domain' => $domain]) . '#sa-history'
@@ -28,7 +29,12 @@
     @endif
     @if($level === 'report' && $reportTitle !== '')
         <span class="cabinet-sa-crumbs__sep" aria-hidden="true">/</span>
-        <span class="cabinet-sa-crumbs__current" aria-current="page">{{ \Illuminate\Support\Str::limit($reportTitle, 48) }}</span>
+        <span class="cabinet-sa-crumbs__current" aria-current="page">
+            {{ \Illuminate\Support\Str::limit($reportTitle, 48) }}
+            @if($reportSeverity !== '')
+                {!! \App\Services\SiteAudit\SiteAuditFindingPresenter::severityBadgeHtml($reportSeverity) !!}
+            @endif
+        </span>
     @elseif($level === 'diff')
         <span class="cabinet-sa-crumbs__sep" aria-hidden="true">/</span>
         <span class="cabinet-sa-crumbs__current" aria-current="page">Сравнение</span>

@@ -6197,6 +6197,16 @@ html.sa-tour-active body {
 .cabinet-sa-crumbs__current {
   color: #0f172a;
   font-weight: 700;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.cabinet-sa-crumbs__current .cabinet-sa-sev-badge,
+.card-title .cabinet-sa-sev-badge {
+  vertical-align: middle;
+  font-weight: 600;
 }
 
 

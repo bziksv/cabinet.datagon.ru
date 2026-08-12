@@ -1,5 +1,14 @@
+@php
+    $saReportTitle = (string) ($meta['title'] ?? $code);
+    $saReportSev = (string) ($meta['severity'] ?? '');
+    $saReportTitleHtml = e($saReportTitle)
+        . ($saReportSev !== '' ? ' ' . \App\Services\SiteAudit\SiteAuditFindingPresenter::severityBadgeHtml($saReportSev) : '')
+        . ' · проверка #' . (int) $crawl->id;
+@endphp
 @component('component.card', [
-    'title' => ($meta['title'] ?? $code) . ' · проверка #' . $crawl->id,
+    'title' => $saReportTitle . ' · проверка #' . $crawl->id,
+    'titleHtml' => $saReportTitleHtml,
+    'documentTitle' => $saReportTitle . ' · проверка #' . $crawl->id,
 ])
     @slot('css')
         <link rel="stylesheet" href="{{ asset('css/cabinet-site-audit.css') }}?v={{ @filemtime(public_path('css/cabinet-site-audit.css')) ?: time() }}">
@@ -35,7 +44,8 @@
             'crawl' => $crawl,
             'project' => $project ?? optional($crawl)->project,
             'level' => 'report',
-            'reportTitle' => $meta['title'] ?? $code,
+            'reportTitle' => $saReportTitle,
+            'reportSeverity' => $saReportSev,
         ])
 
         @include('pages.partials.site-audit-crawl-live', [
@@ -56,8 +66,11 @@
                     @endif
                 @else
                     {{ optional($project)->domain }} ·
-                    приоритет: <strong>{{ \App\Services\SiteAudit\SiteAuditFindingPresenter::severityLabel($meta['severity'] ?? '') }}</strong>
-                    · находок: <strong>{{ number_format((int) $total, 0, '', ' ') }}</strong>
+                    @if($saReportSev !== '')
+                        {!! \App\Services\SiteAudit\SiteAuditFindingPresenter::severityBadgeHtml($saReportSev) !!}
+                        ·
+                    @endif
+                    находок: <strong>{{ number_format((int) $total, 0, '', ' ') }}</strong>
                     @if(!empty($filtersActive))
                         <span class="text-primary">(с фильтром)</span>
                     @endif

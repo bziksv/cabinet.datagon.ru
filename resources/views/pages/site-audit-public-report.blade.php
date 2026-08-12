@@ -20,7 +20,13 @@
 
     <div class="card shadow-sm">
         <div class="card-header py-2">
-            <h1 class="card-title h5 mb-0">{{ $meta['title'] ?? $code }} · проверка #{{ $crawl->id }}</h1>
+            <h1 class="card-title h5 mb-0">
+                {{ $meta['title'] ?? $code }}
+                @if(!empty($meta['severity']))
+                    {!! \App\Services\SiteAudit\SiteAuditFindingPresenter::severityBadgeHtml((string) $meta['severity']) !!}
+                @endif
+                · проверка #{{ $crawl->id }}
+            </h1>
         </div>
         <div class="card-body cabinet-sa-page p-3">
             <div class="mb-2 text-muted small">
@@ -31,8 +37,11 @@
                     @endif
                 @else
                     {{ optional($project)->domain }} ·
-                    приоритет: <strong>{{ \App\Services\SiteAudit\SiteAuditFindingPresenter::severityLabel($meta['severity'] ?? '') }}</strong>
-                    · находок: <strong>{{ number_format((int) $total, 0, '', ' ') }}</strong>
+                    @if(!empty($meta['severity']))
+                        {!! \App\Services\SiteAudit\SiteAuditFindingPresenter::severityBadgeHtml((string) $meta['severity']) !!}
+                        ·
+                    @endif
+                    находок: <strong>{{ number_format((int) $total, 0, '', ' ') }}</strong>
                     @if(!empty($filtersActive))
                         <span class="text-primary">(с фильтром)</span>
                     @endif

@@ -233,6 +233,7 @@
     "Age of the user who made the transition": "Возраст пользователя, совершившего переход",
     "Aggregated data for all modules. Detailed charts open in separate pages.": "Сводные данные по всем модулям. Подробные графики — на отдельных страницах.",
     "Aggregated visits across all modules for users with tracking enabled (statistic=1). Sorted by time in modules.": "Сводка визитов по всем модулям для пользователей с включённым учётом (statistic=1). Сортировка по времени в модулях.",
+    "A fresh verification link has been sent to your email address.": "Новая ссылка для подтверждения отправлена на ваш email.",
     "A group was successfully edited": "Группа была успешно изменена",
     "A group with that name already exists": "Группа с таким названием уже существует",
     "A group with the same name already exists or the name contains numbers": "Группа с таким же именем уже существует или название содержит числа",

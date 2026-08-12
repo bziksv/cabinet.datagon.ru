@@ -37,6 +37,11 @@ class SiteAuditProbeRunner
                 // Полная сверка списка — тот же контур, что и при аудите.
                 (new SiteAuditSerpIndexProbe())->run($crawl, true);
                 break;
+            case 'plagiarism_external':
+                return [
+                    'ok' => false,
+                    'message' => 'Антиплагиат запускается вручную: вкладка «Антиплагиат» на сводке проверки',
+                ];
             default:
                 return ['ok' => false, 'message' => 'Неизвестная проверка'];
         }

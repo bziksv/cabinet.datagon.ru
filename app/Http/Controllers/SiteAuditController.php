@@ -312,7 +312,7 @@ class SiteAuditController extends Controller
             'plagiarismCandidatesLazy' => $crawl->status === SiteAuditCrawl::STATUS_DONE,
             'plagiarismCandidatesUrl' => route('pages.site-audit.plagiarism.candidates', $crawl->id),
             'plagiarismState' => $plagiarismRunner->state($crawl),
-            'plagiarismMaxUrls' => max(1, (int) config('site_audit.plagiarism_external_max_urls', 10)),
+            'plagiarismMaxUrls' => max(1, (int) config('site_audit.plagiarism_external_max_urls', 20)),
             'plagiarismWarnBelow' => (float) config('site_audit.plagiarism_external_warn_below', 70),
             // Лимиты уникальности — через status AJAX (tariff/getAsArray на remote DB дорого).
             'plagiarismRemaining' => null,
@@ -323,16 +323,25 @@ class SiteAuditController extends Controller
         ]);
     }
 
-    public function plagiarismCandidates(int $id): JsonResponse
+    public function plagiarismCandidates(int $id, Request $request): JsonResponse
     {
         $crawl = $this->ownedCrawl($id);
         if ($crawl->status !== SiteAuditCrawl::STATUS_DONE) {
-            return response()->json(['ok' => true, 'candidates' => []]);
+            return response()->json(['ok' => true, 'candidates' => [], 'total' => 0, 'truncated' => false, 'q' => '']);
         }
+
+        $q = trim((string) $request->query('q', ''));
+        if (mb_strlen($q) > 200) {
+            $q = mb_substr($q, 0, 200);
+        }
+        $pack = (new SiteAuditExternalPlagiarismRunner())->candidates($crawl, null, $q);
 
         return response()->json([
             'ok' => true,
-            'candidates' => (new SiteAuditExternalPlagiarismRunner())->candidates($crawl),
+            'candidates' => $pack['candidates'],
+            'total' => $pack['total'],
+            'truncated' => $pack['truncated'],
+            'q' => $pack['q'] ?? $q,
         ]);
     }
 
@@ -409,7 +418,10 @@ class SiteAuditController extends Controller
 
     public function showReport(Request $request, int $id, string $code)
     {
-        $crawl = $this->ownedCrawl($id, false);
+        // index_count_mismatch читает progress_json.serp_index.deep — без progress сводка 0/0.
+        // Slim: без landings/sitemap/robots (тяжёлые), serp_index остаётся.
+        $needProgress = $code === 'index_count_mismatch';
+        $crawl = $this->ownedCrawl($id, $needProgress, $needProgress);
         $crawl->load('project');
 
         $meta = config('site_audit.findings.' . $code);
@@ -544,6 +556,9 @@ class SiteAuditController extends Controller
             if ($code === 'deep_pages' && $rows instanceof \Illuminate\Support\Collection && $rows->isNotEmpty()) {
                 $rows = $this->enrichDeepPagesPaths((int) $crawl->id, $rows);
             }
+            if ($code === 'index_count_mismatch' && $rows instanceof \Illuminate\Support\Collection && $rows->isNotEmpty()) {
+                $rows = $this->enrichIndexMismatchRows((int) $crawl->id, $rows);
+            }
         }
 
         $filterParams = SiteAuditReportFilter::queryParams($filterValues);
@@ -660,6 +675,17 @@ class SiteAuditController extends Controller
             });
         }
 
+        $serpIndexExtraRows = [];
+        if ($code === 'index_count_mismatch') {
+            $deepForExtra = is_array($crawl->progress_json['serp_index']['deep'] ?? null)
+                ? $crawl->progress_json['serp_index']['deep']
+                : [];
+            $rawExtra = is_array($deepForExtra['extra_urls'] ?? null) ? $deepForExtra['extra_urls'] : [];
+            if ($rawExtra !== []) {
+                $serpIndexExtraRows = (new SiteAuditSerpIndexProbe())->enrichExtraUrls($crawl, $rawExtra);
+            }
+        }
+
         return view('pages.site-audit-report', [
             'crawl' => $crawl,
             'project' => $crawl->project,
@@ -693,6 +719,7 @@ class SiteAuditController extends Controller
                     ? $crawl->progress_json['serp_index']['deep']
                     : null)
                 : null,
+            'serpIndexExtraRows' => $serpIndexExtraRows ?? [],
             'serpIndexWebmaster' => $code === 'index_count_mismatch'
                 ? (new SiteAuditSerpIndexProbe())->webmasterStatusPayload($crawl)
                 : null,
@@ -1551,6 +1578,90 @@ class SiteAuditController extends Controller
         ]);
     }
 
+    public function exportIndexExtraUrls(Request $request, int $id)
+    {
+        $crawl = $this->ownedCrawl($id, true, true);
+        $deep = is_array($crawl->progress_json['serp_index']['deep'] ?? null)
+            ? $crawl->progress_json['serp_index']['deep']
+            : [];
+        $rawUrls = [];
+        foreach ((array) ($deep['extra_urls'] ?? []) as $url) {
+            $url = trim((string) $url);
+            if ($url !== '') {
+                $rawUrls[] = $url;
+            }
+        }
+        $rows = (new SiteAuditSerpIndexProbe())->enrichExtraUrls($crawl, $rawUrls);
+        $format = strtolower((string) $request->input('format', 'txt'));
+        if (! in_array($format, ['txt', 'csv'], true)) {
+            $format = 'txt';
+        }
+        $domain = optional($crawl->project)->domain ?: 'site';
+        $safeDomain = preg_replace('/[^a-z0-9.\-]+/i', '-', $domain) ?: 'site';
+        $filename = 'site-audit-' . $crawl->id . '-index-extra-' . $safeDomain . '.' . $format;
+
+        $reasonLabel = static function (string $reason): string {
+            $map = [
+                'robots' => 'robots.txt',
+                'noindex' => 'noindex',
+                'redirect' => 'редирект',
+                'non_200' => 'не 200',
+                'not_fetched' => 'не в обходе',
+                'other' => 'другое',
+            ];
+
+            return $map[$reason] ?? $reason;
+        };
+        $robotsLabel = static function (string $robots): string {
+            if ($robots === 'allow') {
+                return 'разрешён';
+            }
+            if ($robots === 'deny') {
+                return 'запрещён';
+            }
+
+            return 'н/д';
+        };
+
+        if ($format === 'csv') {
+            return response()->streamDownload(function () use ($rows, $reasonLabel, $robotsLabel) {
+                $out = fopen('php://output', 'w');
+                if ($out === false) {
+                    return;
+                }
+                fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+                fputcsv($out, ['url', 'in_crawl', 'http', 'robots', 'reason'], ';');
+                foreach ($rows as $row) {
+                    fputcsv($out, [
+                        $row['url'],
+                        ! empty($row['in_crawl']) ? 'yes' : 'no',
+                        $row['status'] !== null ? (string) $row['status'] : '',
+                        $robotsLabel((string) ($row['robots'] ?? 'unknown')),
+                        $reasonLabel((string) ($row['reason'] ?? '')),
+                    ], ';');
+                }
+                fclose($out);
+            }, $filename, [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+            ]);
+        }
+
+        $lines = [];
+        foreach ($rows as $row) {
+            $lines[] = $row['url']
+                . "\t" . (! empty($row['in_crawl']) ? 'в_обходе' : 'не_в_обходе')
+                . "\t" . ($row['status'] !== null ? (string) $row['status'] : '—')
+                . "\t" . $robotsLabel((string) ($row['robots'] ?? 'unknown'))
+                . "\t" . $reasonLabel((string) ($row['reason'] ?? ''));
+        }
+        $body = $lines === [] ? '' : (implode("\n", $lines) . "\n");
+
+        return response($body, 200, [
+            'Content-Type' => 'text/plain; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+    }
+
     public function exportReportCsv(Request $request, int $id, string $code): StreamedResponse
     {
         $crawl = $this->ownedCrawl($id);
@@ -1924,6 +2035,73 @@ class SiteAuditController extends Controller
             : SiteAuditProject::query()->find($crawl->project_id);
 
         abort_unless($project && $project->isAccessibleBy($userId), 403);
+    }
+
+    /**
+     * Для отчёта «нет в индексе»: подтянуть discovered_via / click_depth / title из site_audit_pages.
+     *
+     * @param  \Illuminate\Support\Collection  $rows
+     * @return \Illuminate\Support\Collection
+     */
+    private function enrichIndexMismatchRows(int $crawlId, $rows)
+    {
+        $hashes = [];
+        foreach ($rows as $row) {
+            $h = (string) ($row->url_hash ?? '');
+            if ($h !== '') {
+                $hashes[$h] = true;
+            }
+        }
+        if ($hashes === []) {
+            return $rows;
+        }
+
+        $pages = SiteAuditPage::query()
+            ->where('crawl_id', $crawlId)
+            ->whereIn('url_hash', array_keys($hashes))
+            ->get(['url_hash', 'discovered_via', 'discovered_from', 'click_depth', 'status_code', 'title']);
+        $byHash = [];
+        foreach ($pages as $p) {
+            $byHash[(string) $p->url_hash] = $p;
+        }
+
+        return $rows->map(function ($row) use ($byHash) {
+            $hash = (string) ($row->url_hash ?? '');
+            $page = $byHash[$hash] ?? null;
+            $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
+            if ($page) {
+                $meta['page_via'] = (string) ($page->discovered_via ?? '');
+                $meta['page_from'] = (string) ($page->discovered_from ?? '');
+                $meta['page_depth'] = $page->click_depth !== null ? (int) $page->click_depth : null;
+                $meta['page_status'] = $page->status_code !== null ? (int) $page->status_code : null;
+                $meta['page_title'] = trim((string) ($page->title ?? ''));
+            }
+            $url = (string) ($row->url ?? '');
+            $meta['has_query'] = strpos($url, '?') !== false;
+            $path = parse_url($url, PHP_URL_PATH);
+            $meta['path_section'] = self::indexMismatchPathSection(is_string($path) ? $path : '');
+            $row->meta_json = $meta;
+
+            return $row;
+        });
+    }
+
+    private static function indexMismatchPathSection(string $path): string
+    {
+        $path = trim($path);
+        if ($path === '' || $path === '/') {
+            return 'главная';
+        }
+        $parts = array_values(array_filter(explode('/', $path), static function ($p) {
+            return $p !== '';
+        }));
+        if ($parts === []) {
+            return 'главная';
+        }
+        $first = rawurldecode((string) $parts[0]);
+        $first = mb_substr($first, 0, 32);
+
+        return $first !== '' ? $first : 'прочее';
     }
 
     /**

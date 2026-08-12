@@ -11,7 +11,7 @@ class SiteAuditDemoFixture
 {
     public const DOMAIN = 'demo-audit.titlo.ru';
     public const PROJECT_NAME = 'Демо: полный аудит (фикстура)';
-    public const DEMO_VERSION = 13;
+    public const DEMO_VERSION = 17;
     public const SHARE_TOKEN = 'demo-site-audit-rich';
 
     /**
@@ -423,7 +423,7 @@ class SiteAuditDemoFixture
     /**
      * @return array<string,mixed>|null
      */
-    private static function metaFor(string $code, string $base, string $url, int $j): ?array
+    public static function metaFor(string $code, string $base, string $url, int $j): ?array
     {
         switch ($code) {
             case 'broken_internal_link':
@@ -508,12 +508,34 @@ class SiteAuditDemoFixture
                     'distance' => 3 + ($j % 5),
                 ];
             case 'thin_content':
-                return ['word_count' => 40 + ($j % 30)];
+                return ['word_count' => 40 + ($j % 30), 'threshold' => 150];
             case 'images_without_alt':
+                $imgCount = 3 + ($j % 4);
+                $without = 1 + ($j % $imgCount);
+
+                return [
+                    'img_without_alt' => $without,
+                    'img_count' => $imgCount,
+                ];
             case 'page_has_broken_links':
+                return [
+                    'count' => 1 + ($j % 3),
+                    'samples' => [
+                        ['url' => $base . '/missing/page-' . ($j + 1) . '/', 'status' => 404, 'text' => 'битая'],
+                    ],
+                ];
             case 'too_many_strong':
+                return [
+                    'strong_count' => 22 + ($j % 12),
+                    'threshold' => 20,
+                ];
             case 'duplicate_links':
-                return ['count' => 1 + ($j % 4)];
+                return [
+                    'count' => 1 + ($j % 4),
+                    'samples' => [
+                        ['url' => $base . '/catalog/', 'count' => 2 + ($j % 3)],
+                    ],
+                ];
             case 'links_nofollow':
                 return [
                     'count' => 2,
@@ -584,6 +606,99 @@ class SiteAuditDemoFixture
                 return ['canonical' => $base . '/'];
             case 'canonical_foreign':
                 return ['canonical' => 'https://other-shop.example/page'];
+            case 'title_too_short':
+                return [
+                    'length' => 18 + ($j % 8),
+                    'min' => 30,
+                    'title' => 'Короткий TITLE #' . ($j + 1),
+                ];
+            case 'title_too_long':
+                return [
+                    'length' => 78 + ($j % 20),
+                    'max' => 70,
+                    'title' => 'Очень длинный демо TITLE для витрины аудита номер ' . ($j + 1) . ' — интернет-магазин мебели и аксессуаров',
+                ];
+            case 'description_too_short':
+                return [
+                    'length' => 40 + ($j % 20),
+                    'min' => 70,
+                    'description' => 'Короткое description #' . ($j + 1),
+                ];
+            case 'description_too_long':
+                return [
+                    'length' => 175 + ($j % 30),
+                    'max' => 160,
+                    'description' => str_repeat('Длинное описание демо. ', 8) . '#' . ($j + 1),
+                ];
+            case 'title_equals_h1':
+                $text = 'Купить диван в Москве — доставка';
+
+                return [
+                    'title' => $text,
+                    'h1' => $text,
+                ];
+            case 'description_equals_h1':
+                $text = 'Интернет-магазин мебели' . ($j > 0 ? ' #' . ($j + 1) : '');
+
+                return [
+                    'description' => $text,
+                    'h1' => $text,
+                ];
+            case 'title_equals_description':
+                $t = 'Одинаковый TITLE и description — витрина #' . ($j + 1);
+
+                return ['title' => $t, 'description' => $t];
+            case 'multiple_title_or_description':
+                return [
+                    'title_count' => 1 + ($j % 2),
+                    'description_count' => 2 + ($j % 2),
+                ];
+            case 'missing_h1':
+            case 'empty_title':
+            case 'empty_description':
+                return ['missing' => true];
+            case 'h1_equals_h2':
+                $h = 'Одинаковый заголовок раздела #' . (($j % 20) + 1);
+
+                return ['h1' => $h, 'h2' => $h];
+            case 'heading_hierarchy':
+                return [
+                    'issue_count' => 1,
+                    'issues' => [
+                        [
+                            'type' => 'skip',
+                            'from' => 1,
+                            'to' => 3,
+                            'text' => 'Подраздел без H2 #' . ($j + 1),
+                        ],
+                    ],
+                    'outline_sample' => [
+                        ['level' => 1, 'text' => 'H1 демо ' . ($j + 1)],
+                        ['level' => 3, 'text' => 'Подраздел без H2 #' . ($j + 1)],
+                    ],
+                ];
+            case 'multiple_h1':
+                return ['count' => 2 + ($j % 2)];
+            case 'noindex':
+                return [
+                    'robots' => ($j % 2) ? 'noindex, follow' : 'noindex, nofollow',
+                ];
+            case 'text_in_noindex':
+                return ['noindex_text_len' => 120 + ($j * 17) % 800];
+            case 'pages_with_iframe':
+                return ['iframe_count' => 1 + ($j % 2)];
+            case 'mixed_content':
+                return [
+                    'count' => 2 + ($j % 3),
+                    'samples' => [
+                        'http://cdn.example/logo.svg',
+                        'http://stats.example/counter.js',
+                    ],
+                ];
+            case 'bad_doctype':
+                return ($j % 2)
+                    ? ['reason' => 'missing']
+                    : ['reason' => 'legacy', 'doctype' => 'HTML 4.01 Transitional'];
             case 'serp_title_mismatch':
                 return [
                     'engine' => $j % 2 ? 'google' : 'yandex',
@@ -685,15 +800,128 @@ class SiteAuditDemoFixture
                     'source' => 'internal',
                 ];
             case 'landing_plagiarism_external':
-                return ['uniqueness' => 42 + ($j % 20), 'peer' => 'https://copy.example/page'];
+                $uniq = 42 + ($j % 20);
+                $peer = 'https://copy.example/page-' . (($j % 7) + 1) . '/';
+
+                return [
+                    'uniqueness_pct' => $uniq,
+                    'matched_pct' => max(0, 100 - $uniq),
+                    'warn_below' => 70,
+                    'sources' => [
+                        ['url' => $peer, 'overlap_pct' => max(10, 100 - $uniq)],
+                    ],
+                    'engine' => 'yandex',
+                    'cost' => 1,
+                    'provider' => 'titlo_text_uniqueness',
+                ];
             case 'word_repeat_in_sentence':
-                return ['count' => 3, 'samples' => [['word' => 'диван', 'count' => 4]]];
+                $words = ['диван', 'доставка', 'скидка', 'москва', 'каталог', 'купить'];
+
+                return [
+                    'count' => 3,
+                    'samples' => [
+                        ['word' => $words[$j % count($words)], 'count' => 4 + ($j % 3)],
+                        ['word' => $words[($j + 2) % count($words)], 'count' => 3 + ($j % 2)],
+                        ['word' => $words[($j + 4) % count($words)], 'count' => 3],
+                    ],
+                ];
             case 'text_nausea':
+                $tops = [
+                    ['купить', 'диван', 'москва'],
+                    ['доставка', 'бесплатно', 'сегодня'],
+                    ['цена', 'каталог', 'акция'],
+                    ['мебель', 'шкаф', 'кухня'],
+                    ['заказать', 'онлайн', 'скидка'],
+                ];
+                $pack = $tops[$j % count($tops)];
+
+                return [
+                    'nausea_classic' => 7.5 + ($j % 5),
+                    'nausea_academic' => 5.2 + ($j % 4) * 0.3,
+                    'top_word' => $pack[0],
+                    'top_word_count' => 12 + ($j % 8),
+                    'top_words' => [
+                        ['word' => $pack[0], 'count' => 12 + ($j % 8)],
+                        ['word' => $pack[1], 'count' => 9 + ($j % 5)],
+                        ['word' => $pack[2], 'count' => 7 + ($j % 4)],
+                    ],
+                ];
             case 'text_bigram_spam':
+                $bigrams = [
+                    ['купить диван', 'диван москва', 'бесплатная доставка'],
+                    ['заказать кухню', 'кухня под ключ', 'рассрочка без'],
+                    ['шкаф купе', 'недорогая мебель', 'доставка сегодня'],
+                    ['офисный стул', 'кресло руководителя', 'купить оптом'],
+                    ['матрас ортопедический', 'кровать двуспальная', 'акции недели'],
+                ];
+                $pack = $bigrams[$j % count($bigrams)];
+                $samples = [];
+                foreach ($pack as $i => $bg) {
+                    $samples[] = [
+                        'bigram' => $bg,
+                        'count' => 8 + ($j % 6) - $i,
+                        'density' => round(1.8 - $i * 0.25 + ($j % 3) * 0.1, 2),
+                    ];
+                }
+
+                return [
+                    'bigram' => $samples[0]['bigram'],
+                    'count' => $samples[0]['count'],
+                    'density' => $samples[0]['density'],
+                    'threshold_count' => 4,
+                    'threshold_density' => 1.5,
+                    'samples' => $samples,
+                ];
             case 'text_trigram_spam':
+                $trigrams = [
+                    ['купить диван москва', 'диван с доставкой', 'рассрочка без процентов'],
+                    ['заказать кухню недорого', 'кухня под ключ', 'бесплатный замер сегодня'],
+                    ['шкаф купе на заказ', 'мебель для спальни', 'акция этой недели'],
+                    ['офисный стул купить', 'кресло для руководителя', 'доставка по россии'],
+                    ['матрас ортопедический купить', 'кровать двуспальная москва', 'скидка на комплект'],
+                    ['детская кровать недорого', 'стол письменный купить', 'стул компьютерный москва'],
+                ];
+                $pack = $trigrams[$j % count($trigrams)];
+                $samples = [];
+                foreach ($pack as $i => $tg) {
+                    $samples[] = [
+                        'trigram' => $tg,
+                        'count' => max(3, 9 + ($j % 5) - $i * 2),
+                        'density' => round(1.6 - $i * 0.2 + ($j % 4) * 0.1, 2),
+                    ];
+                }
+
+                return [
+                    'trigram' => $samples[0]['trigram'],
+                    'count' => $samples[0]['count'],
+                    'density' => $samples[0]['density'],
+                    'threshold_count' => 3,
+                    'threshold_density' => 1.0,
+                    'samples' => $samples,
+                ];
             case 'meta_spam':
+                $titleWords = ['купить', 'диван', 'москва', 'недорого', 'акция'];
+                $descWords = ['доставка', 'рассрочка', 'каталог', 'скидка', 'мебель'];
+
+                return [
+                    'title' => [
+                        'word' => $titleWords[$j % count($titleWords)],
+                        'count' => 3 + ($j % 3),
+                    ],
+                    'description' => [
+                        'word' => $descWords[$j % count($descWords)],
+                        'count' => 3 + ($j % 4),
+                    ],
+                ];
             case 'h1_spam':
-                return ['nausea' => 7.5 + ($j % 5), 'top_word' => 'купить'];
+                $words = ['купить', 'диван', 'кухня', 'шкаф', 'матрас', 'кресло'];
+                $w = $words[$j % count($words)];
+
+                return [
+                    'word' => $w,
+                    'count' => 3 + ($j % 2),
+                    'h1' => ucfirst($w) . ' ' . $w . ' ' . $w . ' — демо #' . ($j + 1),
+                ];
             case 'adult_content':
             case 'negative_content':
                 return ['hits' => ['demo', 'fixture'], 'score' => 2 + ($j % 3)];
@@ -742,7 +970,10 @@ class SiteAuditDemoFixture
                     'network' => $nets[$j % count($nets)],
                 ];
             case 'page_too_large':
-                return ['size_bytes' => 2500000 + $j * 1000];
+                return [
+                    'size_bytes' => 2500000 + $j * 1000,
+                    'threshold' => 1500000,
+                ];
             case 'duplicate_url_variants':
                 return ['variants' => [$url, rtrim($url, '/') . '?utm=1']];
             case 'risky_query_params':
@@ -753,19 +984,46 @@ class SiteAuditDemoFixture
             case 'http_https_both_available':
                 return ['variants' => [$url, str_replace('https://', 'http://', $url)]];
             case 'robots_txt_closed':
+                return ['detail' => 'Disallow: /'];
             case 'robots_txt_error':
+                return [
+                    'reason' => ($j % 3 === 0) ? 'fetch_failed' : (($j % 3 === 1) ? 'empty' : 'http_status'),
+                    'status' => 500,
+                ];
             case 'sitemap_missing':
+                return ['reason' => 'missing'];
             case 'sitemap_error':
+                return [
+                    'reason' => ($j % 2) ? 'not_xml' : 'fetch_failed',
+                ];
             case 'site_availability':
+                return ['detail' => 'периодические сбои 5xx'];
             case 'error_spike':
-                return ['detail' => 'demo-fixture'];
+                return ['detail' => 'рост 5xx относительно прошлой проверки'];
             case 'keyword_cannibalization':
+                return [
+                    'query' => 'купить диван демо',
+                    'landing_url' => $base . '/catalog/',
+                    'urls' => [$url, $base . '/catalog/'],
+                ];
             case 'ad_cannibalization':
+                return [
+                    'query' => 'купить диван демо',
+                    'ad_hint' => '/promo/',
+                    'landing_url' => $base . '/catalog/',
+                ];
             case 'serp_snippet_cannibalization':
+                return [
+                    'query' => 'купить диван демо',
+                    'engine' => 'yandex',
+                    'position' => 3 + ($j % 5),
+                    'own_count' => 2,
+                ];
             case 'landing_query_mismatch':
                 return [
                     'query' => 'купить диван демо',
-                    'urls' => [$url, $base . '/catalog/'],
+                    'hits_any' => 1 + ($j % 3),
+                    'token_count' => 3,
                 ];
             case 'commercial_missing_price':
             case 'commercial_missing_contacts':
@@ -774,13 +1032,65 @@ class SiteAuditDemoFixture
             case 'commercial_missing_payment':
             case 'commercial_missing_stock':
             case 'commercial_missing_reviews':
+                return ['missing' => true];
             case 'landing_not_in_sitemap':
             case 'landing_not_crawled':
             case 'landing_url_changed':
+                return [
+                    'landing_url' => $url,
+                    'expected' => $base . '/catalog/item-' . (($j % 10) + 1) . '/',
+                ];
             case 'landing_no_inbound_internal':
+                return ['inbound' => 0];
+            case 'no_unique_images':
+                return ['img_count' => 2 + ($j % 3), 'unique_img_src_count' => 0];
+            case 'deep_pages':
+                return ['click_depth' => 6 + ($j % 4), 'threshold' => 5];
+            case 'meta_nofollow':
+                return ['robots' => 'nofollow'];
+            case 'soft_404':
+                return ['reason' => 'thin_200', 'word_count' => 12 + ($j % 20)];
+            case 'orphan_pages':
+                return ['inbound' => 0, 'discovered_via' => 'sitemap'];
+            case 'multiple_canonical':
+                return ['count' => 2 + ($j % 2)];
+            case 'canonical_empty':
                 return ['missing' => true];
+            case 'html_critical_errors':
+                return [
+                    'count' => 1 + ($j % 3),
+                    'samples' => [
+                        ['message' => 'Stray end tag “div”.', 'line' => 40 + $j],
+                    ],
+                ];
+            case 'insecure_form':
+                return [
+                    'count' => 1,
+                    'samples' => ['http://example.com/form-action'],
+                ];
+            case 'not_in_sitemap':
+            case 'robots_blocked':
+            case 'no_outbound_internal':
+                return ['flag' => true];
+            case 'sitemap_not_crawled':
+                return ['reason' => 'likely_robots_or_not_queued'];
+            case 'missing_hsts':
+            case 'missing_csp':
+            case 'missing_x_frame_options':
+            case 'missing_x_content_type_options':
+            case 'missing_referrer_policy':
+            case 'missing_permissions_policy':
+            case 'missing_coop':
+            case 'missing_coep':
+            case 'missing_corp':
+            case 'missing_charset':
+                return ['header' => $code];
             default:
-                return ['demo' => true];
+                // Не оставляем голый {"demo":true} — в «Детали» будет пусто.
+                return [
+                    'note' => 'demo',
+                    'code' => $code,
+                ];
         }
     }
 }

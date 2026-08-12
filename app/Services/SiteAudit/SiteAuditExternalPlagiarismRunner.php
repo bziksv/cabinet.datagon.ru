@@ -20,21 +20,21 @@ class SiteAuditExternalPlagiarismRunner
 
     public const FINDING_CODE = 'landing_plagiarism_external';
 
-    public function start(SiteAuditCrawl $crawl, User $user, array $urls): array
+    public function start(SiteAuditCrawl $crawl, User $user, array $urls, array $opts = []): array
     {
         $urls = $this->normalizeSelectedUrls($crawl, $urls);
         if ($urls === []) {
-            throw new \InvalidArgumentException('Выберите хотя бы один URL из этого краула');
+            throw new \InvalidArgumentException('Выберите хотя бы один URL из этой проверки');
         }
 
-        $max = max(1, (int) config('site_audit.plagiarism_external_max_urls', 10));
+        $max = max(1, (int) config('site_audit.plagiarism_external_max_urls', 20));
         if (count($urls) > $max) {
             throw new \InvalidArgumentException('Максимум ' . $max . ' URL за запуск');
         }
 
         $lockKey = 'site_audit_plagiarism_' . $crawl->id;
         if (! Cache::add($lockKey, 1, 1200)) {
-            throw new \RuntimeException('Проверка уже запущена для этого краула');
+            throw new \RuntimeException('Проверка уже запущена для этой проверки');
         }
 
         $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
@@ -44,6 +44,29 @@ class SiteAuditExternalPlagiarismRunner
             throw new \RuntimeException('Проверка уже выполняется');
         }
 
+        // Повторный ручной запуск поверх авто: сохраняем прошлые результаты других URL.
+        $source = (string) ($opts['source'] ?? 'manual');
+        $roles = is_array($opts['roles'] ?? null) ? $opts['roles'] : [];
+        $prevRows = [];
+        if ($source === 'manual' && ($state['status'] ?? '') === 'done' && ! empty($state['rows']) && is_array($state['rows'])) {
+            $checking = array_fill_keys($urls, true);
+            foreach ($state['rows'] as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                $u = (string) ($row['url'] ?? '');
+                if ($u !== '' && ! isset($checking[$u])) {
+                    $prevRows[] = $row;
+                }
+            }
+        }
+        $prevRoles = is_array($state['roles'] ?? null) ? $state['roles'] : [];
+        if ($roles === [] && $prevRoles !== []) {
+            $roles = $prevRoles;
+        } elseif ($prevRoles !== []) {
+            $roles = array_merge($prevRoles, $roles);
+        }
+
         $progress[self::PROGRESS_KEY] = [
             'status' => 'queued',
             'started_at' => now()->toDateTimeString(),
@@ -51,10 +74,13 @@ class SiteAuditExternalPlagiarismRunner
             'urls' => $urls,
             'done' => 0,
             'total' => count($urls),
-            'cost_spent' => 0,
+            'cost_spent' => (int) ($state['cost_spent'] ?? 0),
             'rows' => [],
+            'prev_rows' => $prevRows,
             'error' => null,
             'user_id' => (int) $user->id,
+            'source' => $source,
+            'roles' => $roles,
         ];
         $crawl->progress_json = $progress;
         $crawl->save();
@@ -64,6 +90,350 @@ class SiteAuditExternalPlagiarismRunner
         \App\Jobs\SiteAudit\RunSiteAuditExternalPlagiarismJob::dispatch($crawl->id);
 
         return $progress[self::PROGRESS_KEY];
+    }
+
+    /**
+     * После обхода: главная + 1 категория + 1 товар/услуга (до 3 URL).
+     * Не блокирует finalize — ставит job в очередь.
+     */
+    public function queueAutoSample(SiteAuditCrawl $crawl): void
+    {
+        if (! (bool) config('site_audit.plagiarism_external_auto', true)) {
+            return;
+        }
+        if (\App\Support\DemoCabinet::isCurrentUser()) {
+            return;
+        }
+        $ownerId = (int) ($crawl->user_id ?: optional($crawl->project)->user_id);
+        if ($ownerId > 0) {
+            $owner = User::query()->find($ownerId);
+            if ($owner && \App\Support\DemoCabinet::isDemoUser($owner)) {
+                return;
+            }
+        }
+
+        $crawl->refresh();
+        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+        $state = is_array($progress[self::PROGRESS_KEY] ?? null) ? $progress[self::PROGRESS_KEY] : [];
+        $st = (string) ($state['status'] ?? '');
+        if (in_array($st, ['queued', 'running', 'done'], true)) {
+            return;
+        }
+
+        $picked = $this->autoSampleUrls($crawl);
+        $urls = array_values(array_unique(array_column($picked, 'url')));
+        if ($urls === []) {
+            $progress[self::PROGRESS_KEY] = [
+                'status' => 'idle',
+                'skipped' => true,
+                'reason' => 'no_urls',
+                'source' => 'auto',
+                'roles' => [],
+                'urls' => [],
+                'rows' => [],
+                'done' => 0,
+                'total' => 0,
+            ];
+            $crawl->progress_json = $progress;
+            $crawl->save();
+
+            return;
+        }
+
+        $userId = (int) ($crawl->user_id ?: 0);
+        if ($userId <= 0 && $crawl->project) {
+            $userId = (int) $crawl->project->user_id;
+        }
+        $user = $userId > 0 ? User::query()->find($userId) : null;
+        if (! $user) {
+            $progress[self::PROGRESS_KEY] = [
+                'status' => 'idle',
+                'skipped' => true,
+                'reason' => 'no_user',
+                'source' => 'auto',
+                'roles' => $picked,
+                'urls' => $urls,
+                'rows' => [],
+                'done' => 0,
+                'total' => 0,
+            ];
+            $crawl->progress_json = $progress;
+            $crawl->save();
+
+            return;
+        }
+
+        $roles = [];
+        foreach ($picked as $row) {
+            $roles[(string) $row['url']] = (string) $row['role'];
+        }
+
+        try {
+            $this->start($crawl, $user, $urls, [
+                'source' => 'auto',
+                'roles' => $roles,
+            ]);
+        } catch (\Throwable $e) {
+            $crawl->refresh();
+            $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+            $progress[self::PROGRESS_KEY] = [
+                'status' => 'idle',
+                'skipped' => true,
+                'reason' => 'error',
+                'error' => mb_substr($e->getMessage(), 0, 300),
+                'source' => 'auto',
+                'roles' => $roles,
+                'urls' => $urls,
+                'rows' => [],
+                'done' => 0,
+                'total' => 0,
+            ];
+            $crawl->progress_json = $progress;
+            $crawl->save();
+        }
+    }
+
+    /**
+     * @return list<array{url:string,role:string}>
+     */
+    public function autoSampleUrls(SiteAuditCrawl $crawl): array
+    {
+        $max = max(1, min(
+            (int) config('site_audit.plagiarism_external_auto_max', 3),
+            (int) config('site_audit.plagiarism_external_max_urls', 20)
+        ));
+
+        $pages = SiteAuditPage::query()
+            ->where('crawl_id', $crawl->id)
+            ->where(function ($q) {
+                $q->whereNull('status_code')
+                    ->orWhere(function ($q2) {
+                        $q2->where('status_code', '>=', 200)->where('status_code', '<', 400);
+                    });
+            })
+            ->orderByDesc('word_count')
+            ->limit(800)
+            ->get(['url', 'title', 'word_count']);
+
+        // Главную добираем отдельно — у неё часто мало слов, в топ-800 по тексту может не попасть.
+        $homePages = SiteAuditPage::query()
+            ->where('crawl_id', $crawl->id)
+            ->where(function ($q) {
+                $q->whereNull('status_code')
+                    ->orWhere(function ($q2) {
+                        $q2->where('status_code', '>=', 200)->where('status_code', '<', 400);
+                    });
+            })
+            ->where(function ($q) {
+                $q->where('url', 'like', '%/')
+                    ->orWhere('url', 'like', '%/index.html')
+                    ->orWhere('url', 'like', '%/index.php');
+            })
+            ->orderByRaw('LENGTH(url) asc')
+            ->limit(30)
+            ->get(['url', 'title', 'word_count']);
+        $pages = $homePages->concat($pages)->unique('url')->values();
+
+        $byRole = [
+            'home' => null,
+            'category' => null,
+            'product' => null,
+            'service' => null,
+        ];
+
+        foreach ($pages as $page) {
+            $url = trim((string) $page->url);
+            if ($url === '') {
+                continue;
+            }
+            $role = $this->classifyUrlRole($url);
+            if ($role === null || ! array_key_exists($role, $byRole)) {
+                continue;
+            }
+            if ($byRole[$role] !== null) {
+                continue;
+            }
+            // для авто — хоть немного текста (кроме главной)
+            if ($role !== 'home' && (int) $page->word_count < 40) {
+                continue;
+            }
+            $byRole[$role] = [
+                'url' => $url,
+                'role' => $role,
+                'word_count' => (int) $page->word_count,
+            ];
+        }
+
+        // Главная: если не нашли по path — берём самый «корневой» URL
+        if ($byRole['home'] === null) {
+            $home = $this->guessHomeUrl($crawl, $pages);
+            if ($home !== null) {
+                $byRole['home'] = ['url' => $home, 'role' => 'home', 'word_count' => 0];
+            }
+        }
+
+        $out = [];
+        $seen = [];
+        foreach (['home', 'category'] as $role) {
+            if ($byRole[$role] === null) {
+                continue;
+            }
+            $u = $byRole[$role]['url'];
+            if (isset($seen[$u])) {
+                continue;
+            }
+            $out[] = ['url' => $u, 'role' => $role];
+            $seen[$u] = true;
+            if (count($out) >= $max) {
+                return $out;
+            }
+        }
+
+        // Третья: товар, иначе услуга
+        foreach (['product', 'service'] as $role) {
+            if ($byRole[$role] === null) {
+                continue;
+            }
+            $u = $byRole[$role]['url'];
+            if (isset($seen[$u])) {
+                continue;
+            }
+            $out[] = ['url' => $u, 'role' => $role];
+            $seen[$u] = true;
+            break;
+        }
+
+        // Добор, если категории/товара нет — любая «текстовая» не-редакционная
+        if (count($out) < $max) {
+            foreach ($pages as $page) {
+                $url = trim((string) $page->url);
+                if ($url === '' || isset($seen[$url]) || (int) $page->word_count < 80) {
+                    continue;
+                }
+                $path = $this->urlPath($url);
+                if ($path === '/' || preg_match('#^/(index\.(html?|php))?$#iu', $path)) {
+                    continue;
+                }
+                // не брать «корни» локалей /en/ /es/ как добор
+                if (preg_match('#^/[a-z]{2}/?$#iu', $path)) {
+                    continue;
+                }
+                if ($this->isEditorialPath($path)) {
+                    continue;
+                }
+                $out[] = ['url' => $url, 'role' => 'sample'];
+                $seen[$url] = true;
+                if (count($out) >= $max) {
+                    break;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    private function classifyUrlRole(string $url): ?string
+    {
+        $path = $this->urlPath($url);
+        if ($path === '/' || preg_match('#^/(index\.(html?|php))?$#iu', $path)) {
+            return 'home';
+        }
+        if ($this->isEditorialPath($path)) {
+            return null;
+        }
+        // Услуга раньше «product», т.к. /seo/ и т.п. часто услуги агентства
+        if ($this->isServicePath($path)) {
+            return 'service';
+        }
+        if ($this->isProductDetailPath($path)) {
+            return 'product';
+        }
+        if ($this->isCategoryPath($path)) {
+            return 'category';
+        }
+
+        return null;
+    }
+
+    private function urlPath(string $url): string
+    {
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?? '/');
+        if ($path === '') {
+            return '/';
+        }
+        if ($path[0] !== '/') {
+            $path = '/' . $path;
+        }
+
+        return $path;
+    }
+
+    private function isEditorialPath(string $path): bool
+    {
+        return (bool) preg_match(
+            '#/(blog|blogs|news|novosti|article|articles|post|posts|statya|stati|wiki|docs|dokumenty|privacy|politika|cookie|oferta|soglashenie)(/|$)#iu',
+            $path
+        );
+    }
+
+    private function isServicePath(string $path): bool
+    {
+        return (bool) preg_match(
+            '#/(uslugi|usluga|uslug|services?|service|tarif|tarify|pricing|audit|seo|kontekst|reklama|razrabotka)(/|$)#iu',
+            $path
+        );
+    }
+
+    private function isCategoryPath(string $path): bool
+    {
+        // раздел/категория: /catalog/, /catalog/foo/, /category/bar/ — без глубокого «карточного» хвоста
+        if (preg_match('#^/(catalog|katalog|category|categories|shop|magazin)/?$#iu', $path)) {
+            return true;
+        }
+
+        return (bool) preg_match(
+            '#^/(catalog|katalog|category|categories|shop|magazin)/[^/]+/?$#iu',
+            $path
+        );
+    }
+
+    private function isProductDetailPath(string $path): bool
+    {
+        if (preg_match('#/(product|products|tovar|tovary|item|goods|sku)(/|$)#iu', $path)) {
+            return true;
+        }
+        // глубокий каталог: /catalog/cat/item/
+        return (bool) preg_match(
+            '#^/(catalog|katalog|shop|magazin)/[^/]+/[^/]+#iu',
+            $path
+        );
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, SiteAuditPage>  $pages
+     */
+    private function guessHomeUrl(SiteAuditCrawl $crawl, $pages): ?string
+    {
+        $domain = strtolower(trim((string) optional($crawl->project)->domain));
+        $domain = preg_replace('#^www\.#', '', $domain) ?: '';
+        foreach ($pages as $page) {
+            $url = trim((string) $page->url);
+            $path = $this->urlPath($url);
+            if ($path !== '/' && ! preg_match('#^/(index\.(html?|php))?$#iu', $path)) {
+                continue;
+            }
+            if ($domain !== '') {
+                $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?? ''));
+                $host = preg_replace('#^www\.#', '', $host) ?: '';
+                if ($host !== '' && $host !== $domain) {
+                    continue;
+                }
+            }
+
+            return $url;
+        }
+
+        return null;
     }
 
     public function run(SiteAuditCrawl $crawl): void
@@ -100,6 +470,7 @@ class SiteAuditExternalPlagiarismRunner
             SiteAuditFinding::query()
                 ->where('crawl_id', $crawl->id)
                 ->where('code', self::FINDING_CODE)
+                ->whereIn('url', $urls)
                 ->delete();
 
             $warnBelow = (float) config('site_audit.plagiarism_external_warn_below', 70);
@@ -217,6 +588,13 @@ class SiteAuditExternalPlagiarismRunner
 
             $state['status'] = empty($state['error']) ? 'done' : 'done';
             $state['finished_at'] = now()->toDateTimeString();
+            $prevRows = is_array($state['prev_rows'] ?? null) ? $state['prev_rows'] : [];
+            if ($prevRows !== []) {
+                $state['rows'] = array_values(array_merge($prevRows, is_array($state['rows'] ?? null) ? $state['rows'] : []));
+                $state['done'] = count($state['rows']);
+                $state['total'] = max((int) ($state['total'] ?? 0), count($state['rows']));
+            }
+            unset($state['prev_rows']);
             $this->saveState($crawl, $state);
             $this->refreshCounts($crawl);
         } finally {
@@ -240,12 +618,18 @@ class SiteAuditExternalPlagiarismRunner
     }
 
     /**
-     * Кандидаты для UI: посадочные + страницы краула с текстом.
+     * Кандидаты для UI: короткий стартовый список (+ поиск по q).
+     * Не отдаём десятки тысяч строк в браузер — только выборка.
      *
-     * @return array<int, array{url:string,title:?string,word_count:int,is_landing:bool}>
+     * @return array{candidates: list<array{url:string,title:?string,word_count:int,is_landing:bool}>, total:int, truncated:bool, q:string}
      */
-    public function candidates(SiteAuditCrawl $crawl, int $limit = 80): array
+    public function candidates(SiteAuditCrawl $crawl, ?int $limit = null, string $q = ''): array
     {
+        $q = trim($q);
+        $defaultLimit = max(20, (int) config('site_audit.plagiarism_external_candidates_max', 150));
+        $searchLimit = max(20, (int) config('site_audit.plagiarism_external_search_max', 100));
+        $limit = $limit !== null ? max(1, $limit) : ($q !== '' ? $searchLimit : $defaultLimit);
+
         $landingUrls = [];
         $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
         $landings = is_array($progress['landings']['urls'] ?? null) ? $progress['landings']['urls'] : null;
@@ -260,59 +644,109 @@ class SiteAuditExternalPlagiarismRunner
             }
         }
 
-        $minWords = max(20, (int) config('site_audit.thin_words', 150) / 2);
-        $landingList = array_keys($landingUrls);
-        if ($landingList === []) {
-            $landingList = ['__none__'];
-        }
-        $pages = SiteAuditPage::query()
+        $base = SiteAuditPage::query()
             ->where('crawl_id', $crawl->id)
-            ->where(function ($q) {
-                $q->whereNull('status_code')
+            ->where(function ($qb) {
+                $qb->whereNull('status_code')
                     ->orWhere(function ($q2) {
                         $q2->where('status_code', '>=', 200)->where('status_code', '<', 400);
                     });
-            })
-            ->where(function ($q) use ($minWords, $landingList) {
-                $q->where('word_count', '>=', $minWords)
-                    ->orWhereIn('url', $landingList);
-            })
-            ->orderByDesc('word_count')
-            ->limit(max(20, $limit * 2))
-            ->get(['url', 'title', 'word_count']);
+            });
+
+        $total = (int) (clone $base)->count();
+
+        if ($q !== '') {
+            $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q) . '%';
+            $pages = (clone $base)
+                ->where(function ($qb) use ($like) {
+                    $qb->where('url', 'like', $like)
+                        ->orWhere('title', 'like', $like);
+                })
+                ->orderByDesc('word_count')
+                ->orderBy('url')
+                ->limit($limit)
+                ->get(['url', 'title', 'word_count']);
+            $out = [];
+            foreach ($pages as $page) {
+                $url = (string) $page->url;
+                $out[] = [
+                    'url' => $url,
+                    'title' => $page->title,
+                    'word_count' => (int) $page->word_count,
+                    'is_landing' => isset($landingUrls[$url]),
+                ];
+            }
+
+            return [
+                'candidates' => $out,
+                'total' => $total,
+                'truncated' => true,
+                'q' => $q,
+            ];
+        }
 
         $out = [];
         $seen = [];
-        foreach (array_keys($landingUrls) as $lu) {
-            $page = $pages->firstWhere('url', $lu);
-            $out[] = [
-                'url' => $lu,
-                'title' => $page ? $page->title : null,
-                'word_count' => $page ? (int) $page->word_count : 0,
-                'is_landing' => true,
-            ];
-            $seen[$lu] = true;
-            if (count($out) >= $limit) {
-                return $out;
-            }
-        }
-        foreach ($pages as $page) {
-            if (isset($seen[$page->url])) {
-                continue;
-            }
-            $out[] = [
-                'url' => $page->url,
-                'title' => $page->title,
-                'word_count' => (int) $page->word_count,
-                'is_landing' => false,
-            ];
-            $seen[$page->url] = true;
-            if (count($out) >= $limit) {
-                break;
+        $landingKeys = array_keys($landingUrls);
+        if ($landingKeys !== []) {
+            foreach (array_chunk($landingKeys, 500) as $chunk) {
+                $landingPages = (clone $base)
+                    ->whereIn('url', $chunk)
+                    ->get(['url', 'title', 'word_count'])
+                    ->keyBy('url');
+                foreach ($chunk as $lu) {
+                    if (isset($seen[$lu]) || count($out) >= $limit) {
+                        continue;
+                    }
+                    $page = $landingPages->get($lu);
+                    $out[] = [
+                        'url' => $lu,
+                        'title' => $page ? $page->title : null,
+                        'word_count' => $page ? (int) $page->word_count : 0,
+                        'is_landing' => true,
+                    ];
+                    $seen[$lu] = true;
+                }
+                if (count($out) >= $limit) {
+                    break;
+                }
             }
         }
 
-        return $out;
+        if (count($out) < $limit) {
+            $exclude = array_keys($seen);
+            $restQ = clone $base;
+            if ($exclude !== []) {
+                foreach (array_chunk($exclude, 500) as $chunk) {
+                    $restQ->whereNotIn('url', $chunk);
+                }
+            }
+            $rest = $restQ
+                ->orderByDesc('word_count')
+                ->orderBy('url')
+                ->limit($limit - count($out))
+                ->get(['url', 'title', 'word_count']);
+            foreach ($rest as $page) {
+                $url = (string) $page->url;
+                if (isset($seen[$url])) {
+                    continue;
+                }
+                $out[] = [
+                    'url' => $url,
+                    'title' => $page->title,
+                    'word_count' => (int) $page->word_count,
+                    'is_landing' => isset($landingUrls[$url]),
+                ];
+                $seen[$url] = true;
+            }
+        }
+
+        return [
+            'candidates' => $out,
+            'total' => $total,
+            'truncated' => $total > count($out),
+            'q' => '',
+        ];
     }
 
     /**

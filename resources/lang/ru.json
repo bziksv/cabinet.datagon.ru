@@ -6259,6 +6259,7 @@
     "Words from this list will be added, including without combining with others.": "Слова из этого списка будут добавлены в том числе без сочетания с другими.",
     "wordstat": "wordstat",
     "Word statistics, Zipf distribution, phrase analysis and word clouds for page text or URL.": "Статистика слов, распределение по закону Ципфа, фразы и облака слов для текста или URL страницы.",
+    "Word statistics, Zipf distribution, phrase analysis, uniqueness check and word clouds for page text or URL.": "Статистика слов, закон Ципфа, фразы, проверка уникальности и облака слов для текста или URL страницы.",
     "Word statistics, Zipf distribution, uniqueness check and word clouds for page text or URL.": "Статистика слов, закон Ципфа, проверка уникальности и облака для текста или URL.",
     "Words to exclude": "Слова для исключения",
     "Words to exclude hint": "Одно слово или фраза на строку. Исключается из слов, биграмм, облаков и графика Ципфа.",

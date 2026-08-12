@@ -110,6 +110,30 @@ class SiteAuditFindingPresenter
             return self::deepPagesDetailsHtml($meta);
         }
 
+        if (in_array($code, [
+            'h1_equals_h2',
+            'title_equals_h1',
+            'title_equals_description',
+            'description_equals_h1',
+        ], true)) {
+            return self::headingPairDetailsHtml($code, $meta);
+        }
+
+        if (in_array($code, [
+            'text_trigram_spam',
+            'text_bigram_spam',
+            'h1_spam',
+            'meta_spam',
+            'text_nausea',
+            'word_repeat_in_sentence',
+        ], true)) {
+            return self::spamPhraseDetailsHtml($code, $meta);
+        }
+
+        if ($code === 'landing_plagiarism_external') {
+            return self::plagiarismExternalDetailsHtml($meta);
+        }
+
         if (in_array($code, ['redirect', 'redirect_chain_long', 'redirect_loop'], true)) {
             return self::redirectDetailsHtml($meta, $code);
         }
@@ -121,7 +145,6 @@ class SiteAuditFindingPresenter
             'similar_pages',
             'landing_url_changed',
             'landing_plagiarism_suspect',
-            'landing_plagiarism_external',
             'mixed_content',
             'insecure_form',
             'broken_image',
@@ -778,8 +801,27 @@ class SiteAuditFindingPresenter
             case 'title_equals_h1':
                 return ! empty($meta['h1']) ? ('H1: ' . self::clip($meta['h1'], 80)) : '—';
 
+            case 'title_equals_description':
+                $t = ! empty($meta['title']) ? self::clip((string) $meta['title'], 70) : '';
+
+                return $t !== '' ? ('TITLE=DESC: ' . $t) : 'TITLE = Description';
+
             case 'description_equals_h1':
                 return ! empty($meta['h1']) ? ('H1: ' . self::clip($meta['h1'], 80)) : '—';
+
+            case 'multiple_title_or_description':
+                $bits = [];
+                if (isset($meta['title_count'])) {
+                    $bits[] = 'title×' . (int) $meta['title_count'];
+                }
+                if (isset($meta['description_count'])) {
+                    $bits[] = 'description×' . (int) $meta['description_count'];
+                }
+
+                return $bits ? implode(' · ', $bits) : 'несколько title/description';
+
+            case 'missing_h1':
+                return 'нет H1';
 
             case 'h1_equals_h2':
                 $bits = [];
@@ -1106,8 +1148,13 @@ class SiteAuditFindingPresenter
                 return $n ? ('форм: ' . $n . $sample) : 'form action=http';
 
             case 'bad_doctype':
-                if (($meta['reason'] ?? '') === 'missing') {
+                $reason = (string) ($meta['reason'] ?? '');
+                if ($reason === 'missing') {
                     return 'DOCTYPE отсутствует';
+                }
+                if ($reason === 'legacy') {
+                    return 'устаревший DOCTYPE'
+                        . (! empty($meta['doctype']) ? (': ' . self::clip((string) $meta['doctype'], 60)) : '');
                 }
 
                 return ! empty($meta['doctype'])
@@ -1284,10 +1331,10 @@ class SiteAuditFindingPresenter
                 return $peer !== '' ? ($src . ' · ' . $peer) : $src;
 
             case 'landing_plagiarism_external':
-                $u = isset($meta['uniqueness_pct']) ? ((float) $meta['uniqueness_pct'] . '%') : '';
-                $top = ! empty($meta['sources'][0]['url'])
-                    ? self::clip((string) $meta['sources'][0]['url'], 40)
-                    : '';
+                $pct = self::plagiarismExternalUniquenessPct($meta);
+                $u = $pct !== null ? ($pct . '%') : '';
+                $top = self::plagiarismExternalTopSource($meta);
+                $top = $top !== '' ? self::clip($top, 40) : '';
 
                 return trim($u . ($top !== '' ? (' · ' . $top) : ''));
 
@@ -1421,9 +1468,7 @@ class SiteAuditFindingPresenter
                         $bits[] = 'GSC';
                     }
                     $bits[] = 'нет в индексе';
-                    if (! empty($meta['list_truncated'])) {
-                        $bits[] = 'список ПС мог быть неполным';
-                    }
+                    // Предупреждение про неполный список — один раз в зелёном блоке сверху, не в каждой строке.
 
                     return implode(' · ', $bits);
                 }
@@ -2743,6 +2788,294 @@ class SiteAuditFindingPresenter
         }
 
         return '<span class="cabinet-sa-details-block">' . $html . '</span>';
+    }
+
+    /** % уникальности: боевой uniqueness_pct или старый демо-ключ uniqueness. */
+    private static function plagiarismExternalUniquenessPct(array $meta): ?float
+    {
+        if (isset($meta['uniqueness_pct']) && is_numeric($meta['uniqueness_pct'])) {
+            return (float) $meta['uniqueness_pct'];
+        }
+        if (isset($meta['uniqueness']) && is_numeric($meta['uniqueness'])) {
+            return (float) $meta['uniqueness'];
+        }
+
+        return null;
+    }
+
+    /** Главный чужой URL: sources[0].url или старый демо-ключ peer. */
+    private static function plagiarismExternalTopSource(array $meta): string
+    {
+        if (! empty($meta['sources'][0]['url'])) {
+            return trim((string) $meta['sources'][0]['url']);
+        }
+        if (! empty($meta['peer'])) {
+            return trim((string) $meta['peer']);
+        }
+        if (! empty($meta['peer_url'])) {
+            return trim((string) $meta['peer_url']);
+        }
+
+        return '';
+    }
+
+    /**
+     * Карточка сравнения заголовков (H1=H2, TITLE=H1, …).
+     */
+    private static function headingPairDetailsHtml(string $code, array $meta): ?string
+    {
+        $leftTag = 'A';
+        $rightTag = 'B';
+        $left = '';
+        $right = '';
+
+        switch ($code) {
+            case 'h1_equals_h2':
+                $leftTag = 'H1';
+                $rightTag = 'H2';
+                $left = trim((string) ($meta['h1'] ?? ''));
+                $right = trim((string) ($meta['h2'] ?? ''));
+                break;
+            case 'title_equals_h1':
+                $leftTag = 'TITLE';
+                $rightTag = 'H1';
+                $left = trim((string) ($meta['title'] ?? ''));
+                $right = trim((string) ($meta['h1'] ?? ''));
+                break;
+            case 'title_equals_description':
+                $leftTag = 'TITLE';
+                $rightTag = 'DESC';
+                $left = trim((string) ($meta['title'] ?? ''));
+                $right = trim((string) ($meta['description'] ?? $meta['title'] ?? ''));
+                break;
+            case 'description_equals_h1':
+                $leftTag = 'DESC';
+                $rightTag = 'H1';
+                $left = trim((string) ($meta['description'] ?? $meta['h1'] ?? ''));
+                $right = trim((string) ($meta['h1'] ?? ''));
+                break;
+        }
+
+        if ($left === '' && $right === '') {
+            return null;
+        }
+        if ($right === '') {
+            $right = $left;
+        }
+        if ($left === '') {
+            $left = $right;
+        }
+
+        $same = mb_strtolower($left) === mb_strtolower($right);
+
+        $html = '<div class="cabinet-sa-head-pair">';
+        $html .= '<div class="cabinet-sa-head-pair__flag'
+            . ($same ? ' is-same' : '') . '">'
+            . ($same ? 'совпадают' : 'почти одинаковые')
+            . '</div>';
+
+        if ($same) {
+            // Один текст + оба тега — не дублировать одинаковую строку дважды.
+            $html .= '<div class="cabinet-sa-head-pair__same">'
+                . '<span class="cabinet-sa-head-pair__tags">'
+                . '<span class="cabinet-sa-head-pair__tag">' . e($leftTag) . '</span>'
+                . '<span class="cabinet-sa-head-pair__eq" aria-hidden="true">=</span>'
+                . '<span class="cabinet-sa-head-pair__tag cabinet-sa-head-pair__tag--alt">' . e($rightTag) . '</span>'
+                . '</span>'
+                . '<span class="cabinet-sa-head-pair__text" title="' . e($left) . '">' . e($left) . '</span>'
+                . '</div>';
+        } else {
+            $html .= '<div class="cabinet-sa-head-pair__row">'
+                . '<span class="cabinet-sa-head-pair__tag">' . e($leftTag) . '</span>'
+                . '<span class="cabinet-sa-head-pair__text" title="' . e($left) . '">' . e($left) . '</span>'
+                . '</div>';
+            $html .= '<div class="cabinet-sa-head-pair__row">'
+                . '<span class="cabinet-sa-head-pair__tag cabinet-sa-head-pair__tag--alt">' . e($rightTag) . '</span>'
+                . '<span class="cabinet-sa-head-pair__text" title="' . e($right) . '">' . e($right) . '</span>'
+                . '</div>';
+        }
+        $html .= '</div>';
+
+        return $html;
+    }
+
+    /** Фраза переспама / тошнота — читаемая «чип» вместо сырой строки. */
+    private static function spamPhraseDetailsHtml(string $code, array $meta): ?string
+    {
+        // Несколько фраз в samples — показываем стеком (демо и будущие богатые находки).
+        if (in_array($code, ['text_trigram_spam', 'text_bigram_spam'], true)
+            && ! empty($meta['samples']) && is_array($meta['samples'])) {
+            $rows = [];
+            foreach (array_slice($meta['samples'], 0, 4) as $sample) {
+                if (! is_array($sample)) {
+                    continue;
+                }
+                $phrase = trim((string) ($sample['trigram'] ?? $sample['bigram'] ?? $sample['phrase'] ?? ''));
+                if ($phrase === '') {
+                    continue;
+                }
+                $bits = [];
+                if (isset($sample['count'])) {
+                    $bits[] = '×' . (int) $sample['count'];
+                }
+                if (isset($sample['density'])) {
+                    $bits[] = $sample['density'] . '%';
+                }
+                $rows[] = '<div class="cabinet-sa-spam-phrase__item">'
+                    . '<span class="cabinet-sa-spam-phrase__q">«' . e($phrase) . '»</span>'
+                    . ($bits !== []
+                        ? '<span class="cabinet-sa-spam-phrase__meta">' . e(implode(' · ', $bits)) . '</span>'
+                        : '')
+                    . '</div>';
+            }
+            if ($rows !== []) {
+                return '<div class="cabinet-sa-spam-phrase cabinet-sa-spam-phrase--stack">'
+                    . implode('', $rows)
+                    . '</div>';
+            }
+        }
+
+        $phrase = '';
+        $metaBits = [];
+
+        if ($code === 'text_trigram_spam' && ! empty($meta['trigram'])) {
+            $phrase = (string) $meta['trigram'];
+            $metaBits[] = '×' . (int) ($meta['count'] ?? 0);
+            if (isset($meta['density'])) {
+                $metaBits[] = $meta['density'] . '%';
+            }
+        } elseif ($code === 'text_bigram_spam' && ! empty($meta['bigram'])) {
+            $phrase = (string) $meta['bigram'];
+            $metaBits[] = '×' . (int) ($meta['count'] ?? 0);
+            if (isset($meta['density'])) {
+                $metaBits[] = $meta['density'] . '%';
+            }
+        } elseif ($code === 'h1_spam' && ! empty($meta['word'])) {
+            $phrase = (string) $meta['word'];
+            $metaBits[] = '×' . (int) ($meta['count'] ?? 0);
+            if (! empty($meta['h1'])) {
+                $metaBits[] = self::clip((string) $meta['h1'], 40);
+            }
+        } elseif ($code === 'word_repeat_in_sentence') {
+            $samples = ! empty($meta['samples']) && is_array($meta['samples']) ? $meta['samples'] : [];
+            if ($samples !== []) {
+                $rows = [];
+                foreach (array_slice($samples, 0, 3) as $sample) {
+                    if (! is_array($sample) || empty($sample['word'])) {
+                        continue;
+                    }
+                    $rows[] = '<div class="cabinet-sa-spam-phrase__item">'
+                        . '<span class="cabinet-sa-spam-phrase__q">«' . e((string) $sample['word']) . '»</span>'
+                        . '<span class="cabinet-sa-spam-phrase__meta">×' . (int) ($sample['count'] ?? 0) . '</span>'
+                        . '</div>';
+                }
+                if ($rows !== []) {
+                    return '<div class="cabinet-sa-spam-phrase cabinet-sa-spam-phrase--stack">'
+                        . implode('', $rows) . '</div>';
+                }
+            }
+            $w = ! empty($meta['samples'][0]['word'])
+                ? (string) $meta['samples'][0]['word']
+                : '';
+            if ($w === '') {
+                return null;
+            }
+            $phrase = $w;
+            $metaBits[] = '×' . (int) ($meta['samples'][0]['count'] ?? $meta['count'] ?? 0);
+        } elseif ($code === 'meta_spam') {
+            $bits = [];
+            if (! empty($meta['title']['word'])) {
+                $bits[] = 'title «' . e(self::clip((string) $meta['title']['word'], 28)) . '»×'
+                    . (int) ($meta['title']['count'] ?? 0);
+            }
+            if (! empty($meta['description']['word'])) {
+                $bits[] = 'desc «' . e(self::clip((string) $meta['description']['word'], 28)) . '»×'
+                    . (int) ($meta['description']['count'] ?? 0);
+            }
+            if ($bits === []) {
+                return null;
+            }
+
+            return '<div class="cabinet-sa-spam-phrase">'
+                . '<div class="cabinet-sa-spam-phrase__lines">' . implode('<br>', $bits) . '</div>'
+                . '</div>';
+        } elseif ($code === 'text_nausea') {
+            $bits = [];
+            if (isset($meta['nausea_classic'])) {
+                $bits[] = 'класс. ' . e((string) $meta['nausea_classic']) . '%';
+            }
+            if (isset($meta['nausea_academic'])) {
+                $bits[] = 'акад. ' . e((string) $meta['nausea_academic']) . '%';
+            }
+            $html = '<div class="cabinet-sa-spam-phrase cabinet-sa-spam-phrase--stack">';
+            if ($bits !== []) {
+                $html .= '<div class="cabinet-sa-spam-phrase__stats">' . implode(' · ', $bits) . '</div>';
+            }
+            $words = [];
+            if (! empty($meta['top_words']) && is_array($meta['top_words'])) {
+                foreach (array_slice($meta['top_words'], 0, 3) as $tw) {
+                    if (! is_array($tw) || empty($tw['word'])) {
+                        continue;
+                    }
+                    $words[] = $tw;
+                }
+            } elseif (! empty($meta['top_word'])) {
+                $words[] = [
+                    'word' => (string) $meta['top_word'],
+                    'count' => (int) ($meta['top_word_count'] ?? 0),
+                ];
+            }
+            foreach ($words as $tw) {
+                $html .= '<div class="cabinet-sa-spam-phrase__item">'
+                    . '<span class="cabinet-sa-spam-phrase__q">«' . e((string) $tw['word']) . '»</span>'
+                    . '<span class="cabinet-sa-spam-phrase__meta">×' . (int) ($tw['count'] ?? 0) . '</span>'
+                    . '</div>';
+            }
+            $html .= '</div>';
+
+            return $html;
+        }
+
+        if ($phrase === '') {
+            return null;
+        }
+
+        return '<div class="cabinet-sa-spam-phrase">'
+            . '<span class="cabinet-sa-spam-phrase__q">«' . e($phrase) . '»</span>'
+            . ($metaBits !== []
+                ? '<span class="cabinet-sa-spam-phrase__meta">' . e(implode(' · ', $metaBits)) . '</span>'
+                : '')
+            . '</div>';
+    }
+
+    /** Внешний антиплагиат: % + чужой URL. */
+    private static function plagiarismExternalDetailsHtml(array $meta): ?string
+    {
+        $pct = self::plagiarismExternalUniquenessPct($meta);
+        $src = self::plagiarismExternalTopSource($meta);
+        if ($pct === null && $src === '') {
+            return null;
+        }
+
+        $warn = isset($meta['warn_below']) ? (float) $meta['warn_below'] : 70.0;
+        $low = $pct !== null && $pct < $warn;
+        $html = '<div class="cabinet-sa-uniq">';
+        if ($pct !== null) {
+            $html .= '<span class="cabinet-sa-uniq__pct' . ($low ? ' is-low' : '') . '" title="Уникальность текста">'
+                . e(rtrim(rtrim(number_format($pct, 1, '.', ''), '0'), '.')) . '%</span>';
+        }
+        if ($src !== '') {
+            $html .= '<a class="cabinet-sa-uniq__src cabinet-sa-url-break" href="' . e($src)
+                . '" target="_blank" rel="noopener noreferrer" title="Источник совпадения">'
+                . e($src) . '</a>';
+        }
+        if (! empty($meta['sources'][0]['overlap_pct'])) {
+            $html .= '<span class="cabinet-sa-uniq__overlap" title="Перекрытие с источником">'
+                . e((string) $meta['sources'][0]['overlap_pct']) . '% совп.</span>';
+        }
+        $html .= '</div>';
+
+        return $html;
     }
 
     private static function clip(string $text, int $len): string

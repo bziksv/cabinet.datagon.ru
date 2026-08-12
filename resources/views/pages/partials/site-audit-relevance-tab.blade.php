@@ -15,7 +15,10 @@
     </p>
 
     @if($crawl->status !== 'done')
-        <div class="alert alert-light border">Доступно после завершения проверки.</div>
+        <div class="alert alert-light border">
+            Доступно после завершения проверки.
+            Сейчас: <strong>{{ $crawl->status === 'aggregating' ? 'агрегация / пост-проверки' : $crawl->status }}</strong>.
+        </div>
     @else
         <div id="sa-relevance-body">
             @if($relevanceRowsLazy)

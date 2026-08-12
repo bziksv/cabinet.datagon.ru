@@ -92,6 +92,21 @@
             </span>
         </div>
     @endif
+    @if(($code ?? '') === 'landing_plagiarism_suspect' && !empty($crawl) && empty($isPublic))
+        <div class="cabinet-sa-help__row">
+            <span class="cabinet-sa-help__label">Проверить</span>
+            <span class="cabinet-sa-help__text">
+                Это внутренние дубли на своём сайте (считается при обходе).
+                Внешняя проверка vs интернет — отдельно, на вкладке Антиплагиат.
+                <div class="mt-2">
+                    <a class="btn btn-sm btn-outline-primary"
+                       href="{{ route('pages.site-audit.crawl.show', $crawl->id) }}#sa-pane-plagiarism">
+                        Открыть Антиплагиат
+                    </a>
+                </div>
+            </span>
+        </div>
+    @endif
     @if(!empty($showReferrers) && !empty($crawl))
         <div class="cabinet-sa-help__row">
             <span class="cabinet-sa-help__label">Откуда ссылки</span>

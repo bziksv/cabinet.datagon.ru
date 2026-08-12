@@ -11,7 +11,7 @@ use App\SiteAuditProject;
 use App\Support\HomeUserSites;
 
 /**
- * Сверка индекса с краулом через Яндекс.Вебмастер.
+ * Сверка индекса с проверкой через Яндекс.Вебмастер.
  * Полный diff списка выполняется на этапе агрегации аудита (не отдельной кнопкой).
  */
 class SiteAuditSerpIndexProbe
@@ -200,7 +200,7 @@ class SiteAuditSerpIndexProbe
         $rootUrl = 'https://' . preg_replace('#^https?://#i', '', rtrim($domain, '/')) . '/';
         $crawlMap = $this->crawlUrlMap($crawl);
         if ($crawlMap === []) {
-            return ['ok' => false, 'message' => 'Нет URL краула для сверки'];
+            return ['ok' => false, 'message' => 'Нет URL проверки для сверки'];
         }
 
         $collected = $wmCtx['service']->collectInSearchUrls(
@@ -296,6 +296,7 @@ class SiteAuditSerpIndexProbe
             ? round($found / $ctx['pages_total'], 4)
             : null;
 
+        $extraStoreMax = max(40, min(10000, (int) config('site_audit.serp_index_extra_urls_max', 5000)));
         $deep = [
             'mode' => $ctx['mode'],
             'source' => $ctx['source'],
@@ -314,7 +315,9 @@ class SiteAuditSerpIndexProbe
             'max_urls' => $ctx['max_urls'],
             'pages_fetched' => $ctx['pages_fetched'],
             'missing_urls' => array_slice($missingInIndex, 0, 40),
-            'extra_urls' => array_slice($extraInIndex, 0, 40),
+            // Полный список «в индексе, не в проверке» — для разбора на странице отчёта.
+            'extra_urls' => array_slice($extraInIndex, 0, $extraStoreMax),
+            'extra_urls_capped' => $extraCount > $extraStoreMax,
             'at' => now()->toDateTimeString(),
             'during_audit' => true,
         ];
@@ -415,12 +418,12 @@ class SiteAuditSerpIndexProbe
 
         $msg = 'Вебмастер: ' . $serpCount . ' URL'
             . ($found !== null ? (' (в поиске ~' . $found . ')') : '')
-            . ', совпало с краулом ' . $matched . '/' . $crawlCount;
+            . ', совпало с проверкой ' . $matched . '/' . $crawlCount;
         if ($missingCount > 0) {
-            $msg .= ', в крауле нет в индексе: ' . $missingCount;
+            $msg .= ', в проверке нет в индексе: ' . $missingCount;
         }
         if ($extraCount > 0) {
-            $msg .= ', в индексе нет в крауле: ' . $extraCount;
+            $msg .= ', в индексе нет в проверке: ' . $extraCount;
         }
         if ($truncated) {
             $msg .= ' (список обрезан, сверка частичная)';
@@ -624,5 +627,140 @@ class SiteAuditSerpIndexProbe
         }
 
         return $map;
+    }
+
+    /**
+     * Обогатить extra_urls статусами из обхода и robots.txt.
+     * «В обходе» = URL есть в site_audit_pages этой проверки (не live HEAD).
+     *
+     * @param  array<int, string|array>  $extraUrls
+     * @return array<int, array{
+     *   url:string,
+     *   in_crawl:bool,
+     *   status:?int,
+     *   noindex:?bool,
+     *   robots:string,
+     *   reason:string
+     * }>
+     */
+    public function enrichExtraUrls(SiteAuditCrawl $crawl, array $extraUrls): array
+    {
+        $urls = [];
+        foreach ($extraUrls as $item) {
+            if (is_array($item)) {
+                $u = trim((string) ($item['url'] ?? ''));
+            } else {
+                $u = trim((string) $item);
+            }
+            if ($u !== '') {
+                $urls[] = $u;
+            }
+        }
+        $urls = array_values(array_unique($urls));
+        if ($urls === []) {
+            return [];
+        }
+
+        $pageByKey = [];
+        $pageRows = SiteAuditPage::query()
+            ->where('crawl_id', $crawl->id)
+            ->orderBy('id')
+            ->get(['url', 'url_hash', 'status_code', 'noindex', 'redirect_chain']);
+        foreach ($pageRows as $row) {
+            $pageUrl = trim((string) $row->url);
+            if ($pageUrl === '') {
+                continue;
+            }
+            $key = SiteAuditUrlNormalizer::canonicalKey($pageUrl);
+            if ($key === null || isset($pageByKey[$key])) {
+                continue;
+            }
+            $redir = $row->redirect_chain;
+            $hasRedirect = false;
+            if (is_array($redir)) {
+                $hasRedirect = $redir !== [];
+            } elseif (is_string($redir)) {
+                $trim = trim($redir);
+                $hasRedirect = $trim !== '' && $trim !== '[]' && $trim !== 'null';
+            }
+            $pageByKey[$key] = [
+                'status' => $row->status_code !== null ? (int) $row->status_code : null,
+                'noindex' => $row->noindex === null ? null : (bool) $row->noindex,
+                'redirect' => $hasRedirect,
+                'url_hash' => (string) ($row->url_hash ?? ''),
+            ];
+        }
+
+        $robotsBlocked = [];
+        foreach (
+            SiteAuditFinding::query()
+                ->where('crawl_id', $crawl->id)
+                ->where('code', 'robots_blocked')
+                ->pluck('url_hash')
+                ->all() as $hash
+        ) {
+            $robotsBlocked[(string) $hash] = true;
+        }
+
+        $robotsGroups = null;
+        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+        if (isset($progress['robots']['groups']) && is_array($progress['robots']['groups'])) {
+            $robotsGroups = $progress['robots']['groups'];
+        } else {
+            // slim progress снимает $.robots — достаём отдельно
+            $raw = \DB::table('site_audit_crawls')
+                ->where('id', $crawl->id)
+                ->value(\DB::raw("JSON_EXTRACT(progress_json, '$.robots.groups')"));
+            if (is_string($raw) && $raw !== '' && $raw !== 'null') {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) {
+                    $robotsGroups = $decoded;
+                }
+            }
+        }
+        $robotsChecker = $robotsGroups !== null ? new SiteAuditRobotsTxt() : null;
+
+        $out = [];
+        foreach ($urls as $url) {
+            $key = SiteAuditUrlNormalizer::canonicalKey($url);
+            $page = ($key !== null && isset($pageByKey[$key])) ? $pageByKey[$key] : null;
+            $inCrawl = $page !== null;
+
+            $robots = 'unknown';
+            if ($robotsChecker !== null) {
+                $robots = $robotsChecker->isPathAllowed($robotsGroups, $url) ? 'allow' : 'deny';
+            }
+            if ($inCrawl && $page['url_hash'] !== '' && isset($robotsBlocked[$page['url_hash']])) {
+                $robots = 'deny';
+            }
+
+            $reason = 'not_fetched';
+            if ($inCrawl) {
+                if ($robots === 'deny') {
+                    $reason = 'robots';
+                } elseif (! empty($page['noindex'])) {
+                    $reason = 'noindex';
+                } elseif (! empty($page['redirect'])) {
+                    $reason = 'redirect';
+                } elseif (($page['status'] ?? null) !== 200) {
+                    $reason = 'non_200';
+                } else {
+                    $reason = 'other';
+                }
+            } elseif ($robots === 'deny') {
+                $reason = 'robots';
+            }
+
+            $out[] = [
+                'url' => $url,
+                'in_crawl' => $inCrawl,
+                'status' => $inCrawl ? ($page['status'] ?? null) : null,
+                'noindex' => $inCrawl ? ($page['noindex'] ?? null) : null,
+                'robots' => $robots,
+                'reason' => $reason,
+            ];
+        }
+
+        return $out;
     }
 }

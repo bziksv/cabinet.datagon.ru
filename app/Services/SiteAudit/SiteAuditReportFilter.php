@@ -23,6 +23,37 @@ class SiteAuditReportFilter
             ['key' => 'url', 'label' => 'URL', 'param' => 'q_url'],
         ];
 
+        if ($code === 'index_count_mismatch') {
+            $fields[] = [
+                'key' => 'discovered_via',
+                'label' => 'Откуда в обходе',
+                'param' => 'q_via',
+                'type' => 'select',
+                'options' => [
+                    '' => 'Все',
+                    'sitemap' => 'sitemap',
+                    'link' => 'По ссылке',
+                    'seed' => 'Посев',
+                    'home' => 'Главная',
+                ],
+                'tip' => "Как URL попал в эту проверку.\nsitemap — из карты сайта.\nПо ссылке — с другой страницы.\nПосев — из стартового списка.",
+            ];
+            $fields[] = [
+                'key' => 'url_kind',
+                'label' => 'Вид URL',
+                'param' => 'q_kind',
+                'type' => 'select',
+                'options' => [
+                    '' => 'Все',
+                    'clean' => 'Без ?параметров',
+                    'params' => 'С ?параметрами',
+                ],
+                'tip' => "С параметрами — URL вида /page?cat=…\nЧасто это фильтры/метки, их иногда лучше не держать в индексе.",
+            ];
+
+            return $fields;
+        }
+
         if (in_array($code, ['redirect', 'redirect_chain_long', 'redirect_loop'], true)) {
             $fields[] = [
                 'key' => 'redirect_kind',
@@ -168,6 +199,16 @@ class SiteAuditReportFilter
             ) {
                 continue;
             }
+            if (($field['key'] ?? '') === 'discovered_via'
+                && ! in_array($v, ['sitemap', 'link', 'seed', 'home'], true)
+            ) {
+                continue;
+            }
+            if (($field['key'] ?? '') === 'url_kind'
+                && ! in_array($v, ['clean', 'params'], true)
+            ) {
+                continue;
+            }
             $out[$field['key']] = $v;
         }
 
@@ -210,6 +251,28 @@ class SiteAuditReportFilter
 
         if (isset($values['redirect_kind'])) {
             self::applyRedirectKind($query, (string) $values['redirect_kind']);
+        }
+
+        if (isset($values['discovered_via'])) {
+            $via = (string) $values['discovered_via'];
+            if (in_array($via, ['sitemap', 'link', 'seed', 'home'], true)) {
+                $query->whereExists(function ($sub) use ($crawlId, $via) {
+                    $sub->selectRaw('1')
+                        ->from('site_audit_pages')
+                        ->whereColumn('site_audit_pages.url_hash', 'site_audit_findings.url_hash')
+                        ->where('site_audit_pages.crawl_id', $crawlId)
+                        ->where('site_audit_pages.discovered_via', $via);
+                });
+            }
+        }
+
+        if (isset($values['url_kind'])) {
+            $kind = (string) $values['url_kind'];
+            if ($kind === 'params') {
+                $query->where('site_audit_findings.url', 'like', '%?%');
+            } elseif ($kind === 'clean') {
+                $query->where('site_audit_findings.url', 'not like', '%?%');
+            }
         }
 
         return $query;

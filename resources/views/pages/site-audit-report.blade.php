@@ -214,5 +214,8 @@
         @include('partials.cabinet-confirm-modal')
         @include('pages.partials.site-audit-tree-nav-js')
         @include('pages.partials.site-audit-crawl-live-js')
+        @if(($code ?? '') === 'index_count_mismatch')
+            <script src="{{ asset('js/cabinet-site-audit-index-extra.js') }}?v={{ @filemtime(public_path('js/cabinet-site-audit-index-extra.js')) ?: time() }}" defer></script>
+        @endif
     @endslot
 @endcomponent

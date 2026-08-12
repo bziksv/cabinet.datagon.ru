@@ -9,10 +9,24 @@
     $isIndexMismatch = ($code ?? '') === 'index_count_mismatch';
 @endphp
 @if($probeSkipped && ! $isIndexMismatch)
+    @if(($probeStatus['probe'] ?? '') === 'plagiarism_external')
+        <div class="alert alert-warning border small mb-3 cabinet-sa-probe-cta d-flex flex-wrap align-items-center justify-content-between" style="gap:10px">
+            <div>
+                Проверку уникальности ещё не запускали — замечаний пока нет не потому что «всё хорошо», а потому что страницы не проверяли.
+                Обычно после обхода сами проверяем главную, категорию и товар/услугу; если этого не было — откройте «Антиплагиат» и доберите страницы вручную.
+            </div>
+            @if(empty($isPublic) && !empty($crawl))
+                <a class="btn btn-sm btn-primary flex-shrink-0"
+                   href="{{ route('pages.site-audit.crawl.show', $crawl->id) }}#sa-pane-plagiarism">
+                    Открыть Антиплагиат
+                </a>
+            @endif
+        </div>
+    @else
     <div class="alert alert-warning border small mb-3 cabinet-sa-probe-cta">
         <strong>Проверка не запускалась</strong>
         — {{ \App\Services\SiteAudit\SiteAuditProbeStatus::reasonLabel($probeStatus['reason'] ?? null, $probeStatus['probe'] ?? null) }}.
-        Зелёный «0» здесь не значит «всё ок»: отчёт пустой, потому что пробу ещё не гоняли.
+        Жёлтое «не было» / пустая таблица здесь не значит «всё ок»: отчёт заполняется только после запуска.
         @if(($probeStatus['probe'] ?? '') === 'serp_snippets')
             <div class="mt-1 mb-0">
                 Сниппеты — общий набор до <strong>{{ (int) config('site_audit.serp_snippets_max_urls', 30) }}</strong> URL
@@ -59,6 +73,7 @@
             </form>
         @endif
     </div>
+    @endif
 @endif
 @if($isIndexMismatch && empty($isPublic))
     @php
@@ -91,10 +106,14 @@
             'domain' => $wmDomain,
             'return' => $returnUrl,
         ]);
+        $extraN = 0;
+        $extraUrls = [];
+        $extraShown = 0;
+        $extraCapped = false;
     @endphp
     <div class="alert {{ $deepDone ? 'alert-success' : 'alert-warning' }} border small mb-3 cabinet-sa-probe-cta">
         <div class="mb-2">
-            Сверка списка «в поиске» Вебмастера с краулом выполняется <strong>автоматически при аудите</strong>
+            Сверка списка «в поиске» Вебмастера с проверкой выполняется <strong>автоматически при аудите</strong>
             (этап агрегации), если хост привязан.
         </div>
 
@@ -120,30 +139,65 @@
             </div>
         @endif
 
-        @if($deepDone)
-            <strong>Сверка по этой проверке:</strong>
-            {{ (int) ($serpIndexDeep['serp_count'] ?? 0) }} URL
-            @if(isset($serpIndexDeep['found']))
-                (в поиске ~{{ (int) $serpIndexDeep['found'] }})
-            @endif
-            · совпало
-            {{ (int) ($serpIndexDeep['matched'] ?? 0) }}/{{ (int) ($serpIndexDeep['crawl_count'] ?? 0) }}
-            @if(!empty($serpIndexDeep['truncated']))
-                <span class="text-muted">· список Вебмастера обрезан</span>
-            @endif
+        @if($deepDone && is_array($serpIndexDeep ?? null) && isset($serpIndexDeep['serp_count']))
             @php
-                $missingN = (int) ($serpIndexDeep['missing_in_index'] ?? count($rows ?? []));
+                $wmListN = (int) ($serpIndexDeep['serp_count'] ?? 0);
+                $crawlN = (int) ($serpIndexDeep['crawl_count'] ?? 0);
+                $matchedN = (int) ($serpIndexDeep['matched'] ?? 0);
+                $missingN = (int) ($serpIndexDeep['missing_in_index'] ?? 0);
                 $extraN = (int) ($serpIndexDeep['extra_in_index'] ?? 0);
+                $foundN = isset($serpIndexDeep['found']) ? (int) $serpIndexDeep['found'] : null;
+                $extraUrls = [];
+                $extraShown = 0;
+                $extraCapped = false;
+                if ($extraN > 0) {
+                    $extraUrls = array_values(array_filter(
+                        is_array($serpIndexDeep['extra_urls'] ?? null) ? $serpIndexDeep['extra_urls'] : [],
+                        static function ($u) {
+                            return is_string($u) && trim($u) !== '';
+                        }
+                    ));
+                    $extraShown = count($extraUrls);
+                    $extraCapped = !empty($serpIndexDeep['extra_urls_capped']) || ($extraShown > 0 && $extraShown < $extraN);
+                }
             @endphp
-            @if($missingN > 0)
-                <div class="mt-2 mb-0">
-                    Нет в индексе: <strong>{{ $missingN }}</strong> URL краула
-                    (без robots/noindex). В таблице ниже — URL и ПС в «деталях».
-                </div>
-            @endif
-            @if($extraN > 0)
-                <div class="mt-1 mb-0 text-muted">В индексе нет в крауле: {{ $extraN }}.</div>
-            @endif
+            <div class="mb-0">
+                <strong>Итог сверки</strong>
+                <ul class="mb-0 mt-1 pl-3">
+                    <li>В проверке (без robots/noindex):
+                        <strong>{{ number_format($crawlN, 0, '', ' ') }}</strong> URL</li>
+                    <li>Список «в поиске» из Вебмастера:
+                        <strong>{{ number_format($wmListN, 0, '', ' ') }}</strong> URL
+                        @if($foundN !== null)
+                            <span class="text-muted">
+                                (счётчик Вебмастера «в поиске» ≈ {{ number_format($foundN, 0, '', ' ') }} —
+                                это другая метрика, со списком может не совпадать)
+                            </span>
+                        @endif
+                    </li>
+                    <li>Совпали (есть и в проверке, и в списке):
+                        <strong>{{ number_format($matchedN, 0, '', ' ') }}</strong></li>
+                    <li>В проверке, но <strong>нет в индексе</strong>:
+                        <strong>{{ number_format($missingN, 0, '', ' ') }}</strong>
+                        — строки в таблице ниже</li>
+                    @if($extraN > 0)
+                        <li>Есть в индексе Вебмастера, но <strong>не попали в эту проверку</strong>:
+                            {{ number_format($extraN, 0, '', ' ') }}
+                            — список ниже</li>
+                    @endif
+                </ul>
+                @if(!empty($serpIndexDeep['truncated']))
+                    <div class="alert alert-warning border mb-0 mt-2 py-2 px-3 cabinet-sa-index-truncated">
+                        <strong>Список Вебмастера неполный.</strong>
+                        Часть строк «нет в индексе» может быть ложной — сначала уточните список в Вебмастере или нажмите «Пересверить».
+                    </div>
+                @endif
+            </div>
+        @elseif($deepDone)
+            <div class="mb-0 text-muted">
+                В таблице {{ number_format((int) ($total ?? 0), 0, '', ' ') }} URL без индекса.
+                Сводка сверки не подгрузилась — нажмите «Пересверить» или обновите страницу.
+            </div>
         @elseif(!empty($probeSkipped))
             <div class="mb-2 text-muted">
                 В этой проверке сверка ещё не выполнялась
@@ -160,7 +214,7 @@
                 <input type="hidden" name="engine" value="yandex">
                 <input type="hidden" name="code" value="{{ $code }}">
                 <button type="submit" class="btn btn-sm btn-outline-primary"
-                        data-cabinet-confirm="Повторно снять список из Вебмастера и сверить с краулом #{{ $crawl->id }}?"
+                        data-cabinet-confirm="Повторно снять список из Вебмастера и сверить с проверкой #{{ $crawl->id }}?"
                         data-cabinet-confirm-title="Пересверить"
                         data-cabinet-confirm-ok="Пересверить">
                     Пересверить сейчас
@@ -168,6 +222,158 @@
             </form>
         @endif
     </div>
+    @php
+        if (($extraN ?? 0) > 0 && empty($extraUrls) && ! empty($serpIndexExtraRows) && is_array($serpIndexExtraRows)) {
+            $extraUrls = array_values(array_map(static function ($r) {
+                return is_array($r) ? (string) ($r['url'] ?? '') : (string) $r;
+            }, $serpIndexExtraRows));
+            $extraShown = count(array_filter($extraUrls));
+        }
+        $extraRows = [];
+        if (! empty($serpIndexExtraRows) && is_array($serpIndexExtraRows)) {
+            $extraRows = array_values($serpIndexExtraRows);
+        } elseif (! empty($extraUrls)) {
+            foreach ($extraUrls as $u) {
+                $extraRows[] = [
+                    'url' => $u,
+                    'in_crawl' => false,
+                    'status' => null,
+                    'noindex' => null,
+                    'robots' => 'unknown',
+                    'reason' => 'not_fetched',
+                ];
+            }
+        }
+        $extraShown = count($extraRows);
+        $extraAliveN = 0;
+        $extraRobotsDenyN = 0;
+        $extraRobotsOkN = 0;
+        $extraNotFetchedN = 0;
+        foreach ($extraRows as $er) {
+            $in = ! empty($er['in_crawl']);
+            $rob = (string) ($er['robots'] ?? 'unknown');
+            if ($in && $rob !== 'deny') {
+                $extraAliveN++;
+            }
+            if ($rob === 'deny') {
+                $extraRobotsDenyN++;
+            } else {
+                $extraRobotsOkN++;
+            }
+            if (! $in) {
+                $extraNotFetchedN++;
+            }
+        }
+    @endphp
+    @if(($extraN ?? 0) > 0)
+        <div class="cabinet-sa-index-extra" data-sa-index-extra>
+            <button type="button"
+                    class="cabinet-sa-index-extra__head"
+                    data-sa-extra-toggle
+                    aria-expanded="true"
+                    aria-controls="sa-index-extra-body-{{ $crawl->id }}">
+                <span class="cabinet-sa-index-extra__chevron" aria-hidden="true"></span>
+                <span class="cabinet-sa-index-extra__title">
+                    Есть в индексе, но не попали в эту проверку
+                    <span class="cabinet-sa-index-extra__count">{{ number_format($extraN, 0, '', ' ') }}</span>
+                </span>
+            </button>
+            <div class="cabinet-sa-index-extra__body" id="sa-index-extra-body-{{ $crawl->id }}">
+                <p class="cabinet-sa-index-extra__hint">
+                    Эти URL есть в списке «в поиске» Вебмастера, но не попали в сверку с проверкой
+                    (лимит, robots/noindex, нет во внутренних ссылках/sitemap, параметры <code>?cat=</code> и т.п.).
+                    Колонка «В обходе» — скачивали ли URL в этой проверке (не live-проверка сайта).
+                    По умолчанию — URL, которые <strong>не закрыты robots.txt</strong> (их как раз стоит разобрать: либо вернуть в обход, либо выкинуть из индекса).
+                </p>
+                <p class="cabinet-sa-index-extra__hint cabinet-sa-index-extra__hint--action">
+                    Если страницы <strong>старые / уже удалены</strong> с сайта — подождите переобход
+                    или удалите URL вручную в Яндекс.Вебмастере («Переобход страниц» / удаление из поиска).
+                    Иначе они ещё долго могут висеть в индексе.
+                </p>
+                @if($extraShown === 0)
+                    <p class="cabinet-sa-index-extra__hint text-muted mb-0">
+                        Список ещё не сохранён (старая сверка). Нажмите «Пересверить сейчас» — подтянем все URL.
+                    </p>
+                @else
+                    <div class="cabinet-sa-index-extra__presets" data-sa-extra-presets>
+                        <button type="button" class="btn btn-sm btn-primary" data-sa-extra-preset="robots_ok" title="Не запрещены robots.txt — разбирать в первую очередь">
+                            robots разрешает
+                            <span class="cabinet-sa-index-extra__preset-n">{{ number_format($extraRobotsOkN, 0, '', ' ') }}</span>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-sa-extra-preset="alive" title="Скачаны в этой проверке и не закрыты robots.txt">
+                            В обходе · robots OK
+                            <span class="cabinet-sa-index-extra__preset-n">{{ number_format($extraAliveN, 0, '', ' ') }}</span>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-sa-extra-preset="not_fetched">
+                            Не в обходе
+                            <span class="cabinet-sa-index-extra__preset-n">{{ number_format($extraNotFetchedN, 0, '', ' ') }}</span>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-sa-extra-preset="robots_deny">
+                            robots запрещает
+                            <span class="cabinet-sa-index-extra__preset-n">{{ number_format($extraRobotsDenyN, 0, '', ' ') }}</span>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-sa-extra-preset="all">
+                            Все
+                            <span class="cabinet-sa-index-extra__preset-n">{{ number_format($extraShown, 0, '', ' ') }}</span>
+                        </button>
+                    </div>
+                    <div class="cabinet-sa-index-extra__toolbar">
+                        <input type="search"
+                               class="form-control form-control-sm cabinet-sa-index-extra__search"
+                               placeholder="Фильтр по URL…"
+                               data-sa-extra-filter
+                               autocomplete="off">
+                        <div class="cabinet-sa-index-extra__actions">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-sa-extra-copy>
+                                Копировать
+                            </button>
+                            <a class="btn btn-sm btn-outline-primary"
+                               href="{{ route('pages.site-audit.report.index-extra', $crawl->id) }}?format=txt">
+                                Скачать TXT
+                            </a>
+                            <a class="btn btn-sm btn-outline-success"
+                               href="{{ route('pages.site-audit.report.index-extra', $crawl->id) }}?format=csv">
+                                CSV
+                            </a>
+                        </div>
+                    </div>
+                    @if(!empty($extraCapped))
+                        <div class="small text-muted mb-2">
+                            Показано {{ number_format($extraShown, 0, '', ' ') }}
+                            из {{ number_format($extraN, 0, '', ' ') }}.
+                            @if($extraShown < $extraN)
+                                Нажмите «Пересверить» для полного списка.
+                            @endif
+                        </div>
+                    @endif
+                    <div class="cabinet-sa-index-extra__table-wrap">
+                        <table class="table table-sm table-hover mb-0 cabinet-sa-index-extra__table">
+                            <thead>
+                            <tr>
+                                <th class="cabinet-sa-index-extra__col-n">#</th>
+                                <th>URL</th>
+                                <th class="cabinet-sa-index-extra__col-flag">В обходе</th>
+                                <th class="cabinet-sa-index-extra__col-flag">HTTP</th>
+                                <th class="cabinet-sa-index-extra__col-flag">robots.txt</th>
+                                <th class="cabinet-sa-index-extra__col-reason">Почему не в сверке</th>
+                            </tr>
+                            </thead>
+                            <tbody data-sa-extra-list></tbody>
+                        </table>
+                    </div>
+                    <div class="cabinet-sa-index-extra__pager" data-sa-extra-pager>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-sa-extra-prev disabled>← Назад</button>
+                        <span class="cabinet-sa-index-extra__pager-label" data-sa-extra-page-label>…</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-sa-extra-next>Вперёд →</button>
+                    </div>
+                    <div class="cabinet-sa-index-extra__empty d-none" data-sa-extra-empty>
+                        Ничего не найдено по фильтру.
+                    </div>
+                    <textarea hidden data-sa-extra-json>@json($extraRows)</textarea>
+                @endif
+            </div>
+        </div>
+    @endif
 @endif
 @include('pages.partials.site-audit-report-filters')
 
@@ -246,11 +452,13 @@
 @endif
 
 @if(!empty($canNote))
-    <div class="alert alert-light border small mb-3 cabinet-sa-note-legend">
+    <div class="alert alert-light border small mb-3 cabinet-sa-note-legend{{ ($code ?? '') === 'index_count_mismatch' ? ' cabinet-sa-note-legend--compact' : '' }}">
         <strong>Заметка</strong> — комментарий к строке.
         <strong>Исправлено</strong> — починили, строка уходит из счётчиков.
         <strong>Игнор</strong> — не ошибка / ложное срабатывание.
-        Пометки помнятся для этого сайта (тот же тип замечания + тот же адрес) в следующих проверках, пока сами не снимете.
+        @if(($code ?? '') !== 'index_count_mismatch')
+            Пометки помнятся для этого сайта (тот же тип замечания + тот же адрес) в следующих проверках, пока сами не снимете.
+        @endif
     </div>
 @endif
 
@@ -332,7 +540,11 @@
         @empty
             <div class="text-muted px-3 py-3">
                 @if(!empty($probeSkipped))
-                    Находок нет — проверка ещё не запускалась. Нажмите «Запустить» выше.
+                    @if(($probeStatus['probe'] ?? '') === 'plagiarism_external')
+                        Пока пусто.
+                    @else
+                        Находок нет — проверка ещё не запускалась. Нажмите «Запустить» выше.
+                    @endif
                 @else
                     Находок нет — проверка выполнена, замечаний по этому отчёту нет.
                 @endif
@@ -355,6 +567,7 @@
         $isSerpTitleReport = ($code ?? '') === 'serp_title_mismatch';
         $isHeavyImageReport = ($code ?? '') === 'heavy_image';
         $isAffiliateReport = ($code ?? '') === 'probable_affiliate';
+        $isIndexMismatchReport = ($code ?? '') === 'index_count_mismatch';
         $showActions = !empty($canNote) || !empty($canIgnore);
         // Срочность задаётся на тип ошибки в конфиге. В обычном отчёте все строки одинаковые —
         // колонку «Приор.» показываем только в сводных (virtual), где реально смешаны уровни.
@@ -384,19 +597,24 @@
         $urlColLabel = $isRedirectReport
             ? 'URL'
             : ($isBrokenTarget ? 'Битый URL' : ($isHeavyImageReport ? 'Страница' : ($isAffiliateReport ? 'Страница' : 'URL')));
-        $detailsColLabel = $isSerpTitleReport ? 'Сравнение title' : ($isHeavyImageReport ? 'Изображение' : ($isAffiliateReport ? 'Партнёрки' : 'Детали'));
+        $detailsColLabel = $isSerpTitleReport ? 'Сравнение title'
+            : ($isHeavyImageReport ? 'Изображение'
+                : ($isAffiliateReport ? 'Партнёрки'
+                    : ($isIndexMismatchReport ? 'В проверке' : 'Детали')));
         $detailsColTip = $isSerpTitleReport
             ? "Слева — TITLE в HTML, справа — заголовок в сниппете ПС."
             : ($isHeavyImageReport
                 ? "Файл картинки: превью, вес, имя и полный URL.\nИменно его нужно сжать или заменить."
                 : ($isAffiliateReport
                     ? "Какие исходящие ссылки похожи на партнёрские: сеть, хост и полный URL."
-                    : "Кратко что не так: код ответа, какой дубль, какой запрос и т.д."));
+                    : ($isIndexMismatchReport
+                        ? "Как URL попал в эту проверку, глубина, раздел и есть ли ?параметры.\nВсе строки — нет в индексе Вебмастера."
+                        : "Кратко что не так: код ответа, какой дубль, какой запрос и т.д.")));
         $refColTip = $isRedirectReport
             ? "Откуда URL попал в проверка: sitemap.xml, посев, главная или страница со ссылкой."
             : "Откуда URL попал в проверка или страницы со ссылкой.";
     @endphp
-    <div class="cabinet-sa-table-wrap{{ $isSerpTitleReport ? ' cabinet-sa-table-wrap--serp-title' : '' }}{{ $isBrokenTarget ? ' cabinet-sa-table-wrap--broken' : '' }}{{ $isHeavyImageReport ? ' cabinet-sa-table-wrap--heavy' : '' }}{{ $isAffiliateReport ? ' cabinet-sa-table-wrap--aff' : '' }}">
+    <div class="cabinet-sa-table-wrap{{ $isSerpTitleReport ? ' cabinet-sa-table-wrap--serp-title' : '' }}{{ $isBrokenTarget ? ' cabinet-sa-table-wrap--broken' : '' }}{{ $isHeavyImageReport ? ' cabinet-sa-table-wrap--heavy' : '' }}{{ $isAffiliateReport ? ' cabinet-sa-table-wrap--aff' : '' }}{{ !empty($isIndexMismatchReport) ? ' cabinet-sa-table-wrap--index-mismatch' : '' }}">
         <table class="table table-sm table-hover mb-0 cabinet-sa-findings-table">
             <colgroup>
                 <col class="cabinet-sa-col-url">
@@ -486,17 +704,54 @@
                         </td>
                     @endif
                     <td class="small cabinet-sa-details-cell">
-                        @php
-                            $detailsHtml = \App\Services\SiteAudit\SiteAuditFindingPresenter::metaDetailsHtml(
-                                $row->code ?? $code,
-                                $row->meta_json,
-                                $row->url
-                            );
-                        @endphp
-                        @if($detailsHtml !== null)
-                            {!! $detailsHtml !!}
+                        @if(!empty($isIndexMismatchReport))
+                            @php
+                                $via = (string) ($rowMeta['page_via'] ?? '');
+                                $viaLabels = [
+                                    'sitemap' => 'sitemap',
+                                    'link' => 'по ссылке',
+                                    'seed' => 'посев',
+                                    'home' => 'главная',
+                                ];
+                                $viaLabel = $viaLabels[$via] ?? '';
+                                $depth = $rowMeta['page_depth'] ?? null;
+                                $section = trim((string) ($rowMeta['path_section'] ?? ''));
+                                $hasQuery = ! empty($rowMeta['has_query']);
+                                $pageTitle = trim((string) ($rowMeta['page_title'] ?? ''));
+                            @endphp
+                            <div class="cabinet-sa-index-miss">
+                                <div class="cabinet-sa-index-miss__chips">
+                                    <span class="cabinet-sa-index-miss__chip cabinet-sa-index-miss__chip--warn" title="Есть в этой проверке, нет в списке «в поиске» Вебмастера">нет в индексе</span>
+                                    @if($viaLabel !== '')
+                                        <span class="cabinet-sa-index-miss__chip" title="Как URL попал в эту проверку">{{ $viaLabel }}</span>
+                                    @endif
+                                    @if($depth !== null)
+                                        <span class="cabinet-sa-index-miss__chip" title="Глубина кликов от главной">глубина {{ (int) $depth }}</span>
+                                    @endif
+                                    @if($section !== '')
+                                        <span class="cabinet-sa-index-miss__chip cabinet-sa-index-miss__chip--section" title="Первый сегмент пути">/{{ $section }}</span>
+                                    @endif
+                                    @if($hasQuery)
+                                        <span class="cabinet-sa-index-miss__chip cabinet-sa-index-miss__chip--params" title="В URL есть query-параметры">?params</span>
+                                    @endif
+                                </div>
+                                @if($pageTitle !== '')
+                                    <div class="cabinet-sa-index-miss__title" title="{{ $pageTitle }}">{{ \Illuminate\Support\Str::limit($pageTitle, 90) }}</div>
+                                @endif
+                            </div>
                         @else
-                            {{ \App\Services\SiteAudit\SiteAuditFindingPresenter::metaLine($row->code ?? $code, $row->meta_json, $row->url) }}
+                            @php
+                                $detailsHtml = \App\Services\SiteAudit\SiteAuditFindingPresenter::metaDetailsHtml(
+                                    $row->code ?? $code,
+                                    $row->meta_json,
+                                    $row->url
+                                );
+                            @endphp
+                            @if($detailsHtml !== null)
+                                {!! $detailsHtml !!}
+                            @else
+                                {{ \App\Services\SiteAudit\SiteAuditFindingPresenter::metaLine($row->code ?? $code, $row->meta_json, $row->url) }}
+                            @endif
                         @endif
                     </td>
                     @if(!empty($showReferrers))
@@ -639,7 +894,11 @@
             @empty
                 <tr><td colspan="{{ $colspan }}" class="text-secondary px-3 py-3">
                     @if(!empty($probeSkipped))
-                        Находок нет — проверка ещё не запускалась. Нажмите «Запустить» выше.
+                        @if(($probeStatus['probe'] ?? '') === 'plagiarism_external')
+                            Пока пусто.
+                        @else
+                            Находок нет — проверка ещё не запускалась. Нажмите «Запустить» выше.
+                        @endif
                     @else
                         Находок нет — проверка выполнена, замечаний по этому отчёту нет.
                     @endif

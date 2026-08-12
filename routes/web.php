@@ -303,6 +303,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('site-audit/crawl/{id}/relevance/rows', 'SiteAuditController@relevanceRows')->name('pages.site-audit.relevance.rows')->middleware('permission:Site audit');
     Route::get('site-audit/crawl/{id}/status', 'SiteAuditController@crawlStatus')->name('pages.site-audit.crawl.status')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/probe', 'SiteAuditController@runProbe')->name('pages.site-audit.probe.run')->middleware('permission:Site audit');
+    Route::get('site-audit/crawl/{id}/report/index_count_mismatch/extra', 'SiteAuditController@exportIndexExtraUrls')->name('pages.site-audit.report.index-extra')->middleware('permission:Site audit');
     Route::get('site-audit/crawl/{id}/report/{code}', 'SiteAuditController@showReport')->name('pages.site-audit.report.show')->middleware('permission:Site audit');
     Route::get('site-audit/crawl/{id}/report/{code}/csv', 'SiteAuditController@exportReportCsv')->name('pages.site-audit.report.csv')->middleware('permission:Site audit');
     Route::get('site-audit/crawl/{id}/report/{code}/xlsx', 'SiteAuditController@exportReportXlsx')->name('pages.site-audit.report.xlsx')->middleware('permission:Site audit');

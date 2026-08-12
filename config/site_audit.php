@@ -86,7 +86,7 @@ return [
     'sitemap_not_crawled_sample' => (int) env('SITE_AUDIT_SITEMAP_NOT_CRAWLED_SAMPLE', 80),
     'not_in_sitemap_max' => (int) env('SITE_AUDIT_NOT_IN_SITEMAP_MAX', 500),
     'landing_findings_max' => (int) env('SITE_AUDIT_LANDING_FINDINGS_MAX', 300),
-    // Доступность: доля unreachable+5xx среди страниц краула
+    // Доступность: доля unreachable+5xx среди страниц проверки
     'availability_fail_rate' => (float) env('SITE_AUDIT_AVAILABILITY_FAIL_RATE', 0.10),
     // Индекс ПС vs краул — только Яндекс.Вебмастер (GSC позже). XML site: не используем.
     'serp_index_enabled' => (bool) env('SITE_AUDIT_SERP_INDEX', false),
@@ -98,6 +98,8 @@ return [
     'serp_index_xml_fallback' => (bool) env('SITE_AUDIT_SERP_INDEX_XML_FALLBACK', false),
     // Сколько URL «нет в индексе» писать отдельными findings (полный список в отчёте)
     'serp_index_url_findings_max' => (int) env('SITE_AUDIT_SERP_INDEX_URL_MAX', 5000),
+    // Сколько URL «в индексе, не в проверке» хранить в progress для разбора в UI
+    'serp_index_extra_urls_max' => (int) env('SITE_AUDIT_SERP_INDEX_EXTRA_MAX', 5000),
     'serp_index_list_max' => (int) env('SITE_AUDIT_SERP_INDEX_LIST_MAX', 200),
     'serp_index_deep_sample' => (int) env('SITE_AUDIT_SERP_INDEX_DEEP', 20), // legacy
     'serp_index_deep_engine' => env('SITE_AUDIT_SERP_INDEX_DEEP_ENGINE', 'yandex'),
@@ -147,10 +149,19 @@ return [
     ],
     'landing_plagiarism_max' => (int) env('SITE_AUDIT_LANDING_PLAGIARISM_MAX', 200),
     // Внешний антиплагиат (вкладка): Titlo TextUniqueness, выборочный запуск
-    'plagiarism_external_max_urls' => (int) env('SITE_AUDIT_PLAGIARISM_EXTERNAL_MAX', 10),
+    'plagiarism_external_max_urls' => (int) env('SITE_AUDIT_PLAGIARISM_EXTERNAL_MAX', 20),
     'plagiarism_external_warn_below' => (float) env('SITE_AUDIT_PLAGIARISM_WARN_BELOW', 70),
     'plagiarism_external_engine' => env('SITE_AUDIT_PLAGIARISM_ENGINE', 'yandex'),
     'plagiarism_external_yandex_lr' => env('SITE_AUDIT_PLAGIARISM_LR', '213'),
+    // Сколько URL сразу в списке выбора (не весь обход — иначе DOM ляжет на десятках тысяч)
+    'plagiarism_external_candidates_max' => (int) env('SITE_AUDIT_PLAGIARISM_CANDIDATES_MAX', 150),
+    // Лимит результатов серверного поиска по URL/title
+    'plagiarism_external_search_max' => (int) env('SITE_AUDIT_PLAGIARISM_SEARCH_MAX', 100),
+    // Автовыборка после обхода: главная + категория + товар/услуга (~3 URL)
+    'plagiarism_external_auto' => (bool) env('SITE_AUDIT_PLAGIARISM_AUTO', true),
+    'plagiarism_external_auto_max' => (int) env('SITE_AUDIT_PLAGIARISM_AUTO_MAX', 3),
+    // Маркер для ProbeStatus: всегда «ручной» допинг поверх авто (не путать с auto-флагом).
+    'plagiarism_external_manual' => true,
     'cannibalization_max' => (int) env('SITE_AUDIT_CANNIBALIZATION_MAX', 200),
     'cannibalization_min_token' => (int) env('SITE_AUDIT_CANNIBAL_MIN_TOKEN', 4),
     'cannibalization_min_hits' => (int) env('SITE_AUDIT_CANNIBAL_MIN_HITS', 2),
@@ -692,7 +703,7 @@ return [
             'phase' => 'B',
             'severity' => 'warning',
             'title' => 'Страницы-сироты',
-            'description' => 'В рамках краула нет входящих внутренних ссылок на эту страницу (кроме главной).',
+            'description' => 'В рамках проверки нет входящих внутренних ссылок на эту страницу (кроме главной).',
         ],
         'sitemap_missing' => [
             'phase' => 'B',
@@ -710,13 +721,13 @@ return [
             'phase' => 'B',
             'severity' => 'info',
             'title' => 'Страница не в sitemap',
-            'description' => 'URL обойден краулом, но отсутствует в sitemap сайта.',
+            'description' => 'URL обойден проверкой, но отсутствует в sitemap сайта.',
         ],
         'sitemap_not_crawled' => [
             'phase' => 'B',
             'severity' => 'info',
-            'title' => 'В sitemap, не в крауле',
-            'description' => 'URL есть в sitemap, но не сохранён в результатах этого краула (лимит, robots или сбой скачивания). Не путать с ошибкой самой страницы.',
+            'title' => 'В sitemap, не в проверке',
+            'description' => 'URL есть в sitemap, но не сохранён в результатах этой проверки (лимит, robots или сбой скачивания). Не путать с ошибкой самой страницы.',
         ],
         'landing_not_in_sitemap' => [
             'phase' => 'B',
@@ -727,14 +738,14 @@ return [
         'landing_not_crawled' => [
             'phase' => 'B',
             'severity' => 'warning',
-            'title' => 'Посадочная не в крауле',
+            'title' => 'Посадочная не в проверке',
             'description' => 'Целевой URL из мониторинга не попал в обход (лимит или нет во внутренних ссылках/sitemap-сиде).',
         ],
         'landing_url_changed' => [
             'phase' => 'B',
             'severity' => 'warning',
             'title' => 'Изменения URL посадочных',
-            'description' => 'Целевой URL (monitoring.page) для запроса изменился относительно предыдущего краула проекта.',
+            'description' => 'Целевой URL (monitoring.page) для запроса изменился относительно предыдущей проверки проекта.',
         ],
         'duplicate_url_variants' => [
             'phase' => 'A',
@@ -841,7 +852,7 @@ return [
             'phase' => 'C',
             'severity' => 'warning',
             'title' => 'Нет внутренних ссылок на посадочную',
-            'description' => 'На посадочную из мониторинга нет входящих внутренних ссылок в крауле (кроме самоссылок).',
+            'description' => 'На посадочную из мониторинга нет входящих внутренних ссылок в проверке (кроме самоссылок).',
             'group' => 'seo',
         ],
         'keyword_cannibalization' => [
@@ -957,7 +968,7 @@ return [
             'phase' => 'C',
             'severity' => 'warning',
             'title' => 'Выбросы ошибок',
-            'description' => 'Аномалии: кластер одного HTTP-кода, «горящий» префикс URL или скачок ошибок vs прошлый краул.',
+            'description' => 'Аномалии: кластер одного HTTP-кода, «горящий» префикс URL или скачок ошибок vs прошлая проверка.',
             'group' => 'tech',
         ],
         'psi_mobile' => [
@@ -984,13 +995,13 @@ return [
             'phase' => 'B',
             'severity' => 'warning',
             'title' => 'Проблемы доступности сайта',
-            'description' => 'Корень недоступен/ошибочен или доля unreachable/4xx/5xx среди страниц краула выше порога.',
+            'description' => 'Корень недоступен/ошибочен или доля unreachable/4xx/5xx среди страниц проверки выше порога.',
         ],
         'index_count_mismatch' => [
             'phase' => 'B',
             'severity' => 'warning',
             'title' => 'Страницы на сайте не в индексе поисковых',
-            'description' => 'Сверка «в поиске» (Вебмастер / GSC) с краулом: сводка и URL, которых нет в индексе — в деталях указана ПС.',
+            'description' => 'Сверка «в поиске» (Вебмастер / GSC) с проверкой: сводка и URL, которых нет в индексе — в деталях указана ПС.',
             'group' => 'seo',
         ],
         'serp_snippets' => [
@@ -1037,7 +1048,7 @@ return [
             'phase' => 'B',
             'severity' => 'info',
             'title' => 'Страницы без исходящих внутренних',
-            'description' => 'У страницы нет исходящих внутренних ссылок в крауле (тупик перелинковки).',
+            'description' => 'У страницы нет исходящих внутренних ссылок в проверке (тупик перелинковки).',
         ],
         'risky_query_params' => [
             'phase' => 'B',
@@ -1053,7 +1064,7 @@ return [
         ],
         /*
          * Внешний модуль Titlo: в дереве аудита — страница-объяснение + CTA,
-         * не мгновенный редирект и не finding краула.
+         * не мгновенный редирект и не finding проверки.
          */
         'site_competitors' => [
             'phase' => 'D',
@@ -1113,7 +1124,7 @@ return [
             'phase' => 'D',
             'severity' => 'info',
             'title' => 'HTTP-заголовки',
-            'description' => 'Точечная проверка заголовков URL — модуль; в аудите security pack по всему краулу.',
+            'description' => 'Точечная проверка заголовков URL — модуль; в аудите security pack по всей проверке.',
             'group' => 'tech',
             'external' => true,
             'route' => 'pages.headers',

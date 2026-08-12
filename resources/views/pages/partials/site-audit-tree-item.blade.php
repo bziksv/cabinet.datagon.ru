@@ -15,24 +15,29 @@
         && $itemCount === 0
         && is_array($probe)
         && ($probe['status'] ?? '') === 'skipped';
+    $probePending = !$isExternal
+        && $itemCount === 0
+        && is_array($probe)
+        && ($probe['status'] ?? '') === 'pending';
     $showXmlBadges = empty($isPublic)
         && auth()->check()
         && method_exists(auth()->user(), 'hasRole')
         && auth()->user()->hasRole(['admin', 'Super Admin']);
     $usesXml = !empty($item['uses_xml']);
 @endphp
-<a class="cabinet-sa-tree__item {{ $isActive ? 'is-active' : '' }} {{ ($itemCount || $isExternal || $probeSkipped) ? '' : 'is-empty' }}{{ $isExternal ? ' cabinet-sa-tree__item--external' : '' }}{{ $probeSkipped ? ' cabinet-sa-tree__item--skipped' : '' }}{{ ($showXmlBadges && $usesXml) ? ' cabinet-sa-tree__item--xml' : '' }}"
+<a class="cabinet-sa-tree__item {{ $isActive ? 'is-active' : '' }} {{ ($itemCount || $isExternal || $probeSkipped || $probePending) ? '' : 'is-empty' }}{{ $isExternal ? ' cabinet-sa-tree__item--external' : '' }}{{ $probeSkipped ? ' cabinet-sa-tree__item--skipped' : '' }}{{ $probePending ? ' cabinet-sa-tree__item--pending' : '' }}{{ ($showXmlBadges && $usesXml) ? ' cabinet-sa-tree__item--xml' : '' }}"
    href="{{ $itemHref }}"
    data-title="{{ $item['title'] }}"
    data-severity="{{ $sev }}"
    data-count="{{ $itemCount }}"
    @if($isExternal) data-external="1" @endif
    @if($probeSkipped) data-probe-skipped="1" @endif
+   @if($probePending) data-probe-pending="1" @endif
    @if($showXmlBadges && $usesXml) data-xml="1" @endif
-   title="{{ $isExternal ? 'Отдельный модуль Titlo — сначала объяснение, затем переход' : ($probeSkipped ? ('Не запускалась: ' . \App\Services\SiteAudit\SiteAuditProbeStatus::reasonLabel($probe['reason'] ?? null, $probe['probe'] ?? null)) : '') }}{{ ($showXmlBadges && $usesXml) ? ((($isExternal || $probeSkipped) ? ' · ' : '') . 'Запросы к выдаче (XML)') : '' }}">
+   title="{{ $isExternal ? 'Отдельный модуль Titlo — сначала объяснение, затем переход' : ($probeSkipped ? ('Не запускалась: ' . \App\Services\SiteAudit\SiteAuditProbeStatus::reasonLabel($probe['reason'] ?? null, $probe['probe'] ?? null)) : ($probePending ? 'Проверка уникальности сейчас выполняется' : '')) }}{{ ($showXmlBadges && $usesXml) ? ((($isExternal || $probeSkipped || $probePending) ? ' · ' : '') . 'При запуске ходит в поисковую выдачу (платный лимит)') : '' }}">
     <span class="cabinet-sa-tree__item-main">
         @if($showXmlBadges && $usesXml)
-            <span class="cabinet-sa-xml-tag" title="Запросы к выдаче (XML)">XML</span>
+            <span class="cabinet-sa-xml-tag" title="Не «уже проверено». Метка: при запуске этой проверки идут запросы к поисковой выдаче">выдача</span>
         @endif
         <span class="cabinet-sa-tree__item-title">
             {{ $item['title'] }}
@@ -44,8 +49,10 @@
     </span>
     @if($isExternal)
         <span class="cabinet-sa-badge cabinet-sa-badge--zero" title="Отдельный модуль — не счётчик ошибок">модуль</span>
+    @elseif($probePending)
+        <span class="cabinet-sa-badge cabinet-sa-badge--pending" title="Идёт проверка уникальности">идёт</span>
     @elseif($probeSkipped)
-        <span class="cabinet-sa-badge cabinet-sa-badge--skipped" title="Проверка не запускалась — откройте и нажмите «Запустить»">не было</span>
+        <span class="cabinet-sa-badge cabinet-sa-badge--skipped" title="{{ ($probe['probe'] ?? '') === 'plagiarism_external' ? 'Ещё не запускали — вкладка «Антиплагиат» на сводке проверки' : 'Проверка не запускалась — откройте и нажмите «Запустить»' }}">не было</span>
     @else
         <span class="cabinet-sa-badge cabinet-sa-badge--{{ $itemCount > 0 ? $sev : 'zero' }}">{{ $itemCount }}</span>
     @endif

@@ -4,7 +4,7 @@
     $plagiarismCandidatesLazy = !empty($plagiarismCandidatesLazy);
     $plagiarismCandidatesUrl = $plagiarismCandidatesUrl ?? '';
     $plagiarismState = $plagiarismState ?? ['status' => 'idle', 'rows' => [], 'done' => 0, 'total' => 0];
-    $plagiarismMaxUrls = (int) ($plagiarismMaxUrls ?? 10);
+    $plagiarismMaxUrls = (int) ($plagiarismMaxUrls ?? 20);
     $plagiarismWarnBelow = (float) ($plagiarismWarnBelow ?? 70);
     $plagiarismRemaining = $plagiarismRemaining ?? null;
     $plagiarismLimit = $plagiarismLimit ?? null;
@@ -20,21 +20,36 @@
      data-warn="{{ $plagiarismWarnBelow }}"
      data-csrf="{{ csrf_token() }}">
     <h5 class="mb-2">Антиплагиат (внешний)</h5>
-    <p class="text-secondary small mb-3">
-        Не входит в каждый проверка: выбираете URL → проверка уникальности текста через поиск фрагментов (модуль «Уникальность текста»).
-        Внутренние дубли посадочных — отчёт «Плагиат lite» в SEO.
-        Порог замечания: уникальность &lt; {{ rtrim(rtrim(number_format($plagiarismWarnBelow, 1, '.', ''), '0'), '.') }}%.
-        Макс. {{ $plagiarismMaxUrls }} URL за запуск.
-        @if($plagiarismLimit !== null)
-            Остаток лимита уникальности: <strong id="sa-plag-remaining">{{ $plagiarismRemaining }}</strong> / <span id="sa-plag-limit">{{ $plagiarismLimit }}</span>.
-        @else
-            Остаток лимита уникальности: <strong id="sa-plag-remaining">…</strong> / <span id="sa-plag-limit">…</span>
-            <span class="text-muted" id="sa-plag-limit-hint">(подгружается)</span>
-        @endif
-    </p>
+    <div class="text-secondary small mb-3">
+        <p class="mb-2">
+            После обхода сами проверяем <strong>примерно 3 страницы</strong>: главную, одну категорию и одну карточку товара или услуги —
+            чтобы сразу понять, нет ли копипаста. Это выборочно, не весь сайт.
+        </p>
+        <ul class="mb-2 ps-3">
+            <li>Ниже можно <strong>добрать свои URL</strong> (до {{ $plagiarismMaxUrls }} за раз) и нажать «Проверить выбранные».</li>
+            <li>Сравниваем текст с тем, что находится в поиске (модуль «Уникальность текста»).</li>
+            <li>Если уникальность ниже <strong>{{ rtrim(rtrim(number_format($plagiarismWarnBelow, 1, '.', ''), '0'), '.') }}%</strong> — страница попадёт в отчёт «Низкая уникальность текста (внешний)».</li>
+            <li>Дубли <em>внутри своего сайта</em> — другой отчёт:
+                <a href="{{ route('pages.site-audit.report.show', [$crawl->id, 'landing_plagiarism_suspect']) }}">Поиск плагиата на посадочных (lite)</a>.
+            </li>
+        </ul>
+        <p class="mb-0">
+            Лимит уникальности:
+            @if($plagiarismLimit !== null)
+                осталось <strong id="sa-plag-remaining">{{ $plagiarismRemaining }}</strong> из <span id="sa-plag-limit">{{ $plagiarismLimit }}</span>.
+            @else
+                осталось <strong id="sa-plag-remaining">…</strong> из <span id="sa-plag-limit">…</span>
+                <span class="text-muted" id="sa-plag-limit-hint">(подгружается)</span>.
+            @endif
+        </p>
+    </div>
 
     @if($crawl->status !== 'done')
-        <div class="alert alert-light border">Доступно после завершения проверки.</div>
+        <div class="alert alert-light border">
+            Запуск антиплагиата доступен после завершения проверки.
+            Сейчас статус: <strong>{{ $crawl->status === 'aggregating' ? 'агрегация / пост-проверки' : $crawl->status }}</strong>.
+            Дождись окончания — вкладка останется здесь, список URL подгрузится сам.
+        </div>
     @else
         <div id="sa-plag-candidates-wrap">
             @if($plagiarismCandidatesLazy)

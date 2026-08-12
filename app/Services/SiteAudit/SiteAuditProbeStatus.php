@@ -44,6 +44,13 @@ class SiteAuditProbeStatus
                 'progress_key' => 'serp_index',
                 'config_key' => 'site_audit.serp_index_enabled',
             ],
+            // Ручной запуск с вкладки «Антиплагиат» (не автопроба при агрегации).
+            'plagiarism_external' => [
+                'codes' => ['landing_plagiarism_external'],
+                'title' => 'Антиплагиат (внешний)',
+                'progress_key' => 'plagiarism_external',
+                'config_key' => 'site_audit.plagiarism_external_manual',
+            ],
         ];
     }
 
@@ -99,6 +106,48 @@ class SiteAuditProbeStatus
             ->where('crawl_id', $crawl->id)
             ->whereIn('code', $meta['codes'])
             ->count();
+
+        // Внешний антиплагиат: автовыборка ~3 URL после обхода + ручной добор.
+        if ($probeId === 'plagiarism_external') {
+            $st = is_array($block) ? (string) ($block['status'] ?? '') : '';
+            if (is_array($block) && ! empty($block['skipped']) && ! in_array($st, ['queued', 'running', 'done'], true)) {
+                return [
+                    'probe' => $probeId,
+                    'title' => $meta['title'],
+                    'status' => 'skipped',
+                    'label' => 'не было',
+                    'reason' => (string) ($block['reason'] ?? 'manual'),
+                    'can_run' => false,
+                ];
+            }
+            $ran = $findingCount > 0
+                || in_array($st, ['queued', 'running', 'done'], true)
+                || (is_array($block) && (
+                    array_key_exists('rows', $block)
+                    || ! empty($block['finished_at'])
+                ));
+            if ($ran) {
+                $live = in_array($st, ['queued', 'running'], true);
+
+                return [
+                    'probe' => $probeId,
+                    'title' => $meta['title'],
+                    'status' => $live ? 'pending' : 'ran',
+                    'label' => $live ? 'идёт' : 'готово',
+                    'reason' => null,
+                    'can_run' => false,
+                ];
+            }
+
+            return [
+                'probe' => $probeId,
+                'title' => $meta['title'],
+                'status' => 'skipped',
+                'label' => 'не было',
+                'reason' => 'manual',
+                'can_run' => false,
+            ];
+        }
 
         // Явный skip (выкл. / квота API / нет URL) — важнее «есть rows в progress».
         if (is_array($block) && ! empty($block['skipped'])) {
@@ -165,7 +214,9 @@ class SiteAuditProbeStatus
 
         $map = [
             'disabled' => 'отключена в настройках сервера',
-            'no_urls' => 'не нашлось URL для проверки',
+            'manual' => 'после обхода ещё не успели / не смогли запустить автопроверку — сделайте вручную на вкладке «Антиплагиат»',
+            'no_user' => 'нет пользователя для списания лимита уникальности',
+            'no_urls' => 'не нашлось подходящих страниц для автопроверки',
             'no_key' => 'нет API-ключа',
             'api_quota' => 'Google PageSpeed отклонил все запросы (дневной лимит API без ключа или квота исчерпана)',
             'error' => 'ошибка при запуске',

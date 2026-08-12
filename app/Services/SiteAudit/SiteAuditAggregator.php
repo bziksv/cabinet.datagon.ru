@@ -423,6 +423,14 @@ class SiteAuditAggregator
         Cache::forget($this->brokenLinksCacheKey((int) $crawl->id));
 
         try {
+            (new SiteAuditExternalPlagiarismRunner())->queueAutoSample($crawl);
+        } catch (\Throwable $e) {
+            Log::warning('SiteAudit plagiarism auto queue failed: ' . $e->getMessage(), [
+                'crawl_id' => $crawl->id,
+            ]);
+        }
+
+        try {
             (new SiteAuditPruner())->pruneProject((int) $crawl->project_id);
         } catch (\Throwable $e) {
             Log::warning('SiteAudit prune failed: ' . $e->getMessage(), [

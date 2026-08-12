@@ -2598,18 +2598,7 @@ class SiteAuditAggregator
             }
         }
         // Служебные EN/RU слова — не «смысл статьи», даже если DF низкий на маленьком сэмпле.
-        foreach ([
-            'without', 'with', 'other', 'from', 'this', 'that', 'your', 'have', 'been', 'been',
-            'more', 'most', 'also', 'into', 'over', 'only', 'such', 'than', 'then', 'them',
-            'they', 'what', 'when', 'will', 'would', 'could', 'should', 'about', 'after',
-            'before', 'between', 'under', 'again', 'there', 'these', 'those', 'their',
-            'which', 'while', 'where', 'whose', 'being', 'doing', 'just', 'like', 'make',
-            'made', 'many', 'some', 'same', 'very', 'even', 'back', 'well', 'blog',
-            'page', 'site', 'home', 'menu', 'cookie', 'privacy', 'policy',
-            'для', 'или', 'как', 'это', 'при', 'все', 'ещё', 'еще', 'уже', 'если',
-            'также', 'после', 'перед', 'через', 'между', 'только', 'можно', 'нужно',
-            'сайт', 'страница', 'блог', 'меню', 'главная',
-        ] as $fill) {
+        foreach (SiteAuditTitleChrome::fillerTokens() as $fill) {
             $chrome[$fill] = true;
         }
 
@@ -2643,15 +2632,18 @@ class SiteAuditAggregator
 
                 $tokensA = $bags[$i] ?? self::pageTokenBag($a);
                 $tokensB = $bags[$j] ?? self::pageTokenBag($b);
-                $sharedAll = SiteAuditTextMetrics::sharedTokenList($tokensA, $tokensB, 36);
-                $sharedUnique = [];
-                foreach ($sharedAll as $w) {
-                    if (! isset($chrome[$w])) {
-                        $sharedUnique[] = $w;
+                // Хвосты TITLE этой пары (« — PRIME Blog») — всегда chrome.
+                $pairChrome = $chrome;
+                foreach ([$a->title ?? '', $b->title ?? ''] as $pairTitle) {
+                    foreach (SiteAuditTitleChrome::tokensFromTitle((string) $pairTitle) as $tw) {
+                        $pairChrome[$tw] = true;
                     }
                 }
-                // Пара только на бренде/меню («blog», «prime») — не «похожий контент».
-                if (count($sharedUnique) < $minUniqueShared && $dist > 2) {
+                $sharedAll = SiteAuditTextMetrics::sharedTokenList($tokensA, $tokensB, 36);
+                $sharedUnique = SiteAuditTitleChrome::withoutChrome($sharedAll, $pairChrome);
+                // Пара только на бренде/меню («blog», «prime», «without») — не «похожий контент».
+                // Раньше dist≤2 пропускал chrome-only; старые simhash с chrome в тексте давали ложные пары.
+                if (count($sharedUnique) < $minUniqueShared) {
                     continue;
                 }
 
@@ -2671,11 +2663,7 @@ class SiteAuditAggregator
                         'title' => $page->title,
                         'word_count' => (int) ($page->word_count ?? 0),
                         'similar_word_count' => (int) ($other->word_count ?? 0),
-                        'shared_words' => array_slice(
-                            $sharedUnique !== [] ? $sharedUnique : $sharedAll,
-                            0,
-                            24
-                        ),
+                        'shared_words' => array_slice($sharedUnique, 0, 24),
                         'shared_source' => $sharedSource,
                         'chrome_filtered' => max(0, count($sharedAll) - count($sharedUnique)),
                     ];

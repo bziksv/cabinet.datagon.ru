@@ -1396,6 +1396,17 @@ class SiteAuditFindingPresenter
                 }
             }
         }
+        // Страховка UI: старые findings могли сохранить chrome (blog/prime/without).
+        if ($shared !== []) {
+            $chrome = [];
+            foreach (SiteAuditTitleChrome::fillerTokens() as $t) {
+                $chrome[$t] = true;
+            }
+            foreach (SiteAuditTitleChrome::tokensFromTitle((string) ($meta['title'] ?? '')) as $tw) {
+                $chrome[$tw] = true;
+            }
+            $shared = SiteAuditTitleChrome::withoutChrome($shared, $chrome);
+        }
         $sharedSource = (string) ($meta['shared_source'] ?? '');
 
         if ($thisUrl === '' && $similar === '' && $hamming === null && $words <= 0 && $simWords <= 0 && $shared === []) {

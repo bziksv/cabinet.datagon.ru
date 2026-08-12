@@ -2427,6 +2427,22 @@ class SiteAuditController extends Controller
                 $tokensA = $this->similarPageTokenBag($pageA);
                 $tokensB = $this->similarPageTokenBag($pageB);
                 $shared = \App\Services\SiteAudit\SiteAuditTextMetrics::sharedTokenList($tokensA, $tokensB, 24);
+                $chrome = [];
+                foreach (\App\Services\SiteAudit\SiteAuditTitleChrome::fillerTokens() as $t) {
+                    $chrome[$t] = true;
+                }
+                $domain = (string) optional(
+                    \App\SiteAuditCrawl::query()->with('project:id,domain')->find($crawlId)
+                )->project->domain;
+                foreach (\App\Services\SiteAudit\SiteAuditTitleChrome::domainBrandTokens($domain) as $t) {
+                    $chrome[$t] = true;
+                }
+                foreach ([$pageA->title ?? '', $pageB->title ?? ''] as $pairTitle) {
+                    foreach (\App\Services\SiteAudit\SiteAuditTitleChrome::tokensFromTitle((string) $pairTitle) as $tw) {
+                        $chrome[$tw] = true;
+                    }
+                }
+                $shared = \App\Services\SiteAudit\SiteAuditTitleChrome::withoutChrome($shared, $chrome);
                 if ($shared !== []) {
                     $meta['shared_words'] = $shared;
                     $meta['shared_source'] = (! empty($pageA->token_top_json) && ! empty($pageB->token_top_json))

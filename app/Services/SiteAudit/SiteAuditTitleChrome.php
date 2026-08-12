@@ -129,6 +129,66 @@ class SiteAuditTitleChrome
     }
 
     /**
+     * Служебные EN/RU + навигация: не «смысл статьи» для похожих страниц.
+     *
+     * @return list<string>
+     */
+    public static function fillerTokens(): array
+    {
+        return [
+            'without', 'with', 'other', 'from', 'this', 'that', 'your', 'have', 'been', 'been',
+            'more', 'most', 'also', 'into', 'over', 'only', 'such', 'than', 'then', 'them',
+            'they', 'what', 'when', 'will', 'would', 'could', 'should', 'about', 'after',
+            'before', 'between', 'under', 'again', 'there', 'these', 'those', 'their',
+            'which', 'while', 'where', 'whose', 'being', 'doing', 'just', 'like', 'make',
+            'made', 'many', 'some', 'same', 'very', 'even', 'back', 'well', 'blog',
+            'page', 'site', 'home', 'menu', 'cookie', 'privacy', 'policy', 'ltd', 'llc',
+            'inc', 'com', 'www', 'http', 'https', 'prime',
+            'для', 'или', 'как', 'это', 'при', 'все', 'ещё', 'еще', 'уже', 'если',
+            'также', 'после', 'перед', 'через', 'между', 'только', 'можно', 'нужно',
+            'сайт', 'страница', 'блог', 'меню', 'главная', 'компания', 'агентство',
+        ];
+    }
+
+    /**
+     * Токены из хвоста TITLE одной страницы (« — PRIME Blog»).
+     *
+     * @return list<string>
+     */
+    public static function tokensFromTitle(string $title): array
+    {
+        $out = [];
+        foreach (self::suffixCandidates($title) as $suf) {
+            foreach (preg_split('/[^\p{L}\p{N}]+/u', $suf, -1, PREG_SPLIT_NO_EMPTY) ?: [] as $w) {
+                $w = mb_strtolower($w);
+                if (mb_strlen($w) >= 3) {
+                    $out[] = $w;
+                }
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * @param  list<string>  $tokens
+     * @param  array<string, bool>  $chrome
+     * @return list<string>
+     */
+    public static function withoutChrome(array $tokens, array $chrome): array
+    {
+        $out = [];
+        foreach ($tokens as $w) {
+            $w = mb_strtolower(trim((string) $w));
+            if ($w !== '' && ! isset($chrome[$w])) {
+                $out[] = $w;
+            }
+        }
+
+        return array_values(array_unique($out));
+    }
+
+    /**
      * @return list<string>
      */
     private static function suffixCandidates(string $title): array

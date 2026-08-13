@@ -187,16 +187,18 @@
                     </option>
                 @endforeach
             </select>
-            <select name="sort"
-                    class="form-select form-select-sm cabinet-sc-chronicle-filters__sort"
-                    aria-label="{{ __('Chronicle sort') }}">
-                <option value="desc" @if($filterSort === 'desc') selected @endif>{{ __('Chronicle sort newest first') }}</option>
-                <option value="asc" @if($filterSort === 'asc') selected @endif>{{ __('Chronicle sort oldest first') }}</option>
-            </select>
-            <button type="submit" class="btn btn-sm btn-outline-secondary">{{ __('Apply') }}</button>
-            @if($filterProjectIds || $filterAuthorIds || $filterPreset !== 'unread' || $filterSort !== 'desc')
-                <a href="{{ route('pages.seo-checklist.chronicle', ['view' => 'unread']) }}" class="btn btn-sm btn-link">{{ __('Reset') }}</a>
-            @endif
+            <div class="cabinet-sc-chronicle-filters__end">
+                <select name="sort"
+                        class="form-select form-select-sm cabinet-sc-chronicle-filters__sort"
+                        aria-label="{{ __('Chronicle sort') }}">
+                    <option value="desc" @if($filterSort === 'desc') selected @endif>{{ __('Chronicle sort newest first') }}</option>
+                    <option value="asc" @if($filterSort === 'asc') selected @endif>{{ __('Chronicle sort oldest first') }}</option>
+                </select>
+                <button type="submit" class="btn btn-sm btn-outline-secondary">{{ __('Apply') }}</button>
+                @if($filterProjectIds || $filterAuthorIds || $filterPreset !== 'unread' || $filterSort !== 'desc')
+                    <a href="{{ route('pages.seo-checklist.chronicle', ['view' => 'unread']) }}" class="btn btn-sm btn-link">{{ __('Reset') }}</a>
+                @endif
+            </div>
         </form>
 
         @php
@@ -238,7 +240,8 @@
                             $project = $item ? $item->project : null;
                             $author = $note->authorLabel();
                             $url = ($project && $item)
-                                ? route('pages.seo-checklist.show', ['id' => $project->id]) . '#sc-item-' . $item->id
+                                ? route('pages.seo-checklist.show', ['id' => $project->id])
+                                    . '?focus=' . $item->id . '#sc-item-' . $item->id
                                 : route('pages.seo-checklist');
                         @endphp
                         <li class="cabinet-sc-feed__item is-unread" data-sc-unread-item data-note-id="{{ $note->id }}">
@@ -250,12 +253,15 @@
                                     <strong class="cabinet-sc-feed__who">{{ $author }}</strong>
                                     <time datetime="{{ $note->created_at->toIso8601String() }}">{{ $note->created_at->format('d.m.Y H:i') }}</time>
                                     @if($project)
-                                        <a class="cabinet-sc-feed__project" href="{{ $url }}">{{ $project->domain }}</a>
+                                        <a class="cabinet-sc-feed__project" href="{{ route('pages.seo-checklist.show', ['id' => $project->id]) }}">{{ $project->domain }}</a>
                                     @endif
                                     <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--note">{{ __('Note') }}</span>
                                 </div>
                                 @if($item)
-                                    <a class="cabinet-sc-feed__task" href="{{ $url }}">{{ $item->title }}</a>
+                                    <a class="cabinet-sc-feed__task" href="{{ $url }}">
+                                        <span class="cabinet-sc-feed__task-title">{{ $item->title }}</span>
+                                        <span class="cabinet-sc-feed__task-go">{{ __('Open in project') }}</span>
+                                    </a>
                                 @endif
                                 <div class="cabinet-sc-feed__note">{{ $note->body }}</div>
                                 <div class="cabinet-sc-feed__actions">
@@ -331,17 +337,16 @@
                                         $who = $log->user
                                             ? (trim(($log->user->name ?? '') . ' ' . ($log->user->last_name ?? '')) ?: ($log->user->name ?: $log->user->email))
                                             : '—';
-                                        $anchorId = $item
-                                            ? (int) ($item->parent_id ?: $item->id)
-                                            : 0;
-                                        if ($anchorId < 1 && !empty($meta['parent_id'])) {
-                                            $anchorId = (int) $meta['parent_id'];
-                                        } elseif ($anchorId < 1 && $item) {
-                                            $anchorId = (int) $item->id;
-                                        }
+                                        // Анкор всегда на родительский пункт (у него id="sc-item-…")
+                                        $rawItemId = (int) ($item->id ?? $log->item_id ?? ($meta['item_id'] ?? 0));
+                                        $parentId = (int) ($item->parent_id ?? ($meta['parent_id'] ?? 0));
+                                        $anchorId = $parentId > 0 ? $parentId : $rawItemId;
+                                        $projectUrl = $project
+                                            ? route('pages.seo-checklist.show', ['id' => $project->id])
+                                            : route('pages.seo-checklist');
                                         $url = ($project && $anchorId > 0)
-                                            ? route('pages.seo-checklist.show', ['id' => $project->id]) . '#sc-item-' . $anchorId
-                                            : ($project ? route('pages.seo-checklist.show', ['id' => $project->id]) : route('pages.seo-checklist'));
+                                            ? $projectUrl . '?focus=' . $anchorId . '#sc-item-' . $anchorId
+                                            : $projectUrl;
                                         $taskTitle = $meta['title'] ?? ($item->title ?? null);
                                         $isNote = $log->type === 'note';
                                         $isStatus = $log->type === 'status_change';
@@ -394,7 +399,7 @@
                                                 <strong class="cabinet-sc-feed__who">{{ $who }}</strong>
                                                 <time datetime="{{ $log->created_at->toIso8601String() }}">{{ $log->created_at->format('H:i') }}</time>
                                                 @if($project)
-                                                    <a class="cabinet-sc-feed__project" href="{{ $url }}">{{ $project->domain }}</a>
+                                                    <a class="cabinet-sc-feed__project" href="{{ $projectUrl }}">{{ $project->domain }}</a>
                                                 @endif
                                                 @if($isNote)
                                                     <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--note">{{ __('Note') }}</span>
@@ -407,8 +412,13 @@
                                                 @endif
                                             </div>
 
-                                            @if($taskTitle)
-                                                <a class="cabinet-sc-feed__task" href="{{ $url }}">{{ $taskTitle }}</a>
+                                            @if($taskTitle && $anchorId > 0)
+                                                <a class="cabinet-sc-feed__task" href="{{ $url }}">
+                                                    <span class="cabinet-sc-feed__task-title">{{ $taskTitle }}</span>
+                                                    <span class="cabinet-sc-feed__task-go">{{ __('Open in project') }}</span>
+                                                </a>
+                                            @elseif($taskTitle)
+                                                <span class="cabinet-sc-feed__task is-plain">{{ $taskTitle }}</span>
                                             @endif
 
                                             @if($isCreated || $isDoneEvent)

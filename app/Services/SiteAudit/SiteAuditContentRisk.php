@@ -118,6 +118,8 @@ class SiteAuditContentRisk
     }
 
     /**
+     * Повтор слова подряд в одном предложении (не «meta» 20 раз по всей карте сайта).
+     *
      * @return list<array{word:string,count:int,sentence:string}>
      */
     private static function wordRepeatsInSentences(string $text): array
@@ -131,25 +133,33 @@ class SiteAuditContentRisk
             if (mb_strlen($sentence) < 20) {
                 continue;
             }
+            // Хабы со списками URL (/map/, sitemap-описи): много «/», не предложение.
+            $slashes = substr_count($sentence, '/');
+            if ($slashes >= 8 || ($slashes / max(1, mb_strlen($sentence))) > 0.04) {
+                continue;
+            }
             if (! preg_match_all('/[\p{L}\p{N}]{' . $minWordLen . ',}/u', mb_strtolower($sentence), $m)) {
                 continue;
             }
-            $counts = array_count_values($m[0]);
-            arsort($counts);
-            foreach ($counts as $word => $c) {
-                if ((int) $c < $minCount) {
-                    break;
-                }
-                // стоп-слова пропускаем
+            $words = $m[0];
+            $n = count($words);
+            for ($i = 0; $i < $n; $i++) {
+                $word = (string) $words[$i];
                 if (in_array($word, ['это', 'that', 'this', 'with', 'from', 'http', 'https'], true)) {
                     continue;
                 }
-                $out[] = [
-                    'word' => (string) $word,
-                    'count' => (int) $c,
-                    'sentence' => mb_substr($sentence, 0, 160),
-                ];
-                break;
+                $run = 1;
+                while ($i + $run < $n && $words[$i + $run] === $word) {
+                    $run++;
+                }
+                if ($run >= $minCount) {
+                    $out[] = [
+                        'word' => $word,
+                        'count' => $run,
+                        'sentence' => mb_substr($sentence, 0, 160),
+                    ];
+                    break;
+                }
             }
             if (count($out) >= 8) {
                 break;

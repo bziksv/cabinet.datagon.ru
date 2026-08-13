@@ -40,11 +40,12 @@
          data-csrf="{{ csrf_token() }}"
          data-my-roles="{{ implode(',', $myRoles) }}"
          data-can-approve="{{ !empty($canApproveReview) ? '1' : '0' }}"
-         data-status-options="{{ e(json_encode($statusLabels ?? [], JSON_UNESCAPED_UNICODE)) }}"
+         data-status-options="{{ json_encode($statusLabels ?? [], JSON_UNESCAPED_UNICODE) }}"
          data-i18n-comment-required="{{ e(__('Comment required for this status')) }}"
          data-i18n-choose-status="{{ e(__('Choose task status')) }}"
          data-i18n-send-review-first="{{ e(__('Send to review first')) }}"
          data-i18n-only-pm-auditor="{{ e(__('Only PM or auditor can approve')) }}"
+         data-i18n-only-creator-close="{{ e(__('Only creator, PM or auditor can close checklist item')) }}"
          data-i18n-delete-confirm="{{ e(__('Delete this task?')) }}"
          data-i18n-show-completed="{{ e(__('Show completed stages')) }}"
          data-i18n-hide-completed="{{ e(__('Hide completed stages')) }}"
@@ -53,7 +54,8 @@
          data-i18n-timer-start="{{ e(__('Start timer')) }}"
          data-i18n-timer-stop="{{ e(__('Stop timer')) }}"
          data-i18n-timer-start-short="{{ e(__('Timer start')) }}"
-         data-i18n-timer-stop-short="{{ e(__('Timer stop')) }}">
+         data-i18n-timer-stop-short="{{ e(__('Timer stop')) }}"
+         data-i18n-focus-banner="{{ e(__('Checklist item from chronicle')) }}">
 
         @include('pages.partials.seo-checklist-nav', [
             'scTab' => 'project',
@@ -441,18 +443,6 @@
                                                     title="{{ __('Click to edit') }}">
                                                 {{ $item->title }}
                                             </button>
-                                            <p class="cabinet-sc-task__audit" data-sc-audit @if(!$createdLabel && !$doneLabel) hidden @endif>
-                                                @if($createdLabel)
-                                                    <span data-sc-audit-created>{{ $createdLabel }}</span>
-                                                @else
-                                                    <span data-sc-audit-created hidden></span>
-                                                @endif
-                                                @if($doneLabel)
-                                                    <span data-sc-audit-done>{{ $doneLabel }}</span>
-                                                @else
-                                                    <span data-sc-audit-done hidden></span>
-                                                @endif
-                                            </p>
                                         </div>
                                         @if($item->help || $project->status !== 'archived')
                                             <p class="cabinet-sc-task__help @if(!$item->help) is-empty @endif"
@@ -512,6 +502,18 @@
                                                 @endif
                                             @endforeach
                                         </select>
+                                        <p class="cabinet-sc-task__audit" data-sc-audit @if(!$createdLabel && !$doneLabel) hidden @endif>
+                                            @if($createdLabel)
+                                                <span data-sc-audit-created>{{ $createdLabel }}</span>
+                                            @else
+                                                <span data-sc-audit-created hidden></span>
+                                            @endif
+                                            @if($doneLabel)
+                                                <span data-sc-audit-done>{{ $doneLabel }}</span>
+                                            @else
+                                                <span data-sc-audit-done hidden></span>
+                                            @endif
+                                        </p>
                                         <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-toggle-notes title="{{ __('Notes') }}">
                                             <i class="bi bi-chat-left-text" aria-hidden="true"></i>
                                         </button>
@@ -572,15 +574,27 @@
                                                         'date' => $child->done_at->format('d.m.Y') . "\xc2\xa0" . $child->done_at->format('H:i'),
                                                     ])
                                                     : null;
+                                                $childRunningLog = $child->timeLogs->first();
+                                                $childTimerRunning = (bool) $childRunningLog;
+                                                $childDisplaySeconds = (int) $child->time_spent_seconds
+                                                    + ($childRunningLog ? $childRunningLog->elapsedSeconds() : 0);
+                                                $canCloseChild = !empty($canApproveReview)
+                                                    || ((int) $child->created_by > 0 && (int) $child->created_by === (int) auth()->id());
                                             @endphp
-                                            <li class="cabinet-sc-subtask"
+                                            <li class="cabinet-sc-subtask @if($childTimerRunning) is-timing @endif"
                                                 data-sc-subitem
                                                 data-id="{{ $child->id }}"
-                                                data-status="{{ $child->status }}">
+                                                data-status="{{ $child->status }}"
+                                                data-created-by="{{ (int) $child->created_by }}"
+                                                data-can-close="{{ $canCloseChild ? '1' : '0' }}"
+                                                data-time-spent="{{ (int) $child->time_spent_seconds }}"
+                                                data-timer-running="{{ $childTimerRunning ? '1' : '0' }}"
+                                                data-timer-started-at="{{ $childTimerRunning && $childRunningLog->started_at ? $childRunningLog->started_at->toIso8601String() : '' }}">
                                                 <label class="cabinet-sc-check cabinet-sc-check--sub">
                                                     <input type="checkbox"
                                                            data-sc-done
-                                                           {{ in_array($child->status, \App\SeoChecklist\SeoChecklistItem::CLOSED_STATUSES, true) ? 'checked' : '' }}>
+                                                           {{ in_array($child->status, \App\SeoChecklist\SeoChecklistItem::CLOSED_STATUSES, true) ? 'checked' : '' }}
+                                                           @if(!$canCloseChild && !in_array($child->status, \App\SeoChecklist\SeoChecklistItem::CLOSED_STATUSES, true)) disabled @endif>
                                                 </label>
                                                 <div class="cabinet-sc-subtask__body">
                                                     <button type="button"
@@ -590,31 +604,55 @@
                                                             title="{{ __('Click to edit') }}">
                                                         {{ $child->title }}
                                                     </button>
-                                                    <p class="cabinet-sc-task__audit cabinet-sc-task__audit--sub" data-sc-audit @if(!$childCreatedLabel && !$childDoneLabel) hidden @endif>
-                                                        @if($childCreatedLabel)
-                                                            <span data-sc-audit-created>{{ $childCreatedLabel }}</span>
-                                                        @else
-                                                            <span data-sc-audit-created hidden></span>
-                                                        @endif
-                                                        @if($childDoneLabel)
-                                                            <span data-sc-audit-done>{{ $childDoneLabel }}</span>
-                                                        @else
-                                                            <span data-sc-audit-done hidden></span>
-                                                        @endif
-                                                    </p>
+                                                </div>
+                                                <div class="cabinet-sc-subtask__time">
+                                                    <span class="cabinet-sc-time cabinet-sc-time--sub @if($childTimerRunning) is-running @endif"
+                                                          data-sc-time
+                                                          aria-label="{{ __('Time spent') }}">
+                                                        {{ \App\Services\SeoChecklist\SeoChecklistService::formatDuration($childDisplaySeconds) }}
+                                                    </span>
+                                                    @if($project->status !== 'archived')
+                                                        <button type="button"
+                                                                class="btn btn-sm @if($childTimerRunning) btn-danger @else btn-outline-success @endif cabinet-sc-subtask__timer"
+                                                                data-sc-timer
+                                                                data-tip="{{ $childTimerRunning ? __('Stop timer') : __('Start timer') }}">
+                                                            {{ $childTimerRunning ? __('Timer stop') : __('Timer start') }}
+                                                        </button>
+                                                    @endif
                                                 </div>
                                                 @if($project->status !== 'archived')
                                                     <select class="form-select form-select-sm cabinet-sc-subtask__status"
                                                             data-sc-status
                                                             aria-label="{{ __('Status') }}">
                                                         @foreach($statusLabels as $value => $label)
-                                                            <option value="{{ $value }}"
-                                                                    @if($child->status === $value) selected @endif>{{ $label }}</option>
+                                                            @php
+                                                                $hideClosedChild = in_array($value, ['done', 'skip'], true)
+                                                                    && !$canCloseChild
+                                                                    && $child->status !== $value;
+                                                            @endphp
+                                                            @if(!$hideClosedChild)
+                                                                <option value="{{ $value }}"
+                                                                        @if($child->status === $value) selected @endif>{{ $label }}</option>
+                                                            @endif
                                                         @endforeach
                                                     </select>
-                                                    <button type="button" class="btn btn-link btn-sm text-danger p-0 cabinet-sc-subtask__delete" data-sc-delete title="{{ __('Delete') }}">×</button>
                                                 @else
                                                     <span class="cabinet-sc-subtask__status-label">{{ $statusLabels[$child->status] ?? $child->status }}</span>
+                                                @endif
+                                                <p class="cabinet-sc-task__audit cabinet-sc-task__audit--sub" data-sc-audit @if(!$childCreatedLabel && !$childDoneLabel) hidden @endif>
+                                                    @if($childCreatedLabel)
+                                                        <span data-sc-audit-created>{{ $childCreatedLabel }}</span>
+                                                    @else
+                                                        <span data-sc-audit-created hidden></span>
+                                                    @endif
+                                                    @if($childDoneLabel)
+                                                        <span data-sc-audit-done>{{ $childDoneLabel }}</span>
+                                                    @else
+                                                        <span data-sc-audit-done hidden></span>
+                                                    @endif
+                                                </p>
+                                                @if($project->status !== 'archived')
+                                                    <button type="button" class="btn btn-link btn-sm text-danger p-0 cabinet-sc-subtask__delete" data-sc-delete data-tip="{{ __('Delete') }}" aria-label="{{ __('Delete') }}">×</button>
                                                 @endif
                                             </li>
                                         @endforeach

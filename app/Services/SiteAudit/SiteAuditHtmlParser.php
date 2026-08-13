@@ -634,6 +634,10 @@ class SiteAuditHtmlParser
             }
         }
 
+        // Иначе <a>Главная</a><a>Каталог</a> → «ГлавнаяКаталог» и ломает токенизацию.
+        $html = preg_replace('/(?<=>)(?=\S)/u', ' ', $html) ?? $html;
+        $html = preg_replace('/(?<=\S)(?=<)/u', ' ', $html) ?? $html;
+
         $text = strip_tags($html);
         $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 

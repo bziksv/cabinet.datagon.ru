@@ -329,8 +329,10 @@ class SiteAuditContacts
 
     private static function isServicePath(string $path): bool
     {
+        // Не берём голый /seo/ или /audit/ — часто хабы/доки, а не услуга.
+        // Услуга: /uslugi/, /services/, /tarif/, /kontekst/, … либо /seo-prodvizhenie/ и т.п. по тексту.
         return (bool) preg_match(
-            '#/(uslugi|usluga|uslug|services?|service|tarif|tarify|pricing|audit|seo|kontekst|reklama|razrabotka)(/|$)#iu',
+            '#/(uslugi|usluga|uslug|services?|service|tarif|tarify|pricing|kontekst|reklama|razrabotka)(/|$)#iu',
             $path
         );
     }

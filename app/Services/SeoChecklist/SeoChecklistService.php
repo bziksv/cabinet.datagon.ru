@@ -2065,9 +2065,13 @@ class SeoChecklistService
         }
 
         if ($status === 'done' || $status === 'skip') {
-            // Подзадачи — обычные чекбоксы: исполнитель закрывает сам, без «на проверку».
-            // Основные задачи — только PM/аудитор и только из «На проверку».
-            if (!$item->isSubtask()) {
+            if ($item->isSubtask()) {
+                // Пункт чеклиста: без «на проверку», но закрыть могут только поставивший / PM / аудитор
+                if (!$this->canCloseChecklistItem($item, $project, $userId)) {
+                    return ['ok' => false, 'message' => __('Only creator, PM or auditor can close checklist item')];
+                }
+            } else {
+                // Основные задачи — только PM/аудитор и только из «На проверку».
                 if ($from !== 'review') {
                     return ['ok' => false, 'message' => __('Send to review first')];
                 }
@@ -2098,6 +2102,21 @@ class SeoChecklistService
         ], $this->itemActivitySnapshot($item)));
 
         return ['ok' => true, 'item' => $item];
+    }
+
+    /**
+     * Закрыть пункт чеклиста (подзадачу): тот кто поставил, PM или аудитор.
+     */
+    public function canCloseChecklistItem(SeoChecklistItem $item, SeoChecklistProject $project, int $userId): bool
+    {
+        if ($userId < 1) {
+            return false;
+        }
+        if ((int) $item->created_by === $userId) {
+            return true;
+        }
+
+        return $this->canApproveReview($project, $userId);
     }
 
     /**
@@ -2209,6 +2228,7 @@ class SeoChecklistService
         $item->loadMissing(['createdByUser', 'doneByUser', 'parent:id,title']);
 
         return [
+            'item_id' => (int) $item->id,
             'title' => (string) $item->title,
             'parent_id' => $item->parent_id ? (int) $item->parent_id : null,
             'parent_title' => $item->parent ? (string) $item->parent->title : null,
@@ -2975,11 +2995,11 @@ class SeoChecklistService
             ->whereNotNull('ended_at')
             ->whereBetween('started_at', [$fromDate, $toDate])
             ->whereHas('item', function ($q) use ($projectIds) {
-                $q->whereIn('project_id', $projectIds->all())->whereNull('parent_id');
+                $q->whereIn('project_id', $projectIds->all());
             })
             ->with([
                 'user:id,name,email,last_name',
-                'item:id,title,project_id',
+                'item:id,title,project_id,parent_id',
                 'item.project:id,domain,title',
             ])
             ->orderByDesc('started_at')
@@ -2998,7 +3018,8 @@ class SeoChecklistService
             ?int $projectId,
             string $date,
             int $seconds,
-            bool $isActive = false
+            bool $isActive = false,
+            ?int $anchorItemId = null
         ): void {
             if ($seconds < 1 || $date === '') {
                 return;
@@ -3009,6 +3030,7 @@ class SeoChecklistService
                     'user_id' => $logUserId,
                     'user_label' => $userLabel,
                     'item_id' => $itemId,
+                    'anchor_item_id' => $anchorItemId ?: $itemId,
                     'title' => $title,
                     'domain' => $domain,
                     'project_id' => $projectId,
@@ -3042,16 +3064,20 @@ class SeoChecklistService
             $item = $log->item;
             $project = $item ? $item->project : null;
             $uid = (int) $log->user_id;
+            $itemId = $item ? (int) $item->id : null;
+            $anchorId = $item && $item->parent_id ? (int) $item->parent_id : $itemId;
             $addCell(
                 $cells,
                 $uid,
                 $userLabelOf($log->user, $uid),
-                $item ? (int) $item->id : null,
+                $itemId,
                 $item ? (string) $item->title : '—',
                 $project ? (string) $project->domain : '—',
                 $project ? (int) $project->id : null,
                 $date,
-                max(0, (int) $log->duration_seconds)
+                max(0, (int) $log->duration_seconds),
+                false,
+                $anchorId
             );
         }
 
@@ -3077,6 +3103,7 @@ class SeoChecklistService
                 }
                 $item = $active['item'];
                 $project = $active['project'];
+                $anchorId = $item->parent_id ? (int) $item->parent_id : (int) $item->id;
                 $addCell(
                     $cells,
                     (int) $uid,
@@ -3087,7 +3114,8 @@ class SeoChecklistService
                     $project ? (int) $project->id : null,
                     $date,
                     (int) $segment['duration_seconds'],
-                    true
+                    true,
+                    $anchorId
                 );
             }
         }
@@ -3114,6 +3142,7 @@ class SeoChecklistService
                     'user_id' => $cell['user_id'],
                     'user_label' => $cell['user_label'],
                     'item_id' => $cell['item_id'],
+                    'anchor_item_id' => $cell['anchor_item_id'] ?? $cell['item_id'],
                     'title' => $cell['title'],
                     'domain' => $cell['domain'],
                     'project_id' => $cell['project_id'],
@@ -3133,6 +3162,7 @@ class SeoChecklistService
                     'user_id' => $cell['user_id'],
                     'user_label' => $cell['user_label'],
                     'item_id' => $cell['item_id'],
+                    'anchor_item_id' => $cell['anchor_item_id'] ?? $cell['item_id'],
                     'title' => $cell['title'],
                     'domain' => $cell['domain'],
                     'project_id' => $cell['project_id'],

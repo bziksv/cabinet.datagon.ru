@@ -218,10 +218,10 @@
                         <summary class="cabinet-sc-timesheet__day-head">
                             <div class="cabinet-sc-timesheet__task-head">
                                 @if(!empty($task['project_id']) && !empty($task['item_id']))
-                                    <a href="{{ route('pages.seo-checklist.show', ['id' => $task['project_id']]) }}#sc-item-{{ $task['item_id'] }}"
+                                    <a href="{{ route('pages.seo-checklist.show', ['id' => $task['project_id']]) }}#sc-item-{{ $task['anchor_item_id'] ?? $task['item_id'] }}"
                                        class="cabinet-sc-timesheet__domain"
                                        onclick="event.stopPropagation()">{{ $task['domain'] }}</a>
-                                    <a href="{{ route('pages.seo-checklist.show', ['id' => $task['project_id']]) }}#sc-item-{{ $task['item_id'] }}"
+                                    <a href="{{ route('pages.seo-checklist.show', ['id' => $task['project_id']]) }}#sc-item-{{ $task['anchor_item_id'] ?? $task['item_id'] }}"
                                        class="cabinet-sc-timesheet__task-title"
                                        onclick="event.stopPropagation()">{{ $task['title'] }}</a>
                                 @else
@@ -283,7 +283,7 @@
                                     data-sc-timesheet-row
                                     data-search="{{ e($rowSearch) }}">
                                     @if(!empty($entry['project_id']) && !empty($entry['item_id']))
-                                        <a href="{{ route('pages.seo-checklist.show', ['id' => $entry['project_id']]) }}#sc-item-{{ $entry['item_id'] }}"
+                                        <a href="{{ route('pages.seo-checklist.show', ['id' => $entry['project_id']]) }}#sc-item-{{ $entry['anchor_item_id'] ?? $entry['item_id'] }}"
                                            class="cabinet-sc-timesheet__domain">{{ $entry['domain'] }}</a>
                                     @else
                                         <span class="cabinet-sc-timesheet__domain">{{ $entry['domain'] }}</span>

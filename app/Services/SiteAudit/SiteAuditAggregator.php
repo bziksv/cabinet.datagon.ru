@@ -6,6 +6,7 @@ use App\SiteAuditCrawl;
 use App\SiteAuditCrawlStat;
 use App\SiteAuditFinding;
 use App\SiteAuditPage;
+use App\SiteAuditProject;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -369,6 +370,18 @@ class SiteAuditAggregator
     {
         $depthMeta = is_array($state['depth'] ?? null) ? $state['depth'] : [];
         $notify = (bool) ($state['notify'] ?? true);
+
+        // www/http зеркала пишутся на discover; если finding потерялся, а host_variants в progress
+        // уже есть — восстанавливаем до подсчёта counts_json.
+        try {
+            $project = SiteAuditProject::query()->find($crawl->project_id);
+            if ($project && $project->domain) {
+                (new SiteAuditHostVariantProbe())->run($crawl, (string) $project->domain);
+                $crawl->refresh();
+            }
+        } catch (\Throwable $e) {
+            // optional
+        }
 
         $buckets = [
             'critical' => 0,
@@ -1355,6 +1368,12 @@ class SiteAuditAggregator
                 &$emittedPag
             ) {
                 foreach ($pages as $page) {
+                    $code = (int) ($page->status_code ?? 0);
+                    // 4xx/5xx /missing/page-2/ и т.п. — не «пагинация в индексе».
+                    if ($code > 0 && ($code < 200 || $code >= 400)) {
+                        continue;
+                    }
+
                     $query = parse_url($page->url, PHP_URL_QUERY);
                     $path = (string) (parse_url($page->url, PHP_URL_PATH) ?: '');
                     $params = [];

@@ -3079,24 +3079,34 @@ class SiteAuditController extends Controller
             ->pluck('c', 'code')
             ->all();
 
-        // После точечных проб counts_json может отставать — для probe-кодов берём live.
-        $probeCodes = [];
-        foreach (SiteAuditProbeStatus::catalog() as $meta) {
-            foreach ($meta['codes'] as $code) {
-                $probeCodes[$code] = true;
-            }
-        }
+        $catalog = config('site_audit.findings', []);
+        // Не из findings: витрины/агрегаты, которые пишет финализация.
+        $computed = [
+            'pages_with_canonical' => true,
+            'click_depth_max' => true,
+        ];
 
         if ($crawl->isFinished() && $stored !== []) {
-            foreach ($probeCodes as $code => $_) {
-                if ($code === 'serp_title_mismatch') {
-                    $stored[$code] = SiteAuditSerpSnippetsProbe::countMismatchFindings((int) $crawl->id);
+            $out = $stored;
+            // Live всегда побеждает для реальных кодов: пробы после done,
+            // ужесточение детекторов, ручные чистки findings (иначе soft_404: 51 в дереве при 1 строке).
+            foreach ($live as $code => $c) {
+                if (! empty($catalog[$code]['virtual'])) {
                     continue;
                 }
-                $stored[$code] = (int) ($live[$code] ?? 0);
+                $out[$code] = (int) $c;
             }
+            foreach ($out as $code => $_) {
+                if (isset($computed[$code]) || ! empty($catalog[$code]['virtual'])) {
+                    continue;
+                }
+                if (! isset($live[$code])) {
+                    $out[$code] = 0;
+                }
+            }
+            $out['serp_title_mismatch'] = SiteAuditSerpSnippetsProbe::countMismatchFindings((int) $crawl->id);
 
-            return $stored;
+            return $out;
         }
 
         if (isset($live['serp_title_mismatch'])) {

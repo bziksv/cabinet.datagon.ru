@@ -48,12 +48,13 @@ class SeoChecklistDueBadgeComposer
                     $log = $active['log'];
                     $item = $active['item'];
                     $project = $active['project'];
+                    $anchorId = $item->parent_id ? (int) $item->parent_id : (int) $item->id;
                     $activeTimer = [
                         'item_id' => $item->id,
                         'project_id' => $project->id,
                         'domain' => $project->domain,
                         'title' => $item->title,
-                        'url' => route('pages.seo-checklist.show', ['id' => $project->id]) . '#sc-item-' . $item->id,
+                        'url' => route('pages.seo-checklist.show', ['id' => $project->id]) . '#sc-item-' . $anchorId,
                         'started_at' => $log->started_at ? $log->started_at->toIso8601String() : null,
                         'elapsed_seconds' => $log->elapsedSeconds(),
                         'time_spent_seconds' => (int) $item->time_spent_seconds,

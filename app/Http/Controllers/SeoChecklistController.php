@@ -1193,6 +1193,9 @@ class SeoChecklistController extends Controller
             'doneByUser',
             'children.createdByUser',
             'children.doneByUser',
+            'children.timeLogs' => function ($q) use ($authId) {
+                $q->where('user_id', $authId)->whereNull('ended_at')->orderByDesc('id');
+            },
             'timeLogs' => function ($q) use ($authId) {
                 $q->where('user_id', $authId)->whereNull('ended_at')->orderByDesc('id');
             },
@@ -1609,6 +1612,7 @@ class SeoChecklistController extends Controller
                 'title' => $child->title,
                 'status' => $child->status,
                 'parent_id' => $parent->id,
+                'created_by' => (int) $child->created_by,
                 'audit' => $this->itemAuditPayload($child),
             ],
         ]);
@@ -1863,12 +1867,14 @@ class SeoChecklistController extends Controller
         $item = $active['item'];
         $project = $active['project'];
 
+        $anchorId = $item->parent_id ? (int) $item->parent_id : (int) $item->id;
+
         return [
             'item_id' => $item->id,
             'project_id' => $project->id,
             'domain' => $project->domain,
             'title' => $item->title,
-            'url' => route('pages.seo-checklist.show', ['id' => $project->id]) . '#sc-item-' . $item->id,
+            'url' => route('pages.seo-checklist.show', ['id' => $project->id]) . '#sc-item-' . $anchorId,
             'started_at' => $log->started_at ? $log->started_at->toIso8601String() : null,
             'elapsed_seconds' => $log->elapsedSeconds(),
             'time_spent_seconds' => (int) $item->time_spent_seconds,

@@ -49,6 +49,26 @@
         return base + Math.max(0, Math.floor((Date.now() - started) / 1000));
     }
 
+    function findItemEl(id) {
+        return root.querySelector('[data-sc-item][data-id="' + id + '"], [data-sc-subitem][data-id="' + id + '"]');
+    }
+
+    function itemTimeEl(itemEl) {
+        if (!itemEl) return null;
+        if (itemEl.hasAttribute('data-sc-subitem')) {
+            return itemEl.querySelector('.cabinet-sc-subtask__time [data-sc-time]');
+        }
+        return itemEl.querySelector('.cabinet-sc-task__actions [data-sc-time]');
+    }
+
+    function itemTimerBtn(itemEl) {
+        if (!itemEl) return null;
+        if (itemEl.hasAttribute('data-sc-subitem')) {
+            return itemEl.querySelector('.cabinet-sc-subtask__time [data-sc-timer]');
+        }
+        return itemEl.querySelector('.cabinet-sc-task__actions [data-sc-timer]');
+    }
+
     function applyTimerUi(itemEl, state) {
         if (!itemEl || !state) return;
         if (typeof state.time_spent_seconds === 'number') {
@@ -59,7 +79,7 @@
         itemEl.setAttribute('data-timer-started-at', running && state.timer_started_at ? state.timer_started_at : '');
         itemEl.classList.toggle('is-timing', running);
 
-        var timeEl = itemEl.querySelector('[data-sc-time]');
+        var timeEl = itemTimeEl(itemEl);
         if (timeEl) {
             timeEl.classList.toggle('is-running', running);
             timeEl.textContent = formatDuration(
@@ -67,24 +87,27 @@
             );
         }
 
-        var btn = itemEl.querySelector('[data-sc-timer]');
+        var btn = itemTimerBtn(itemEl);
         if (btn) {
             btn.textContent = running ? labelStopShort : labelStartShort;
-            btn.title = running ? labelStop : labelStart;
+            btn.setAttribute('data-tip', running ? labelStop : labelStart);
+            if (btn.hasAttribute('title')) {
+                btn.title = running ? labelStop : labelStart;
+            }
             btn.classList.toggle('btn-danger', running);
             btn.classList.toggle('btn-outline-success', !running);
         }
     }
 
     function tickAllTimers() {
-        root.querySelectorAll('[data-sc-item][data-timer-running="1"]').forEach(function (itemEl) {
-            var timeEl = itemEl.querySelector('[data-sc-time]');
+        root.querySelectorAll('[data-sc-item][data-timer-running="1"], [data-sc-subitem][data-timer-running="1"]').forEach(function (itemEl) {
+            var timeEl = itemTimeEl(itemEl);
             if (timeEl) timeEl.textContent = formatDuration(itemDisplaySeconds(itemEl));
         });
     }
 
     function syncPageFromActive(active) {
-        root.querySelectorAll('[data-sc-item]').forEach(function (itemEl) {
+        root.querySelectorAll('[data-sc-item], [data-sc-subitem]').forEach(function (itemEl) {
             var id = parseInt(itemEl.getAttribute('data-id') || '0', 10);
             if (active && id === active.item_id) {
                 applyTimerUi(itemEl, {
@@ -104,17 +127,22 @@
         });
     }
 
+    var labelOnlyCreatorClose = root.getAttribute('data-i18n-only-creator-close')
+        || 'Only the creator, PM or auditor can mark as done';
+
     function askStatusAfterStop(itemEl) {
         var select = itemEl.querySelector('[data-sc-status]');
         if (!select) return;
-        var canApprove = (itemEl.getAttribute('data-can-approve') || root.getAttribute('data-can-approve')) === '1';
+        var isSub = itemEl.hasAttribute('data-sc-subitem');
+        var canClose = isSub
+            ? itemEl.getAttribute('data-can-close') === '1'
+            : (itemEl.getAttribute('data-can-approve') || root.getAttribute('data-can-approve')) === '1';
         var options = [];
         var defaultValue = 'rework';
         var hasRework = false;
         Array.prototype.forEach.call(select.options, function (opt) {
             if (opt.disabled || !opt.value || opt.value === 'todo') return;
-            // «Выполнено» только PM/аудитору — после стопа таймера обычным ролям не предлагаем
-            if ((opt.value === 'done' || opt.value === 'skip') && !canApprove) return;
+            if ((opt.value === 'done' || opt.value === 'skip') && !canClose) return;
             options.push({ value: opt.value, label: String(opt.textContent || '').trim() });
             if (opt.value === 'rework') hasRework = true;
         });
@@ -147,7 +175,7 @@
                     return;
                 }
                 if (result.data.stopped_item) {
-                    var prev = root.querySelector('[data-sc-item][data-id="' + result.data.stopped_item.id + '"]');
+                    var prev = findItemEl(result.data.stopped_item.id);
                     if (prev) applyTimerUi(prev, result.data.stopped_item);
                 }
                 if (result.data.item) {
@@ -723,30 +751,37 @@
     function focusHashTarget() {
         var hash = String(window.location.hash || '');
         var match = hash.match(/^#sc-item-(\d+)$/);
-        if (!match) return;
-        var id = match[1];
-        var target = root.querySelector('#sc-item-' + id)
-            || root.querySelector('[data-sc-item][data-id="' + id + '"]');
-        if (!target) return;
-
-        // Сброс фильтров/поиска, если задача скрыта
-        if (target.classList.contains('is-hidden-filter')
-            || (target.closest('[data-sc-stage]') && target.closest('[data-sc-stage]').classList.contains('is-empty-filter'))) {
-            activeFilters = ['open'];
-            currentSearch = '';
-            hideCompletedStages = false;
-            if (taskSearch) taskSearch.value = '';
-            if (hideDoneBtn) {
-                hideDoneBtn.classList.remove('active');
-                hideDoneBtn.textContent = root.getAttribute('data-i18n-hide-completed') || 'Hide completed stages';
-            }
-            applyFilters();
-            // если всё ещё скрыта (например done) — покажем всё
-            if (target.classList.contains('is-hidden-filter')) {
-                activeFilters = [];
-                applyFilters();
+        var id = match ? match[1] : '';
+        if (!id) {
+            try {
+                var params = new URLSearchParams(window.location.search || '');
+                id = String(params.get('focus') || '');
+            } catch (e) {
+                id = '';
             }
         }
+        if (!id) return;
+
+        var target = root.querySelector('#sc-item-' + id)
+            || root.querySelector('[data-sc-item][data-id="' + id + '"]');
+        if (!target) return false;
+
+        // Сброс фильтров/поиска, если задача скрыта — иначе «непонятно где искать»
+        activeFilters = [];
+        currentSearch = '';
+        hideCompletedStages = false;
+        if (taskSearch) taskSearch.value = '';
+        if (hideDoneBtn) {
+            hideDoneBtn.classList.remove('active');
+            hideDoneBtn.disabled = false;
+            hideDoneBtn.textContent = root.getAttribute('data-i18n-hide-completed') || 'Hide completed stages';
+        }
+        root.querySelectorAll('[data-sc-filter]').forEach(function (btn) {
+            var key = btn.getAttribute('data-sc-filter');
+            btn.classList.toggle('active', key === 'all');
+            btn.setAttribute('aria-pressed', key === 'all' ? 'true' : 'false');
+        });
+        applyFilters();
 
         var stage = target.closest('[data-sc-stage]');
         if (stage) {
@@ -754,19 +789,50 @@
             stage.classList.remove('is-empty-filter');
         }
 
-        window.setTimeout(function () {
+        var titleEl = target.querySelector('[data-sc-title]');
+        var titleText = titleEl ? String(titleEl.textContent || '').trim() : '';
+        showFocusBanner(titleText);
+
+        function paint() {
             target.scrollIntoView({ behavior: 'smooth', block: 'center' });
             target.classList.add('is-flash', 'is-hash-target');
-            window.setTimeout(function () {
-                target.classList.remove('is-flash');
-            }, 2200);
-            window.setTimeout(function () {
-                target.classList.remove('is-hash-target');
-            }, 7000);
-        }, 80);
+        }
+        window.setTimeout(paint, 60);
+        window.setTimeout(paint, 320);
+        window.setTimeout(function () {
+            target.classList.remove('is-flash');
+        }, 3200);
+        window.setTimeout(function () {
+            target.classList.remove('is-hash-target');
+            hideFocusBanner();
+        }, 12000);
+        return true;
+    }
+
+    function showFocusBanner(titleText) {
+        var box = root.querySelector('[data-sc-focus-banner]');
+        if (!box) {
+            box = document.createElement('div');
+            box.className = 'cabinet-sc-focus-banner';
+            box.setAttribute('data-sc-focus-banner', '');
+            box.innerHTML = '<strong></strong><span></span><button type="button" class="cabinet-sc-focus-banner__close" aria-label="OK">×</button>';
+            root.insertBefore(box, root.firstChild);
+            box.querySelector('.cabinet-sc-focus-banner__close').addEventListener('click', hideFocusBanner);
+        }
+        var strong = box.querySelector('strong');
+        var span = box.querySelector('span');
+        if (strong) strong.textContent = root.getAttribute('data-i18n-focus-banner') || 'Пункт из хроники';
+        if (span) span.textContent = titleText || '';
+        box.hidden = false;
+    }
+
+    function hideFocusBanner() {
+        var box = root.querySelector('[data-sc-focus-banner]');
+        if (box) box.hidden = true;
     }
 
     focusHashTarget();
+    window.addEventListener('hashchange', focusHashTarget);
 
     function deleteItem(el) {
         var id = el.getAttribute('data-id');
@@ -938,7 +1004,11 @@
             checkbox.addEventListener('change', function () {
                 if (checkbox.checked) {
                     if (isSub) {
-                        // Подзадача: сразу «готово», без очереди на проверку
+                        if (el.getAttribute('data-can-close') !== '1') {
+                            checkbox.checked = false;
+                            alert(labelOnlyCreatorClose);
+                            return;
+                        }
                         setStatus(el, 'done');
                         return;
                     }
@@ -958,15 +1028,15 @@
             });
         }
 
+        var timerBtn = itemTimerBtn(el);
+        if (timerBtn) {
+            timerBtn.addEventListener('click', function () {
+                toggleTimer(el);
+            });
+        }
+
         if (!isSub) {
             bindHelpEdit(el);
-
-            var timerBtn = el.querySelector('[data-sc-timer]');
-            if (timerBtn) {
-                timerBtn.addEventListener('click', function () {
-                    toggleTimer(el);
-                });
-            }
 
             var toggleNotes = el.querySelector('[data-sc-toggle-notes]');
             var notesBox = el.querySelector('[data-sc-notes]');
@@ -1057,30 +1127,62 @@
                         li.setAttribute('data-sc-subitem', '');
                         li.setAttribute('data-id', result.data.item.id);
                         li.setAttribute('data-status', result.data.item.status || 'todo');
+                        li.setAttribute('data-created-by', String(result.data.item.created_by || root.getAttribute('data-auth-id') || '0'));
+                        li.setAttribute('data-can-close', '1'); // создатель = текущий пользователь
+                        li.setAttribute('data-time-spent', '0');
+                        li.setAttribute('data-timer-running', '0');
+                        li.setAttribute('data-timer-started-at', '');
                         var statusOpts = '';
+                        var statusValue = result.data.item.status || 'todo';
+                        var canCloseNew = true;
                         try {
                             var statusMap = JSON.parse(root.getAttribute('data-status-options') || '{}');
-                            Object.keys(statusMap).forEach(function (key) {
-                                statusOpts += '<option value="' + key + '"' +
-                                    (key === (result.data.item.status || 'todo') ? ' selected' : '') +
-                                    '>' + String(statusMap[key]).replace(/</g, '&lt;') + '</option>';
-                            });
+                            if (statusMap && typeof statusMap === 'object') {
+                                Object.keys(statusMap).forEach(function (key) {
+                                    if ((key === 'done' || key === 'skip') && !canCloseNew && key !== statusValue) return;
+                                    statusOpts += '<option value="' + key + '"' +
+                                        (key === statusValue ? ' selected' : '') +
+                                        '>' + String(statusMap[key]).replace(/</g, '&lt;') + '</option>';
+                                });
+                            }
                         } catch (e) {
                             statusOpts = '';
                         }
+                        if (!statusOpts) {
+                            // fallback: скопировать опции с соседней задачи/подзадачи
+                            var sample = el.querySelector('[data-sc-status]') || root.querySelector('[data-sc-status]');
+                            if (sample) {
+                                Array.prototype.forEach.call(sample.options, function (opt) {
+                                    if (!opt.value) return;
+                                    statusOpts += '<option value="' + opt.value + '"' +
+                                        (opt.value === statusValue ? ' selected' : '') +
+                                        '>' + String(opt.textContent || '').replace(/</g, '&lt;') + '</option>';
+                                });
+                            }
+                        }
+                        var startLabel = labelStartShort || 'Start';
+                        var startTip = labelStart || 'Start timer';
                         li.innerHTML = '<label class="cabinet-sc-check cabinet-sc-check--sub">' +
                             '<input type="checkbox" data-sc-done></label>' +
                             '<div class="cabinet-sc-subtask__body">' +
-                            '<button type="button" class="cabinet-sc-subtask__title" data-sc-title></button>' +
-                            '<p class="cabinet-sc-task__audit cabinet-sc-task__audit--sub" data-sc-audit hidden>' +
-                            '<span data-sc-audit-created hidden></span>' +
-                            '<span data-sc-audit-done hidden></span></p></div>' +
+                            '<button type="button" class="cabinet-sc-subtask__title" data-sc-title></button></div>' +
+                            '<div class="cabinet-sc-subtask__time">' +
+                            '<span class="cabinet-sc-time cabinet-sc-time--sub" data-sc-time>0:00</span>' +
+                            '<button type="button" class="btn btn-sm btn-outline-success cabinet-sc-subtask__timer" data-sc-timer data-tip="' +
+                            String(startTip).replace(/"/g, '&quot;') + '">' + String(startLabel).replace(/</g, '&lt;') + '</button></div>' +
                             '<select class="form-select form-select-sm cabinet-sc-subtask__status" data-sc-status aria-label="Status">' +
                             statusOpts + '</select>' +
-                            '<button type="button" class="btn btn-link btn-sm text-danger p-0 cabinet-sc-subtask__delete" data-sc-delete title="Delete">×</button>';
+                            '<p class="cabinet-sc-task__audit cabinet-sc-task__audit--sub" data-sc-audit hidden>' +
+                            '<span data-sc-audit-created hidden></span>' +
+                            '<span data-sc-audit-done hidden></span></p>' +
+                            '<button type="button" class="btn btn-link btn-sm text-danger p-0 cabinet-sc-subtask__delete" data-sc-delete data-tip="Delete" aria-label="Delete">×</button>';
                         var titleBtn = li.querySelector('[data-sc-title]');
                         titleBtn.textContent = result.data.item.title;
                         titleBtn.title = root.getAttribute('data-i18n-click-to-edit') || 'Click to edit';
+                        var statusSelect = li.querySelector('[data-sc-status]');
+                        if (statusSelect && statusValue) {
+                            statusSelect.value = statusValue;
+                        }
                         if (result.data.item.audit) {
                             applyAuditMeta(li, result.data.item.audit);
                         }

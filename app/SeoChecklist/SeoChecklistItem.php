@@ -97,6 +97,11 @@ class SeoChecklistItem extends Model
         return $this->hasMany(self::class, 'parent_id')->orderBy('sort');
     }
 
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
     public function runningTimeLog(?int $userId = null): ?SeoChecklistItemTimeLog
     {
         $q = $this->timeLogs()->whereNull('ended_at')->orderByDesc('id');

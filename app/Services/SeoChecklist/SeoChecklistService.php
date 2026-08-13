@@ -1786,6 +1786,13 @@ class SeoChecklistService
         ]);
 
         $project->recalculateProgress();
+        $this->logActivity(
+            (int) $project->id,
+            (int) $item->id,
+            Auth::id() ? (int) Auth::id() : 0,
+            'item_created',
+            $this->itemActivitySnapshot($item)
+        );
 
         return ['ok' => true, 'item' => $item->fresh()];
     }
@@ -2085,11 +2092,10 @@ class SeoChecklistService
         $item->save();
 
         $project->recalculateProgress();
-        $this->logActivity($project->id, $item->id, $userId, 'status_change', [
+        $this->logActivity($project->id, $item->id, $userId, 'status_change', array_merge([
             'from' => $from,
             'to' => $status,
-            'title' => $item->title,
-        ]);
+        ], $this->itemActivitySnapshot($item)));
 
         return ['ok' => true, 'item' => $item];
     }
@@ -2191,6 +2197,37 @@ class SeoChecklistService
             'type' => $type,
             'meta_json' => $meta,
         ]);
+    }
+
+    /**
+     * Снимок задачи для хроники: кто поставил / кто выполнил.
+     *
+     * @return array<string, mixed>
+     */
+    public function itemActivitySnapshot(SeoChecklistItem $item): array
+    {
+        $item->loadMissing(['createdByUser', 'doneByUser', 'parent:id,title']);
+
+        return [
+            'title' => (string) $item->title,
+            'parent_id' => $item->parent_id ? (int) $item->parent_id : null,
+            'parent_title' => $item->parent ? (string) $item->parent->title : null,
+            'is_subtask' => $item->isSubtask(),
+            'created_by_name' => $this->userDisplayName($item->createdByUser),
+            'created_at' => $item->created_at ? $item->created_at->format('d.m.Y H:i') : null,
+            'done_by_name' => $this->userDisplayName($item->doneByUser),
+            'done_at' => $item->done_at ? $item->done_at->format('d.m.Y H:i') : null,
+        ];
+    }
+
+    private function userDisplayName($user): ?string
+    {
+        if (!$user) {
+            return null;
+        }
+        $name = trim(($user->name ?? '') . ' ' . ($user->last_name ?? ''));
+
+        return $name !== '' ? $name : (string) ($user->email ?: null);
     }
 
     /**
@@ -2349,7 +2386,14 @@ class SeoChecklistService
         if (SeoChecklistActivityLog::tableReady()) {
             $logQuery = SeoChecklistActivityLog::query()
                 ->whereIn('project_id', $projectIds->all())
-                ->with(['user', 'project:id,domain,title', 'item:id,title,project_id,status'])
+                ->with([
+                    'user',
+                    'project:id,domain,title',
+                    'item:id,title,project_id,parent_id,status,created_by,done_by,created_at,done_at',
+                    'item.createdByUser',
+                    'item.doneByUser',
+                    'item.parent:id,title',
+                ])
                 ->orderByDesc('id');
             if ($authorIds !== []) {
                 $logQuery->whereIn('user_id', $authorIds);
@@ -2556,11 +2600,10 @@ class SeoChecklistService
             if ($project) {
                 $project->recalculateProgress();
             }
-            $this->logActivity((int) $project->id, (int) $item->id, $userId, 'status_change', [
+            $this->logActivity((int) $project->id, (int) $item->id, $userId, 'status_change', array_merge([
                 'from' => $from,
                 'to' => 'doing',
-                'title' => $item->title,
-            ]);
+            ], $this->itemActivitySnapshot($item)));
         }
 
         $project->forceFill(['last_activity_at' => now()])->save();

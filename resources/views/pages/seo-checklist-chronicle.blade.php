@@ -318,22 +318,66 @@
                                         $meta = is_array($log->meta_json) ? $log->meta_json : [];
                                         $project = $log->project;
                                         $item = $log->item;
-                                        $who = $log->user ? ($log->user->name ?: $log->user->email) : '—';
-                                        $url = ($project && $item)
-                                            ? route('pages.seo-checklist.show', ['id' => $project->id]) . '#sc-item-' . $item->id
+                                        $who = $log->user
+                                            ? (trim(($log->user->name ?? '') . ' ' . ($log->user->last_name ?? '')) ?: ($log->user->name ?: $log->user->email))
+                                            : '—';
+                                        $anchorId = $item
+                                            ? (int) ($item->parent_id ?: $item->id)
+                                            : 0;
+                                        if ($anchorId < 1 && !empty($meta['parent_id'])) {
+                                            $anchorId = (int) $meta['parent_id'];
+                                        } elseif ($anchorId < 1 && $item) {
+                                            $anchorId = (int) $item->id;
+                                        }
+                                        $url = ($project && $anchorId > 0)
+                                            ? route('pages.seo-checklist.show', ['id' => $project->id]) . '#sc-item-' . $anchorId
                                             : ($project ? route('pages.seo-checklist.show', ['id' => $project->id]) : route('pages.seo-checklist'));
                                         $taskTitle = $meta['title'] ?? ($item->title ?? null);
                                         $isNote = $log->type === 'note';
                                         $isStatus = $log->type === 'status_change';
+                                        $isCreated = $log->type === 'item_created';
+                                        $statusTo = $meta['to'] ?? null;
+                                        $isDoneEvent = $isStatus && in_array($statusTo, ['done', 'skip'], true);
+                                        $createdByName = $meta['created_by_name']
+                                            ?? ($item && $item->createdByUser
+                                                ? (trim(($item->createdByUser->name ?? '') . ' ' . ($item->createdByUser->last_name ?? '')) ?: $item->createdByUser->email)
+                                                : null);
+                                        $createdAtLabel = $meta['created_at']
+                                            ?? ($item && $item->created_at ? $item->created_at->format('d.m.Y H:i') : null);
+                                        $doneByName = $meta['done_by_name']
+                                            ?? ($item && $item->doneByUser
+                                                ? (trim(($item->doneByUser->name ?? '') . ' ' . ($item->doneByUser->last_name ?? '')) ?: $item->doneByUser->email)
+                                                : ($isDoneEvent ? $who : null));
+                                        $doneAtLabel = $meta['done_at']
+                                            ?? ($item && $item->done_at ? $item->done_at->format('d.m.Y H:i') : ($isDoneEvent ? $log->created_at->format('d.m.Y H:i') : null));
+                                        $createdLabel = ($createdByName || $createdAtLabel)
+                                            ? __('Created by :name on :date', [
+                                                'name' => $createdByName ?: '—',
+                                                'date' => $createdAtLabel ?: '—',
+                                            ])
+                                            : null;
+                                        $doneLabel = ($isDoneEvent || ($doneAtLabel && $doneByName))
+                                            ? __('Completed by :name on :date', [
+                                                'name' => $doneByName ?: '—',
+                                                'date' => $doneAtLabel ?: '—',
+                                            ])
+                                            : null;
+                                        if ($isCreated && !$createdLabel) {
+                                            $createdLabel = __('Created by :name on :date', [
+                                                'name' => $who,
+                                                'date' => $log->created_at->format('d.m.Y H:i'),
+                                            ]);
+                                        }
                                         $noteId = $isNote ? (int) ($meta['note_id'] ?? 0) : 0;
                                         $isOwnNote = $isNote && (int) $log->user_id === (int) ($authUserId ?? 0);
                                         $noteIsRead = $noteId > 0 && !empty(($readNoteIds ?? [])[$noteId]);
                                         $noteIsUnread = $isNote && !$isOwnNote && $noteId > 0 && !$noteIsRead;
+                                        $kindClass = $isNote ? 'is-note' : (($isDoneEvent || $isCreated) ? 'is-done' : 'is-status');
                                     @endphp
-                                    <li class="cabinet-sc-feed__item {{ $isNote ? 'is-note' : '' }} {{ $isStatus ? 'is-status' : '' }} {{ $noteIsUnread ? 'is-unread' : '' }}"
+                                    <li class="cabinet-sc-feed__item {{ $isNote ? 'is-note' : '' }} {{ $isStatus ? 'is-status' : '' }} {{ $isCreated ? 'is-created' : '' }} {{ $isDoneEvent ? 'is-done-event' : '' }} {{ $noteIsUnread ? 'is-unread' : '' }}"
                                         @if($noteId > 0) data-sc-feed-note data-note-id="{{ $noteId }}" data-note-read="{{ $noteIsRead ? '1' : '0' }}" @endif>
                                         <div class="cabinet-sc-feed__rail" aria-hidden="true">
-                                            {!! $renderAvatar($log->user, $who, $isNote ? 'is-note' : 'is-status') !!}
+                                            {!! $renderAvatar($log->user, $who, $kindClass) !!}
                                         </div>
                                         <div class="cabinet-sc-feed__card">
                                             <div class="cabinet-sc-feed__meta">
@@ -344,6 +388,10 @@
                                                 @endif
                                                 @if($isNote)
                                                     <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--note">{{ __('Note') }}</span>
+                                                @elseif($isCreated)
+                                                    <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--created">{{ __('Chronicle kind created') }}</span>
+                                                @elseif($isDoneEvent)
+                                                    <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--done">{{ __('Chronicle kind completed') }}</span>
                                                 @elseif($isStatus)
                                                     <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--status">{{ __('Status') }}</span>
                                                 @endif
@@ -353,7 +401,16 @@
                                                 <a class="cabinet-sc-feed__task" href="{{ $url }}">{{ $taskTitle }}</a>
                                             @endif
 
-                                            @if($isStatus)
+                                            @if($isCreated || $isDoneEvent)
+                                                <div class="cabinet-sc-feed__audit">
+                                                    @if($createdLabel)
+                                                        <span>{{ $createdLabel }}</span>
+                                                    @endif
+                                                    @if($isDoneEvent && $doneLabel)
+                                                        <span>{{ $doneLabel }}</span>
+                                                    @endif
+                                                </div>
+                                            @elseif($isStatus)
                                                 <div class="cabinet-sc-feed__status">
                                                     {!! $statusPill($meta['from'] ?? null) !!}
                                                     <span class="cabinet-sc-feed__arrow" aria-hidden="true">→</span>

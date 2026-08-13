@@ -866,6 +866,11 @@
     color: #0e7490;
 }
 
+.cabinet-sc-feed__avatar.is-done:not(.has-photo) {
+    background: #ecfdf5;
+    color: #047857;
+}
+
 .cabinet-sc-feed__card {
     min-width: 0;
     padding: 0.55rem 0.75rem 0.6rem;
@@ -927,6 +932,27 @@
 .cabinet-sc-feed__kind--note {
     background: #ffedd5;
     color: #9a3412;
+}
+
+.cabinet-sc-feed__kind--created {
+    background: #eef2ff;
+    color: #4338ca;
+}
+
+.cabinet-sc-feed__kind--done {
+    background: #d1fae5;
+    color: #047857;
+}
+
+.cabinet-sc-feed__audit {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+    margin: 0.05rem 0 0.15rem;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: var(--sc-muted);
 }
 
 .cabinet-sc-feed__task {

@@ -1582,7 +1582,14 @@ class SeoChecklistController extends Controller
             'created_by' => (int) Auth::id(),
         ]);
         $project->forceFill(['last_activity_at' => now()])->save();
-        $child->loadMissing(['createdByUser', 'doneByUser']);
+        $child->loadMissing(['createdByUser', 'doneByUser', 'parent:id,title']);
+        $this->service->logActivity(
+            (int) $project->id,
+            (int) $child->id,
+            (int) Auth::id(),
+            'item_created',
+            $this->service->itemActivitySnapshot($child)
+        );
 
         return response()->json([
             'ok' => true,

@@ -1101,7 +1101,7 @@
     "Delete selected projects": "Удалить выбранные проекты",
     "Delete stage": "Удалить этап",
     "Delete successfully": "Удалено",
-    "Delete task": "Удалить задачу",
+    "Delete task": "Удаление задачи",
     "Delete this limit?": "Удалить этот лимит?",
     "Delete this limit property and all tariff values?": "Удалить это свойство лимита и все значения по тарифам?",
     "Delete this module?": "Удалить этот модуль?",
@@ -6412,5 +6412,7 @@
     "Chronicle unread pref review": "Статус «На проверку»",
     "Chronicle unread pref created": "Новые задачи",
     "Chronicle unread prefs saved": "Настройки непрочитанных сохранены",
-    "Chronicle unread prefs cleared": "В непрочитанных ничего не выбрано"
+    "Chronicle unread prefs cleared": "В непрочитанных ничего не выбрано",
+    "Delete this checklist item?": "Удалить этот пункт чеклиста?",
+    "This action cannot be undone": "Отменить будет нельзя"
 }

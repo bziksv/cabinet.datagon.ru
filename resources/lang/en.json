@@ -705,5 +705,7 @@
     "Chronicle unread pref review": "Status “For review”",
     "Chronicle unread pref created": "New tasks",
     "Chronicle unread prefs saved": "Unread settings saved",
-    "Chronicle unread prefs cleared": "No unread event types selected"
+    "Chronicle unread prefs cleared": "No unread event types selected",
+    "Delete this checklist item?": "Delete this checklist item?",
+    "This action cannot be undone": "This cannot be undone"
 }

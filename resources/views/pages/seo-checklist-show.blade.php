@@ -47,6 +47,7 @@
          data-i18n-only-pm-auditor="{{ e(__('Only PM or auditor can approve')) }}"
          data-i18n-only-creator-close="{{ e(__('Only creator, PM or auditor can close checklist item')) }}"
          data-i18n-delete-confirm="{{ e(__('Delete this task?')) }}"
+         data-i18n-delete-sub-confirm="{{ e(__('Delete this checklist item?')) }}"
          data-i18n-show-completed="{{ e(__('Show completed stages')) }}"
          data-i18n-hide-completed="{{ e(__('Hide completed stages')) }}"
          data-i18n-open-hides-stages="{{ e(__('Open filter already hides completed stages')) }}"
@@ -707,6 +708,7 @@
     </div>
 
     @include('pages.partials.seo-checklist-delete-project-modal')
+    @include('pages.partials.seo-checklist-delete-item-modal')
     @include('pages.partials.seo-checklist-status-modal')
 
     @slot('js')

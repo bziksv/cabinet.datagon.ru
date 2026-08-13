@@ -3364,6 +3364,8 @@ a.cabinet-sc-timesheet__task-title:hover {
 .cabinet-sc-subtask > .cabinet-sc-subtask__delete {
     grid-column: 6;
     justify-self: center;
+    position: relative;
+    z-index: 2;
 }
 
 .cabinet-sc-subtask__body {
@@ -3438,15 +3440,16 @@ span.cabinet-sc-time--sub {
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
-    width: 1.25rem;
-    height: 1.25rem;
+    width: 1.6rem;
+    height: 1.6rem;
     margin: 0;
     padding: 0 !important;
     line-height: 1;
-    font-size: 1rem;
+    font-size: 1.05rem;
     font-weight: 600;
     border-radius: 50%;
     text-decoration: none !important;
+    cursor: pointer;
 }
 
 .cabinet-sc-plan__subs {

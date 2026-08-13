@@ -20,6 +20,8 @@
     var commentRequired = root.getAttribute('data-i18n-comment-required') || 'Comment required';
     var chooseStatusLabel = root.getAttribute('data-i18n-choose-status') || 'Choose task status';
     var deleteConfirm = root.getAttribute('data-i18n-delete-confirm') || 'Delete?';
+    var deleteSubConfirm = root.getAttribute('data-i18n-delete-sub-confirm') || deleteConfirm;
+    var pendingDeleteEl = null;
 
     function formatDuration(total) {
         if (window.cabinetSeoChecklistFormatDuration) {
@@ -840,10 +842,48 @@
     focusHashTarget();
     window.addEventListener('hashchange', focusHashTarget);
 
-    function deleteItem(el) {
+    function openDeleteItemModal(el) {
+        pendingDeleteEl = el;
+        var modalEl = document.getElementById('cabinetScDeleteItemModal');
+        var isSub = el.hasAttribute('data-sc-subitem');
+        var titleEl = el.querySelector('[data-sc-title]');
+        var titleText = titleEl ? String(titleEl.textContent || '').trim() : '';
+        if (modalEl) {
+            var lead = modalEl.querySelector('[data-sc-delete-item-lead]');
+            var titleOut = modalEl.querySelector('[data-sc-delete-item-title]');
+            if (lead) lead.textContent = isSub ? deleteSubConfirm : deleteConfirm;
+            if (titleOut) titleOut.textContent = titleText;
+            if (window.bootstrap && bootstrap.Modal) {
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                return;
+            }
+            if (window.jQuery) {
+                window.jQuery(modalEl).modal('show');
+                return;
+            }
+        }
+        // fallback, если модалки нет
+        if (window.confirm(isSub ? deleteSubConfirm : deleteConfirm)) {
+            performDeleteItem(el);
+        } else {
+            pendingDeleteEl = null;
+        }
+    }
+
+    function hideDeleteItemModal() {
+        var modalEl = document.getElementById('cabinetScDeleteItemModal');
+        if (!modalEl) return;
+        if (window.bootstrap && bootstrap.Modal) {
+            var inst = bootstrap.Modal.getInstance(modalEl);
+            if (inst) inst.hide();
+        } else if (window.jQuery) {
+            window.jQuery(modalEl).modal('hide');
+        }
+    }
+
+    function performDeleteItem(el) {
         var id = el.getAttribute('data-id');
         if (!id || !deleteTpl) return;
-        if (!window.confirm(deleteConfirm)) return;
         el.classList.add('is-busy');
         postJson(urlFor(deleteTpl, id), {})
             .then(function (result) {
@@ -872,6 +912,44 @@
                 el.classList.remove('is-busy');
             });
     }
+
+    function deleteItem(el) {
+        if (!el || !el.getAttribute('data-id') || !deleteTpl) return;
+        openDeleteItemModal(el);
+    }
+
+    (function initDeleteItemModal() {
+        var modalEl = document.getElementById('cabinetScDeleteItemModal');
+        if (!modalEl) return;
+        var confirmBtn = modalEl.querySelector('[data-sc-delete-item-confirm]');
+        if (!confirmBtn) return;
+        confirmBtn.addEventListener('click', function () {
+            var el = pendingDeleteEl;
+            pendingDeleteEl = null;
+            hideDeleteItemModal();
+            if (el) performDeleteItem(el);
+        });
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            pendingDeleteEl = null;
+        });
+        if (window.jQuery) {
+            window.jQuery(modalEl).on('hidden.bs.modal', function () {
+                pendingDeleteEl = null;
+            });
+        }
+    })();
+
+    // Делегирование: крестик/корзина всегда ловятся, даже если bindRow не навесился
+    root.addEventListener('click', function (e) {
+        var delBtn = e.target.closest('[data-sc-delete]');
+        if (!delBtn || !root.contains(delBtn)) return;
+        // кнопка удаления проекта — другой обработчик
+        if (delBtn.hasAttribute('data-sc-delete-project')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        var el = delBtn.closest('[data-sc-subitem], [data-sc-item]');
+        if (el) deleteItem(el);
+    });
 
     function startInlineEdit(hostEl, opts) {
         if (!hostEl || hostEl.classList.contains('is-editing') || hostEl.disabled) return;
@@ -1218,16 +1296,7 @@
 
         bindTitleEdit(el);
 
-        var delBtn = el.querySelector(':scope > .cabinet-sc-task__actions [data-sc-delete], :scope > [data-sc-delete]');
-        if (!delBtn) {
-            delBtn = isSub ? el.querySelector('[data-sc-delete]') : el.querySelector('.cabinet-sc-task__actions [data-sc-delete]');
-        }
-        if (delBtn) {
-            delBtn.addEventListener('click', function (ev) {
-                ev.preventDefault();
-                deleteItem(el);
-            });
-        }
+        // удаление — через делегирование на root ([data-sc-delete])
     }
 
     root.querySelectorAll('[data-sc-item]').forEach(function (itemEl) {

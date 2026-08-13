@@ -40,6 +40,7 @@
          data-csrf="{{ csrf_token() }}"
          data-my-roles="{{ implode(',', $myRoles) }}"
          data-can-approve="{{ !empty($canApproveReview) ? '1' : '0' }}"
+         data-status-options="{{ e(json_encode($statusLabels ?? [], JSON_UNESCAPED_UNICODE)) }}"
          data-i18n-comment-required="{{ e(__('Comment required for this status')) }}"
          data-i18n-choose-status="{{ e(__('Choose task status')) }}"
          data-i18n-send-review-first="{{ e(__('Send to review first')) }}"
@@ -603,7 +604,17 @@
                                                     </p>
                                                 </div>
                                                 @if($project->status !== 'archived')
-                                                    <button type="button" class="btn btn-link btn-sm text-danger p-0" data-sc-delete title="{{ __('Delete') }}">×</button>
+                                                    <select class="form-select form-select-sm cabinet-sc-subtask__status"
+                                                            data-sc-status
+                                                            aria-label="{{ __('Status') }}">
+                                                        @foreach($statusLabels as $value => $label)
+                                                            <option value="{{ $value }}"
+                                                                    @if($child->status === $value) selected @endif>{{ $label }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                    <button type="button" class="btn btn-link btn-sm text-danger p-0 cabinet-sc-subtask__delete" data-sc-delete title="{{ __('Delete') }}">×</button>
+                                                @else
+                                                    <span class="cabinet-sc-subtask__status-label">{{ $statusLabels[$child->status] ?? $child->status }}</span>
                                                 @endif
                                             </li>
                                         @endforeach

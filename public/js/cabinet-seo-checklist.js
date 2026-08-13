@@ -951,14 +951,15 @@
             });
         }
 
+        var statusSelect = el.querySelector('[data-sc-status]');
+        if (statusSelect) {
+            statusSelect.addEventListener('change', function () {
+                setStatus(el, statusSelect.value);
+            });
+        }
+
         if (!isSub) {
             bindHelpEdit(el);
-            var select = el.querySelector('[data-sc-status]');
-            if (select) {
-                select.addEventListener('change', function () {
-                    setStatus(el, select.value);
-                });
-            }
 
             var timerBtn = el.querySelector('[data-sc-timer]');
             if (timerBtn) {
@@ -1056,6 +1057,17 @@
                         li.setAttribute('data-sc-subitem', '');
                         li.setAttribute('data-id', result.data.item.id);
                         li.setAttribute('data-status', result.data.item.status || 'todo');
+                        var statusOpts = '';
+                        try {
+                            var statusMap = JSON.parse(root.getAttribute('data-status-options') || '{}');
+                            Object.keys(statusMap).forEach(function (key) {
+                                statusOpts += '<option value="' + key + '"' +
+                                    (key === (result.data.item.status || 'todo') ? ' selected' : '') +
+                                    '>' + String(statusMap[key]).replace(/</g, '&lt;') + '</option>';
+                            });
+                        } catch (e) {
+                            statusOpts = '';
+                        }
                         li.innerHTML = '<label class="cabinet-sc-check cabinet-sc-check--sub">' +
                             '<input type="checkbox" data-sc-done></label>' +
                             '<div class="cabinet-sc-subtask__body">' +
@@ -1063,7 +1075,9 @@
                             '<p class="cabinet-sc-task__audit cabinet-sc-task__audit--sub" data-sc-audit hidden>' +
                             '<span data-sc-audit-created hidden></span>' +
                             '<span data-sc-audit-done hidden></span></p></div>' +
-                            '<button type="button" class="btn btn-link btn-sm text-danger p-0" data-sc-delete title="Delete">×</button>';
+                            '<select class="form-select form-select-sm cabinet-sc-subtask__status" data-sc-status aria-label="Status">' +
+                            statusOpts + '</select>' +
+                            '<button type="button" class="btn btn-link btn-sm text-danger p-0 cabinet-sc-subtask__delete" data-sc-delete title="Delete">×</button>';
                         var titleBtn = li.querySelector('[data-sc-title]');
                         titleBtn.textContent = result.data.item.title;
                         titleBtn.title = root.getAttribute('data-i18n-click-to-edit') || 'Click to edit';

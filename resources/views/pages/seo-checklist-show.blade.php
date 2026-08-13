@@ -420,13 +420,15 @@
                                             $createdLabel = ($createdByName || $item->created_at)
                                                 ? __('Created by :name on :date', [
                                                     'name' => $createdByName ?: '—',
-                                                    'date' => $item->created_at ? $item->created_at->format('d.m.Y H:i') : '—',
+                                                    'date' => $item->created_at
+                                                        ? $item->created_at->format('d.m.Y') . "\xc2\xa0" . $item->created_at->format('H:i')
+                                                        : '—',
                                                 ])
                                                 : null;
                                             $doneLabel = $item->done_at
                                                 ? __('Completed by :name on :date', [
                                                     'name' => $doneByName ?: '—',
-                                                    'date' => $item->done_at->format('d.m.Y H:i'),
+                                                    'date' => $item->done_at->format('d.m.Y') . "\xc2\xa0" . $item->done_at->format('H:i'),
                                                 ])
                                                 : null;
                                         @endphp
@@ -558,13 +560,15 @@
                                                 $childCreatedLabel = ($childCreatedBy || $child->created_at)
                                                     ? __('Created by :name on :date', [
                                                         'name' => $childCreatedBy ?: '—',
-                                                        'date' => $child->created_at ? $child->created_at->format('d.m.Y H:i') : '—',
+                                                        'date' => $child->created_at
+                                                            ? $child->created_at->format('d.m.Y') . "\xc2\xa0" . $child->created_at->format('H:i')
+                                                            : '—',
                                                     ])
                                                     : null;
                                                 $childDoneLabel = $child->done_at
                                                     ? __('Completed by :name on :date', [
                                                         'name' => $childDoneBy ?: '—',
-                                                        'date' => $child->done_at->format('d.m.Y H:i'),
+                                                        'date' => $child->done_at->format('d.m.Y') . "\xc2\xa0" . $child->done_at->format('H:i'),
                                                     ])
                                                     : null;
                                             @endphp

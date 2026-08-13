@@ -1942,7 +1942,7 @@ class SeoChecklistController extends Controller
     private function itemAuditPayload(SeoChecklistItem $item): array
     {
         $createdBy = $this->userShortLabel($item->createdByUser);
-        $createdAt = $item->created_at ? $item->created_at->format('d.m.Y H:i') : null;
+        $createdAt = $this->formatAuditAt($item->created_at);
         $createdLabel = null;
         if ($createdBy || $createdAt) {
             $createdLabel = __('Created by :name on :date', [
@@ -1956,7 +1956,7 @@ class SeoChecklistController extends Controller
             $doneBy = $this->userShortLabel($item->doneByUser);
             $doneLabel = __('Completed by :name on :date', [
                 'name' => $doneBy ?: '—',
-                'date' => $item->done_at->format('d.m.Y H:i'),
+                'date' => $this->formatAuditAt($item->done_at) ?: '—',
             ]);
         }
 
@@ -1964,6 +1964,16 @@ class SeoChecklistController extends Controller
             'created_label' => $createdLabel,
             'done_label' => $doneLabel,
         ];
+    }
+
+    /** Дата+время без переноса между ними (nbsp). */
+    private function formatAuditAt($dt): ?string
+    {
+        if (!$dt) {
+            return null;
+        }
+
+        return $dt->format('d.m.Y') . "\xc2\xa0" . $dt->format('H:i');
     }
 
     private function userShortLabel($user): ?string

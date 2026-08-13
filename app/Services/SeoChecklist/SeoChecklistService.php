@@ -2214,9 +2214,13 @@ class SeoChecklistService
             'parent_title' => $item->parent ? (string) $item->parent->title : null,
             'is_subtask' => $item->isSubtask(),
             'created_by_name' => $this->userDisplayName($item->createdByUser),
-            'created_at' => $item->created_at ? $item->created_at->format('d.m.Y H:i') : null,
+            'created_at' => $item->created_at
+                ? $item->created_at->format('d.m.Y') . "\xc2\xa0" . $item->created_at->format('H:i')
+                : null,
             'done_by_name' => $this->userDisplayName($item->doneByUser),
-            'done_at' => $item->done_at ? $item->done_at->format('d.m.Y H:i') : null,
+            'done_at' => $item->done_at
+                ? $item->done_at->format('d.m.Y') . "\xc2\xa0" . $item->done_at->format('H:i')
+                : null,
         ];
     }
 

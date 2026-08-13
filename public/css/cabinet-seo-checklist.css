@@ -3213,7 +3213,7 @@ a.cabinet-sc-timesheet__task-title:hover {
     align-items: flex-end;
     gap: 0.05rem;
     flex: 0 1 auto;
-    max-width: min(18rem, 46%);
+    max-width: min(22rem, 52%);
     margin: 0;
     padding-top: 0.15rem;
     font-size: 0.7rem;
@@ -3222,8 +3222,16 @@ a.cabinet-sc-timesheet__task-title:hover {
     text-align: right;
 }
 
+.cabinet-sc-task__audit > span {
+    display: block;
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .cabinet-sc-task__audit--sub {
-    max-width: min(16rem, 52%);
+    max-width: min(20rem, 58%);
     margin: 0;
     padding-top: 0.1rem;
 }

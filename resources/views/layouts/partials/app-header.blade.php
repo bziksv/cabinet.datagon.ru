@@ -55,34 +55,39 @@
                     $scDueCount = (int) ($seoChecklistDueCount ?? 0);
                     $scOverdueCount = (int) ($seoChecklistOverdueCount ?? 0);
                     $scUnreadNotes = (int) ($seoChecklistUnreadNotesCount ?? 0);
-                    if ($scDueCount > 0) {
-                        $scHeaderHref = route('pages.seo-checklist.my-tasks');
-                    } elseif ($scUnreadNotes > 0) {
-                        $scHeaderHref = route('pages.seo-checklist.chronicle', ['view' => 'unread']);
-                    } else {
-                        $scHeaderHref = route('pages.seo-checklist.chronicle');
-                    }
+                    $scDueTip = $scOverdueCount > 0
+                        ? __('SEO checklist header due tip overdue', [
+                            'overdue' => $scOverdueCount,
+                            'total' => $scDueCount,
+                        ])
+                        : __('SEO checklist header due tip soon', ['total' => $scDueCount]);
+                    $scUnreadTip = __('SEO checklist header unread tip');
                 @endphp
                 <li class="nav-item d-none d-md-block">
-                    <a class="nav-link @if(request()->routeIs('pages.seo-checklist*')) active @endif"
-                       href="{{ $scHeaderHref }}"
-                       title="{{ $seoChecklistModuleTitle ?? __('SEO Checklist') }}">
-                        <i class="bi bi-clipboard-check me-1" aria-hidden="true"></i>
-                        {{ $seoChecklistModuleTitle ?? __('SEO Checklist') }}
+                    <div class="nav-link d-flex flex-wrap align-items-center gap-1 py-2 @if(request()->routeIs('pages.seo-checklist*')) active @endif">
+                        <a class="text-reset text-decoration-none d-inline-flex align-items-center @if(request()->routeIs('pages.seo-checklist*')) fw-semibold @endif"
+                           href="{{ route('pages.seo-checklist') }}">
+                            <i class="bi bi-clipboard-check me-1" aria-hidden="true"></i>
+                            {{ $seoChecklistModuleTitle ?? __('SEO Checklist') }}
+                        </a>
                         @if($scDueCount > 0)
-                            <span class="navbar-badge badge @if($scOverdueCount > 0) text-bg-danger @else text-bg-warning @endif ms-1"
-                                  data-sc-due-header-count
-                                  title="{{ __('Overdue and due soon tasks') }}">
+                            <a href="{{ route('pages.seo-checklist.my-tasks') }}"
+                               class="navbar-badge badge @if($scOverdueCount > 0) text-bg-danger @else text-bg-warning @endif text-decoration-none cabinet-header-tip"
+                               data-sc-due-header-count
+                               data-tip="{{ $scDueTip }}"
+                               aria-label="{{ $scDueTip }}">
                                 {{ $scDueCount > 99 ? '99+' : $scDueCount }}
-                            </span>
+                            </a>
                         @endif
-                        <span class="navbar-badge badge text-bg-warning ms-1"
-                              data-sc-unread-header-count
-                              title="{{ __('Unread notes') }}"
-                              @if($scUnreadNotes < 1) hidden @endif>
+                        <a href="{{ route('pages.seo-checklist.chronicle', ['view' => 'unread']) }}"
+                           class="navbar-badge badge text-bg-warning text-decoration-none cabinet-header-tip"
+                           data-sc-unread-header-count
+                           data-tip="{{ $scUnreadTip }}"
+                           aria-label="{{ $scUnreadTip }}"
+                           @if($scUnreadNotes < 1) hidden @endif>
                             {{ $scUnreadNotes > 99 ? '99+' : $scUnreadNotes }}
-                        </span>
-                    </a>
+                        </a>
+                    </div>
                 </li>
             @endif
             @if(!empty($seoChecklistActiveTimer))

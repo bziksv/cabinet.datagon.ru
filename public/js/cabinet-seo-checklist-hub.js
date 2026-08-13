@@ -965,19 +965,35 @@
             var remaining = list ? list.querySelectorAll('[data-sc-unread-item]').length : count;
             var section = page.querySelector('[data-sc-unread-section]');
             var empty = page.querySelector('[data-sc-unread-empty]');
+            var emptyInline = page.querySelector('[data-sc-unread-empty-inline]');
+            var markAllForms = page.querySelectorAll('[data-sc-mark-all="1"]');
             var preset = page.getAttribute('data-filter-preset') || 'unread';
 
             if (count === 0 || remaining === 0) {
-                if (section) section.hidden = true;
+                if (preset === 'unread') {
+                    if (section) section.hidden = false;
+                    if (emptyInline) emptyInline.hidden = false;
+                    if (list) list.hidden = true;
+                } else {
+                    if (section) section.hidden = true;
+                    if (empty) empty.hidden = false;
+                }
                 page.querySelectorAll('[data-sc-mark-all-wrap]').forEach(function (wrap) {
                     wrap.hidden = true;
                 });
-                if (empty && preset === 'unread') empty.hidden = false;
+                markAllForms.forEach(function (form) {
+                    form.hidden = true;
+                });
             } else {
                 if (section) section.hidden = false;
                 if (empty) empty.hidden = true;
+                if (emptyInline) emptyInline.hidden = true;
+                if (list) list.hidden = false;
                 page.querySelectorAll('[data-sc-mark-all-wrap]').forEach(function (wrap) {
                     wrap.hidden = false;
+                });
+                markAllForms.forEach(function (form) {
+                    form.hidden = false;
                 });
             }
 
@@ -1008,7 +1024,7 @@
             });
         }
 
-        function updateAfterRead(unreadCount, removedIds, markAll) {
+        function updateAfterRead(unreadCount, removedNoteIds, removedActivityIds, markAll) {
             var list = page.querySelector('[data-sc-unread-list]');
             if (markAll) {
                 if (list) list.innerHTML = '';
@@ -1016,13 +1032,18 @@
                     var id = item.getAttribute('data-note-id');
                     if (id) setFeedNoteReadState(id, true);
                 });
-            } else if (removedIds && removedIds.length) {
-                removedIds.forEach(function (id) {
+            } else {
+                (removedNoteIds || []).forEach(function (id) {
                     if (list) {
                         var item = list.querySelector('[data-sc-unread-item][data-note-id="' + id + '"]');
                         if (item && item.parentNode) item.parentNode.removeChild(item);
                     }
                     setFeedNoteReadState(id, true);
+                });
+                (removedActivityIds || []).forEach(function (id) {
+                    if (!list) return;
+                    var item = list.querySelector('[data-sc-unread-item][data-activity-id="' + id + '"]');
+                    if (item && item.parentNode) item.parentNode.removeChild(item);
                 });
             }
             syncCounts(unreadCount);
@@ -1045,10 +1066,17 @@
 
             var btn = form.querySelector('button[type="submit"]');
             var noteId = form.getAttribute('data-note-id');
+            var activityId = form.getAttribute('data-activity-id');
             var noteIds = noteId ? [String(noteId)] : [];
+            var activityIds = activityId ? [String(activityId)] : [];
             if (!noteId) {
                 form.querySelectorAll('input[name="note_ids[]"]').forEach(function (input) {
                     if (input.value) noteIds.push(String(input.value));
+                });
+            }
+            if (!activityId) {
+                form.querySelectorAll('input[name="activity_ids[]"]').forEach(function (input) {
+                    if (input.value) activityIds.push(String(input.value));
                 });
             }
 
@@ -1084,7 +1112,7 @@
                         alert((result.data && result.data.message) || 'Error');
                         return;
                     }
-                    updateAfterRead(result.data.unread_count, noteIds, markAll);
+                    updateAfterRead(result.data.unread_count, noteIds, activityIds, markAll);
                     showFlash(result.data.message || markedMsg);
                 })
                 .catch(function () {

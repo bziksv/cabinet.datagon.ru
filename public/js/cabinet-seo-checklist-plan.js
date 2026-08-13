@@ -67,6 +67,22 @@
         return base + Math.max(0, Math.floor((Date.now() - started) / 1000));
     }
 
+    function timerTargets(itemEl) {
+        if (!itemEl) return { timeEl: null, btn: null };
+        if (itemEl.hasAttribute('data-sc-plan-sub')) {
+            return {
+                timeEl: itemEl.querySelector('[data-sc-time]'),
+                btn: itemEl.querySelector('[data-sc-timer]'),
+            };
+        }
+        var row = itemEl.querySelector('.cabinet-sc-plan__row');
+        var scope = row || itemEl;
+        return {
+            timeEl: scope.querySelector('[data-sc-time]'),
+            btn: scope.querySelector('[data-sc-timer]'),
+        };
+    }
+
     function applyTimerUi(itemEl, state) {
         if (!itemEl || !state) return;
         if (typeof state.time_spent_seconds === 'number') {
@@ -77,25 +93,24 @@
         itemEl.setAttribute('data-timer-started-at', running && state.timer_started_at ? state.timer_started_at : '');
         itemEl.classList.toggle('is-timing', running);
 
-        var timeEl = itemEl.querySelector('[data-sc-time]');
-        if (timeEl) {
-            timeEl.classList.toggle('is-running', running);
-            timeEl.textContent = formatDuration(
+        var targets = timerTargets(itemEl);
+        if (targets.timeEl) {
+            targets.timeEl.classList.toggle('is-running', running);
+            targets.timeEl.textContent = formatDuration(
                 typeof state.display_seconds === 'number' ? state.display_seconds : itemDisplaySeconds(itemEl)
             );
         }
 
-        var btn = itemEl.querySelector('[data-sc-timer]');
-        if (btn) {
-            btn.textContent = running ? labelStopShort : labelStartShort;
-            btn.title = running ? labelStop : labelStart;
-            btn.classList.toggle('btn-danger', running);
-            btn.classList.toggle('btn-outline-success', !running);
+        if (targets.btn) {
+            targets.btn.textContent = running ? labelStopShort : labelStartShort;
+            targets.btn.setAttribute('data-tip', running ? labelStop : labelStart);
+            targets.btn.classList.toggle('btn-danger', running);
+            targets.btn.classList.toggle('btn-outline-success', !running);
         }
     }
 
     function syncFromActive(active) {
-        root.querySelectorAll('[data-sc-plan-item]').forEach(function (itemEl) {
+        root.querySelectorAll('[data-sc-plan-item], [data-sc-plan-sub]').forEach(function (itemEl) {
             var id = parseInt(itemEl.getAttribute('data-id') || '0', 10);
             if (active && id === active.item_id) {
                 applyTimerUi(itemEl, {
@@ -124,6 +139,14 @@
         });
     }
 
+    function refreshSubCounts(subsRoot) {
+        if (!subsRoot) return;
+        var all = subsRoot.querySelectorAll('[data-sc-plan-sub]').length;
+        var open = subsRoot.querySelectorAll('[data-sc-plan-sub]:not(.is-done)').length;
+        var meta = subsRoot.querySelector('[data-sc-plan-subs-count]');
+        if (meta) meta.textContent = open + '/' + all;
+    }
+
     function removeItem(itemEl) {
         var group = itemEl.closest('[data-sc-plan-group]');
         itemEl.parentNode.removeChild(itemEl);
@@ -132,16 +155,43 @@
 
     function applyStatusUi(itemEl, status) {
         if (!status) return;
+        var isSub = itemEl.hasAttribute('data-sc-plan-sub');
         itemEl.setAttribute('data-status', status);
-        itemEl.classList.toggle('is-doing', status === 'doing' || status === 'rework');
-        var select = itemEl.querySelector('[data-sc-status]');
+        itemEl.classList.toggle('is-doing', !isSub && (status === 'doing' || status === 'rework'));
+        itemEl.classList.toggle('is-review', status === 'review');
+        itemEl.classList.toggle('is-done', status === 'done' || status === 'skip');
+
+        var title = itemEl.querySelector(isSub ? '[data-sc-title]' : '.cabinet-sc-plan__task');
+        if (title) {
+            title.classList.toggle('is-review-text', status === 'review');
+            title.classList.toggle('is-done-text', status === 'done' || status === 'skip');
+        }
+        var hint = itemEl.querySelector('[data-sc-review-hint]');
+        if (hint) hint.hidden = status !== 'review';
+
+        var select = null;
+        if (isSub) {
+            select = itemEl.querySelector('.cabinet-sc-subtask__status') || itemEl.querySelector('[data-sc-status]');
+        } else {
+            var row = itemEl.querySelector('.cabinet-sc-plan__row');
+            select = row ? row.querySelector('[data-sc-status]') : itemEl.querySelector('[data-sc-status]');
+        }
         if (select && select.value !== status) select.value = status;
+
+        if (isSub) {
+            var done = itemEl.querySelector('[data-sc-plan-sub-done]');
+            if (done) done.checked = status === 'done' || status === 'skip';
+            refreshSubCounts(itemEl.closest('.cabinet-sc-plan__subs'));
+        }
     }
 
     function askStatusAfterStop(itemEl) {
         var select = itemEl.querySelector('[data-sc-status]');
         if (!select) return;
-        var canApprove = (itemEl.getAttribute('data-can-approve') || root.getAttribute('data-can-approve')) === '1';
+        var isSub = itemEl.hasAttribute('data-sc-plan-sub');
+        var canApprove = isSub
+            ? itemEl.getAttribute('data-can-close') === '1'
+            : (itemEl.getAttribute('data-can-approve') || root.getAttribute('data-can-approve')) === '1';
         var options = [];
         var defaultValue = 'rework';
         var hasRework = false;
@@ -167,6 +217,12 @@
         setStatus(itemEl, defaultValue);
     }
 
+    function findPlanRow(id) {
+        if (!id) return null;
+        return root.querySelector('[data-sc-plan-sub][data-id="' + id + '"]')
+            || root.querySelector('[data-sc-plan-item][data-id="' + id + '"]');
+    }
+
     function toggleTimer(itemEl) {
         var id = itemEl.getAttribute('data-id');
         var projectId = itemEl.getAttribute('data-project-id');
@@ -180,7 +236,7 @@
                 return;
             }
             if (result.data.stopped_item) {
-                var prev = root.querySelector('[data-sc-plan-item][data-id="' + result.data.stopped_item.id + '"]');
+                var prev = findPlanRow(result.data.stopped_item.id);
                 if (prev) applyTimerUi(prev, result.data.stopped_item);
             }
             if (result.data.item) {
@@ -231,8 +287,13 @@
         postJson(urlFor(statusTpl, projectId, id), payload).then(function (result) {
             itemEl.classList.remove('is-busy');
             if (!result.ok) {
-                var select = itemEl.querySelector('[data-sc-status]');
-                if (select) select.value = itemEl.getAttribute('data-status') || 'todo';
+                var selectFail = itemEl.querySelector('[data-sc-status]');
+                if (selectFail) selectFail.value = itemEl.getAttribute('data-status') || 'todo';
+                var doneFail = itemEl.querySelector('[data-sc-plan-sub-done]');
+                if (doneFail) {
+                    var prev = itemEl.getAttribute('data-status') || 'todo';
+                    doneFail.checked = prev === 'done' || prev === 'skip';
+                }
                 alert((result.data && result.data.message) || 'Error');
                 return;
             }
@@ -249,8 +310,8 @@
                 }
                 syncFromActive(result.data.active || null);
             }
-            // закрытые задачи убираем из плана
-            if (next === 'done' || next === 'skip') {
+            // закрытые основные задачи убираем из плана; пункты чеклиста остаются
+            if (!itemEl.hasAttribute('data-sc-plan-sub') && (next === 'done' || next === 'skip')) {
                 removeItem(itemEl);
             }
         }).catch(function () {
@@ -265,7 +326,7 @@
         var timerBtn = e.target.closest('[data-sc-timer]');
         if (timerBtn) {
             e.preventDefault();
-            var item = timerBtn.closest('[data-sc-plan-item]');
+            var item = timerBtn.closest('[data-sc-plan-sub], [data-sc-plan-item]');
             if (item && !item.classList.contains('is-busy')) toggleTimer(item);
         }
     });
@@ -273,7 +334,7 @@
     root.addEventListener('change', function (e) {
         var select = e.target.closest('[data-sc-status]');
         if (select) {
-            var item = select.closest('[data-sc-plan-item]');
+            var item = select.closest('[data-sc-plan-sub], [data-sc-plan-item]');
             if (!item || item.classList.contains('is-busy')) return;
             setStatus(item, select.value);
             return;
@@ -283,33 +344,8 @@
         if (!subDone) return;
         var sub = subDone.closest('[data-sc-plan-sub]');
         if (!sub || sub.classList.contains('is-busy')) return;
-        var subId = sub.getAttribute('data-id');
-        var projectId = sub.getAttribute('data-project-id');
         var next = subDone.checked ? 'done' : 'todo';
-        var prev = sub.getAttribute('data-status') || 'todo';
-        sub.classList.add('is-busy');
-        postJson(urlFor(statusTpl, projectId, subId), { status: next }).then(function (result) {
-            sub.classList.remove('is-busy');
-            if (!result.ok) {
-                subDone.checked = prev === 'done' || prev === 'skip';
-                alert((result.data && result.data.message) || 'Error');
-                return;
-            }
-            var status = result.data.item.status;
-            sub.setAttribute('data-status', status);
-            sub.classList.toggle('is-done', status === 'done' || status === 'skip');
-            var head = sub.closest('.cabinet-sc-plan__subs');
-            if (head) {
-                var all = head.querySelectorAll('[data-sc-plan-sub]').length;
-                var open = head.querySelectorAll('[data-sc-plan-sub]:not(.is-done)').length;
-                var meta = head.querySelector('.cabinet-sc-plan__subs-head span');
-                if (meta) meta.textContent = open + '/' + all;
-            }
-        }).catch(function () {
-            sub.classList.remove('is-busy');
-            subDone.checked = prev === 'done' || prev === 'skip';
-            alert('Error');
-        });
+        setStatus(sub, next);
     });
 
     (function initPlanFilters() {
@@ -438,9 +474,9 @@
     })();
 
     window.setInterval(function () {
-        root.querySelectorAll('[data-sc-plan-item][data-timer-running="1"]').forEach(function (itemEl) {
-            var timeEl = itemEl.querySelector('[data-sc-time]');
-            if (timeEl) timeEl.textContent = formatDuration(itemDisplaySeconds(itemEl));
+        root.querySelectorAll('[data-sc-plan-item][data-timer-running="1"], [data-sc-plan-sub][data-timer-running="1"]').forEach(function (itemEl) {
+            var targets = timerTargets(itemEl);
+            if (targets.timeEl) targets.timeEl.textContent = formatDuration(itemDisplaySeconds(itemEl));
         });
     }, 1000);
 })();

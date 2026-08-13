@@ -11,8 +11,9 @@
         : route('pages.seo-checklist');
     $canApprove = !empty($canApprove);
     $canManage = !empty($canManage);
+    $authId = (int) auth()->id();
 @endphp
-<li class="cabinet-sc-plan__item @if($isOver) is-overdue @endif @if($item->status === 'doing') is-doing @endif @if($item->is_important) is-important @endif @if($timerRunning) is-timing @endif"
+<li class="cabinet-sc-plan__item @if($isOver) is-overdue @endif @if($item->status === 'doing') is-doing @endif @if($item->status === 'review') is-review @endif @if($item->is_important) is-important @endif @if($timerRunning) is-timing @endif"
     data-sc-plan-item
     data-id="{{ $item->id }}"
     data-project-id="{{ $item->project_id }}"
@@ -28,15 +29,15 @@
     <div class="cabinet-sc-plan__row">
         <div class="cabinet-sc-plan__main">
             @if($project)
-                <a href="{{ $projectUrl }}" class="cabinet-sc-plan__domain" title="{{ __('Open in project') }}">{{ $project->domain }}</a>
+                <a href="{{ $projectUrl }}" class="cabinet-sc-plan__domain">{{ $project->domain }}</a>
             @endif
-            <span class="cabinet-sc-plan__task">{{ $item->title }}</span>
+            <span class="cabinet-sc-plan__task {{ $item->status === 'review' ? 'is-review-text' : '' }}">{{ $item->title }}</span>
+            <span class="cabinet-sc-review-hint" data-sc-review-hint @if($item->status !== 'review') hidden @endif>{{ __('Waiting for review') }}</span>
         </div>
         <div class="cabinet-sc-plan__controls">
             @if($item->is_important)
                 <span class="cabinet-sc-plan__flag"
                       data-tip="{{ __('Important task hint') }}"
-                      title="{{ __('Important task hint') }}"
                       aria-label="{{ __('Important task hint') }}"
                       role="img"
                       tabindex="0">!</span>
@@ -44,12 +45,10 @@
             @if(trim((string) ($item->help ?? '')) !== '')
                 <span class="cabinet-sc-plan__help-tip"
                       data-tip="{{ e($item->help) }}"
-                      title="{{ e($item->help) }}"
                       aria-label="{{ __('Hint / help') }}"
                       role="img"
                       tabindex="0">?</span>
             @endif
-            <span class="cabinet-sc-role cabinet-sc-role--{{ $item->role }}">{{ $roleLabel }}</span>
             @if($item->due_at)
                 <span class="cabinet-sc-plan__due @if($isOver) is-overdue @endif">
                     @if($isOver)
@@ -61,16 +60,19 @@
             @endif
             <span class="cabinet-sc-time @if($timerRunning) is-running @endif"
                   data-sc-time
-                  title="{{ __('Time spent') }}">
+                  aria-label="{{ __('Time spent') }}">
                 {{ \App\Services\SeoChecklist\SeoChecklistService::formatDuration($displaySeconds) }}
             </span>
             @if(!$projectArchived)
                 <button type="button"
                         class="btn btn-sm @if($timerRunning) btn-danger @else btn-outline-success @endif"
                         data-sc-timer
-                        title="{{ $timerRunning ? __('Stop timer') : __('Start timer') }}">
+                        data-tip="{{ $timerRunning ? __('Stop timer') : __('Start timer') }}">
                     {{ $timerRunning ? __('Timer stop') : __('Timer start') }}
                 </button>
+            @endif
+            <span class="cabinet-sc-role cabinet-sc-role--{{ $item->role }}">{{ $roleLabel }}</span>
+            @if(!$projectArchived)
                 <select class="form-select form-select-sm cabinet-sc-plan__status"
                         data-sc-status
                         aria-label="{{ __('Status') }}">
@@ -91,7 +93,7 @@
             @endif
             <a href="{{ $projectUrl }}"
                class="btn btn-sm cabinet-sc-plan__open"
-               title="{{ __('Open in project') }}">
+               data-tip="{{ __('Open in project') }}">
                 <i class="bi bi-folder2-open" aria-hidden="true"></i>
                 {{ __('To project') }}
             </a>
@@ -104,28 +106,108 @@
         })->count();
     @endphp
     @if($children->isNotEmpty())
-        <div class="cabinet-sc-plan__subs">
-            <div class="cabinet-sc-plan__subs-head">
-                {{ __('Subtasks') }}
-                <span>{{ $openChildren }}/{{ $children->count() }}</span>
+        <div class="cabinet-sc-plan__subs cabinet-sc-subtasks-block">
+            <div class="cabinet-sc-plan__subs-head cabinet-sc-subtasks-block__head">
+                <span class="cabinet-sc-subtasks-block__title">{{ __('Subtasks') }}</span>
+                <span class="cabinet-sc-subtasks-block__count" data-sc-plan-subs-count>{{ $openChildren }}/{{ $children->count() }}</span>
             </div>
-            <ul class="cabinet-sc-plan__subs-list">
+            <ul class="cabinet-sc-plan__subs-list cabinet-sc-subtasks">
                 @foreach($children as $child)
                     @php
                         $childDone = in_array($child->status, \App\SeoChecklist\SeoChecklistItem::CLOSED_STATUSES, true);
+                        $childRunningLog = $child->relationLoaded('timeLogs') ? $child->timeLogs->first() : null;
+                        $childTimerRunning = (bool) $childRunningLog;
+                        $childDisplaySeconds = (int) $child->time_spent_seconds
+                            + ($childRunningLog ? $childRunningLog->elapsedSeconds() : 0);
+                        $canCloseChild = $canApprove
+                            || ((int) $child->created_by > 0 && (int) $child->created_by === $authId);
+                        $childCreatedBy = $child->createdByUser
+                            ? (trim(($child->createdByUser->name ?? '') . ' ' . ($child->createdByUser->last_name ?? '')) ?: $child->createdByUser->email)
+                            : null;
+                        $childCreatedLabel = ($childCreatedBy || $child->created_at)
+                            ? __('Created by :name on :date', [
+                                'name' => $childCreatedBy ?: '—',
+                                'date' => $child->created_at
+                                    ? $child->created_at->format('d.m.Y') . "\xc2\xa0" . $child->created_at->format('H:i')
+                                    : '—',
+                            ])
+                            : null;
+                        $childDoneBy = $child->doneByUser
+                            ? (trim(($child->doneByUser->name ?? '') . ' ' . ($child->doneByUser->last_name ?? '')) ?: $child->doneByUser->email)
+                            : null;
+                        $childDoneLabel = $child->done_at
+                            ? __('Completed by :name on :date', [
+                                'name' => $childDoneBy ?: '—',
+                                'date' => $child->done_at->format('d.m.Y') . "\xc2\xa0" . $child->done_at->format('H:i'),
+                            ])
+                            : null;
                     @endphp
-                    <li class="cabinet-sc-plan__sub @if($childDone) is-done @endif"
+                    <li class="cabinet-sc-subtask cabinet-sc-plan__sub @if($childTimerRunning) is-timing @endif @if($child->status === 'review') is-review @endif @if($childDone) is-done @endif"
                         data-sc-plan-sub
                         data-id="{{ $child->id }}"
                         data-project-id="{{ $item->project_id }}"
-                        data-status="{{ $child->status }}">
-                        <label class="cabinet-sc-plan__sub-check">
+                        data-status="{{ $child->status }}"
+                        data-can-close="{{ $canCloseChild ? '1' : '0' }}"
+                        data-time-spent="{{ (int) $child->time_spent_seconds }}"
+                        data-timer-running="{{ $childTimerRunning ? '1' : '0' }}"
+                        data-timer-started-at="{{ $childTimerRunning && $childRunningLog->started_at ? $childRunningLog->started_at->toIso8601String() : '' }}">
+                        <label class="cabinet-sc-check cabinet-sc-check--sub">
                             <input type="checkbox"
                                    data-sc-plan-sub-done
                                    @if($childDone) checked @endif
-                                   @if($projectArchived) disabled @endif>
-                            <span>{{ $child->title }}</span>
+                                   @if($projectArchived || (!$canCloseChild && !$childDone)) disabled @endif>
                         </label>
+                        <div class="cabinet-sc-subtask__body">
+                            <span class="cabinet-sc-subtask__title {{ $childDone ? 'is-done-text' : '' }} {{ $child->status === 'review' ? 'is-review-text' : '' }}"
+                                  data-sc-title>{{ $child->title }}</span>
+                            <span class="cabinet-sc-review-hint" data-sc-review-hint @if($child->status !== 'review') hidden @endif>{{ __('Waiting for review') }}</span>
+                        </div>
+                        <div class="cabinet-sc-subtask__time">
+                            <span class="cabinet-sc-time cabinet-sc-time--sub @if($childTimerRunning) is-running @endif"
+                                  data-sc-time
+                                  aria-label="{{ __('Time spent') }}">
+                                {{ \App\Services\SeoChecklist\SeoChecklistService::formatDuration($childDisplaySeconds) }}
+                            </span>
+                            @if(!$projectArchived)
+                                <button type="button"
+                                        class="btn btn-sm @if($childTimerRunning) btn-danger @else btn-outline-success @endif cabinet-sc-subtask__timer"
+                                        data-sc-timer
+                                        data-tip="{{ $childTimerRunning ? __('Stop timer') : __('Start timer') }}">
+                                    {{ $childTimerRunning ? __('Timer stop') : __('Timer start') }}
+                                </button>
+                            @endif
+                        </div>
+                        @if(!$projectArchived)
+                            <select class="form-select form-select-sm cabinet-sc-subtask__status"
+                                    data-sc-status
+                                    aria-label="{{ __('Status') }}">
+                                @foreach($statusLabels as $value => $label)
+                                    @php
+                                        $hideClosedChild = in_array($value, ['done', 'skip'], true)
+                                            && !$canCloseChild
+                                            && $child->status !== $value;
+                                    @endphp
+                                    @if(!$hideClosedChild)
+                                        <option value="{{ $value }}"
+                                                @if($child->status === $value) selected @endif>{{ $label }}</option>
+                                    @endif
+                                @endforeach
+                            </select>
+                        @else
+                            <span class="cabinet-sc-subtask__status-label">{{ $statusLabels[$child->status] ?? $child->status }}</span>
+                        @endif
+                        <p class="cabinet-sc-task__audit cabinet-sc-task__audit--sub" data-sc-audit @if(!$childCreatedLabel && !$childDoneLabel) hidden @endif>
+                            @if($childCreatedLabel)
+                                <span data-sc-audit-created>{{ $childCreatedLabel }}</span>
+                            @else
+                                <span data-sc-audit-created hidden></span>
+                            @endif
+                            @if($childDoneLabel)
+                                <span data-sc-audit-done>{{ $childDoneLabel }}</span>
+                            @else
+                                <span data-sc-audit-done hidden></span>
+                            @endif
+                        </p>
                     </li>
                 @endforeach
             </ul>

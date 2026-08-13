@@ -55,7 +55,8 @@
          data-i18n-timer-stop="{{ e(__('Stop timer')) }}"
          data-i18n-timer-start-short="{{ e(__('Timer start')) }}"
          data-i18n-timer-stop-short="{{ e(__('Timer stop')) }}"
-         data-i18n-focus-banner="{{ e(__('Checklist item from chronicle')) }}">
+         data-i18n-focus-banner="{{ e(__('Checklist item from chronicle')) }}"
+         data-i18n-waiting-review="{{ e(__('Waiting for review')) }}">
 
         @include('pages.partials.seo-checklist-nav', [
             'scTab' => 'project',
@@ -393,7 +394,7 @@
                                 $displaySeconds = (int) $item->time_spent_seconds + ($runningLog ? $runningLog->elapsedSeconds() : 0);
                             @endphp
                             <li id="sc-item-{{ $item->id }}"
-                                class="cabinet-sc-task @if($itemOverdue) is-overdue @elseif($itemDueSoon) is-due-soon @endif @if($timerRunning) is-timing @endif"
+                                class="cabinet-sc-task @if($itemOverdue) is-overdue @elseif($itemDueSoon) is-due-soon @endif @if($timerRunning) is-timing @endif @if($item->status === 'review') is-review @endif @if(in_array($item->status, \App\SeoChecklist\SeoChecklistItem::CLOSED_STATUSES, true)) is-done @endif"
                                 data-sc-item
                                 data-id="{{ $item->id }}"
                                 data-status="{{ $item->status }}"
@@ -437,12 +438,13 @@
                                         @endphp
                                         <div class="cabinet-sc-task__head">
                                             <button type="button"
-                                                    class="cabinet-sc-task__title {{ $item->is_important ? 'is-important' : '' }}"
+                                                    class="cabinet-sc-task__title {{ $item->is_important ? 'is-important' : '' }} {{ $item->status === 'review' ? 'is-review-text' : '' }} {{ in_array($item->status, \App\SeoChecklist\SeoChecklistItem::CLOSED_STATUSES, true) ? 'is-done-text' : '' }}"
                                                     data-sc-title
                                                     @if($project->status === 'archived') disabled @endif
                                                     title="{{ __('Click to edit') }}">
                                                 {{ $item->title }}
                                             </button>
+                                            <span class="cabinet-sc-review-hint" data-sc-review-hint @if($item->status !== 'review') hidden @endif>{{ __('Waiting for review') }}</span>
                                         </div>
                                         @if($item->help || $project->status !== 'archived')
                                             <p class="cabinet-sc-task__help @if(!$item->help) is-empty @endif"
@@ -581,7 +583,7 @@
                                                 $canCloseChild = !empty($canApproveReview)
                                                     || ((int) $child->created_by > 0 && (int) $child->created_by === (int) auth()->id());
                                             @endphp
-                                            <li class="cabinet-sc-subtask @if($childTimerRunning) is-timing @endif"
+                                            <li class="cabinet-sc-subtask @if($childTimerRunning) is-timing @endif @if($child->status === 'review') is-review @endif @if(in_array($child->status, \App\SeoChecklist\SeoChecklistItem::CLOSED_STATUSES, true)) is-done @endif"
                                                 data-sc-subitem
                                                 data-id="{{ $child->id }}"
                                                 data-status="{{ $child->status }}"
@@ -598,12 +600,13 @@
                                                 </label>
                                                 <div class="cabinet-sc-subtask__body">
                                                     <button type="button"
-                                                            class="cabinet-sc-subtask__title {{ in_array($child->status, \App\SeoChecklist\SeoChecklistItem::CLOSED_STATUSES, true) ? 'is-done-text' : '' }}"
+                                                            class="cabinet-sc-subtask__title {{ in_array($child->status, \App\SeoChecklist\SeoChecklistItem::CLOSED_STATUSES, true) ? 'is-done-text' : '' }} {{ $child->status === 'review' ? 'is-review-text' : '' }}"
                                                             data-sc-title
                                                             @if($project->status === 'archived') disabled @endif
                                                             title="{{ __('Click to edit') }}">
                                                         {{ $child->title }}
                                                     </button>
+                                                    <span class="cabinet-sc-review-hint" data-sc-review-hint @if($child->status !== 'review') hidden @endif>{{ __('Waiting for review') }}</span>
                                                 </div>
                                                 <div class="cabinet-sc-subtask__time">
                                                     <span class="cabinet-sc-time cabinet-sc-time--sub @if($childTimerRunning) is-running @endif"

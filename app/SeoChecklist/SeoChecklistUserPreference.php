@@ -16,6 +16,15 @@ class SeoChecklistUserPreference extends Model
     protected $fillable = [
         'user_id',
         'module_title',
+        'unread_notes',
+        'unread_review',
+        'unread_created',
+    ];
+
+    protected $casts = [
+        'unread_notes' => 'boolean',
+        'unread_review' => 'boolean',
+        'unread_created' => 'boolean',
     ];
 
     public static function tableReady(): bool
@@ -62,5 +71,67 @@ class SeoChecklistUserPreference extends Model
         );
 
         return static::moduleTitleFor($userId);
+    }
+
+    /**
+     * Что показывать во вкладке «Непрочитанные».
+     * По умолчанию — только заметки (как раньше).
+     *
+     * @return array{notes:bool,review:bool,created:bool}
+     */
+    public static function chronicleUnreadPrefsFor(?int $userId): array
+    {
+        $defaults = [
+            'notes' => true,
+            'review' => false,
+            'created' => false,
+        ];
+        if (!$userId || $userId < 1 || !static::tableReady()) {
+            return $defaults;
+        }
+        if (!Schema::hasColumn('seo_checklist_user_preferences', 'unread_notes')) {
+            return $defaults;
+        }
+
+        $row = static::query()->find($userId);
+        if (!$row) {
+            return $defaults;
+        }
+
+        return [
+            'notes' => $row->unread_notes !== null ? (bool) $row->unread_notes : true,
+            'review' => (bool) ($row->unread_review ?? false),
+            'created' => (bool) ($row->unread_created ?? false),
+        ];
+    }
+
+    /**
+     * @param  array{notes?:bool|int|string,review?:bool|int|string,created?:bool|int|string}  $prefs
+     * @return array{notes:bool,review:bool,created:bool}
+     */
+    public static function saveChronicleUnreadPrefs(int $userId, array $prefs): array
+    {
+        $normalized = [
+            'notes' => !empty($prefs['notes']),
+            'review' => !empty($prefs['review']),
+            'created' => !empty($prefs['created']),
+        ];
+        if ($userId < 1 || !static::tableReady()) {
+            return $normalized;
+        }
+        if (!Schema::hasColumn('seo_checklist_user_preferences', 'unread_notes')) {
+            return $normalized;
+        }
+
+        static::query()->updateOrCreate(
+            ['user_id' => $userId],
+            [
+                'unread_notes' => $normalized['notes'],
+                'unread_review' => $normalized['review'],
+                'unread_created' => $normalized['created'],
+            ]
+        );
+
+        return static::chronicleUnreadPrefsFor($userId);
     }
 }

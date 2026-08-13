@@ -360,6 +360,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('checklist/chronicle', 'SeoChecklistController@chronicle')->name('pages.seo-checklist.chronicle')->middleware('permission:SEO Checklist');
     Route::post('checklist/chronicle/read', 'SeoChecklistController@markChronicleNotesRead')->name('pages.seo-checklist.chronicle.read')->middleware('permission:SEO Checklist');
     Route::post('checklist/chronicle/unread', 'SeoChecklistController@markChronicleNotesUnread')->name('pages.seo-checklist.chronicle.unread')->middleware('permission:SEO Checklist');
+    Route::post('checklist/chronicle/unread-prefs', 'SeoChecklistController@updateChronicleUnreadPrefs')->name('pages.seo-checklist.chronicle.unread-prefs')->middleware('permission:SEO Checklist');
     Route::post('checklist/module-title', 'SeoChecklistController@updateModuleTitle')->name('pages.seo-checklist.module-title')->middleware('permission:SEO Checklist');
     Route::get('checklist/time', 'SeoChecklistController@timesheet')->name('pages.seo-checklist.timesheet')->middleware('permission:SEO Checklist');
     Route::get('checklist/time/export', 'SeoChecklistController@timesheetExport')->name('pages.seo-checklist.timesheet.export')->middleware('permission:SEO Checklist');

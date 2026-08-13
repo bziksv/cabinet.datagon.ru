@@ -365,6 +365,7 @@
     function applyItemUi(itemEl, status) {
         itemEl.setAttribute('data-status', status);
         itemEl.classList.toggle('is-done', status === 'done' || status === 'skip');
+        itemEl.classList.toggle('is-review', status === 'review');
         var checkbox = itemEl.querySelector('.cabinet-sc-task__main > .cabinet-sc-check > [data-sc-done]')
             || itemEl.querySelector('.cabinet-sc-check--sub > [data-sc-done]')
             || itemEl.querySelector('[data-sc-done]');
@@ -372,7 +373,12 @@
         var select = itemEl.querySelector('[data-sc-status]');
         if (select && select.value !== status) select.value = status;
         var titleEl = itemEl.querySelector('[data-sc-title]');
-        if (titleEl) titleEl.classList.toggle('is-done-text', status === 'done' || status === 'skip');
+        if (titleEl) {
+            titleEl.classList.toggle('is-done-text', status === 'done' || status === 'skip');
+            titleEl.classList.toggle('is-review-text', status === 'review');
+        }
+        var hint = itemEl.querySelector('[data-sc-review-hint]');
+        if (hint) hint.hidden = status !== 'review';
     }
 
     function applyAuditMeta(itemEl, audit) {
@@ -1165,7 +1171,10 @@
                         li.innerHTML = '<label class="cabinet-sc-check cabinet-sc-check--sub">' +
                             '<input type="checkbox" data-sc-done></label>' +
                             '<div class="cabinet-sc-subtask__body">' +
-                            '<button type="button" class="cabinet-sc-subtask__title" data-sc-title></button></div>' +
+                            '<button type="button" class="cabinet-sc-subtask__title" data-sc-title></button>' +
+                            '<span class="cabinet-sc-review-hint" data-sc-review-hint hidden>' +
+                            String(root.getAttribute('data-i18n-waiting-review') || 'Waiting for review').replace(/</g, '&lt;') +
+                            '</span></div>' +
                             '<div class="cabinet-sc-subtask__time">' +
                             '<span class="cabinet-sc-time cabinet-sc-time--sub" data-sc-time>0:00</span>' +
                             '<button type="button" class="btn btn-sm btn-outline-success cabinet-sc-subtask__timer" data-sc-timer data-tip="' +

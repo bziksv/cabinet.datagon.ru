@@ -835,6 +835,136 @@
     cursor: pointer;
 }
 
+.cabinet-sc-feed__head-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.cabinet-sc-unread-settings {
+    position: relative;
+}
+
+.cabinet-sc-unread-settings__btn {
+    list-style: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--sc-border);
+    border-radius: 0.45rem;
+    background: #fff;
+    color: #64748b;
+    cursor: pointer;
+    position: relative;
+}
+
+.cabinet-sc-unread-settings__btn::-webkit-details-marker {
+    display: none;
+}
+
+.cabinet-sc-unread-settings__btn:hover,
+.cabinet-sc-unread-settings[open] > .cabinet-sc-unread-settings__btn {
+    color: #1d4ed8;
+    border-color: #93c5fd;
+    background: #eff6ff;
+}
+
+.cabinet-sc-unread-settings__btn[data-tip]:hover::after,
+.cabinet-sc-unread-settings__btn[data-tip]:focus::after,
+.cabinet-sc-unread-settings__btn[data-tip]:focus-visible::after {
+    content: attr(data-tip);
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 0.45rem);
+    z-index: 40;
+    max-width: 16rem;
+    padding: 0.4rem 0.55rem;
+    border-radius: 0.45rem;
+    background: #111827;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.35;
+    white-space: normal;
+    pointer-events: none;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+}
+
+.cabinet-sc-unread-settings__btn[data-tip]:hover::before,
+.cabinet-sc-unread-settings__btn[data-tip]:focus::before,
+.cabinet-sc-unread-settings__btn[data-tip]:focus-visible::before {
+    content: '';
+    position: absolute;
+    right: 0.55rem;
+    bottom: calc(100% + 0.15rem);
+    z-index: 41;
+    border: 6px solid transparent;
+    border-top-color: #111827;
+    pointer-events: none;
+}
+
+.cabinet-sc-unread-settings[open] > .cabinet-sc-unread-settings__btn[data-tip]::after,
+.cabinet-sc-unread-settings[open] > .cabinet-sc-unread-settings__btn[data-tip]::before {
+    display: none;
+}
+
+.cabinet-sc-unread-settings__panel {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    right: 0;
+    z-index: 30;
+    width: min(18.5rem, calc(100vw - 2rem));
+    padding: 0.75rem 0.85rem;
+    border: 1px solid var(--sc-border);
+    border-radius: 0.75rem;
+    background: #fff;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+}
+
+.cabinet-sc-unread-settings__title {
+    font-size: 0.86rem;
+    font-weight: 750;
+    margin-bottom: 0.25rem;
+}
+
+.cabinet-sc-unread-settings__hint {
+    margin: 0 0 0.55rem;
+    font-size: 0.72rem;
+    color: var(--sc-muted);
+    line-height: 1.35;
+}
+
+.cabinet-sc-unread-settings__check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.45rem;
+    margin: 0 0 0.4rem;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    cursor: pointer;
+}
+
+.cabinet-sc-unread-settings__check input {
+    margin-top: 0.15rem;
+    flex: 0 0 auto;
+}
+
+.cabinet-sc-unread-settings__save {
+    margin-top: 0.35rem;
+    width: 100%;
+}
+
+.cabinet-sc-feed__kind--review {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
 .cabinet-sc-feed {
     border: 1px solid var(--sc-border);
     border-radius: 0.9rem;
@@ -845,6 +975,12 @@
 .cabinet-sc-feed--unread {
     border-color: color-mix(in srgb, #f59e0b 35%, var(--sc-border));
     box-shadow: inset 3px 0 0 #f59e0b;
+    overflow: visible;
+}
+
+.cabinet-sc-feed--unread .cabinet-sc-feed__head {
+    overflow: visible;
+    border-radius: 0.9rem 0.9rem 0 0;
 }
 
 .cabinet-sc-feed__head {
@@ -3028,6 +3164,63 @@ a.cabinet-sc-timesheet__task-title:hover {
     border-left: 3px solid #ca8a04;
 }
 
+/* «На проверку» — работа с твоей стороны сделана, ждём PM/аудитора */
+.cabinet-sc-task.is-review,
+.cabinet-sc-subtask.is-review,
+.cabinet-sc-plan__item[data-status="review"] {
+    background: color-mix(in srgb, #2563eb 7%, #fff);
+    border-color: #93c5fd;
+    box-shadow: inset 3px 0 0 #2563eb;
+}
+
+.cabinet-sc-task.is-review.is-timing,
+.cabinet-sc-subtask.is-review.is-timing {
+    box-shadow: inset 3px 0 0 #2563eb;
+}
+
+.cabinet-sc-task__title.is-review-text,
+.cabinet-sc-subtask__title.is-review-text,
+.cabinet-sc-plan__item[data-status="review"] .cabinet-sc-plan__task,
+.cabinet-sc-plan__task.is-review-text {
+    color: #1e3a8a;
+}
+
+.cabinet-sc-plan__main .cabinet-sc-review-hint {
+    align-self: flex-start;
+}
+
+.cabinet-sc-task.is-review [data-sc-status],
+.cabinet-sc-subtask.is-review [data-sc-status],
+.cabinet-sc-plan__item[data-status="review"] .cabinet-sc-plan__status {
+    background-color: #dbeafe !important;
+    border-color: #60a5fa !important;
+    color: #1d4ed8 !important;
+    font-weight: 700;
+}
+
+.cabinet-sc-review-hint {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0.08rem 0.45rem;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 0.68rem;
+    font-weight: 750;
+    line-height: 1.25;
+    white-space: nowrap;
+}
+
+.cabinet-sc-review-hint[hidden] {
+    display: none !important;
+}
+
+.cabinet-sc-task__head .cabinet-sc-review-hint {
+    align-self: center;
+}
+
 .cabinet-sc-due-input {
     width: 4.2rem;
     display: inline-block;
@@ -3174,7 +3367,10 @@ a.cabinet-sc-timesheet__task-title:hover {
 }
 
 .cabinet-sc-subtask__body {
-    display: block;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.2rem 0.5rem;
     min-width: 0;
 }
 
@@ -3254,11 +3450,12 @@ span.cabinet-sc-time--sub {
 }
 
 .cabinet-sc-plan__subs {
-    margin: 0.55rem 0 0;
-    padding: 0.55rem 0.7rem 0.6rem;
+    margin: 0.45rem 0.75rem 0.75rem;
+    padding: 0;
     border: 1px solid #e2e8f0;
-    border-radius: 0.65rem;
+    border-radius: 0.75rem;
     background: #f8fafc;
+    overflow: hidden;
 }
 
 .cabinet-sc-plan__subs-head {
@@ -3266,7 +3463,10 @@ span.cabinet-sc-time--sub {
     justify-content: space-between;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 0.35rem;
+    margin: 0;
+    padding: 0.45rem 0.75rem;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f1f5f9;
     font-size: 0.78rem;
     font-weight: 750;
     color: #475569;
@@ -3275,40 +3475,23 @@ span.cabinet-sc-time--sub {
 .cabinet-sc-plan__subs-list {
     list-style: none;
     margin: 0;
-    padding: 0;
-    display: grid;
-    gap: 0.25rem;
+    padding: 0.2rem 0;
+    display: block;
+}
+
+.cabinet-sc-plan__subs .cabinet-sc-subtask {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    background: transparent;
 }
 
 .cabinet-sc-plan__sub {
     margin: 0;
 }
 
-.cabinet-sc-plan__sub-check {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.45rem;
-    margin: 0;
-    padding: 0.3rem 0.4rem;
-    border-radius: 0.4rem;
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    font-size: 0.84rem;
-    cursor: pointer;
-}
-
-.cabinet-sc-plan__sub-check input {
-    margin-top: 0.15rem;
-}
-
-.cabinet-sc-plan__sub-check span {
-    color: #0f172a;
-    line-height: 1.3;
-}
-
-.cabinet-sc-plan__sub.is-done .cabinet-sc-plan__sub-check span {
-    color: #94a3b8;
-    text-decoration: line-through;
+.cabinet-sc-plan__sub.is-busy {
+    opacity: 0.65;
+    pointer-events: none;
 }
 
 .cabinet-sc-check--sub {

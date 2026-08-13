@@ -210,6 +210,7 @@ class SeoChecklistController extends Controller
             'reviewCount' => $this->service->reviewQueueForUser($userId)->count(),
             'showReviewTab' => $this->service->canSeeReviewQueue($userId),
             'unreadNotesCount' => (int) ($data['unread_count'] ?? 0),
+            'unreadPrefs' => $data['unread_prefs'] ?? \App\SeoChecklist\SeoChecklistUserPreference::chronicleUnreadPrefsFor($userId),
             'readNoteIds' => $readNoteIds,
             'authUserId' => $userId,
         ]);
@@ -246,11 +247,16 @@ class SeoChecklistController extends Controller
         if ($request->boolean('all')) {
             $marked = $this->service->markAllUnreadNotesRead($userId);
         } else {
-            $ids = $request->input('note_ids', []);
-            if (!is_array($ids)) {
-                $ids = [];
+            $noteIds = $request->input('note_ids', []);
+            if (!is_array($noteIds)) {
+                $noteIds = [];
             }
-            $marked = $this->service->markNotesRead($userId, $ids);
+            $activityIds = $request->input('activity_ids', []);
+            if (!is_array($activityIds)) {
+                $activityIds = [];
+            }
+            $marked = $this->service->markNotesRead($userId, $noteIds)
+                + $this->service->markActivitiesRead($userId, $activityIds);
         }
 
         $unreadCount = (int) ($this->service->chronicleForUser($userId, null, null, true, 1)['unread_count'] ?? 0);
@@ -286,11 +292,16 @@ class SeoChecklistController extends Controller
     public function markChronicleNotesUnread(Request $request)
     {
         $userId = (int) Auth::id();
-        $ids = $request->input('note_ids', []);
-        if (!is_array($ids)) {
-            $ids = [];
+        $noteIds = $request->input('note_ids', []);
+        if (!is_array($noteIds)) {
+            $noteIds = [];
         }
-        $marked = $this->service->markNotesUnread($userId, $ids);
+        $activityIds = $request->input('activity_ids', []);
+        if (!is_array($activityIds)) {
+            $activityIds = [];
+        }
+        $marked = $this->service->markNotesUnread($userId, $noteIds)
+            + $this->service->markActivitiesUnread($userId, $activityIds);
         $unreadCount = (int) ($this->service->chronicleForUser($userId, null, null, true, 1)['unread_count'] ?? 0);
 
         if ($request->ajax() || $request->wantsJson()) {
@@ -316,6 +327,44 @@ class SeoChecklistController extends Controller
         return redirect()
             ->route('pages.seo-checklist.chronicle', $query)
             ->with('success', __('Notes marked as unread'));
+    }
+
+    public function updateChronicleUnreadPrefs(Request $request): RedirectResponse
+    {
+        $prefs = SeoChecklistUserPreference::saveChronicleUnreadPrefs((int) Auth::id(), [
+            'notes' => $request->boolean('unread_notes'),
+            'review' => $request->boolean('unread_review'),
+            'created' => $request->boolean('unread_created'),
+        ]);
+
+        $query = ['view' => 'unread'];
+        foreach ($this->requestIdList($request, 'project_ids', 'project_id') as $id) {
+            $query['project_ids'][] = $id;
+        }
+        foreach ($this->requestIdList($request, 'author_ids', 'author_id') as $id) {
+            $query['author_ids'][] = $id;
+        }
+        if ($request->filled('sort')) {
+            $query['sort'] = $this->chronicleSortFromRequest($request);
+        }
+
+        $enabled = [];
+        if ($prefs['notes']) {
+            $enabled[] = __('Chronicle unread pref notes');
+        }
+        if ($prefs['review']) {
+            $enabled[] = __('Chronicle unread pref review');
+        }
+        if ($prefs['created']) {
+            $enabled[] = __('Chronicle unread pref created');
+        }
+        $message = $enabled === []
+            ? __('Chronicle unread prefs cleared')
+            : __('Chronicle unread prefs saved');
+
+        return redirect()
+            ->route('pages.seo-checklist.chronicle', $query)
+            ->with('success', $message);
     }
 
     public function updateModuleTitle(Request $request): RedirectResponse

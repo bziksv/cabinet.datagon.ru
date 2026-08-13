@@ -119,25 +119,6 @@
         <div class="cabinet-sc-plan-head">
             <div>
                 <h2 class="cabinet-sc-plan-head__title">{{ __('Chronicle') }}</h2>
-                <p class="cabinet-sc-plan-head__hint">{{ __('Chronicle hint') }}</p>
-            </div>
-            <div class="cabinet-sc-feed__mark-all" data-sc-mark-all-wrap @if(($unreadNotesCount ?? 0) < 1) hidden @endif>
-                <form method="post" action="{{ route('pages.seo-checklist.chronicle.read') }}" data-sc-mark-read data-sc-mark-all="1">
-                    @csrf
-                    <input type="hidden" name="all" value="1">
-                    <input type="hidden" name="view" value="{{ $filterPreset }}">
-                    @foreach($filterProjectIds as $pid)
-                        <input type="hidden" name="project_ids[]" value="{{ $pid }}">
-                    @endforeach
-                    @foreach($filterAuthorIds as $aid)
-                        <input type="hidden" name="author_ids[]" value="{{ $aid }}">
-                    @endforeach
-                    <input type="hidden" name="sort" value="{{ $filterSort }}">
-                    <button type="submit" class="btn btn-primary btn-sm" data-sc-mark-all-btn>
-                        <i class="bi bi-check2-all" aria-hidden="true"></i>
-                        <span data-sc-mark-all-label>{{ __('Mark all notes read') }} ({{ $unreadNotesCount }})</span>
-                    </button>
-                </form>
             </div>
         </div>
 
@@ -202,96 +183,244 @@
         </form>
 
         @php
-            $unreadNotes = $chronicle['unread_notes'] ?? collect();
+            $unreadEvents = $chronicle['unread_events'] ?? collect();
+            if ($unreadEvents->isEmpty() && !empty($chronicle['unread_notes']) && $chronicle['unread_notes']->isNotEmpty()) {
+                // fallback на старый формат, если сервис ещё без unread_events
+                $unreadEvents = $chronicle['unread_notes']->map(function ($note) {
+                    return (object) [
+                        'source' => 'note',
+                        'created_at' => $note->created_at,
+                        'note' => $note,
+                        'log' => null,
+                    ];
+                });
+            }
             $logs = $chronicle['items'] ?? collect();
+            $unreadPrefs = $unreadPrefs ?? ($chronicle['unread_prefs'] ?? [
+                'notes' => true,
+                'review' => false,
+                'created' => false,
+            ]);
+            $showUnreadSection = $filterPreset === 'unread' || $unreadEvents->isNotEmpty();
         @endphp
 
-        @if($unreadNotes->isNotEmpty() || $filterPreset === 'unread')
+        @if($showUnreadSection)
             <section class="cabinet-sc-feed cabinet-sc-feed--unread mb-3"
                      data-sc-unread-section
-                     @if($unreadNotes->isEmpty()) hidden @endif>
+                     @if($unreadEvents->isEmpty() && $filterPreset !== 'unread') hidden @endif>
                 <header class="cabinet-sc-feed__head">
                     <div class="cabinet-sc-feed__head-main">
                         <span class="cabinet-sc-feed__icon" aria-hidden="true"><i class="bi bi-chat-dots-fill"></i></span>
                         <h3>{{ __('Unread notes') }}</h3>
-                        <span class="cabinet-sc-feed__count" data-sc-unread-section-count>{{ $unreadNotes->count() }}</span>
+                        <span class="cabinet-sc-feed__count"
+                              data-sc-unread-section-count
+                              @if($unreadEvents->isEmpty()) hidden @endif>{{ $unreadEvents->count() }}</span>
                     </div>
-                    <form method="post" action="{{ route('pages.seo-checklist.chronicle.read') }}" data-sc-mark-read data-sc-mark-all="1">
-                        @csrf
-                        <input type="hidden" name="all" value="1">
-                        <input type="hidden" name="view" value="{{ $filterPreset }}">
-                        @foreach($filterProjectIds as $pid)
-                            <input type="hidden" name="project_ids[]" value="{{ $pid }}">
-                        @endforeach
-                        @foreach($filterAuthorIds as $aid)
-                            <input type="hidden" name="author_ids[]" value="{{ $aid }}">
-                        @endforeach
-                        <input type="hidden" name="sort" value="{{ $filterSort }}">
-                        <button type="submit" class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-check2-all" aria-hidden="true"></i>
-                            {{ __('Mark all notes read') }}
-                        </button>
-                    </form>
+                    <div class="cabinet-sc-feed__head-actions">
+                        <details class="cabinet-sc-unread-settings" data-sc-unread-settings>
+                            <summary class="cabinet-sc-unread-settings__btn"
+                                     data-tip="{{ __('Chronicle unread settings tip') }}"
+                                     aria-label="{{ __('Chronicle unread settings tip') }}">
+                                <i class="bi bi-gear" aria-hidden="true"></i>
+                            </summary>
+                            <form method="post"
+                                  action="{{ route('pages.seo-checklist.chronicle.unread-prefs') }}"
+                                  class="cabinet-sc-unread-settings__panel">
+                                @csrf
+                                <input type="hidden" name="view" value="unread">
+                                <input type="hidden" name="sort" value="{{ $filterSort }}">
+                                @foreach($filterProjectIds as $pid)
+                                    <input type="hidden" name="project_ids[]" value="{{ $pid }}">
+                                @endforeach
+                                @foreach($filterAuthorIds as $aid)
+                                    <input type="hidden" name="author_ids[]" value="{{ $aid }}">
+                                @endforeach
+                                <div class="cabinet-sc-unread-settings__title">{{ __('Chronicle unread settings') }}</div>
+                                <p class="cabinet-sc-unread-settings__hint">{{ __('Chronicle unread settings hint') }}</p>
+                                <label class="cabinet-sc-unread-settings__check">
+                                    <input type="checkbox" name="unread_notes" value="1" @if(!empty($unreadPrefs['notes'])) checked @endif>
+                                    <span>{{ __('Chronicle unread pref notes') }}</span>
+                                </label>
+                                <label class="cabinet-sc-unread-settings__check">
+                                    <input type="checkbox" name="unread_review" value="1" @if(!empty($unreadPrefs['review'])) checked @endif>
+                                    <span>{{ __('Chronicle unread pref review') }}</span>
+                                </label>
+                                <label class="cabinet-sc-unread-settings__check">
+                                    <input type="checkbox" name="unread_created" value="1" @if(!empty($unreadPrefs['created'])) checked @endif>
+                                    <span>{{ __('Chronicle unread pref created') }}</span>
+                                </label>
+                                <button type="submit" class="btn btn-sm btn-primary cabinet-sc-unread-settings__save">{{ __('Save') }}</button>
+                            </form>
+                        </details>
+                        <form method="post"
+                              action="{{ route('pages.seo-checklist.chronicle.read') }}"
+                              data-sc-mark-read
+                              data-sc-mark-all="1"
+                              @if($unreadEvents->isEmpty()) hidden @endif>
+                            @csrf
+                            <input type="hidden" name="all" value="1">
+                            <input type="hidden" name="view" value="{{ $filterPreset }}">
+                            @foreach($filterProjectIds as $pid)
+                                <input type="hidden" name="project_ids[]" value="{{ $pid }}">
+                            @endforeach
+                            @foreach($filterAuthorIds as $aid)
+                                <input type="hidden" name="author_ids[]" value="{{ $aid }}">
+                            @endforeach
+                            <input type="hidden" name="sort" value="{{ $filterSort }}">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-check2-all" aria-hidden="true"></i>
+                                {{ __('Mark all notes read') }}
+                            </button>
+                        </form>
+                    </div>
                 </header>
-                <ol class="cabinet-sc-feed__list" data-sc-unread-list>
-                    @foreach($unreadNotes as $note)
-                        @php
-                            $item = $note->item;
-                            $project = $item ? $item->project : null;
-                            $author = $note->authorLabel();
-                            $url = ($project && $item)
-                                ? route('pages.seo-checklist.show', ['id' => $project->id])
-                                    . '?focus=' . $item->id . '#sc-item-' . $item->id
-                                : route('pages.seo-checklist');
-                        @endphp
-                        <li class="cabinet-sc-feed__item is-unread" data-sc-unread-item data-note-id="{{ $note->id }}">
-                            <div class="cabinet-sc-feed__rail" aria-hidden="true">
-                                {!! $renderAvatar($note->user, $author) !!}
-                            </div>
-                            <div class="cabinet-sc-feed__card">
-                                <div class="cabinet-sc-feed__meta">
-                                    <strong class="cabinet-sc-feed__who">{{ $author }}</strong>
-                                    <time datetime="{{ $note->created_at->toIso8601String() }}">{{ $note->created_at->format('d.m.Y H:i') }}</time>
-                                    @if($project)
-                                        <a class="cabinet-sc-feed__project" href="{{ route('pages.seo-checklist.show', ['id' => $project->id]) }}">{{ $project->domain }}</a>
-                                    @endif
-                                    <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--note">{{ __('Note') }}</span>
-                                </div>
-                                @if($item)
-                                    <a class="cabinet-sc-feed__task" href="{{ $url }}">
-                                        <span class="cabinet-sc-feed__task-title">{{ $item->title }}</span>
-                                        <span class="cabinet-sc-feed__task-go">{{ __('Open in project') }}</span>
-                                    </a>
-                                @endif
-                                <div class="cabinet-sc-feed__note">{{ $note->body }}</div>
-                                <div class="cabinet-sc-feed__actions">
-                                    <form method="post" action="{{ route('pages.seo-checklist.chronicle.read') }}" data-sc-mark-read data-note-id="{{ $note->id }}">
-                                        @csrf
-                                        <input type="hidden" name="note_ids[]" value="{{ $note->id }}">
-                                        <input type="hidden" name="view" value="{{ $filterPreset }}">
-                                        <input type="hidden" name="sort" value="{{ $filterSort }}">
-                                        @foreach($filterProjectIds as $pid)
-                                            <input type="hidden" name="project_ids[]" value="{{ $pid }}">
-                                        @endforeach
-                                        @foreach($filterAuthorIds as $aid)
-                                            <input type="hidden" name="author_ids[]" value="{{ $aid }}">
-                                        @endforeach
-                                        <button type="submit" class="btn btn-sm btn-primary cabinet-sc-feed__ack">
-                                            <i class="bi bi-check2" aria-hidden="true"></i>
-                                            {{ __('Mark note read') }}
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
-                        </li>
-                    @endforeach
-                </ol>
+                @if($unreadEvents->isEmpty())
+                    <div class="cabinet-sc-empty py-4 px-3" data-sc-unread-empty-inline>
+                        <p class="fw-semibold mb-1">{{ __('No unread notes') }}</p>
+                        <p class="small text-secondary mb-0">{{ __('Chronicle unread empty hint') }}</p>
+                    </div>
+                @else
+                    <ol class="cabinet-sc-feed__list" data-sc-unread-list>
+                        @foreach($unreadEvents as $event)
+                            @php
+                                $source = (string) ($event->source ?? 'note');
+                                $note = $event->note ?? null;
+                                $log = $event->log ?? null;
+                            @endphp
+                            @if($source === 'note' && $note)
+                                @php
+                                    $item = $note->item;
+                                    $project = $item ? $item->project : null;
+                                    $author = $note->authorLabel();
+                                    $url = ($project && $item)
+                                        ? route('pages.seo-checklist.show', ['id' => $project->id])
+                                            . '?focus=' . $item->id . '#sc-item-' . $item->id
+                                        : route('pages.seo-checklist');
+                                @endphp
+                                <li class="cabinet-sc-feed__item is-unread" data-sc-unread-item data-note-id="{{ $note->id }}">
+                                    <div class="cabinet-sc-feed__rail" aria-hidden="true">
+                                        {!! $renderAvatar($note->user, $author) !!}
+                                    </div>
+                                    <div class="cabinet-sc-feed__card">
+                                        <div class="cabinet-sc-feed__meta">
+                                            <strong class="cabinet-sc-feed__who">{{ $author }}</strong>
+                                            <time datetime="{{ $note->created_at->toIso8601String() }}">{{ $note->created_at->format('d.m.Y H:i') }}</time>
+                                            @if($project)
+                                                <a class="cabinet-sc-feed__project" href="{{ route('pages.seo-checklist.show', ['id' => $project->id]) }}">{{ $project->domain }}</a>
+                                            @endif
+                                            <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--note">{{ __('Note') }}</span>
+                                        </div>
+                                        @if($item)
+                                            <a class="cabinet-sc-feed__task" href="{{ $url }}">
+                                                <span class="cabinet-sc-feed__task-title">{{ $item->title }}</span>
+                                                <span class="cabinet-sc-feed__task-go">{{ __('Open in project') }}</span>
+                                            </a>
+                                        @endif
+                                        <div class="cabinet-sc-feed__note">{{ $note->body }}</div>
+                                        <div class="cabinet-sc-feed__actions">
+                                            <form method="post" action="{{ route('pages.seo-checklist.chronicle.read') }}" data-sc-mark-read data-note-id="{{ $note->id }}">
+                                                @csrf
+                                                <input type="hidden" name="note_ids[]" value="{{ $note->id }}">
+                                                <input type="hidden" name="view" value="{{ $filterPreset }}">
+                                                <input type="hidden" name="sort" value="{{ $filterSort }}">
+                                                @foreach($filterProjectIds as $pid)
+                                                    <input type="hidden" name="project_ids[]" value="{{ $pid }}">
+                                                @endforeach
+                                                @foreach($filterAuthorIds as $aid)
+                                                    <input type="hidden" name="author_ids[]" value="{{ $aid }}">
+                                                @endforeach
+                                                <button type="submit" class="btn btn-sm btn-primary cabinet-sc-feed__ack">
+                                                    <i class="bi bi-check2" aria-hidden="true"></i>
+                                                    {{ __('Mark note read') }}
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </li>
+                            @elseif($log)
+                                @php
+                                    $meta = is_array($log->meta_json) ? $log->meta_json : [];
+                                    $project = $log->project;
+                                    $item = $log->item;
+                                    $who = $log->user
+                                        ? (trim(($log->user->name ?? '') . ' ' . ($log->user->last_name ?? '')) ?: ($log->user->name ?: $log->user->email))
+                                        : '—';
+                                    $rawItemId = (int) ($item->id ?? $log->item_id ?? ($meta['item_id'] ?? 0));
+                                    $parentId = (int) ($item->parent_id ?? ($meta['parent_id'] ?? 0));
+                                    $anchorId = $parentId > 0 ? $parentId : $rawItemId;
+                                    $projectUrl = $project
+                                        ? route('pages.seo-checklist.show', ['id' => $project->id])
+                                        : route('pages.seo-checklist');
+                                    $url = ($project && $anchorId > 0)
+                                        ? $projectUrl . '?focus=' . $anchorId . '#sc-item-' . $anchorId
+                                        : $projectUrl;
+                                    $taskTitle = $meta['title'] ?? ($item->title ?? null);
+                                    $isCreated = $source === 'created' || $log->type === 'item_created';
+                                @endphp
+                                <li class="cabinet-sc-feed__item is-unread {{ $isCreated ? 'is-created' : 'is-status' }}"
+                                    data-sc-unread-item
+                                    data-activity-id="{{ $log->id }}">
+                                    <div class="cabinet-sc-feed__rail" aria-hidden="true">
+                                        {!! $renderAvatar($log->user, $who, $isCreated ? 'is-done' : 'is-status') !!}
+                                    </div>
+                                    <div class="cabinet-sc-feed__card">
+                                        <div class="cabinet-sc-feed__meta">
+                                            <strong class="cabinet-sc-feed__who">{{ $who }}</strong>
+                                            <time datetime="{{ $log->created_at->toIso8601String() }}">{{ $log->created_at->format('d.m.Y H:i') }}</time>
+                                            @if($project)
+                                                <a class="cabinet-sc-feed__project" href="{{ $projectUrl }}">{{ $project->domain }}</a>
+                                            @endif
+                                            @if($isCreated)
+                                                <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--created">{{ __('Chronicle kind created') }}</span>
+                                            @else
+                                                <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--review">{{ __('For review') }}</span>
+                                            @endif
+                                        </div>
+                                        @if($taskTitle && $anchorId > 0)
+                                            <a class="cabinet-sc-feed__task" href="{{ $url }}">
+                                                <span class="cabinet-sc-feed__task-title">{{ $taskTitle }}</span>
+                                                <span class="cabinet-sc-feed__task-go">{{ __('Open in project') }}</span>
+                                            </a>
+                                        @elseif($taskTitle)
+                                            <span class="cabinet-sc-feed__task is-plain">{{ $taskTitle }}</span>
+                                        @endif
+                                        @if(!$isCreated)
+                                            <div class="cabinet-sc-feed__status">
+                                                {!! $statusPill($meta['from'] ?? null) !!}
+                                                <span class="cabinet-sc-feed__arrow" aria-hidden="true">→</span>
+                                                {!! $statusPill($meta['to'] ?? null) !!}
+                                            </div>
+                                        @endif
+                                        <div class="cabinet-sc-feed__actions">
+                                            <form method="post" action="{{ route('pages.seo-checklist.chronicle.read') }}" data-sc-mark-read data-activity-id="{{ $log->id }}">
+                                                @csrf
+                                                <input type="hidden" name="activity_ids[]" value="{{ $log->id }}">
+                                                <input type="hidden" name="view" value="{{ $filterPreset }}">
+                                                <input type="hidden" name="sort" value="{{ $filterSort }}">
+                                                @foreach($filterProjectIds as $pid)
+                                                    <input type="hidden" name="project_ids[]" value="{{ $pid }}">
+                                                @endforeach
+                                                @foreach($filterAuthorIds as $aid)
+                                                    <input type="hidden" name="author_ids[]" value="{{ $aid }}">
+                                                @endforeach
+                                                <button type="submit" class="btn btn-sm btn-primary cabinet-sc-feed__ack">
+                                                    <i class="bi bi-check2" aria-hidden="true"></i>
+                                                    {{ __('Mark note read') }}
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </li>
+                            @endif
+                        @endforeach
+                    </ol>
+                @endif
             </section>
         @endif
 
         <div class="cabinet-sc-empty cabinet-sc-empty--chronicle"
              data-sc-unread-empty
-             @if(!($filterPreset === 'unread' && $unreadNotes->isEmpty())) hidden @endif>
+             hidden>
             <p class="fw-semibold mb-1">{{ __('No unread notes') }}</p>
             <p class="small text-secondary mb-3">{{ __('Chronicle unread empty hint') }}</p>
             <div class="d-flex flex-wrap gap-2">

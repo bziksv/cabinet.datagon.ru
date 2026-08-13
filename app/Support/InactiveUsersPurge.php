@@ -54,6 +54,7 @@ class InactiveUsersPurge
         // Чек-лист / отчёты: простые user_id-таблицы (иерархию чистит deleteSeo*ForUser)
         'seo_checklist_user_preferences',
         'seo_checklist_note_reads',
+        'seo_checklist_activity_reads',
         'seo_checklist_item_notes',
         'seo_checklist_item_time_logs',
         'seo_checklist_activity_logs',
@@ -414,12 +415,20 @@ class InactiveUsersPurge
                         DB::table('seo_checklist_item_time_logs')->whereIn('item_id', $itemIds)->delete();
                     }
                     if (Schema::hasTable('seo_checklist_activity_logs')) {
+                        $activityIds = DB::table('seo_checklist_activity_logs')->whereIn('item_id', $itemIds)->pluck('id');
+                        if ($activityIds->isNotEmpty() && Schema::hasTable('seo_checklist_activity_reads')) {
+                            DB::table('seo_checklist_activity_reads')->whereIn('activity_id', $activityIds)->delete();
+                        }
                         DB::table('seo_checklist_activity_logs')->whereIn('item_id', $itemIds)->delete();
                     }
                     DB::table('seo_checklist_items')->whereIn('id', $itemIds)->delete();
                 }
 
                 if (Schema::hasTable('seo_checklist_activity_logs')) {
+                    $activityIds = DB::table('seo_checklist_activity_logs')->whereIn('project_id', $projectIds)->pluck('id');
+                    if ($activityIds->isNotEmpty() && Schema::hasTable('seo_checklist_activity_reads')) {
+                        DB::table('seo_checklist_activity_reads')->whereIn('activity_id', $activityIds)->delete();
+                    }
                     DB::table('seo_checklist_activity_logs')->whereIn('project_id', $projectIds)->delete();
                 }
                 DB::table('seo_checklist_projects')->whereIn('id', $projectIds)->delete();
@@ -466,6 +475,7 @@ class InactiveUsersPurge
         foreach ([
             'seo_checklist_user_preferences',
             'seo_checklist_note_reads',
+            'seo_checklist_activity_reads',
             'seo_checklist_item_notes',
             'seo_checklist_item_time_logs',
             'seo_checklist_activity_logs',

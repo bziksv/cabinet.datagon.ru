@@ -2066,7 +2066,8 @@ class SiteAuditAggregator
                 $samples = is_array($meta['samples'] ?? null) ? $meta['samples'] : [];
                 $stillPresent = false;
                 foreach ($samples as $sample) {
-                    $src = (string) ($sample['src'] ?? '');
+                    // emitImageAssets пишет 'img'; старые/ручные meta могли с 'src'
+                    $src = (string) ($sample['img'] ?? $sample['src'] ?? '');
                     if ($src !== '' && ! empty($imgsByHash[$hash][$src])) {
                         $stillPresent = true;
                         break;
@@ -2075,6 +2076,24 @@ class SiteAuditAggregator
                 if (! $stillPresent) {
                     continue;
                 }
+            }
+
+            $dupQ = SiteAuditFinding::query()
+                ->where('crawl_id', $crawl->id)
+                ->where('code', $row->code)
+                ->where('url_hash', $row->url_hash);
+            if ($row->code === 'lost_file') {
+                $asset = (string) ($meta['asset'] ?? '');
+                $already = $dupQ->get(['meta_json'])->contains(static function ($f) use ($asset) {
+                    $m = is_array($f->meta_json) ? $f->meta_json : [];
+
+                    return (string) ($m['asset'] ?? '') === $asset;
+                });
+            } else {
+                $already = $dupQ->exists();
+            }
+            if ($already) {
+                continue;
             }
 
             SiteAuditFinding::query()->create([

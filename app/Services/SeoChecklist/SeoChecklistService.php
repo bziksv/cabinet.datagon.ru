@@ -5,6 +5,7 @@ namespace App\Services\SeoChecklist;
 use App\DomainMonitoring;
 use App\MonitoringProject;
 use App\SeoChecklist\SeoChecklistActivityLog;
+use App\SeoChecklist\SeoChecklistActivityRead;
 use App\SeoChecklist\SeoChecklistItem;
 use App\SeoChecklist\SeoChecklistItemNote;
 use App\SeoChecklist\SeoChecklistItemTimeLog;
@@ -14,6 +15,7 @@ use App\SeoChecklist\SeoChecklistTeam;
 use App\SeoChecklist\SeoChecklistTeamMember;
 use App\SeoChecklist\SeoChecklistTemplate;
 use App\SeoChecklist\SeoChecklistTemplateTask;
+use App\SeoChecklist\SeoChecklistUserPreference;
 use App\SiteAuditProject;
 use App\Support\HomeUserSites;
 use App\Support\SeoChecklistDefaultTemplate;
@@ -439,8 +441,15 @@ class SeoChecklistService
             ->whereIn('status', SeoChecklistItem::OPEN_STATUSES)
             ->with([
                 'project:id,domain,title,user_id,owner_user_id,pm_user_id,team_id,status',
-                'children' => function ($q) {
-                    $q->orderBy('sort')->orderBy('id');
+                'children' => function ($q) use ($userId) {
+                    $q->orderBy('sort')->orderBy('id')
+                        ->with([
+                            'createdByUser',
+                            'doneByUser',
+                            'timeLogs' => function ($tq) use ($userId) {
+                                $tq->where('user_id', $userId)->whereNull('ended_at')->orderByDesc('id');
+                            },
+                        ]);
                 },
                 'timeLogs' => function ($q) use ($userId) {
                     $q->where('user_id', $userId)->whereNull('ended_at')->orderByDesc('id');
@@ -2186,8 +2195,15 @@ class SeoChecklistService
             ->where('status', 'review')
             ->with([
                 'project:id,domain,title,user_id,owner_user_id,pm_user_id,team_id,status',
-                'children' => function ($q) {
-                    $q->orderBy('sort')->orderBy('id');
+                'children' => function ($q) use ($userId) {
+                    $q->orderBy('sort')->orderBy('id')
+                        ->with([
+                            'createdByUser',
+                            'doneByUser',
+                            'timeLogs' => function ($tq) use ($userId) {
+                                $tq->where('user_id', $userId)->whereNull('ended_at')->orderByDesc('id');
+                            },
+                        ]);
                 },
                 'timeLogs' => function ($q) use ($userId) {
                     $q->where('user_id', $userId)->whereNull('ended_at')->orderByDesc('id');
@@ -2304,30 +2320,32 @@ class SeoChecklistService
     }
 
     /**
-     * Сколько непрочитанных чужих заметок (для бейджа в шапке / табе).
+     * Сколько непрочитанных событий в хронике по настройкам пользователя (бейдж).
      */
     public function unreadNotesCountForUser(int $userId): int
     {
-        if ($userId < 1 || !SeoChecklistNoteRead::tableReady()) {
-            return 0;
-        }
+        return $this->unreadChronicleCountForUser($userId);
+    }
 
-        $projectIds = $this->accessibleProjectsQuery($userId)
-            ->where('status', 'active')
-            ->pluck('id');
-        if ($projectIds->isEmpty()) {
-            return 0;
-        }
+    /**
+     * @param  array<int, int>|int|null  $projectFilter
+     * @param  array<int, int>|int|null  $authorFilter
+     */
+    public function unreadChronicleCountForUser(
+        int $userId,
+        $projectFilter = null,
+        $authorFilter = null
+    ): int {
+        $bundle = $this->collectUnreadChronicle(
+            $userId,
+            $projectFilter,
+            $this->normalizeIdList($authorFilter),
+            1,
+            'desc',
+            true
+        );
 
-        return (int) SeoChecklistItemNote::query()
-            ->where('user_id', '!=', $userId)
-            ->whereHas('item', function ($q) use ($projectIds) {
-                $q->whereIn('project_id', $projectIds->all())->whereNull('parent_id');
-            })
-            ->whereDoesntHave('reads', function ($q) use ($userId) {
-                $q->where('user_id', $userId);
-            })
-            ->count();
+        return (int) ($bundle['unread_count'] ?? 0);
     }
 
     /**
@@ -2338,7 +2356,7 @@ class SeoChecklistService
      * Хроника.
      *
      * @param  bool|string  $presetOrUnread  true/false (legacy unreadOnly) или preset: unread|notes|all
-     * @return array{items:\Illuminate\Support\Collection,unread_notes:\Illuminate\Support\Collection,unread_count:int,preset:string}
+     * @return array{items:\Illuminate\Support\Collection,unread_notes:\Illuminate\Support\Collection,unread_events:\Illuminate\Support\Collection,unread_count:int,preset:string,unread_prefs:array}
      */
     public function chronicleForUser(
         int $userId,
@@ -2357,6 +2375,7 @@ class SeoChecklistService
             $preset = 'all';
         }
         $sort = strtolower($sort) === 'asc' ? 'asc' : 'desc';
+        $prefs = SeoChecklistUserPreference::chronicleUnreadPrefsFor($userId);
 
         $projectIds = $this->accessibleProjectsQuery($userId)
             ->where('status', 'active')
@@ -2369,49 +2388,28 @@ class SeoChecklistService
         $empty = [
             'items' => collect(),
             'unread_notes' => collect(),
+            'unread_events' => collect(),
             'unread_count' => 0,
             'preset' => $preset,
             'sort' => $sort,
+            'unread_prefs' => $prefs,
         ];
         if ($projectIds->isEmpty()) {
             return $empty;
         }
 
         $authorIds = $this->normalizeIdList($authorFilter);
-
-        $unreadNotes = collect();
-        $unreadCount = 0;
-        if (SeoChecklistNoteRead::tableReady()) {
-            $noteQuery = SeoChecklistItemNote::query()
-                ->where('user_id', '!=', $userId)
-                ->whereHas('item', function ($q) use ($projectIds) {
-                    $q->whereIn('project_id', $projectIds->all())->whereNull('parent_id');
-                })
-                ->whereDoesntHave('reads', function ($q) use ($userId) {
-                    $q->where('user_id', $userId);
-                })
-                ->with(['user', 'item.project:id,domain,title']);
-
-            if ($authorIds !== []) {
-                $noteQuery->whereIn('user_id', $authorIds);
-            }
-            $unreadCount = (clone $noteQuery)->count();
-            // Непрочитанные: asc = сначала старые (удобно разгребать очередь)
-            if ($sort === 'asc') {
-                $noteQuery->orderBy('id');
-            } else {
-                $noteQuery->orderByDesc('id');
-            }
-            $unreadNotes = $noteQuery->limit(60)->get();
-        }
+        $unread = $this->collectUnreadChronicle($userId, $projectIds->all(), $authorIds, 60, $sort, false, $prefs);
 
         if ($preset === 'unread') {
             return [
                 'items' => collect(),
-                'unread_notes' => $unreadNotes,
-                'unread_count' => $unreadCount,
+                'unread_notes' => $unread['unread_notes'],
+                'unread_events' => $unread['unread_events'],
+                'unread_count' => $unread['unread_count'],
                 'preset' => $preset,
                 'sort' => $sort,
+                'unread_prefs' => $prefs,
             ];
         }
 
@@ -2444,10 +2442,183 @@ class SeoChecklistService
 
         return [
             'items' => $items,
-            'unread_notes' => $unreadNotes,
-            'unread_count' => $unreadCount,
+            'unread_notes' => $unread['unread_notes'],
+            'unread_events' => $unread['unread_events'],
+            'unread_count' => $unread['unread_count'],
             'preset' => $preset,
             'sort' => $sort,
+            'unread_prefs' => $prefs,
+        ];
+    }
+
+    /**
+     * Собрать непрочитанные события по настройкам пользователя.
+     *
+     * @param  array<int, int>|int|null  $projectFilter
+     * @param  array<int, int>  $authorIds
+     * @param  array{notes?:bool,review?:bool,created?:bool}|null  $prefs
+     * @return array{unread_notes:\Illuminate\Support\Collection,unread_events:\Illuminate\Support\Collection,unread_count:int}
+     */
+    private function collectUnreadChronicle(
+        int $userId,
+        $projectFilter = null,
+        array $authorIds = [],
+        int $limit = 60,
+        string $sort = 'desc',
+        bool $countOnly = false,
+        ?array $prefs = null
+    ): array {
+        $empty = [
+            'unread_notes' => collect(),
+            'unread_events' => collect(),
+            'unread_count' => 0,
+        ];
+        if ($userId < 1) {
+            return $empty;
+        }
+
+        $prefs = $prefs ?: SeoChecklistUserPreference::chronicleUnreadPrefsFor($userId);
+        $wantNotes = !empty($prefs['notes']);
+        $wantReview = !empty($prefs['review']);
+        $wantCreated = !empty($prefs['created']);
+        if (!$wantNotes && !$wantReview && !$wantCreated) {
+            return $empty;
+        }
+
+        if (is_array($projectFilter)) {
+            $projectIds = collect(array_values(array_filter(array_map('intval', $projectFilter))));
+            // Список id с вызывающего (уже суженный) — пересечём с доступными на всякий случай.
+            $accessible = $this->accessibleProjectsQuery($userId)
+                ->where('status', 'active')
+                ->pluck('id');
+            $projectIds = $projectIds->intersect($accessible)->values();
+        } else {
+            $projectIds = $this->accessibleProjectsQuery($userId)
+                ->where('status', 'active')
+                ->pluck('id');
+            $filterProjects = $this->normalizeIdList($projectFilter);
+            if ($filterProjects !== []) {
+                $projectIds = $projectIds->intersect($filterProjects)->values();
+            }
+        }
+        if ($projectIds->isEmpty()) {
+            return $empty;
+        }
+
+        $notes = collect();
+        $noteCount = 0;
+        if ($wantNotes && SeoChecklistNoteRead::tableReady()) {
+            $noteQuery = SeoChecklistItemNote::query()
+                ->where('user_id', '!=', $userId)
+                ->whereHas('item', function ($q) use ($projectIds) {
+                    $q->whereIn('project_id', $projectIds->all())->whereNull('parent_id');
+                })
+                ->whereDoesntHave('reads', function ($q) use ($userId) {
+                    $q->where('user_id', $userId);
+                });
+            if ($authorIds !== []) {
+                $noteQuery->whereIn('user_id', $authorIds);
+            }
+            $noteCount = (clone $noteQuery)->count();
+            if (!$countOnly) {
+                $noteQuery->with(['user', 'item.project:id,domain,title']);
+                if ($sort === 'asc') {
+                    $noteQuery->orderBy('id');
+                } else {
+                    $noteQuery->orderByDesc('id');
+                }
+                $notes = $noteQuery->limit($limit)->get();
+            }
+        }
+
+        $logs = collect();
+        $activityCount = 0;
+        if (($wantReview || $wantCreated) && SeoChecklistActivityLog::tableReady() && SeoChecklistActivityRead::tableReady()) {
+            $logQuery = SeoChecklistActivityLog::query()
+                ->whereIn('project_id', $projectIds->all())
+                ->where('user_id', '!=', $userId)
+                ->whereDoesntHave('reads', function ($q) use ($userId) {
+                    $q->where('user_id', $userId);
+                })
+                ->where(function ($q) use ($wantReview, $wantCreated) {
+                    if ($wantReview) {
+                        $q->orWhere(function ($qq) {
+                            $qq->where('type', 'status_change')
+                                ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(meta_json, '$.to')) = ?", ['review']);
+                        });
+                    }
+                    if ($wantCreated) {
+                        $q->orWhere('type', 'item_created');
+                    }
+                });
+            if ($authorIds !== []) {
+                $logQuery->whereIn('user_id', $authorIds);
+            }
+            $activityCount = (clone $logQuery)->count();
+            if (!$countOnly) {
+                $logQuery->with([
+                    'user',
+                    'project:id,domain,title',
+                    'item:id,title,project_id,parent_id,status,created_by,done_by,created_at,done_at',
+                    'item.createdByUser',
+                    'item.doneByUser',
+                    'item.parent:id,title',
+                ]);
+                if ($sort === 'asc') {
+                    $logQuery->orderBy('id');
+                } else {
+                    $logQuery->orderByDesc('id');
+                }
+                $logs = $logQuery->limit($limit)->get();
+            }
+        }
+
+        $unreadCount = $noteCount + $activityCount;
+        if ($countOnly) {
+            return [
+                'unread_notes' => collect(),
+                'unread_events' => collect(),
+                'unread_count' => $unreadCount,
+            ];
+        }
+
+        $events = collect();
+        foreach ($notes as $note) {
+            $events->push((object) [
+                'source' => 'note',
+                'sort_key' => (int) $note->id,
+                'created_at' => $note->created_at,
+                'note' => $note,
+                'log' => null,
+            ]);
+        }
+        foreach ($logs as $log) {
+            $source = ($log->type === 'item_created') ? 'created' : 'review';
+            $events->push((object) [
+                'source' => $source,
+                'sort_key' => (int) $log->id,
+                'created_at' => $log->created_at,
+                'note' => null,
+                'log' => $log,
+            ]);
+        }
+        if ($sort === 'asc') {
+            $events = $events->sortBy(function ($e) {
+                return ($e->created_at ? $e->created_at->timestamp : 0) . '-' . $e->sort_key;
+            })->values();
+        } else {
+            $events = $events->sortByDesc(function ($e) {
+                return ($e->created_at ? $e->created_at->timestamp : 0) . '-' . $e->sort_key;
+            })->values();
+        }
+        if ($events->count() > $limit) {
+            $events = $events->take($limit)->values();
+        }
+
+        return [
+            'unread_notes' => $notes,
+            'unread_events' => $events,
+            'unread_count' => $unreadCount,
         ];
     }
 
@@ -2495,12 +2666,42 @@ class SeoChecklistService
         return $n;
     }
 
+    public function markActivitiesRead(int $userId, array $activityIds): int
+    {
+        if (!SeoChecklistActivityRead::tableReady() || $userId < 1) {
+            return 0;
+        }
+        $activityIds = array_values(array_unique(array_filter(array_map('intval', $activityIds))));
+        if ($activityIds === []) {
+            return 0;
+        }
+        $n = 0;
+        foreach ($activityIds as $activityId) {
+            SeoChecklistActivityRead::query()->updateOrCreate(
+                ['user_id' => $userId, 'activity_id' => $activityId],
+                ['read_at' => now()]
+            );
+            $n++;
+        }
+
+        return $n;
+    }
+
     public function markAllUnreadNotesRead(int $userId): int
     {
-        $data = $this->chronicleForUser($userId, null, null, true, 500);
-        $ids = $data['unread_notes']->pluck('id')->all();
+        $data = $this->collectUnreadChronicle($userId, null, [], 500, 'desc', false);
+        $marked = 0;
+        $noteIds = $data['unread_notes']->pluck('id')->all();
+        $marked += $this->markNotesRead($userId, $noteIds);
+        $activityIds = [];
+        foreach ($data['unread_events'] as $event) {
+            if (!empty($event->log) && (int) ($event->log->id ?? 0) > 0) {
+                $activityIds[] = (int) $event->log->id;
+            }
+        }
+        $marked += $this->markActivitiesRead($userId, $activityIds);
 
-        return $this->markNotesRead($userId, $ids);
+        return $marked;
     }
 
     /**
@@ -2519,6 +2720,22 @@ class SeoChecklistService
         return (int) SeoChecklistNoteRead::query()
             ->where('user_id', $userId)
             ->whereIn('note_id', $noteIds)
+            ->delete();
+    }
+
+    public function markActivitiesUnread(int $userId, array $activityIds): int
+    {
+        if (!SeoChecklistActivityRead::tableReady() || $userId < 1) {
+            return 0;
+        }
+        $activityIds = array_values(array_unique(array_filter(array_map('intval', $activityIds))));
+        if ($activityIds === []) {
+            return 0;
+        }
+
+        return (int) SeoChecklistActivityRead::query()
+            ->where('user_id', $userId)
+            ->whereIn('activity_id', $activityIds)
             ->delete();
     }
 

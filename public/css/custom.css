@@ -115,11 +115,14 @@
 }
 
 #header-nav-bar.cabinet-header .navbar-badge {
-    position: static;
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-left: 0.4rem;
+    align-self: center;
+    margin: 0 0 0 0.35rem;
     min-width: 1.5rem;
     height: 1.5rem;
     padding: 0 0.45rem;
@@ -128,6 +131,25 @@
     line-height: 1;
     vertical-align: middle;
     border-radius: 50rem;
+    transform: none !important;
+}
+
+#header-nav-bar.cabinet-header .cabinet-header-sc-nav {
+    display: inline-flex !important;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0;
+    white-space: nowrap;
+}
+
+#header-nav-bar.cabinet-header .cabinet-header-sc-nav__label {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1.25;
+}
+
+#header-nav-bar.cabinet-header .cabinet-header-sc-nav .navbar-badge {
+    margin-left: 0.35rem;
 }
 
 /* Подсказки бейджей чеклиста в шапке — без native title */

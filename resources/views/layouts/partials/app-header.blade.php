@@ -64,8 +64,8 @@
                     $scUnreadTip = __('SEO checklist header unread tip');
                 @endphp
                 <li class="nav-item d-none d-md-block">
-                    <div class="nav-link d-flex flex-wrap align-items-center gap-1 py-2 @if(request()->routeIs('pages.seo-checklist*')) active @endif">
-                        <a class="text-reset text-decoration-none d-inline-flex align-items-center @if(request()->routeIs('pages.seo-checklist*')) fw-semibold @endif"
+                    <div class="nav-link cabinet-header-sc-nav @if(request()->routeIs('pages.seo-checklist*')) active @endif">
+                        <a class="cabinet-header-sc-nav__label text-reset text-decoration-none @if(request()->routeIs('pages.seo-checklist*')) fw-semibold @endif"
                            href="{{ route('pages.seo-checklist') }}">
                             <i class="bi bi-clipboard-check me-1" aria-hidden="true"></i>
                             {{ $seoChecklistModuleTitle ?? __('SEO Checklist') }}

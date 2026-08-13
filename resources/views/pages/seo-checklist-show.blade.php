@@ -410,21 +410,6 @@
                                                {{ in_array($item->status, \App\SeoChecklist\SeoChecklistItem::CLOSED_STATUSES, true) ? 'checked' : '' }}>
                                     </label>
                                     <div class="cabinet-sc-task__body">
-                                        <button type="button"
-                                                class="cabinet-sc-task__title {{ $item->is_important ? 'is-important' : '' }}"
-                                                data-sc-title
-                                                @if($project->status === 'archived') disabled @endif
-                                                title="{{ __('Click to edit') }}">
-                                            {{ $item->title }}
-                                        </button>
-                                        @if($item->help || $project->status !== 'archived')
-                                            <p class="cabinet-sc-task__help @if(!$item->help) is-empty @endif"
-                                               data-sc-help
-                                               data-raw-value="{{ e($item->help ?: '') }}"
-                                               @if($project->status !== 'archived') title="{{ __('Click to edit') }}" tabindex="0" role="button" @endif>
-                                                {{ $item->help ?: __('Add description') }}
-                                            </p>
-                                        @endif
                                         @php
                                             $createdByName = $item->createdByUser
                                                 ? (trim(($item->createdByUser->name ?? '') . ' ' . ($item->createdByUser->last_name ?? '')) ?: $item->createdByUser->email)
@@ -445,18 +430,35 @@
                                                 ])
                                                 : null;
                                         @endphp
-                                        <p class="cabinet-sc-task__audit" data-sc-audit @if(!$createdLabel && !$doneLabel) hidden @endif>
-                                            @if($createdLabel)
-                                                <span data-sc-audit-created>{{ $createdLabel }}</span>
-                                            @else
-                                                <span data-sc-audit-created hidden></span>
-                                            @endif
-                                            @if($doneLabel)
-                                                <span data-sc-audit-done>{{ $doneLabel }}</span>
-                                            @else
-                                                <span data-sc-audit-done hidden></span>
-                                            @endif
-                                        </p>
+                                        <div class="cabinet-sc-task__head">
+                                            <button type="button"
+                                                    class="cabinet-sc-task__title {{ $item->is_important ? 'is-important' : '' }}"
+                                                    data-sc-title
+                                                    @if($project->status === 'archived') disabled @endif
+                                                    title="{{ __('Click to edit') }}">
+                                                {{ $item->title }}
+                                            </button>
+                                            <p class="cabinet-sc-task__audit" data-sc-audit @if(!$createdLabel && !$doneLabel) hidden @endif>
+                                                @if($createdLabel)
+                                                    <span data-sc-audit-created>{{ $createdLabel }}</span>
+                                                @else
+                                                    <span data-sc-audit-created hidden></span>
+                                                @endif
+                                                @if($doneLabel)
+                                                    <span data-sc-audit-done>{{ $doneLabel }}</span>
+                                                @else
+                                                    <span data-sc-audit-done hidden></span>
+                                                @endif
+                                            </p>
+                                        </div>
+                                        @if($item->help || $project->status !== 'archived')
+                                            <p class="cabinet-sc-task__help @if(!$item->help) is-empty @endif"
+                                               data-sc-help
+                                               data-raw-value="{{ e($item->help ?: '') }}"
+                                               @if($project->status !== 'archived') title="{{ __('Click to edit') }}" tabindex="0" role="button" @endif>
+                                                {{ $item->help ?: __('Add description') }}
+                                            </p>
+                                        @endif
                                     </div>
                                     <div class="cabinet-sc-task__actions">
                                         @if($item->due_at)

@@ -17,6 +17,7 @@ class SeoChecklistDueBadgeComposer
             'seoChecklistNavVisible' => false,
             'seoChecklistDueCount' => 0,
             'seoChecklistOverdueCount' => 0,
+            'seoChecklistUnreadNotesCount' => 0,
             'seoChecklistActiveTimer' => null,
             'seoChecklistModuleTitle' => SeoChecklistUserPreference::defaultTitle(),
         ];
@@ -39,6 +40,7 @@ class SeoChecklistDueBadgeComposer
             $userId = (int) $user->id;
             $service = app(SeoChecklistService::class);
             $alerts = $service->dueAlertsForUser($userId);
+            $unreadNotesCount = $service->unreadNotesCountForUser($userId);
             $activeTimer = null;
             if (Schema::hasTable('seo_checklist_item_time_logs')) {
                 $active = $service->activeTimerForUser($userId);
@@ -65,6 +67,7 @@ class SeoChecklistDueBadgeComposer
                 'seoChecklistNavVisible' => true,
                 'seoChecklistDueCount' => (int) ($alerts['count'] ?? 0),
                 'seoChecklistOverdueCount' => (int) ($alerts['overdue'] ?? 0),
+                'seoChecklistUnreadNotesCount' => $unreadNotesCount,
                 'seoChecklistActiveTimer' => $activeTimer,
                 'seoChecklistModuleTitle' => SeoChecklistUserPreference::moduleTitleFor($userId),
             ]);

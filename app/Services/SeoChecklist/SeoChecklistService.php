@@ -1782,6 +1782,7 @@ class SeoChecklistService
             ),
             'links_json' => [],
             'status' => 'todo',
+            'created_by' => Auth::id() ? (int) Auth::id() : null,
         ]);
 
         $project->recalculateProgress();
@@ -2057,12 +2058,15 @@ class SeoChecklistService
         }
 
         if ($status === 'done' || $status === 'skip') {
-            // Закрытие задачи — только PM/аудитор и только из «На проверку»
-            if ($from !== 'review') {
-                return ['ok' => false, 'message' => __('Send to review first')];
-            }
-            if (!$this->canApproveReview($project, $userId)) {
-                return ['ok' => false, 'message' => __('Only PM or auditor can approve')];
+            // Подзадачи — обычные чекбоксы: исполнитель закрывает сам, без «на проверку».
+            // Основные задачи — только PM/аудитор и только из «На проверку».
+            if (!$item->isSubtask()) {
+                if ($from !== 'review') {
+                    return ['ok' => false, 'message' => __('Send to review first')];
+                }
+                if (!$this->canApproveReview($project, $userId)) {
+                    return ['ok' => false, 'message' => __('Only PM or auditor can approve')];
+                }
             }
         }
 
@@ -2239,6 +2243,33 @@ class SeoChecklistService
     }
 
     /**
+     * Сколько непрочитанных чужих заметок (для бейджа в шапке / табе).
+     */
+    public function unreadNotesCountForUser(int $userId): int
+    {
+        if ($userId < 1 || !SeoChecklistNoteRead::tableReady()) {
+            return 0;
+        }
+
+        $projectIds = $this->accessibleProjectsQuery($userId)
+            ->where('status', 'active')
+            ->pluck('id');
+        if ($projectIds->isEmpty()) {
+            return 0;
+        }
+
+        return (int) SeoChecklistItemNote::query()
+            ->where('user_id', '!=', $userId)
+            ->whereHas('item', function ($q) use ($projectIds) {
+                $q->whereIn('project_id', $projectIds->all())->whereNull('parent_id');
+            })
+            ->whereDoesntHave('reads', function ($q) use ($userId) {
+                $q->where('user_id', $userId);
+            })
+            ->count();
+    }
+
+    /**
      * @param  array<int, int>|int|null  $projectFilter  один id, список id или null
      * @param  array<int, int>|int|null  $authorFilter
      */
@@ -2388,6 +2419,54 @@ class SeoChecklistService
         $ids = $data['unread_notes']->pluck('id')->all();
 
         return $this->markNotesRead($userId, $ids);
+    }
+
+    /**
+     * Снять отметку «прочитано» — заметка снова в непрочитанных.
+     */
+    public function markNotesUnread(int $userId, array $noteIds): int
+    {
+        if (!SeoChecklistNoteRead::tableReady() || $userId < 1) {
+            return 0;
+        }
+        $noteIds = array_values(array_unique(array_filter(array_map('intval', $noteIds))));
+        if ($noteIds === []) {
+            return 0;
+        }
+
+        return (int) SeoChecklistNoteRead::query()
+            ->where('user_id', $userId)
+            ->whereIn('note_id', $noteIds)
+            ->delete();
+    }
+
+    /**
+     * Какие из note_id текущий пользователь уже отметил прочитанными.
+     *
+     * @param  array<int, int>  $noteIds
+     * @return array<int, true>  note_id => true
+     */
+    public function readNoteIdMap(int $userId, array $noteIds): array
+    {
+        if (!SeoChecklistNoteRead::tableReady() || $userId < 1 || $noteIds === []) {
+            return [];
+        }
+        $noteIds = array_values(array_unique(array_filter(array_map('intval', $noteIds))));
+        if ($noteIds === []) {
+            return [];
+        }
+
+        $map = [];
+        foreach (
+            SeoChecklistNoteRead::query()
+                ->where('user_id', $userId)
+                ->whereIn('note_id', $noteIds)
+                ->pluck('note_id') as $noteId
+        ) {
+            $map[(int) $noteId] = true;
+        }
+
+        return $map;
     }
 
     /**

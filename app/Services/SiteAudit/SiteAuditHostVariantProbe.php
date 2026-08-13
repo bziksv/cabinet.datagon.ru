@@ -82,7 +82,8 @@ class SiteAuditHostVariantProbe
         $crawl->save();
 
         if ($this->httpServesWithoutHttpsCanonical($http, $apex, $www)) {
-            $httpsTarget = $this->isLive($httpsWww) && $this->hasWww((string) ($www['final_host'] ?? ''))
+            // isLive() ждёт результат probe(), не URL-строку (TypeError валил весь host_variants).
+            $httpsTarget = $this->isLive($www) && $this->hasWww((string) ($www['final_host'] ?? ''))
                 ? $httpsWww
                 : $httpsApex;
             $this->createFinding($crawl->id, 'http_https_both_available', $httpApex, [

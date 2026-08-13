@@ -471,6 +471,9 @@ class SiteAuditAggregator
         $descMax = (int) config('site_audit.description_max', 160);
         $chunkSize = max(50, (int) config('site_audit.aggregate_from_pages_chunk', 200));
         $afterId = (int) ($meta['after_id'] ?? 0);
+        $chromeBigrams = $this->chromeNgramMap($crawlId, 'top_bigram');
+        $chromeTrigrams = $this->chromeNgramMap($crawlId, 'top_trigram');
+        $ngramMinWords = max(1, (int) config('site_audit.ngram_spam_min_words', 40));
 
         while (true) {
             $pages = SiteAuditPage::query()
@@ -647,52 +650,77 @@ class SiteAuditAggregator
                     }
 
                     $nauseaClassicMax = (float) config('site_audit.nausea_classic_max', 8.0);
-                    $nauseaAcademicMax = (float) config('site_audit.nausea_academic_max', 10.0);
+                    $nauseaAcademicMax = (float) config('site_audit.nausea_academic_max', 25.0);
+                    $nauseaMinWords = max(1, (int) config('site_audit.nausea_min_words', 50));
                     $classic = $page->nausea_classic !== null ? (float) $page->nausea_classic : null;
                     $academic = $page->nausea_academic !== null ? (float) $page->nausea_academic : null;
-                    if (($classic !== null && $classic >= $nauseaClassicMax)
-                        || ($academic !== null && $academic >= $nauseaAcademicMax)
+                    $nauseaWords = (int) ($page->word_count ?? 0);
+                    if ($nauseaWords >= $nauseaMinWords
+                        && (
+                            ($classic !== null && $classic >= $nauseaClassicMax)
+                            || ($academic !== null && $academic >= $nauseaAcademicMax)
+                        )
                     ) {
                         $findings[] = $this->row($crawlId, 'text_nausea', $page, [
                             'nausea_classic' => $classic,
                             'nausea_academic' => $academic,
                             'top_word' => $page->top_word,
                             'top_word_count' => (int) $page->top_word_count,
+                            'word_count' => $nauseaWords,
                             'threshold_classic' => $nauseaClassicMax,
                             'threshold_academic' => $nauseaAcademicMax,
+                            'min_words' => $nauseaMinWords,
                         ]);
                     }
 
-                    $bigramMin = (int) config('site_audit.bigram_spam_min', 4);
+                    $bigramMin = (int) config('site_audit.bigram_spam_min', 5);
                     $bigramDensityMin = (float) config('site_audit.bigram_spam_density_min', 1.5);
                     $bgCount = (int) $page->top_bigram_count;
                     $words = (int) $page->word_count;
                     $bgDensity = ($words > 0 && $bgCount > 0)
                         ? round(($bgCount / $words) * 100, 2)
                         : 0.0;
-                    if ($page->top_bigram && $bgCount >= $bigramMin && $bgDensity >= $bigramDensityMin) {
+                    $bgKey = mb_strtolower(trim((string) ($page->top_bigram ?? '')));
+                    if ($words >= $ngramMinWords
+                        && $page->top_bigram
+                        && $bgKey !== ''
+                        && ! isset($chromeBigrams[$bgKey])
+                        && $bgCount >= $bigramMin
+                        && $bgDensity >= $bigramDensityMin
+                    ) {
                         $findings[] = $this->row($crawlId, 'text_bigram_spam', $page, [
                             'bigram' => $page->top_bigram,
                             'count' => $bgCount,
                             'density' => $bgDensity,
+                            'word_count' => $words,
                             'threshold_count' => $bigramMin,
                             'threshold_density' => $bigramDensityMin,
+                            'min_words' => $ngramMinWords,
                         ]);
                     }
 
-                    $trigramMin = (int) config('site_audit.trigram_spam_min', 3);
+                    $trigramMin = (int) config('site_audit.trigram_spam_min', 5);
                     $trigramDensityMin = (float) config('site_audit.trigram_spam_density_min', 1.0);
                     $tgCount = (int) ($page->top_trigram_count ?? 0);
                     $tgDensity = ($words > 0 && $tgCount > 0)
                         ? round(($tgCount / $words) * 100, 2)
                         : 0.0;
-                    if (! empty($page->top_trigram) && $tgCount >= $trigramMin && $tgDensity >= $trigramDensityMin) {
+                    $tgKey = mb_strtolower(trim((string) ($page->top_trigram ?? '')));
+                    if ($words >= $ngramMinWords
+                        && ! empty($page->top_trigram)
+                        && $tgKey !== ''
+                        && ! isset($chromeTrigrams[$tgKey])
+                        && $tgCount >= $trigramMin
+                        && $tgDensity >= $trigramDensityMin
+                    ) {
                         $findings[] = $this->row($crawlId, 'text_trigram_spam', $page, [
                             'trigram' => $page->top_trigram,
                             'count' => $tgCount,
                             'density' => $tgDensity,
+                            'word_count' => $words,
                             'threshold_count' => $trigramMin,
                             'threshold_density' => $trigramDensityMin,
+                            'min_words' => $ngramMinWords,
                         ]);
                     }
 
@@ -714,7 +742,7 @@ class SiteAuditAggregator
                         ]);
                     }
 
-                    $softMeta = $this->soft404Meta($page, $thin);
+                    $softMeta = $this->soft404Meta($page);
                     if ($softMeta !== null) {
                         $findings[] = $this->row($crawlId, 'soft_404', $page, $softMeta);
                     }
@@ -734,11 +762,54 @@ class SiteAuditAggregator
     }
 
     /**
-     * Soft 404: 200 + паттерн «не найдено» в TITLE/H1 или крайне мало текста.
+     * N-граммы, которые «top» на большой доле страниц = сквозной бренд/chrome, не переспам контента.
+     *
+     * @return array<string,true> ключ — mb_strtolower(фраза)
+     */
+    private function chromeNgramMap(int $crawlId, string $column): array
+    {
+        if (! in_array($column, ['top_bigram', 'top_trigram'], true)) {
+            return [];
+        }
+        $share = (float) config('site_audit.ngram_chrome_share', 0.20);
+        $minPages = max(2, (int) config('site_audit.ngram_chrome_min_pages', 8));
+
+        $rows = SiteAuditPage::query()
+            ->where('crawl_id', $crawlId)
+            ->whereNotNull($column)
+            ->where($column, '!=', '')
+            ->get([$column]);
+
+        $n = $rows->count();
+        if ($n < $minPages) {
+            return [];
+        }
+        $need = max($minPages, (int) ceil($share * $n));
+        $df = [];
+        foreach ($rows as $row) {
+            $key = mb_strtolower(trim((string) ($row->{$column} ?? '')));
+            if ($key === '') {
+                continue;
+            }
+            $df[$key] = ($df[$key] ?? 0) + 1;
+        }
+        $out = [];
+        foreach ($df as $key => $c) {
+            if ($c >= $need) {
+                $out[$key] = true;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Soft 404: 200 + паттерн «не найдено» в TITLE/H1.
+     * Крайне мало текста без таких паттернов — это thin_content, не soft 404.
      *
      * @return array<string, mixed>|null
      */
-    private function soft404Meta(SiteAuditPage $page, int $thin): ?array
+    private function soft404Meta(SiteAuditPage $page): ?array
     {
         if ((int) $page->status_code !== 200) {
             return null;
@@ -784,15 +855,6 @@ class SiteAuditAggregator
                     'matched_in' => 'h1',
                 ]);
             }
-        }
-
-        // очень тощий ответ при 200 — кандидат soft-404 (жёстче обычного thin)
-        $softThin = max(20, (int) floor($thin / 3));
-        if ($page->word_count !== null && (int) $page->word_count > 0 && (int) $page->word_count < $softThin) {
-            return array_merge($base, [
-                'reason' => 'thin',
-                'threshold' => $softThin,
-            ]);
         }
 
         return null;
@@ -1484,10 +1546,45 @@ class SiteAuditAggregator
         $pageSev = config('site_audit.findings.page_has_broken_links.severity', 'warning');
         $linkSev = config('site_audit.findings.broken_internal_link.severity', 'critical');
 
+        // Циклы редиректов — не «битая ссылка» (отдельный отчёт redirect_loop).
+        $redirectLoopHashes = [];
+        $redirectLoopUrls = [];
+        foreach (
+            SiteAuditFinding::query()
+                ->where('crawl_id', $crawl->id)
+                ->where('code', 'redirect_loop')
+                ->get(['url', 'url_hash']) as $loopRow
+        ) {
+            $redirectLoopHashes[(string) $loopRow->url_hash] = true;
+            $redirectLoopUrls[(string) $loopRow->url] = true;
+        }
+
         $uniqueBroken = Cache::get($cacheKey);
         if (! is_array($uniqueBroken)) {
             $uniqueBroken = [];
         }
+
+        $isBrokenCrawlTarget = static function ($target) use ($redirectLoopHashes, $redirectLoopUrls): ?array {
+            if (! $target) {
+                return null;
+            }
+            $tu = (string) ($target->url ?? '');
+            $th = (string) ($target->url_hash ?? '');
+            if (($th !== '' && isset($redirectLoopHashes[$th])) || ($tu !== '' && isset($redirectLoopUrls[$tu]))) {
+                return null;
+            }
+            $code = $target->status_code;
+            // null без loop — цель не ответила / оборвался fetch; ≥400 — битая.
+            if ($code === null || (int) $code >= 400) {
+                return [
+                    'url' => $tu !== '' ? $tu : $th,
+                    'status' => $code !== null ? (int) $code : null,
+                    'source' => 'crawl',
+                ];
+            }
+
+            return null;
+        };
 
         while (true) {
             $pages = SiteAuditPage::query()
@@ -1519,42 +1616,29 @@ class SiteAuditAggregator
                     $out = (string) $out;
                     if ($out === '' || (strlen($out) === 64 && ctype_xdigit($out))) {
                         if (isset($byHash[$out])) {
-                            $target = $byHash[$out];
-                            $code = $target->status_code;
-                            if ($code === null || (int) $code >= 400) {
-                                $brokenSamples[] = [
-                                    'url' => $target->url,
-                                    'status' => $code !== null ? (int) $code : null,
-                                    'source' => 'crawl',
-                                ];
+                            $sample = $isBrokenCrawlTarget($byHash[$out]);
+                            if ($sample !== null) {
+                                $brokenSamples[] = $sample;
                             }
                         }
                         continue;
                     }
 
                     if (isset($byUrl[$out])) {
-                        $target = $byUrl[$out];
-                        $code = $target->status_code;
-                        if ($code === null || (int) $code >= 400) {
-                            $brokenSamples[] = [
-                                'url' => $out,
-                                'status' => $code !== null ? (int) $code : null,
-                                'source' => 'crawl',
-                            ];
+                        $sample = $isBrokenCrawlTarget($byUrl[$out]);
+                        if ($sample !== null) {
+                            $sample['url'] = $out;
+                            $brokenSamples[] = $sample;
                         }
                         continue;
                     }
 
                     $h = SiteAuditUrlNormalizer::hash($out);
                     if (isset($byHash[$h])) {
-                        $target = $byHash[$h];
-                        $code = $target->status_code;
-                        if ($code === null || (int) $code >= 400) {
-                            $brokenSamples[] = [
-                                'url' => $out,
-                                'status' => $code !== null ? (int) $code : null,
-                                'source' => 'crawl',
-                            ];
+                        $sample = $isBrokenCrawlTarget($byHash[$h]);
+                        if ($sample !== null) {
+                            $sample['url'] = $out;
+                            $brokenSamples[] = $sample;
                         }
                         continue;
                     }
@@ -2633,13 +2717,19 @@ class SiteAuditAggregator
         $shingleSize = max(2, (int) config('site_audit.simhash_shingle_size', 5));
         $chromeShare = (float) config('site_audit.simhash_chrome_token_share', 0.20);
         $chromeMinPages = (int) config('site_audit.simhash_chrome_min_pages', 8);
-        $minUniqueShared = max(1, (int) config('site_audit.simhash_min_unique_shared', 2));
+        $minUniqueShared = max(1, (int) config('site_audit.simhash_min_unique_shared', 4));
+        $thinWords = max(40, (int) config('site_audit.thin_words', 150));
+        // На тощих страницах шаблон даёт ложные пары — требуем больше «смысловых» общих слов.
+        $minUniqueSharedThin = max($minUniqueShared, (int) config('site_audit.simhash_min_unique_shared_thin', 10));
 
         $cols = [
             'id', 'url', 'url_hash', 'simhash', 'title', 'h1', 'description',
             'word_count', 'top_word', 'top_bigram', 'top_trigram',
             'redirect_chain', 'final_url',
         ];
+        if (Schema::hasColumn('site_audit_pages', 'content_hash')) {
+            $cols[] = 'content_hash';
+        }
         if (Schema::hasColumn('site_audit_pages', 'token_top_json')) {
             $cols[] = 'token_top_json';
         }
@@ -2728,6 +2818,13 @@ class SiteAuditAggregator
                     continue;
                 }
 
+                // Exact duplicate_content — не дублируем в similar_pages.
+                $hashA = trim((string) ($a->content_hash ?? ''));
+                $hashB = trim((string) ($b->content_hash ?? ''));
+                if ($hashA !== '' && $hashA === $hashB) {
+                    continue;
+                }
+
                 $shinglesB = $hasShinglesCol
                     ? SiteAuditSimhash::normalizeShingleList($b->shingles_json ?? null)
                     : [];
@@ -2751,9 +2848,13 @@ class SiteAuditAggregator
                 }
                 $sharedAll = SiteAuditTextMetrics::sharedTokenList($tokensA, $tokensB, 36);
                 $sharedUnique = SiteAuditTitleChrome::withoutChrome($sharedAll, $pairChrome);
+                $wordsA = (int) ($a->word_count ?? 0);
+                $wordsB = (int) ($b->word_count ?? 0);
+                $needUnique = ($wordsA > 0 && $wordsA < $thinWords && $wordsB > 0 && $wordsB < $thinWords)
+                    ? $minUniqueSharedThin
+                    : $minUniqueShared;
                 // Пара только на бренде/меню («blog», «prime», «without») — не «похожий контент».
-                // Раньше dist≤2 пропускал chrome-only; старые simhash с chrome в тексте давали ложные пары.
-                if (count($sharedUnique) < $minUniqueShared) {
+                if (count($sharedUnique) < $needUnique) {
                     continue;
                 }
 

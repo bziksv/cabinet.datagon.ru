@@ -69,7 +69,21 @@ class SiteAuditUrlNormalizer
             }
         }
 
-        $out = $scheme . '://' . $host . $path;
+        // Нестандартный порт сохраняем (иначе :59999 схлопывается в :443 и unreachable ломается).
+        // После force_https порт 80 — это бывший http-default, его не тащим в https://host:80/.
+        $portSuffix = '';
+        if (isset($parts['port'])) {
+            $port = (int) $parts['port'];
+            if (! empty($opts['force_https']) && $port === 80) {
+                $port = 0;
+            }
+            $defaultPort = $scheme === 'https' ? 443 : 80;
+            if ($port > 0 && $port !== $defaultPort) {
+                $portSuffix = ':' . $port;
+            }
+        }
+
+        $out = $scheme . '://' . $host . $portSuffix . $path;
         if ($query) {
             ksort($query);
             $out .= '?' . http_build_query($query);

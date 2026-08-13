@@ -314,9 +314,96 @@ class SiteAuditFetcher
             }
         }
         $msg = $e->getMessage();
+        $tooMany = self::isTooManyRedirectsMessage($msg);
+        if ($tooMany && $chain === []) {
+            $probed = $this->probeRedirectHops($url, 12);
+            if ($probed !== []) {
+                $chain = $probed;
+                $final = end($probed) ?: $url;
+            }
+        }
         $loop = SiteAuditRedirectChain::analyze($url, $chain, $final);
 
-        return $this->fail($url, $ua, $status, $msg, $chain, $final, ! empty($loop['loop']));
+        return $this->fail(
+            $url,
+            $ua,
+            $status,
+            $msg,
+            $chain,
+            $final,
+            ! empty($loop['loop']) || $tooMany
+        );
+    }
+
+    /** Guzzle: «Will not follow more than N redirects» — без HISTORY_HEADER. */
+    public static function isTooManyRedirectsMessage(string $error): bool
+    {
+        $error = strtolower($error);
+        if ($error === '') {
+            return false;
+        }
+        if (strpos($error, 'redirect') === false) {
+            return false;
+        }
+
+        return strpos($error, 'more than') !== false
+            || strpos($error, 'too many') !== false
+            || strpos($error, 'maximum') !== false;
+    }
+
+    /**
+     * Ручной обход Location (без follow), чтобы собрать цепочку при TooManyRedirects.
+     *
+     * @return list<string>
+     */
+    private function probeRedirectHops(string $startUrl, int $maxHops = 12): array
+    {
+        $maxHops = max(2, min(20, $maxHops));
+        $hops = [];
+        $current = $startUrl;
+        $seen = [];
+        try {
+            $client = new Client([
+                'timeout' => min(8, (int) config('site_audit.request_timeout', 15)),
+                'connect_timeout' => 5,
+                'http_errors' => false,
+                'allow_redirects' => false,
+                'verify' => true,
+                'headers' => [
+                    'User-Agent' => (string) config('site_audit.user_agent', 'TitloSiteAuditBot/1.0'),
+                    'Accept' => '*/*',
+                ],
+            ]);
+            for ($i = 0; $i < $maxHops; $i++) {
+                $norm = SiteAuditRedirectChain::normalize($current);
+                if ($norm !== '' && isset($seen[$norm])) {
+                    $hops[] = $current;
+                    break;
+                }
+                if ($norm !== '') {
+                    $seen[$norm] = true;
+                }
+                $res = $client->request('GET', $current, ['headers' => ['Accept' => 'text/html,*/*']]);
+                $code = $res->getStatusCode();
+                if ($code < 300 || $code >= 400) {
+                    break;
+                }
+                $loc = trim($res->getHeaderLine('Location'));
+                if ($loc === '') {
+                    break;
+                }
+                $next = SiteAuditUrlNormalizer::resolve($loc, $current);
+                if ($next === null || $next === '') {
+                    break;
+                }
+                $hops[] = $next;
+                $current = $next;
+            }
+        } catch (\Throwable $e) {
+            return $hops;
+        }
+
+        return $hops;
     }
 
     private function fail(
@@ -328,6 +415,10 @@ class SiteAuditFetcher
         ?string $finalUrl = null,
         bool $redirectLoop = false
     ): array {
+        if (! $redirectLoop && self::isTooManyRedirectsMessage($error)) {
+            $redirectLoop = true;
+        }
+
         return [
             'ok' => false,
             'status_code' => $status,

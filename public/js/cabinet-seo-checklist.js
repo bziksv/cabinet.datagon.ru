@@ -347,6 +347,35 @@
         if (titleEl) titleEl.classList.toggle('is-done-text', status === 'done' || status === 'skip');
     }
 
+    function applyAuditMeta(itemEl, audit) {
+        if (!itemEl || !audit) return;
+        var box = itemEl.querySelector('[data-sc-audit]');
+        if (!box) return;
+        var created = box.querySelector('[data-sc-audit-created]');
+        var done = box.querySelector('[data-sc-audit-done]');
+        if (created) {
+            if (audit.created_label) {
+                created.textContent = audit.created_label;
+                created.hidden = false;
+            } else {
+                created.textContent = '';
+                created.hidden = true;
+            }
+        }
+        if (done) {
+            if (audit.done_label) {
+                done.textContent = audit.done_label;
+                done.hidden = false;
+            } else {
+                done.textContent = '';
+                done.hidden = true;
+            }
+        }
+        var hasCreated = !!(created && !created.hidden && created.textContent);
+        var hasDone = !!(done && !done.hidden && done.textContent);
+        box.hidden = !hasCreated && !hasDone;
+    }
+
     function setStatus(itemEl, status, extras) {
         var id = itemEl.getAttribute('data-id');
         var payload = { status: status };
@@ -377,6 +406,9 @@
                     return;
                 }
                 applyItemUi(itemEl, result.data.item.status);
+                if (result.data.item.audit) {
+                    applyAuditMeta(itemEl, result.data.item.audit);
+                }
                 if (result.data.item.time_spent_seconds !== undefined || result.data.item.timer_running !== undefined) {
                     applyTimerUi(itemEl, result.data.item);
                 }
@@ -885,6 +917,10 @@
             });
         });
         helpEl.addEventListener('keydown', function (e) {
+            // Space/Enter открывают редактирование только с фокуса на самом <p>,
+            // не из textarea внутри (иначе пробел в описании глотается).
+            if (helpEl.classList.contains('is-editing')) return;
+            if (e.target !== helpEl) return;
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 helpEl.click();
@@ -901,6 +937,11 @@
         if (checkbox) {
             checkbox.addEventListener('change', function () {
                 if (checkbox.checked) {
+                    if (isSub) {
+                        // Подзадача: сразу «готово», без очереди на проверку
+                        setStatus(el, 'done');
+                        return;
+                    }
                     var cur = el.getAttribute('data-status') || 'todo';
                     var canApprove = root.getAttribute('data-can-approve') === '1';
                     setStatus(el, (cur === 'review' && canApprove) ? 'done' : 'review');
@@ -1017,11 +1058,18 @@
                         li.setAttribute('data-status', result.data.item.status || 'todo');
                         li.innerHTML = '<label class="cabinet-sc-check cabinet-sc-check--sub">' +
                             '<input type="checkbox" data-sc-done></label>' +
+                            '<div class="cabinet-sc-subtask__body">' +
                             '<button type="button" class="cabinet-sc-subtask__title" data-sc-title></button>' +
+                            '<p class="cabinet-sc-task__audit cabinet-sc-task__audit--sub" data-sc-audit hidden>' +
+                            '<span data-sc-audit-created hidden></span>' +
+                            '<span data-sc-audit-done hidden></span></p></div>' +
                             '<button type="button" class="btn btn-link btn-sm text-danger p-0" data-sc-delete title="Delete">×</button>';
                         var titleBtn = li.querySelector('[data-sc-title]');
                         titleBtn.textContent = result.data.item.title;
                         titleBtn.title = root.getAttribute('data-i18n-click-to-edit') || 'Click to edit';
+                        if (result.data.item.audit) {
+                            applyAuditMeta(li, result.data.item.audit);
+                        }
                         list.appendChild(li);
                         bindRow(li, true);
                         subTitle.value = '';

@@ -38,7 +38,7 @@ class SeoChecklistController extends Controller
 
         $projects = $this->service->accessibleProjectsQuery($userId)
             ->where('status', 'active')
-            ->with(['ownerUser', 'pmUser', 'template'])
+            ->with(['ownerUser', 'pmUser', 'template', 'team.members.user'])
             ->orderByDesc('last_activity_at')
             ->orderByDesc('id')
             ->get();
@@ -85,6 +85,7 @@ class SeoChecklistController extends Controller
             'unreadNotesCount' => (int) ($chronicle['unread_count'] ?? 0),
             'accessKinds' => $accessKinds,
             'stages' => SeoChecklistDefaultTemplate::stages(),
+            'teamRoleLabels' => \App\SeoChecklist\SeoChecklistTeam::roleLabels(),
         ]);
     }
 
@@ -178,6 +179,19 @@ class SeoChecklistController extends Controller
             ->orderBy('domain')
             ->get(['id', 'domain']);
 
+        $feedNoteIds = [];
+        foreach (($data['items'] ?? collect()) as $log) {
+            if (($log->type ?? '') !== 'note') {
+                continue;
+            }
+            $meta = is_array($log->meta_json) ? $log->meta_json : [];
+            $noteId = (int) ($meta['note_id'] ?? 0);
+            if ($noteId > 0) {
+                $feedNoteIds[] = $noteId;
+            }
+        }
+        $readNoteIds = $this->service->readNoteIdMap($userId, $feedNoteIds);
+
         return view('pages.seo-checklist-chronicle', [
             'chronicle' => $data,
             'projects' => $projects,
@@ -194,6 +208,8 @@ class SeoChecklistController extends Controller
             'reviewCount' => $this->service->reviewQueueForUser($userId)->count(),
             'showReviewTab' => $this->service->canSeeReviewQueue($userId),
             'unreadNotesCount' => (int) ($data['unread_count'] ?? 0),
+            'readNoteIds' => $readNoteIds,
+            'authUserId' => $userId,
         ]);
     }
 
@@ -212,17 +228,31 @@ class SeoChecklistController extends Controller
         return $preset;
     }
 
-    public function markChronicleNotesRead(Request $request): RedirectResponse
+    /**
+     * @return JsonResponse|RedirectResponse
+     */
+    public function markChronicleNotesRead(Request $request)
     {
         $userId = (int) Auth::id();
         if ($request->boolean('all')) {
-            $this->service->markAllUnreadNotesRead($userId);
+            $marked = $this->service->markAllUnreadNotesRead($userId);
         } else {
             $ids = $request->input('note_ids', []);
             if (!is_array($ids)) {
                 $ids = [];
             }
-            $this->service->markNotesRead($userId, $ids);
+            $marked = $this->service->markNotesRead($userId, $ids);
+        }
+
+        $unreadCount = (int) ($this->service->chronicleForUser($userId, null, null, true, 1)['unread_count'] ?? 0);
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'ok' => true,
+                'marked' => (int) $marked,
+                'unread_count' => $unreadCount,
+                'message' => __('Notes marked as read'),
+            ]);
         }
 
         $query = [];
@@ -238,6 +268,43 @@ class SeoChecklistController extends Controller
         return redirect()
             ->route('pages.seo-checklist.chronicle', $query)
             ->with('success', __('Notes marked as read'));
+    }
+
+    /**
+     * @return JsonResponse|RedirectResponse
+     */
+    public function markChronicleNotesUnread(Request $request)
+    {
+        $userId = (int) Auth::id();
+        $ids = $request->input('note_ids', []);
+        if (!is_array($ids)) {
+            $ids = [];
+        }
+        $marked = $this->service->markNotesUnread($userId, $ids);
+        $unreadCount = (int) ($this->service->chronicleForUser($userId, null, null, true, 1)['unread_count'] ?? 0);
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'ok' => true,
+                'marked' => (int) $marked,
+                'unread_count' => $unreadCount,
+                'message' => __('Notes marked as unread'),
+            ]);
+        }
+
+        $query = [];
+        foreach ($this->requestIdList($request, 'project_ids', 'project_id') as $id) {
+            $query['project_ids'][] = $id;
+        }
+        foreach ($this->requestIdList($request, 'author_ids', 'author_id') as $id) {
+            $query['author_ids'][] = $id;
+        }
+        $preset = $this->chroniclePresetFromRequest($request);
+        $query['view'] = $preset;
+
+        return redirect()
+            ->route('pages.seo-checklist.chronicle', $query)
+            ->with('success', __('Notes marked as unread'));
     }
 
     public function updateModuleTitle(Request $request): RedirectResponse
@@ -1108,10 +1175,13 @@ class SeoChecklistController extends Controller
 
         $this->service->syncAutoStatuses($project, $authId);
         $project->refresh();
-        $project->load(['ownerUser', 'pmUser']);
+        $project->load(['ownerUser', 'pmUser', 'team.members.user']);
         $items = $project->items()->whereNull('parent_id')->with([
             'notes.user',
-            'children',
+            'createdByUser',
+            'doneByUser',
+            'children.createdByUser',
+            'children.doneByUser',
             'timeLogs' => function ($q) use ($authId) {
                 $q->where('user_id', $authId)->whereNull('ended_at')->orderByDesc('id');
             },
@@ -1302,6 +1372,7 @@ class SeoChecklistController extends Controller
             return response()->json(['ok' => false, 'message' => $changed['message'] ?? __('Invalid status')], 422);
         }
         $item->refresh();
+        $item->loadMissing(['createdByUser', 'doneByUser']);
 
         $project->refresh();
 
@@ -1315,6 +1386,7 @@ class SeoChecklistController extends Controller
                 'display_seconds' => $item->displayTimeSpentSeconds((int) Auth::id()),
                 'timer_running' => false,
                 'timer_started_at' => null,
+                'audit' => $this->itemAuditPayload($item),
             ],
             'active' => (($active = $this->service->activeTimerForUser((int) Auth::id()))
                 ? $this->activeTimerState($active)
@@ -1381,7 +1453,7 @@ class SeoChecklistController extends Controller
 
     public function destroyItem(Request $request, int $id, int $itemId)
     {
-        $project = $this->findManageableProject($id);
+        $project = $this->findAccessibleProject($id);
         if (!$project || $project->status === 'archived') {
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['ok' => false, 'message' => __('Project not found')], 404);
@@ -1397,6 +1469,15 @@ class SeoChecklistController extends Controller
             }
 
             return redirect()->route('pages.seo-checklist.show', ['id' => $id])->with('error', __('Task not found'));
+        }
+
+        // Основные задачи — только менеджер; подзадачи может удалить любой с доступом к проекту
+        if (!$item->isSubtask() && !$this->service->canManageProject($project, (int) Auth::id())) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['ok' => false, 'message' => __('Only PM or auditor can approve')], 403);
+            }
+
+            return redirect()->route('pages.seo-checklist.show', ['id' => $id])->with('error', __('Project not found'));
         }
 
         $result = $this->service->deleteProjectItem($item);
@@ -1498,8 +1579,10 @@ class SeoChecklistController extends Controller
             'allows_subtasks' => false,
             'status' => 'todo',
             'links_json' => [],
+            'created_by' => (int) Auth::id(),
         ]);
         $project->forceFill(['last_activity_at' => now()])->save();
+        $child->loadMissing(['createdByUser', 'doneByUser']);
 
         return response()->json([
             'ok' => true,
@@ -1508,6 +1591,7 @@ class SeoChecklistController extends Controller
                 'title' => $child->title,
                 'status' => $child->status,
                 'parent_id' => $parent->id,
+                'audit' => $this->itemAuditPayload($child),
             ],
         ]);
     }
@@ -1832,6 +1916,46 @@ class SeoChecklistController extends Controller
     private function findAccessibleProject(int $id): ?SeoChecklistProject
     {
         return $this->service->findAccessibleProject((int) Auth::id(), $id);
+    }
+
+    /**
+     * @return array{created_label:?string,done_label:?string}
+     */
+    private function itemAuditPayload(SeoChecklistItem $item): array
+    {
+        $createdBy = $this->userShortLabel($item->createdByUser);
+        $createdAt = $item->created_at ? $item->created_at->format('d.m.Y H:i') : null;
+        $createdLabel = null;
+        if ($createdBy || $createdAt) {
+            $createdLabel = __('Created by :name on :date', [
+                'name' => $createdBy ?: '—',
+                'date' => $createdAt ?: '—',
+            ]);
+        }
+
+        $doneLabel = null;
+        if ($item->done_at) {
+            $doneBy = $this->userShortLabel($item->doneByUser);
+            $doneLabel = __('Completed by :name on :date', [
+                'name' => $doneBy ?: '—',
+                'date' => $item->done_at->format('d.m.Y H:i'),
+            ]);
+        }
+
+        return [
+            'created_label' => $createdLabel,
+            'done_label' => $doneLabel,
+        ];
+    }
+
+    private function userShortLabel($user): ?string
+    {
+        if (!$user) {
+            return null;
+        }
+        $name = trim(($user->name ?? '') . ' ' . ($user->last_name ?? ''));
+
+        return $name !== '' ? $name : (string) ($user->email ?: null);
     }
 
     private function findManageableProject(int $id): ?SeoChecklistProject

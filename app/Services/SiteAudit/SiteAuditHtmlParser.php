@@ -70,7 +70,8 @@ class SiteAuditHtmlParser
         $words = preg_split('/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY);
         $wordCount = is_array($words) ? count($words) : 0;
         $textMetrics = SiteAuditTextMetrics::analyze($text);
-        $noindexText = SiteAuditTextMetrics::noindexText($html);
+        $noindexInfo = SiteAuditTextMetrics::noindexInfo($html);
+        $noindexText = (string) ($noindexInfo['text'] ?? '');
         $contentRisk = config('site_audit.content_risk_enabled', true)
             ? SiteAuditContentRisk::analyze($text)
             : [
@@ -142,24 +143,8 @@ class SiteAuditHtmlParser
             $doctype = '';
         }
 
-        $mixedSamples = [];
         $isHttps = stripos($finalUrl, 'https://') === 0;
-        if ($isHttps && preg_match_all(
-            '/\b(?:src|href|action|data-src)\s*=\s*["\'](http:\/\/[^"\']+)["\']/i',
-            $html,
-            $mm
-        )) {
-            foreach ($mm[1] as $httpUrl) {
-                // игнор localhost / schema-relative уже отсечены
-                if (stripos($httpUrl, 'http://') !== 0) {
-                    continue;
-                }
-                $mixedSamples[] = $httpUrl;
-                if (count($mixedSamples) >= 5) {
-                    break;
-                }
-            }
-        }
+        $mixedSamples = $isHttps ? $this->collectMixedContentSamples($html) : [];
 
         $insecureForms = $isHttps ? $this->insecureFormActions($html) : [];
         $htmlErrors = $this->collectHtmlErrors($html);
@@ -201,7 +186,12 @@ class SiteAuditHtmlParser
             'top_trigram' => $textMetrics['top_trigram'],
             'top_trigram_count' => $textMetrics['top_trigram_count'],
             'token_top' => $textMetrics['top_tokens'] ?? [],
-            'noindex_text_len' => mb_strlen($noindexText),
+            'noindex_text_len' => (int) ($noindexInfo['len'] ?? mb_strlen($noindexText)),
+            'noindex_sample' => (string) ($noindexInfo['sample'] ?? ''),
+            'noindex_links' => isset($noindexInfo['links']) && is_array($noindexInfo['links'])
+                ? $noindexInfo['links']
+                : [],
+            'noindex_hash' => (string) ($noindexInfo['hash'] ?? ''),
             'img_count' => $imgCount,
             'img_without_alt' => $imgWithoutAlt,
             'unique_img_src_count' => count($imgSrcs),
@@ -233,6 +223,69 @@ class SiteAuditHtmlParser
      *
      * @return list<array{line:?int, level:string, message:string}>
      */
+    /**
+     * Mixed content = HTTP-подресурсы на HTTPS-странице (img/script/css/iframe/…).
+     * Не считаем: обычные &lt;a href&gt;, rel=canonical, form action (это insecure_form).
+     *
+     * @return list<string>
+     */
+    private function collectMixedContentSamples(string $html): array
+    {
+        $samples = [];
+        $add = static function (string $url) use (&$samples): void {
+            $url = trim(html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            if ($url === '' || stripos($url, 'http://') !== 0) {
+                return;
+            }
+            if (in_array($url, $samples, true)) {
+                return;
+            }
+            $samples[] = $url;
+        };
+
+        // Passiveктивные/пассивные media-теги с src / data-src / poster.
+        if (preg_match_all(
+            '/<(?:img|script|iframe|embed|video|audio|source|track|object)\b([^>]*)>/i',
+            $html,
+            $tags,
+            PREG_SET_ORDER
+        )) {
+            foreach ($tags as $tag) {
+                $attrs = $tag[1] ?? '';
+                foreach (['src', 'data-src', 'poster', 'data'] as $attr) {
+                    if (preg_match('/\b' . $attr . '\s*=\s*("([^"]*)"|\'([^\']*)\')/i', $attrs, $am)) {
+                        $add($this->quotedAttr($am));
+                    }
+                }
+                if (count($samples) >= 5) {
+                    return $samples;
+                }
+            }
+        }
+
+        // <link rel="stylesheet|icon|preload|prefetch|…"> с http href — не canonical/alternate.
+        if (preg_match_all('/<link\b([^>]*)>/i', $html, $links, PREG_SET_ORDER)) {
+            foreach ($links as $link) {
+                $attrs = $link[1] ?? '';
+                $rel = '';
+                if (preg_match('/\brel\s*=\s*("([^"]*)"|\'([^\']*)\')/i', $attrs, $rm)) {
+                    $rel = mb_strtolower($this->quotedAttr($rm));
+                }
+                if ($rel === '' || ! preg_match('/\b(stylesheet|icon|shortcut\s+icon|apple-touch-icon|preload|prefetch|modulepreload|manifest)\b/i', $rel)) {
+                    continue;
+                }
+                if (preg_match('/\bhref\s*=\s*("([^"]*)"|\'([^\']*)\')/i', $attrs, $hm)) {
+                    $add($this->quotedAttr($hm));
+                }
+                if (count($samples) >= 5) {
+                    return $samples;
+                }
+            }
+        }
+
+        return array_slice($samples, 0, 5);
+    }
+
     private function collectHtmlErrors(string $html): array
     {
         $out = [];

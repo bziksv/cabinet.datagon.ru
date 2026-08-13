@@ -908,6 +908,192 @@
         });
     })();
 
+    // —— Chronicle: «Ознакомлен» / «Вернуть в непрочитанные» без перезагрузки ——
+    (function initChronicleMarkRead() {
+        var page = document.querySelector('[data-sc-hub="chronicle"]');
+        if (!page) return;
+
+        var csrf = page.getAttribute('data-csrf') ||
+            (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+        var markUrl = page.getAttribute('data-mark-read-url') || '';
+        var unmarkUrl = page.getAttribute('data-mark-unread-url') || '';
+        var markAllLabel = page.getAttribute('data-i18n-mark-all') || 'Mark all';
+        var markedMsg = page.getAttribute('data-i18n-marked') || 'Notes marked as read';
+        var unmarkedMsg = page.getAttribute('data-i18n-unmarked') || 'Notes marked as unread';
+        if (!markUrl && !unmarkUrl) return;
+
+        function postForm(url, form) {
+            var body = new FormData(form);
+            return fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrf,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+                body: body,
+            }).then(function (r) {
+                return r.json().then(function (data) {
+                    return { ok: r.ok && data && data.ok !== false, data: data || {}, status: r.status };
+                });
+            });
+        }
+
+        function setCount(el, n) {
+            if (!el) return;
+            var count = Math.max(0, parseInt(n, 10) || 0);
+            if (count < 1) {
+                el.hidden = true;
+                el.textContent = '0';
+                return;
+            }
+            el.hidden = false;
+            el.textContent = count > 99 ? '99+' : String(count);
+        }
+
+        function showFlash(message) {
+            var slot = page.querySelector('[data-sc-flash-slot]');
+            if (!slot) return;
+            slot.innerHTML = '<div class="alert alert-success py-2 px-3 small">' +
+                String(message || '').replace(/</g, '&lt;') + '</div>';
+        }
+
+        function syncCounts(unreadCount) {
+            var count = Math.max(0, parseInt(unreadCount, 10) || 0);
+            var list = page.querySelector('[data-sc-unread-list]');
+            var remaining = list ? list.querySelectorAll('[data-sc-unread-item]').length : count;
+            var section = page.querySelector('[data-sc-unread-section]');
+            var empty = page.querySelector('[data-sc-unread-empty]');
+            var preset = page.getAttribute('data-filter-preset') || 'unread';
+
+            if (count === 0 || remaining === 0) {
+                if (section) section.hidden = true;
+                page.querySelectorAll('[data-sc-mark-all-wrap]').forEach(function (wrap) {
+                    wrap.hidden = true;
+                });
+                if (empty && preset === 'unread') empty.hidden = false;
+            } else {
+                if (section) section.hidden = false;
+                if (empty) empty.hidden = true;
+                page.querySelectorAll('[data-sc-mark-all-wrap]').forEach(function (wrap) {
+                    wrap.hidden = false;
+                });
+            }
+
+            setCount(page.querySelector('[data-sc-unread-section-count]'), remaining || count);
+            setCount(page.querySelector('[data-sc-unread-preset-count]'), count);
+            setCount(document.querySelector('[data-sc-unread-nav-count]'), count);
+            setCount(document.querySelector('[data-sc-unread-header-count]'), count);
+
+            page.querySelectorAll('[data-sc-mark-all-label]').forEach(function (label) {
+                label.textContent = count > 0 ? (markAllLabel + ' (' + count + ')') : markAllLabel;
+            });
+        }
+
+        function setFeedNoteReadState(noteId, isRead) {
+            if (!noteId) return;
+            page.querySelectorAll('[data-sc-feed-note][data-note-id="' + noteId + '"]').forEach(function (item) {
+                item.setAttribute('data-note-read', isRead ? '1' : '0');
+                item.classList.toggle('is-unread', !isRead);
+                var actions = item.querySelector('[data-sc-note-actions]');
+                if (!actions) return;
+                var readForm = actions.querySelector('[data-sc-mark-read]');
+                var unreadForm = actions.querySelector('[data-sc-mark-unread]');
+                if (readForm) readForm.hidden = !!isRead;
+                if (unreadForm) unreadForm.hidden = !isRead;
+                actions.querySelectorAll('button[type="submit"]').forEach(function (b) {
+                    b.disabled = false;
+                });
+            });
+        }
+
+        function updateAfterRead(unreadCount, removedIds, markAll) {
+            var list = page.querySelector('[data-sc-unread-list]');
+            if (markAll) {
+                if (list) list.innerHTML = '';
+                page.querySelectorAll('[data-sc-feed-note]').forEach(function (item) {
+                    var id = item.getAttribute('data-note-id');
+                    if (id) setFeedNoteReadState(id, true);
+                });
+            } else if (removedIds && removedIds.length) {
+                removedIds.forEach(function (id) {
+                    if (list) {
+                        var item = list.querySelector('[data-sc-unread-item][data-note-id="' + id + '"]');
+                        if (item && item.parentNode) item.parentNode.removeChild(item);
+                    }
+                    setFeedNoteReadState(id, true);
+                });
+            }
+            syncCounts(unreadCount);
+        }
+
+        function updateAfterUnread(unreadCount, noteIds) {
+            (noteIds || []).forEach(function (id) {
+                setFeedNoteReadState(id, false);
+            });
+            syncCounts(unreadCount);
+        }
+
+        page.addEventListener('submit', function (e) {
+            var readForm = e.target.closest('[data-sc-mark-read]');
+            var unreadForm = e.target.closest('[data-sc-mark-unread]');
+            if (!readForm && !unreadForm) return;
+            var form = readForm || unreadForm;
+            if (!page.contains(form)) return;
+            e.preventDefault();
+
+            var btn = form.querySelector('button[type="submit"]');
+            var noteId = form.getAttribute('data-note-id');
+            var noteIds = noteId ? [String(noteId)] : [];
+            if (!noteId) {
+                form.querySelectorAll('input[name="note_ids[]"]').forEach(function (input) {
+                    if (input.value) noteIds.push(String(input.value));
+                });
+            }
+
+            if (btn) btn.disabled = true;
+
+            if (unreadForm) {
+                if (!unmarkUrl) {
+                    if (btn) btn.disabled = false;
+                    return;
+                }
+                postForm(unmarkUrl, form)
+                    .then(function (result) {
+                        if (!result.ok) {
+                            if (btn) btn.disabled = false;
+                            alert((result.data && result.data.message) || 'Error');
+                            return;
+                        }
+                        updateAfterUnread(result.data.unread_count, noteIds);
+                        showFlash(result.data.message || unmarkedMsg);
+                    })
+                    .catch(function () {
+                        if (btn) btn.disabled = false;
+                        alert('Error');
+                    });
+                return;
+            }
+
+            var markAll = form.getAttribute('data-sc-mark-all') === '1';
+            postForm(markUrl, form)
+                .then(function (result) {
+                    if (!result.ok) {
+                        if (btn) btn.disabled = false;
+                        alert((result.data && result.data.message) || 'Error');
+                        return;
+                    }
+                    updateAfterRead(result.data.unread_count, noteIds, markAll);
+                    showFlash(result.data.message || markedMsg);
+                })
+                .catch(function () {
+                    if (btn) btn.disabled = false;
+                    alert('Error');
+                });
+        });
+    })();
+
     // —— Delete project: Bootstrap modal instead of window.confirm ——
     (function initDeleteProjectModal() {
         var modalEl = document.getElementById('cabinetScDeleteProjectModal');

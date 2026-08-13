@@ -73,8 +73,10 @@ return [
     // Токен на ≥ этой доли страниц = шаблон (меню/бренд) — не считаем «смысловым» пересечением.
     'simhash_chrome_token_share' => (float) env('SITE_AUDIT_SIMHASH_CHROME_SHARE', 0.20),
     'simhash_chrome_min_pages' => (int) env('SITE_AUDIT_SIMHASH_CHROME_MIN', 8),
-    // Минимум нешаблонных общих слов; иначе пара с Hamming>2 отбрасывается.
-    'simhash_min_unique_shared' => (int) env('SITE_AUDIT_SIMHASH_MIN_UNIQUE', 2),
+    // Минимум нешаблонных общих слов (раньше 2 — на тощем стенде шумели deep/meta).
+    'simhash_min_unique_shared' => (int) env('SITE_AUDIT_SIMHASH_MIN_UNIQUE', 4),
+    // Для обеих страниц < thin_words — ещё жёстче (иначе меню+пара слов = «похоже»).
+    'simhash_min_unique_shared_thin' => (int) env('SITE_AUDIT_SIMHASH_MIN_UNIQUE_THIN', 10),
     'share_ttl_days' => (int) env('SITE_AUDIT_SHARE_TTL_DAYS', 0), // 0 = бессрочно
     'broken_link_head_max' => (int) env('SITE_AUDIT_BROKEN_HEAD_MAX', 40),
     'broken_external_head_max' => (int) env('SITE_AUDIT_BROKEN_EXT_HEAD_MAX', 80),
@@ -97,11 +99,18 @@ return [
     'click_depth_warn' => (int) env('SITE_AUDIT_CLICK_DEPTH_WARN', 4),
     'strong_max' => (int) env('SITE_AUDIT_STRONG_MAX', 20),
     'nausea_classic_max' => (float) env('SITE_AUDIT_NAUSEA_CLASSIC_MAX', 8.0),
-    'nausea_academic_max' => (float) env('SITE_AUDIT_NAUSEA_ACADEMIC_MAX', 10.0),
-    'bigram_spam_min' => (int) env('SITE_AUDIT_BIGRAM_SPAM_MIN', 4),
+    // Академическая тошнота на коротком «уникальном» тексте ≈ 100/√n — порог 10% ловит почти всё.
+    'nausea_academic_max' => (float) env('SITE_AUDIT_NAUSEA_ACADEMIC_MAX', 25.0),
+    // Ниже — thin_content; тошнота на 10–40 словах бессмысленна.
+    'nausea_min_words' => (int) env('SITE_AUDIT_NAUSEA_MIN_WORDS', 50),
+    'bigram_spam_min' => (int) env('SITE_AUDIT_BIGRAM_SPAM_MIN', 5),
     'bigram_spam_density_min' => (float) env('SITE_AUDIT_BIGRAM_SPAM_DENSITY', 1.5),
-    'trigram_spam_min' => (int) env('SITE_AUDIT_TRIGRAM_SPAM_MIN', 3),
+    'trigram_spam_min' => (int) env('SITE_AUDIT_TRIGRAM_SPAM_MIN', 5),
     'trigram_spam_density_min' => (float) env('SITE_AUDIT_TRIGRAM_SPAM_DENSITY', 1.0),
+    // Би-/триграммы на тощих страницах и сквозной бренд в шапке — шум.
+    'ngram_spam_min_words' => (int) env('SITE_AUDIT_NGRAM_SPAM_MIN_WORDS', 40),
+    'ngram_chrome_share' => (float) env('SITE_AUDIT_NGRAM_CHROME_SHARE', 0.20),
+    'ngram_chrome_min_pages' => (int) env('SITE_AUDIT_NGRAM_CHROME_MIN', 8),
     'sitemap_url_cap' => (int) env('SITE_AUDIT_SITEMAP_URL_CAP', 20000),
     'sitemap_not_crawled_sample' => (int) env('SITE_AUDIT_SITEMAP_NOT_CRAWLED_SAMPLE', 80),
     'not_in_sitemap_max' => (int) env('SITE_AUDIT_NOT_IN_SITEMAP_MAX', 500),
@@ -671,7 +680,7 @@ return [
             'phase' => 'B',
             'severity' => 'warning',
             'title' => 'Тошнота текста',
-            'description' => 'Классическая или академическая тошнота текста выше порога.',
+            'description' => 'Классическая или академическая тошнота выше порога (на страницах с достаточным объёмом текста).',
         ],
         'text_bigram_spam' => [
             'phase' => 'B',
@@ -806,7 +815,7 @@ return [
             'phase' => 'B',
             'severity' => 'other',
             'title' => 'Soft 404',
-            'description' => 'Ответ 200, но страница похожа на «не найдено» (паттерн в title/H1 или крайне мало текста).',
+            'description' => 'Ответ 200, но в TITLE/H1 есть признаки «не найдено» / 404. Мало текста без таких паттернов — отчёт «Тощие страницы».',
         ],
         'orphan_pages' => [
             'phase' => 'B',

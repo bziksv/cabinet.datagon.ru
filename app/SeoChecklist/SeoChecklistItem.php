@@ -20,7 +20,7 @@ class SeoChecklistItem extends Model
     protected $fillable = [
         'project_id', 'parent_id', 'code', 'stage_key', 'stage_sort', 'sort',
         'title', 'help', 'role', 'is_important', 'allows_subtasks', 'repeat_rule', 'due_days_from_start', 'due_at', 'links_json',
-        'status', 'assignee_user_id', 'done_at', 'done_by', 'time_spent_seconds',
+        'status', 'assignee_user_id', 'done_at', 'done_by', 'created_by', 'time_spent_seconds',
     ];
 
     protected $casts = [
@@ -44,6 +44,11 @@ class SeoChecklistItem extends Model
         return in_array($this->status, self::CLOSED_STATUSES, true);
     }
 
+    public function isSubtask(): bool
+    {
+        return $this->parent_id !== null;
+    }
+
     public function isOverdue(): bool
     {
         if (!$this->due_at || !$this->isOpenStatus()) {
@@ -65,6 +70,16 @@ class SeoChecklistItem extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(SeoChecklistProject::class, 'project_id');
+    }
+
+    public function doneByUser(): BelongsTo
+    {
+        return $this->belongsTo(\App\User::class, 'done_by');
+    }
+
+    public function createdByUser(): BelongsTo
+    {
+        return $this->belongsTo(\App\User::class, 'created_by');
     }
 
     public function notes(): HasMany

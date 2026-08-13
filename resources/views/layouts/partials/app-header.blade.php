@@ -51,18 +51,37 @@
                 </a>
             </li>
             @if(!empty($seoChecklistNavVisible))
+                @php
+                    $scDueCount = (int) ($seoChecklistDueCount ?? 0);
+                    $scOverdueCount = (int) ($seoChecklistOverdueCount ?? 0);
+                    $scUnreadNotes = (int) ($seoChecklistUnreadNotesCount ?? 0);
+                    if ($scDueCount > 0) {
+                        $scHeaderHref = route('pages.seo-checklist.my-tasks');
+                    } elseif ($scUnreadNotes > 0) {
+                        $scHeaderHref = route('pages.seo-checklist.chronicle', ['view' => 'unread']);
+                    } else {
+                        $scHeaderHref = route('pages.seo-checklist.chronicle');
+                    }
+                @endphp
                 <li class="nav-item d-none d-md-block">
                     <a class="nav-link @if(request()->routeIs('pages.seo-checklist*')) active @endif"
-                       href="{{ route('pages.seo-checklist.chronicle', ['view' => 'unread']) }}"
+                       href="{{ $scHeaderHref }}"
                        title="{{ $seoChecklistModuleTitle ?? __('SEO Checklist') }}">
                         <i class="bi bi-clipboard-check me-1" aria-hidden="true"></i>
                         {{ $seoChecklistModuleTitle ?? __('SEO Checklist') }}
-                        @if(($seoChecklistDueCount ?? 0) > 0)
-                            <span class="navbar-badge badge @if(($seoChecklistOverdueCount ?? 0) > 0) text-bg-danger @else text-bg-warning @endif ms-1"
+                        @if($scDueCount > 0)
+                            <span class="navbar-badge badge @if($scOverdueCount > 0) text-bg-danger @else text-bg-warning @endif ms-1"
+                                  data-sc-due-header-count
                                   title="{{ __('Overdue and due soon tasks') }}">
-                                {{ $seoChecklistDueCount > 99 ? '99+' : $seoChecklistDueCount }}
+                                {{ $scDueCount > 99 ? '99+' : $scDueCount }}
                             </span>
                         @endif
+                        <span class="navbar-badge badge text-bg-warning ms-1"
+                              data-sc-unread-header-count
+                              title="{{ __('Unread notes') }}"
+                              @if($scUnreadNotes < 1) hidden @endif>
+                            {{ $scUnreadNotes > 99 ? '99+' : $scUnreadNotes }}
+                        </span>
                     </a>
                 </li>
             @endif

@@ -84,21 +84,43 @@
                             ? mb_strtoupper(mb_substr(trim(($owner->name ?? '') ?: ($owner->email ?? '?')), 0, 1))
                             : null;
                         $tpl = $project->template;
+                        $team = $project->team;
+                        $teamRoleLabelsLocal = $teamRoleLabels ?? \App\SeoChecklist\SeoChecklistTeam::roleLabels();
+                        $previewByRole = [];
+                        $teamMemberNames = [];
+                        if ($team) {
+                            foreach ($teamRoleLabelsLocal as $roleKey => $roleLabel) {
+                                $previewByRole[$roleKey] = $team->members->where('role', $roleKey)->map(function ($member) use (&$teamMemberNames) {
+                                    $u = $member->user;
+                                    if (!$u) {
+                                        return null;
+                                    }
+                                    $name = trim(($u->name ?? '') . ' ' . ($u->last_name ?? '')) ?: ($u->email ?? '');
+                                    if ($name !== '') {
+                                        $teamMemberNames[] = $name;
+                                    }
+
+                                    return $name !== '' ? $name : null;
+                                })->filter()->values();
+                            }
+                        }
                         $activityTs = $project->last_activity_at ? $project->last_activity_at->getTimestamp() : 0;
-                        $searchBlob = strtolower(implode(' ', array_filter([
+                        $searchBlob = strtolower(implode(' ', array_filter(array_merge([
                             $project->domain,
                             $ownerName,
                             $pmName,
                             $owner ? $owner->email : null,
                             $pm ? $pm->email : null,
                             $tpl ? $tpl->title : null,
-                        ])));
+                            $team ? $team->title : null,
+                        ], $teamMemberNames))));
                     @endphp
                     <a href="{{ route('pages.seo-checklist.show', ['id' => $project->id]) }}"
                        class="cabinet-sc-card cabinet-sc-card--project"
                        data-sc-project-card
                        data-search="{{ e($searchBlob) }}"
                        data-has-pm="{{ $pm ? '1' : '0' }}"
+                       data-has-team="{{ $team ? '1' : '0' }}"
                        data-sort-activity="{{ $activityTs }}"
                        data-sort-progress="{{ $pct }}"
                        data-sort-domain="{{ e(mb_strtolower($project->domain)) }}">
@@ -123,20 +145,44 @@
                         </div>
                         <div class="cabinet-sc-card__people">
                             @if($ownerInitials)
-                                <span class="cabinet-sc-avatar" title="{{ __('SEO role owner') }}: {{ $ownerName }}">{{ $ownerInitials }}</span>
+                                <span class="cabinet-sc-avatar" aria-hidden="true">{{ $ownerInitials }}</span>
                             @endif
                             <div class="cabinet-sc-card__people-text">
-                                <span>{{ __('SEO role owner') }}: <strong>{{ $ownerName ?: '—' }}</strong></span>
-                                <span>
-                                    {{ __('SEO role PM') }}:
-                                    @if($pmName)
-                                        <strong>{{ $pmName }}</strong>
-                                    @else
-                                        <span class="cabinet-sc-role cabinet-sc-role--shared">{{ __('Without PM') }}</span>
-                                    @endif
-                                </span>
+                                @if($team)
+                                    <span class="cabinet-sc-card__team-name">
+                                        {{ __('Team') }}: <strong>{{ $team->title }}</strong>
+                                        <span class="cabinet-sc-card__team-count">{{ $team->members->count() }} {{ __('members') }}</span>
+                                    </span>
+                                @else
+                                    <span>{{ __('SEO role owner') }}: <strong>{{ $ownerName ?: '—' }}</strong></span>
+                                    <span>
+                                        {{ __('SEO role PM') }}:
+                                        @if($pmName)
+                                            <strong>{{ $pmName }}</strong>
+                                        @else
+                                            <span class="cabinet-sc-role cabinet-sc-role--shared">{{ __('Without PM') }}</span>
+                                        @endif
+                                    </span>
+                                    <span class="cabinet-sc-team-chip cabinet-sc-team-chip--empty">{{ __('No team') }}</span>
+                                @endif
                             </div>
                         </div>
+                        @if($team)
+                            <div class="cabinet-sc-card__team">
+                                @foreach($teamRoleLabelsLocal as $roleKey => $roleLabel)
+                                    @php $names = $previewByRole[$roleKey] ?? collect(); @endphp
+                                    @if($names->isNotEmpty())
+                                        <span class="cabinet-sc-team-chip cabinet-sc-team-chip--{{ in_array($roleKey, ['auditor', 'participant'], true) ? 'shared' : $roleKey }}">
+                                            <span class="cabinet-sc-team-chip__role">{{ $roleLabel }}</span>
+                                            <span class="cabinet-sc-team-chip__people">{{ $names->take(2)->implode(', ') }}@if($names->count() > 2) +{{ $names->count() - 2 }}@endif</span>
+                                        </span>
+                                    @endif
+                                @endforeach
+                                @if($team->members->isEmpty())
+                                    <span class="cabinet-sc-team-chip cabinet-sc-team-chip--empty">{{ __('No one yet') }}</span>
+                                @endif
+                            </div>
+                        @endif
                         <div class="cabinet-sc-card__meta text-secondary small">
                             {{ $project->progress_done }}/{{ $project->progress_total }}
                             ·

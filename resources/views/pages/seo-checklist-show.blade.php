@@ -97,10 +97,41 @@
                     @endif
                 </p>
                 <p class="cabinet-sc-team-line small mb-0">
-                    <span>{{ __('SEO role owner') }}: <strong>{{ $ownerLabel }}</strong></span>
-                    <span class="cabinet-sc-team-line__sep">·</span>
-                    <span>{{ __('SEO role PM') }}: <strong>{{ $pmLabel }}</strong></span>
+                    @if($project->team)
+                        <span>{{ __('Team') }}: <strong>{{ $project->team->title }}</strong>
+                            <span class="text-secondary">({{ $project->team->members->count() }} {{ __('members') }})</span>
+                        </span>
+                    @else
+                        <span>{{ __('SEO role owner') }}: <strong>{{ $ownerLabel }}</strong></span>
+                        <span class="cabinet-sc-team-line__sep">·</span>
+                        <span>{{ __('SEO role PM') }}: <strong>{{ $pmLabel }}</strong></span>
+                        <span class="cabinet-sc-team-line__sep">·</span>
+                        <span class="text-secondary">{{ __('No team') }}</span>
+                    @endif
                 </p>
+                @if($project->team)
+                    <div class="cabinet-sc-card__team cabinet-sc-show-team mt-2">
+                        @foreach(($teamRoleLabels ?? \App\SeoChecklist\SeoChecklistTeam::roleLabels()) as $roleKey => $roleLabel)
+                            @php
+                                $names = $project->team->members->where('role', $roleKey)->map(function ($member) {
+                                    $u = $member->user;
+                                    if (!$u) {
+                                        return null;
+                                    }
+                                    $name = trim(($u->name ?? '') . ' ' . ($u->last_name ?? '')) ?: ($u->email ?? '');
+
+                                    return $name !== '' ? $name : null;
+                                })->filter()->values();
+                            @endphp
+                            @if($names->isNotEmpty())
+                                <span class="cabinet-sc-team-chip cabinet-sc-team-chip--{{ in_array($roleKey, ['auditor', 'participant'], true) ? 'shared' : $roleKey }}">
+                                    <span class="cabinet-sc-team-chip__role">{{ $roleLabel }}</span>
+                                    <span class="cabinet-sc-team-chip__people">{{ $names->take(3)->implode(', ') }}@if($names->count() > 3) +{{ $names->count() - 3 }}@endif</span>
+                                </span>
+                            @endif
+                        @endforeach
+                    </div>
+                @endif
             </div>
             <div class="cabinet-sc-show-actions">
                 @if($project->status !== 'archived' && $project->progress_done < $project->progress_total)
@@ -202,7 +233,11 @@
                         <span class="cabinet-sc-action__icon" aria-hidden="true"><i class="bi bi-people"></i></span>
                         <span class="cabinet-sc-action__text">
                             <strong>{{ __('SEO checklist team') }}</strong>
-                            <em>{{ __('Click to open team settings') }}</em>
+                            @if($project->team)
+                                <em>{{ $project->team->title }} · {{ $project->team->members->count() }} {{ __('members') }}</em>
+                            @else
+                                <em>{{ __('Click to open team settings') }}</em>
+                            @endif
                         </span>
                         <span class="cabinet-sc-action__cta">
                             <span class="cabinet-sc-action__cta-open">{{ __('Expand') }}</span>
@@ -234,7 +269,6 @@
                             <button type="submit" class="btn btn-sm btn-primary">{{ __('Save') }}</button>
                         </form>
                         @if($project->team)
-                            @php $project->loadMissing(['team.members.user']); @endphp
                             <div class="cabinet-sc-role-groups mt-2">
                                 @foreach(($teamRoleLabels ?? []) as $roleKey => $roleLabel)
                                     @php $roleMembers = $project->team->members->where('role', $roleKey); @endphp
@@ -391,6 +425,38 @@
                                                 {{ $item->help ?: __('Add description') }}
                                             </p>
                                         @endif
+                                        @php
+                                            $createdByName = $item->createdByUser
+                                                ? (trim(($item->createdByUser->name ?? '') . ' ' . ($item->createdByUser->last_name ?? '')) ?: $item->createdByUser->email)
+                                                : null;
+                                            $doneByName = $item->doneByUser
+                                                ? (trim(($item->doneByUser->name ?? '') . ' ' . ($item->doneByUser->last_name ?? '')) ?: $item->doneByUser->email)
+                                                : null;
+                                            $createdLabel = ($createdByName || $item->created_at)
+                                                ? __('Created by :name on :date', [
+                                                    'name' => $createdByName ?: '—',
+                                                    'date' => $item->created_at ? $item->created_at->format('d.m.Y H:i') : '—',
+                                                ])
+                                                : null;
+                                            $doneLabel = $item->done_at
+                                                ? __('Completed by :name on :date', [
+                                                    'name' => $doneByName ?: '—',
+                                                    'date' => $item->done_at->format('d.m.Y H:i'),
+                                                ])
+                                                : null;
+                                        @endphp
+                                        <p class="cabinet-sc-task__audit" data-sc-audit @if(!$createdLabel && !$doneLabel) hidden @endif>
+                                            @if($createdLabel)
+                                                <span data-sc-audit-created>{{ $createdLabel }}</span>
+                                            @else
+                                                <span data-sc-audit-created hidden></span>
+                                            @endif
+                                            @if($doneLabel)
+                                                <span data-sc-audit-done>{{ $doneLabel }}</span>
+                                            @else
+                                                <span data-sc-audit-done hidden></span>
+                                            @endif
+                                        </p>
                                     </div>
                                     <div class="cabinet-sc-task__actions">
                                         @if($item->due_at)
@@ -480,6 +546,26 @@
                                     </div>
                                     <ul class="cabinet-sc-subtasks" data-sc-subtasks>
                                         @foreach($item->children as $child)
+                                            @php
+                                                $childCreatedBy = $child->createdByUser
+                                                    ? (trim(($child->createdByUser->name ?? '') . ' ' . ($child->createdByUser->last_name ?? '')) ?: $child->createdByUser->email)
+                                                    : null;
+                                                $childDoneBy = $child->doneByUser
+                                                    ? (trim(($child->doneByUser->name ?? '') . ' ' . ($child->doneByUser->last_name ?? '')) ?: $child->doneByUser->email)
+                                                    : null;
+                                                $childCreatedLabel = ($childCreatedBy || $child->created_at)
+                                                    ? __('Created by :name on :date', [
+                                                        'name' => $childCreatedBy ?: '—',
+                                                        'date' => $child->created_at ? $child->created_at->format('d.m.Y H:i') : '—',
+                                                    ])
+                                                    : null;
+                                                $childDoneLabel = $child->done_at
+                                                    ? __('Completed by :name on :date', [
+                                                        'name' => $childDoneBy ?: '—',
+                                                        'date' => $child->done_at->format('d.m.Y H:i'),
+                                                    ])
+                                                    : null;
+                                            @endphp
                                             <li class="cabinet-sc-subtask"
                                                 data-sc-subitem
                                                 data-id="{{ $child->id }}"
@@ -489,14 +575,28 @@
                                                            data-sc-done
                                                            {{ in_array($child->status, \App\SeoChecklist\SeoChecklistItem::CLOSED_STATUSES, true) ? 'checked' : '' }}>
                                                 </label>
-                                                <button type="button"
-                                                        class="cabinet-sc-subtask__title {{ in_array($child->status, \App\SeoChecklist\SeoChecklistItem::CLOSED_STATUSES, true) ? 'is-done-text' : '' }}"
-                                                        data-sc-title
-                                                        @if($project->status === 'archived') disabled @endif
-                                                        title="{{ __('Click to edit') }}">
-                                                    {{ $child->title }}
-                                                </button>
-                                                @if($canManage && $project->status !== 'archived')
+                                                <div class="cabinet-sc-subtask__body">
+                                                    <button type="button"
+                                                            class="cabinet-sc-subtask__title {{ in_array($child->status, \App\SeoChecklist\SeoChecklistItem::CLOSED_STATUSES, true) ? 'is-done-text' : '' }}"
+                                                            data-sc-title
+                                                            @if($project->status === 'archived') disabled @endif
+                                                            title="{{ __('Click to edit') }}">
+                                                        {{ $child->title }}
+                                                    </button>
+                                                    <p class="cabinet-sc-task__audit cabinet-sc-task__audit--sub" data-sc-audit @if(!$childCreatedLabel && !$childDoneLabel) hidden @endif>
+                                                        @if($childCreatedLabel)
+                                                            <span data-sc-audit-created>{{ $childCreatedLabel }}</span>
+                                                        @else
+                                                            <span data-sc-audit-created hidden></span>
+                                                        @endif
+                                                        @if($childDoneLabel)
+                                                            <span data-sc-audit-done>{{ $childDoneLabel }}</span>
+                                                        @else
+                                                            <span data-sc-audit-done hidden></span>
+                                                        @endif
+                                                    </p>
+                                                </div>
+                                                @if($project->status !== 'archived')
                                                     <button type="button" class="btn btn-link btn-sm text-danger p-0" data-sc-delete title="{{ __('Delete') }}">×</button>
                                                 @endif
                                             </li>

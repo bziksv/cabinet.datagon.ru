@@ -16,9 +16,9 @@
            class="cabinet-sc-tabs__item @if($scTab === 'chronicle') is-active @endif"
            @if($scTab === 'chronicle') aria-current="page" @endif>
             {{ __('Chronicle') }}
-            @if((int) ($scUnreadNotesCount ?? 0) > 0)
-                <span class="cabinet-sc-tabs__count is-hot">{{ (int) $scUnreadNotesCount > 99 ? '99+' : (int) $scUnreadNotesCount }}</span>
-            @endif
+            <span class="cabinet-sc-tabs__count is-hot"
+                  data-sc-unread-nav-count
+                  @if((int) ($scUnreadNotesCount ?? 0) < 1) hidden @endif>{{ (int) ($scUnreadNotesCount ?? 0) > 99 ? '99+' : (int) ($scUnreadNotesCount ?? 0) }}</span>
         </a>
         <a href="{{ route('pages.seo-checklist.my-tasks') }}"
            class="cabinet-sc-tabs__item @if($scTab === 'my-tasks') is-active @endif"

@@ -1502,6 +1502,30 @@
     font-weight: 650;
 }
 
+.cabinet-sc-card__team-name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem;
+}
+
+.cabinet-sc-card__team-count {
+    color: var(--sc-muted);
+    font-weight: 500;
+}
+
+.cabinet-sc-card__team {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: -0.15rem 0 0.55rem;
+}
+
+.cabinet-sc-card__people-text .cabinet-sc-team-chip {
+    align-self: flex-start;
+    margin-top: 0.2rem;
+}
+
 .cabinet-sc-card__tpl {
     color: var(--sc-accent);
     font-weight: 600;
@@ -1698,9 +1722,18 @@
     margin: 0 0.15rem;
 }
 
+.cabinet-sc-show-team {
+    margin-top: 0.45rem;
+    margin-bottom: 0;
+}
+
 .cabinet-sc-team-line {
     margin-top: 0.35rem;
     color: var(--sc-muted);
+}
+
+.cabinet-sc-show-head .cabinet-sc-team-line {
+    margin-top: 0.35rem;
 }
 
 .cabinet-sc-team-line__sep {
@@ -2849,13 +2882,18 @@ a.cabinet-sc-timesheet__task-title:hover {
 
 .cabinet-sc-subtask {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.4rem;
     margin: 0 0 0.3rem;
     padding: 0.35rem 0.45rem;
     border-radius: 0.45rem;
     background: #fff;
     border: 1px solid #e2e8f0;
+}
+
+.cabinet-sc-subtask__body {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .cabinet-sc-plan__subs {
@@ -3099,8 +3137,15 @@ a.cabinet-sc-timesheet__task-title:hover {
     color: #94a3b8;
 }
 
+.cabinet-sc-subtask {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+}
+
 .cabinet-sc-subtask__title {
     flex: 1 1 auto;
+    width: 100%;
     min-width: 0;
     margin: 0;
     padding: 0.1rem 0.35rem;
@@ -3122,6 +3167,20 @@ a.cabinet-sc-timesheet__task-title:hover {
 .cabinet-sc-subtask__title.is-done-text {
     text-decoration: line-through;
     color: var(--sc-muted);
+}
+
+.cabinet-sc-task__audit {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.15rem 0.75rem;
+    margin: 0.2rem 0 0;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    color: var(--sc-muted);
+}
+
+.cabinet-sc-task__audit--sub {
+    margin: 0.05rem 0 0 0.35rem;
 }
 
 .cabinet-sc-task__links {

@@ -15,10 +15,11 @@
         if (!in_array($filterPreset, ['unread', 'notes', 'all'], true)) {
             $filterPreset = 'unread';
         }
+        $filterSort = strtolower((string) ($filterSort ?? 'desc')) === 'asc' ? 'asc' : 'desc';
         $statusLabels = $statusLabels ?? [];
 
-        $chronicleQuery = function (array $extra = []) use ($filterProjectIds, $filterAuthorIds, $filterPreset) {
-            $q = array_merge(['view' => $filterPreset], $extra);
+        $chronicleQuery = function (array $extra = []) use ($filterProjectIds, $filterAuthorIds, $filterPreset, $filterSort) {
+            $q = array_merge(['view' => $filterPreset, 'sort' => $filterSort], $extra);
             if ($filterProjectIds !== []) {
                 $q['project_ids'] = $filterProjectIds;
             }
@@ -131,6 +132,7 @@
                     @foreach($filterAuthorIds as $aid)
                         <input type="hidden" name="author_ids[]" value="{{ $aid }}">
                     @endforeach
+                    <input type="hidden" name="sort" value="{{ $filterSort }}">
                     <button type="submit" class="btn btn-primary btn-sm" data-sc-mark-all-btn>
                         <i class="bi bi-check2-all" aria-hidden="true"></i>
                         <span data-sc-mark-all-label>{{ __('Mark all notes read') }} ({{ $unreadNotesCount }})</span>
@@ -185,8 +187,14 @@
                     </option>
                 @endforeach
             </select>
+            <select name="sort"
+                    class="form-select form-select-sm cabinet-sc-chronicle-filters__sort"
+                    aria-label="{{ __('Chronicle sort') }}">
+                <option value="desc" @if($filterSort === 'desc') selected @endif>{{ __('Chronicle sort newest first') }}</option>
+                <option value="asc" @if($filterSort === 'asc') selected @endif>{{ __('Chronicle sort oldest first') }}</option>
+            </select>
             <button type="submit" class="btn btn-sm btn-outline-secondary">{{ __('Apply') }}</button>
-            @if($filterProjectIds || $filterAuthorIds || $filterPreset !== 'unread')
+            @if($filterProjectIds || $filterAuthorIds || $filterPreset !== 'unread' || $filterSort !== 'desc')
                 <a href="{{ route('pages.seo-checklist.chronicle', ['view' => 'unread']) }}" class="btn btn-sm btn-link">{{ __('Reset') }}</a>
             @endif
         </form>
@@ -216,6 +224,7 @@
                         @foreach($filterAuthorIds as $aid)
                             <input type="hidden" name="author_ids[]" value="{{ $aid }}">
                         @endforeach
+                        <input type="hidden" name="sort" value="{{ $filterSort }}">
                         <button type="submit" class="btn btn-sm btn-outline-primary">
                             <i class="bi bi-check2-all" aria-hidden="true"></i>
                             {{ __('Mark all notes read') }}
@@ -254,6 +263,7 @@
                                         @csrf
                                         <input type="hidden" name="note_ids[]" value="{{ $note->id }}">
                                         <input type="hidden" name="view" value="{{ $filterPreset }}">
+                                        <input type="hidden" name="sort" value="{{ $filterSort }}">
                                         @foreach($filterProjectIds as $pid)
                                             <input type="hidden" name="project_ids[]" value="{{ $pid }}">
                                         @endforeach
@@ -432,6 +442,7 @@
                                                         @csrf
                                                         <input type="hidden" name="note_ids[]" value="{{ $noteId }}">
                                                         <input type="hidden" name="view" value="{{ $filterPreset }}">
+                                                        <input type="hidden" name="sort" value="{{ $filterSort }}">
                                                         <button type="submit" class="btn btn-sm btn-primary cabinet-sc-feed__ack">
                                                             <i class="bi bi-check2" aria-hidden="true"></i>
                                                             {{ __('Mark note read') }}
@@ -445,6 +456,7 @@
                                                         @csrf
                                                         <input type="hidden" name="note_ids[]" value="{{ $noteId }}">
                                                         <input type="hidden" name="view" value="{{ $filterPreset }}">
+                                                        <input type="hidden" name="sort" value="{{ $filterSort }}">
                                                         <button type="submit" class="btn btn-sm btn-outline-secondary cabinet-sc-feed__ack">
                                                             <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
                                                             {{ __('Mark note unread') }}

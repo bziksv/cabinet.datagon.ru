@@ -2321,7 +2321,8 @@ class SeoChecklistService
         $projectFilter = null,
         $authorFilter = null,
         $presetOrUnread = 'all',
-        int $limit = 80
+        int $limit = 80,
+        string $sort = 'desc'
     ): array {
         if (is_bool($presetOrUnread)) {
             $preset = $presetOrUnread ? 'unread' : 'all';
@@ -2331,6 +2332,7 @@ class SeoChecklistService
         if (!in_array($preset, ['unread', 'notes', 'all'], true)) {
             $preset = 'all';
         }
+        $sort = strtolower($sort) === 'asc' ? 'asc' : 'desc';
 
         $projectIds = $this->accessibleProjectsQuery($userId)
             ->where('status', 'active')
@@ -2345,6 +2347,7 @@ class SeoChecklistService
             'unread_notes' => collect(),
             'unread_count' => 0,
             'preset' => $preset,
+            'sort' => $sort,
         ];
         if ($projectIds->isEmpty()) {
             return $empty;
@@ -2363,13 +2366,18 @@ class SeoChecklistService
                 ->whereDoesntHave('reads', function ($q) use ($userId) {
                     $q->where('user_id', $userId);
                 })
-                ->with(['user', 'item.project:id,domain,title'])
-                ->orderByDesc('id');
+                ->with(['user', 'item.project:id,domain,title']);
 
             if ($authorIds !== []) {
                 $noteQuery->whereIn('user_id', $authorIds);
             }
             $unreadCount = (clone $noteQuery)->count();
+            // Непрочитанные: asc = сначала старые (удобно разгребать очередь)
+            if ($sort === 'asc') {
+                $noteQuery->orderBy('id');
+            } else {
+                $noteQuery->orderByDesc('id');
+            }
             $unreadNotes = $noteQuery->limit(60)->get();
         }
 
@@ -2379,6 +2387,7 @@ class SeoChecklistService
                 'unread_notes' => $unreadNotes,
                 'unread_count' => $unreadCount,
                 'preset' => $preset,
+                'sort' => $sort,
             ];
         }
 
@@ -2402,7 +2411,11 @@ class SeoChecklistService
             if ($preset === 'notes') {
                 $logQuery->where('type', 'note');
             }
+            // Окно — последние N, при asc показываем их от старых к новым
             $items = $logQuery->limit($limit)->get();
+            if ($sort === 'asc') {
+                $items = $items->sortBy('id')->values();
+            }
         }
 
         return [
@@ -2410,6 +2423,7 @@ class SeoChecklistService
             'unread_notes' => $unreadNotes,
             'unread_count' => $unreadCount,
             'preset' => $preset,
+            'sort' => $sort,
         ];
     }
 

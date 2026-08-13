@@ -171,8 +171,9 @@ class SeoChecklistController extends Controller
         $projectIds = $this->requestIdList($request, 'project_ids', 'project_id');
         $authorIds = $this->requestIdList($request, 'author_ids', 'author_id');
         $preset = $this->chroniclePresetFromRequest($request);
+        $sort = $this->chronicleSortFromRequest($request);
 
-        $data = $this->service->chronicleForUser($userId, $projectIds, $authorIds, $preset);
+        $data = $this->service->chronicleForUser($userId, $projectIds, $authorIds, $preset, 80, $sort);
         $plan = $this->service->workPlanForUser($userId);
         $projects = $this->service->accessibleProjectsQuery($userId)
             ->where('status', 'active')
@@ -199,6 +200,7 @@ class SeoChecklistController extends Controller
             'filterProjectIds' => $projectIds,
             'filterAuthorIds' => $authorIds,
             'filterPreset' => $preset,
+            'filterSort' => $sort,
             'filterUnread' => $preset === 'unread',
             'statusLabels' => $this->statusLabels(),
             'projectsCount' => $projects->count(),
@@ -226,6 +228,13 @@ class SeoChecklistController extends Controller
         }
 
         return $preset;
+    }
+
+    private function chronicleSortFromRequest(Request $request): string
+    {
+        $sort = strtolower((string) $request->input('sort', 'desc'));
+
+        return $sort === 'asc' ? 'asc' : 'desc';
     }
 
     /**
@@ -264,6 +273,7 @@ class SeoChecklistController extends Controller
         }
         $preset = $this->chroniclePresetFromRequest($request);
         $query['view'] = $preset;
+        $query['sort'] = $this->chronicleSortFromRequest($request);
 
         return redirect()
             ->route('pages.seo-checklist.chronicle', $query)
@@ -301,6 +311,7 @@ class SeoChecklistController extends Controller
         }
         $preset = $this->chroniclePresetFromRequest($request);
         $query['view'] = $preset;
+        $query['sort'] = $this->chronicleSortFromRequest($request);
 
         return redirect()
             ->route('pages.seo-checklist.chronicle', $query)

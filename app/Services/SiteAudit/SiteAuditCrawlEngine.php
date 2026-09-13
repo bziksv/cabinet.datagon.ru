@@ -327,7 +327,10 @@ class SiteAuditCrawlEngine
             }
 
             // ещё есть URL — следующий тик
-            $pagesTotal = max(count($seen), $fetched + (count($queue) - $i));
+            $pagesTotal = min(
+                $limit,
+                max(count($seen), $fetched + (count($queue) - $i))
+            );
             $saved = $this->persistEngineState($crawl, $queue, $i, $fetched, $seen, $unchanged, $expanded, $origins);
             if (! $saved) {
                 // одна повторная попытка записать очередь
@@ -854,15 +857,33 @@ class SiteAuditCrawlEngine
         }
 
         if (! $this->hasEngineState($crawl)) {
-            // Файл могли снести старым finishFetch при cancel — пробуем восстановить очередь.
-            if (! $this->tryRebuildEngineStateForResume($crawl)) {
+            // Не вызываем tryRebuild здесь: rebuild писал pages_total = размер всего sitemap
+            // при каждом открытии истории (canResume на строке). Rebuild — только в resume()/processBatch.
+            if ((int) $crawl->pages_fetched < 1) {
                 return false;
             }
+            $fetched = (int) $crawl->pages_fetched;
+            $planCap = $this->resumePlanCap($crawl, $fetched);
+            if ($fetched >= $planCap) {
+                return false;
+            }
+            // Не разжимаем sitemap в истории: достаточно url_count / seed из JSON_EXTRACT.
+            $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+            $urlCount = (int) ($progress['sitemap']['url_count'] ?? 0);
+            if ($urlCount <= 0 && isset($crawl->sitemap_url_count_raw)) {
+                $urlCount = (int) $crawl->sitemap_url_count_raw;
+            }
+            if ($urlCount > 0) {
+                return $urlCount > $fetched;
+            }
+
+            return $fetched < max(1, (int) $crawl->pages_total, $planCap);
         }
 
         $meta = $this->engineResumeMeta($crawl);
-        if ($meta !== null && (int) ($meta['remaining'] ?? 0) > 0) {
-            return true;
+        if ($meta !== null) {
+            // Не читаем crawl_N.json (может быть МБ) только ради кнопки «Возобновить».
+            return (int) ($meta['remaining'] ?? 0) > 0;
         }
 
         $state = $this->loadEngineState($crawl);
@@ -913,26 +934,30 @@ class SiteAuditCrawlEngine
         $doneSet = array_fill_keys($done, true);
 
         $remaining = [];
-        $seen = [];
-        foreach ($done as $u) {
-            $seen[(string) $u] = true;
-        }
         foreach ($sitemapUrls as $u) {
             $u = (string) $u;
             if ($u === '' || isset($doneSet[$u])) {
                 continue;
             }
             $remaining[] = $u;
-            $seen[$u] = true;
         }
         if ($remaining === []) {
             return false;
         }
 
-        $limit = max(1, (int) $crawl->pages_limit);
-        $remaining = array_slice($remaining, 0, max(0, $limit - count($done)));
+        $fetched = max((int) $crawl->pages_fetched, count($done));
+        $planCap = $this->resumePlanCap($crawl, $fetched);
+        $remaining = array_slice($remaining, 0, max(0, $planCap - count($done)));
         if ($remaining === []) {
             return false;
+        }
+
+        $seen = [];
+        foreach ($done as $u) {
+            $seen[(string) $u] = true;
+        }
+        foreach ($remaining as $u) {
+            $seen[$u] = true;
         }
 
         $origins = [];
@@ -940,7 +965,6 @@ class SiteAuditCrawlEngine
             $origins[$u] = ['via' => 'sitemap', 'from' => null];
         }
 
-        $fetched = max((int) $crawl->pages_fetched, count($done));
         $ok = $this->persistEngineState($crawl, $remaining, 0, $fetched, $seen, 0, 0, $origins);
         if (! $ok) {
             return false;
@@ -951,9 +975,41 @@ class SiteAuditCrawlEngine
             'crawl_id' => $crawl->id,
             'fetched' => $fetched,
             'remaining' => count($remaining),
+            'plan_cap' => $planCap,
         ]);
 
         return $this->hasEngineState($crawl);
+    }
+
+    /**
+     * Потолок плана при rebuild: не раздувать до всего sitemap, если изначально был seed/лимит прогресса.
+     */
+    private function resumePlanCap(SiteAuditCrawl $crawl, int $fetched): int
+    {
+        $limit = max(1, (int) $crawl->pages_limit);
+        $existingTotal = max(0, (int) $crawl->pages_total);
+        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+        $seedCount = (int) ($progress['sitemap']['seed_count'] ?? 0);
+        $urlCount = (int) ($progress['sitemap']['url_count'] ?? 0);
+        if ($seedCount <= 0 && isset($crawl->sitemap_seed_count_raw)) {
+            $seedCount = (int) $crawl->sitemap_seed_count_raw;
+        }
+        if ($urlCount <= 0 && isset($crawl->sitemap_url_count_raw)) {
+            $urlCount = (int) $crawl->sitemap_url_count_raw;
+        }
+
+        $plan = $limit;
+        if ($existingTotal > 0) {
+            $plan = min($plan, max($existingTotal, $fetched));
+        }
+        // Уже раздутый total (= весь sitemap) — откатываем к seed.
+        if ($seedCount > 0 && $urlCount > 0 && $existingTotal >= $urlCount) {
+            $plan = min($limit, max($seedCount, $fetched));
+        } elseif ($seedCount > 0 && $existingTotal <= 0) {
+            $plan = min($plan, max($seedCount, $fetched));
+        }
+
+        return max($fetched, $plan);
     }
 
     /**
@@ -989,6 +1045,12 @@ class SiteAuditCrawlEngine
     {
         if (! $this->canResume($crawl)) {
             throw new \RuntimeException('Нет сохранённого прогресса для продолжения — только полный повтор');
+        }
+
+        if (! $this->hasEngineState($crawl)) {
+            if (! $this->tryRebuildEngineStateForResume($crawl)) {
+                throw new \RuntimeException('Нет сохранённого прогресса для продолжения — только полный повтор');
+            }
         }
 
         Cache::forget('site_audit_engine_miss_' . $crawl->id);
@@ -1172,7 +1234,7 @@ class SiteAuditCrawlEngine
             'fetched' => $fetched,
         ];
         $progress['fetched'] = $fetched;
-        $progress['total'] = max(count($seen), $fetched + count($remaining));
+        $progress['total'] = $this->cappedPagesTotal($crawl, $fetched, count($remaining), count($seen));
         $progress['pages_unchanged'] = $unchanged;
         $progress['links_expanded'] = $expanded;
         $crawl->progress_json = $progress;
@@ -1180,6 +1242,35 @@ class SiteAuditCrawlEngine
         $crawl->pages_total = (int) $progress['total'];
 
         return true;
+    }
+
+    /**
+     * Знаменатель прогресса: не больше pages_limit и не прыгает к размеру всего sitemap.
+     */
+    private function cappedPagesTotal(SiteAuditCrawl $crawl, int $fetched, int $remainingCount, int $seenCount): int
+    {
+        $limit = max(1, (int) $crawl->pages_limit);
+        $total = min($limit, max($seenCount, $fetched + $remainingCount, $fetched));
+
+        $progress = is_array($crawl->progress_json) ? $crawl->progress_json : [];
+        $seedCount = (int) ($progress['sitemap']['seed_count'] ?? 0);
+        $urlCount = (int) ($progress['sitemap']['url_count'] ?? 0);
+        $prev = max(0, (int) $crawl->pages_total);
+
+        // Артефакт resume-rebuild / uncapped seen: total ≈ весь sitemap.
+        if ($urlCount > 0 && $seedCount > 0 && $total >= $urlCount) {
+            $safe = max($fetched, $seedCount);
+            if ($prev > 0 && $prev < $urlCount) {
+                $safe = max($safe, $prev);
+            }
+            $queuePlan = $fetched + $remainingCount;
+            if ($queuePlan > $safe && $queuePlan < $urlCount) {
+                $safe = $queuePlan;
+            }
+            $total = min($total, $safe);
+        }
+
+        return max($fetched, $total);
     }
 
     private function clearEngineState(SiteAuditCrawl $crawl): void

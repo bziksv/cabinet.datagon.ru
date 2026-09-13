@@ -55,6 +55,78 @@ class SiteAuditFindingNoteService
         );
     }
 
+    /**
+     * «Исправлено» для блока/паттерна (не для каждой страницы).
+     */
+    public function markPatternFixed(
+        int $projectId,
+        int $userId,
+        string $code,
+        string $groupHash,
+        ?string $label = null
+    ): ?SiteAuditFindingNote {
+        $groupHash = trim($groupHash);
+        if ($groupHash === '' || ! $this->tableReady()) {
+            return null;
+        }
+        $urlHash = SiteAuditIgnoreService::patternUrlHash($code, $groupHash);
+        if ($urlHash === '') {
+            return null;
+        }
+
+        return $this->upsert(
+            $projectId,
+            $userId,
+            $code,
+            $urlHash,
+            SiteAuditIgnoreService::PATTERN_URL_PREFIX . mb_substr($groupHash, 0, 480),
+            SiteAuditFindingNote::STATUS_FIXED,
+            $label
+        );
+    }
+
+    /**
+     * @return array<string,true> group_hash => true
+     */
+    public function fixedPatternHashesForCode(int $projectId, string $code): array
+    {
+        if ($projectId < 1 || $code === '' || ! $this->tableReady()) {
+            return [];
+        }
+        $rows = SiteAuditFindingNote::query()
+            ->where('project_id', $projectId)
+            ->where('code', $code)
+            ->where('status', SiteAuditFindingNote::STATUS_FIXED)
+            ->where('url_hash', 'like', SiteAuditIgnoreService::PATTERN_HASH_PREFIX . '%')
+            ->get(['url']);
+        $out = [];
+        foreach ($rows as $row) {
+            $url = (string) ($row->url ?? '');
+            if (strpos($url, SiteAuditIgnoreService::PATTERN_URL_PREFIX) === 0) {
+                $sig = substr($url, strlen(SiteAuditIgnoreService::PATTERN_URL_PREFIX));
+                if ($sig !== '') {
+                    $out[$sig] = true;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    public function clearPatternFixed(int $projectId, string $code, string $groupHash): int
+    {
+        $urlHash = SiteAuditIgnoreService::patternUrlHash($code, trim($groupHash));
+        if ($urlHash === '' || ! $this->tableReady()) {
+            return 0;
+        }
+
+        return SiteAuditFindingNote::query()
+            ->where('project_id', $projectId)
+            ->where('code', $code)
+            ->where('url_hash', $urlHash)
+            ->delete();
+    }
+
     public function upsertForFinding(
         SiteAuditFinding $finding,
         int $projectId,

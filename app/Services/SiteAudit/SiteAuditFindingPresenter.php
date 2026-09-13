@@ -2130,9 +2130,25 @@ class SiteAuditFindingPresenter
                 return 'посадочная отсутствует в карте сайта';
 
             case 'landing_not_crawled':
-                return isset($meta['pages_limit'])
-                    ? ('посадочная · не в проверке · лимит ' . number_format((int) $meta['pages_limit'], 0, '', ' '))
-                    : 'посадочная · не в проверке';
+                $reason = (string) ($meta['reason'] ?? '');
+                $fetched = (int) ($meta['pages_fetched'] ?? 0);
+                $planned = (int) ($meta['pages_total'] ?? $meta['seed_count'] ?? 0);
+                $limit = (int) ($meta['pages_limit'] ?? 0);
+                // «лимит 100 000» — потолок настройки, не размер сайта; показываем только если упёрлись в лимит.
+                if ($reason === 'pages_limit' || ($limit > 0 && $fetched > 0 && $fetched >= $limit)) {
+                    return 'посадочная · не в проверке · упёрлись в лимит '
+                        . number_format($limit, 0, '', ' ');
+                }
+                if ($fetched > 0) {
+                    return 'посадочная · не в обходе · проверено '
+                        . number_format($fetched, 0, '', ' ') . ' стр.';
+                }
+                if ($planned > 0) {
+                    return 'посадочная · не в обходе · в проверке '
+                        . number_format($planned, 0, '', ' ') . ' стр.';
+                }
+                // Старые findings: в meta только pages_limit (тарифный потолок) — не путаем с «было 100к».
+                return 'посадочная · не в обходе';
 
             case 'landing_url_changed':
                 $q = trim((string) ($meta['query'] ?? ''));

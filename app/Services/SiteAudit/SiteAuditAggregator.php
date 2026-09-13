@@ -1030,6 +1030,11 @@ class SiteAuditAggregator
             if (! isset($crawledSet[$url])) {
                 if ($notCrawled < $max) {
                     $cfg = config('site_audit.findings.landing_not_crawled', []);
+                    $pagesLimit = (int) $crawl->pages_limit;
+                    $pagesFetched = (int) $crawl->pages_fetched;
+                    $pagesTotal = max($pagesFetched, (int) $crawl->pages_total);
+                    $seedCount = (int) ($crawl->progress_json['sitemap']['seed_count'] ?? 0);
+                    $hitLimit = $pagesLimit > 0 && $pagesFetched >= $pagesLimit;
                     SiteAuditFinding::query()->create([
                         'crawl_id' => $crawl->id,
                         'code' => 'landing_not_crawled',
@@ -1038,7 +1043,11 @@ class SiteAuditAggregator
                         'url_hash' => SiteAuditUrlNormalizer::hash($url),
                         'meta_json' => [
                             'source' => 'monitoring',
-                            'pages_limit' => (int) $crawl->pages_limit,
+                            'pages_limit' => $pagesLimit,
+                            'pages_fetched' => $pagesFetched,
+                            'pages_total' => $pagesTotal,
+                            'seed_count' => $seedCount,
+                            'reason' => $hitLimit ? 'pages_limit' : 'not_in_queue',
                             'monitoring_project_ids' => $resolved['project_ids'],
                         ],
                     ]);

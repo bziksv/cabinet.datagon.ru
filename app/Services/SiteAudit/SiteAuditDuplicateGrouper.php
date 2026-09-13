@@ -54,6 +54,51 @@ class SiteAuditDuplicateGrouper
         return $code === 'insecure_form';
     }
 
+    /**
+     * Группы из samples одной finding: игнор finding = выкинуть все блоки страницы.
+     * Для таких кодов блок игнорируем по group_hash (паттерн), не по id находки.
+     */
+    public static function usesSharedFindings(string $code): bool
+    {
+        return self::isHtmlErrors($code)
+            || self::isLinkInverted($code)
+            || self::isInsecureForm($code);
+    }
+
+    /**
+     * Убрать/оставить группы по игнору или «исправлено» паттерна.
+     *
+     * @param  list<array{hash?:string}>  $groups
+     * @param  array<string,true>  $hideHashes
+     * @param  array<string,true>  $onlyHashes  если не пусто — оставить только эти (режим «показать игнор/исправленные»)
+     * @return list<array>
+     */
+    public static function filterGroupsByPatternHashes(array $groups, array $hideHashes, array $onlyHashes = []): array
+    {
+        if ($hideHashes === [] && $onlyHashes === []) {
+            return $groups;
+        }
+        $out = [];
+        foreach ($groups as $g) {
+            $h = (string) ($g['hash'] ?? '');
+            if ($h === '') {
+                $out[] = $g;
+                continue;
+            }
+            if ($onlyHashes !== []) {
+                if (isset($onlyHashes[$h])) {
+                    $out[] = $g;
+                }
+                continue;
+            }
+            if (! isset($hideHashes[$h])) {
+                $out[] = $g;
+            }
+        }
+
+        return $out;
+    }
+
     /** Лимит findings в память для режима groups (иначе fallback в list). */
     public static function groupsMemoryLimit(string $code): int
     {

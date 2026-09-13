@@ -64,9 +64,6 @@
                     $b = $c->buckets_json ?: [];
                     $stClass = $c->statusCssClass();
                     $sizeBytes = (int) (($crawlSizes ?? [])[$c->id] ?? 0);
-                    $pct = $c->pages_total > 0
-                        ? (int) round(100 * $c->pages_fetched / max(1, $c->pages_total))
-                        : 0;
                     $finished = $c->isFinished();
                     $rawSettings = $c->settings_json_raw ?? null;
                     if (is_string($rawSettings)) {
@@ -85,7 +82,10 @@
                     $teamId = (int) (optional($project)->team_id ?? 0);
                     $teamTitle = optional(optional($project)->team)->title;
                     $fetchedN = (int) $c->pages_fetched;
-                    $totalN = max(0, (int) $c->pages_total);
+                    $totalN = $c->displayPagesTotal();
+                    $pct = $totalN > 0
+                        ? (int) round(100 * $fetchedN / max(1, $totalN))
+                        : 0;
                     $isFailed = $c->status === 'failed' || $c->status === 'cancelled';
                     $indeterminate = ! $finished && ($totalN < 1 || in_array($c->status, ['queued', 'queued_wait', 'discovering'], true));
                     if ($finished && ! $isFailed) {

@@ -32,10 +32,13 @@ class SiteAuditLinkExtractor
         $externalAssetItems = [];
         $badLinks = [];
 
+        // Яндекс <!--noindex-->…<!--/noindex--> / <noindex> — до stripHtmlComments,
+        // иначе маркеры съедаются, а ссылки внутри остаются в DOM и копят «дубли».
+        $htmlForAnchors = $this->stripYandexNoindexBlocks($html);
         // Ссылки в <!-- ... --> не живут в DOM для пользователя/бота — не считаем.
-        $html = $this->stripHtmlComments($html);
+        $htmlForAnchors = $this->stripHtmlComments($htmlForAnchors);
         // Примеры в JSON-LD / <script> / <style> — не кликабельные ссылки страницы.
-        $htmlForAnchors = $this->stripNonRenderableMarkup($html);
+        $htmlForAnchors = $this->stripNonRenderableMarkup($htmlForAnchors);
 
         $robots = [];
         if (preg_match_all('/<meta\b[^>]*\bname\s*=\s*["\']robots["\'][^>]*>/i', $html, $mt)) {
@@ -96,7 +99,8 @@ class SiteAuditLinkExtractor
                     continue;
                 }
 
-                $isNofollow = (bool) preg_match('/\brel\s*=\s*["\'][^"\']*\bnofollow\b/i', $attrs);
+                $isNofollow = $metaNofollow
+                    || (bool) preg_match('/\brel\s*=\s*["\'][^"\']*\bnofollow\b/i', $attrs);
                 if ($isNofollow) {
                     $nofollowLinks++;
                 }
@@ -104,7 +108,10 @@ class SiteAuditLinkExtractor
                 $abs = SiteAuditUrlNormalizer::resolve($href, $baseUrl, $projectHost, $opts);
                 if ($abs) {
                     $internal[$abs] = true;
-                    $internalCounts[$abs] = ($internalCounts[$abs] ?? 0) + 1;
+                    // Дубли считаем только по follow-ссылкам: nofollow не передаёт вес.
+                    if (! $isNofollow) {
+                        $internalCounts[$abs] = ($internalCounts[$abs] ?? 0) + 1;
+                    }
                     if ($isNofollow && count($nofollowSamples) < 20) {
                         $nofollowSamples[] = [
                             'href' => $abs,
@@ -285,6 +292,28 @@ class SiteAuditLinkExtractor
             'img_srcs' => array_values($imgSrcs),
             'asset_srcs' => array_keys($assetSrcs),
         ];
+    }
+
+    /**
+     * Убрать Яндекс-блоки noindex целиком (маркеры + содержимое).
+     * Иначе stripHtmlComments снимает только <!--noindex-->, а ссылки футера остаются.
+     */
+    private function stripYandexNoindexBlocks(string $html): string
+    {
+        if ($html === '') {
+            return $html;
+        }
+
+        $out = preg_replace('/<!--\s*noindex\s*-->.*?<!--\s*\/noindex\s*-->/is', '', $html);
+        if (! is_string($out)) {
+            $out = $html;
+        }
+        $out2 = preg_replace('/<noindex\b[^>]*>.*?<\/noindex>/is', '', $out);
+        if (! is_string($out2)) {
+            return $out;
+        }
+
+        return $out2;
     }
 
     /**

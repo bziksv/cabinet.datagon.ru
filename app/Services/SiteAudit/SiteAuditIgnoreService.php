@@ -4,12 +4,34 @@ namespace App\Services\SiteAudit;
 
 use App\SiteAuditCrawl;
 use App\SiteAuditFinding;
+use App\SiteAuditFindingNote;
 use App\SiteAuditIgnore;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 class SiteAuditIgnoreService
 {
+    public const PATTERN_URL_PREFIX = 'pattern:';
+    public const PATTERN_HASH_PREFIX = 'g:';
+
+    /**
+     * Ключ игнора паттерна (блока в режиме «По ошибкам»), не URL страницы.
+     */
+    public static function patternUrlHash(string $code, string $groupHash): string
+    {
+        $groupHash = trim($groupHash);
+        if ($groupHash === '') {
+            return '';
+        }
+
+        return self::PATTERN_HASH_PREFIX . substr(hash('sha256', $code . "\0" . $groupHash), 0, 40);
+    }
+
+    public static function isPatternUrlHash(string $urlHash): bool
+    {
+        return strpos($urlHash, self::PATTERN_HASH_PREFIX) === 0;
+    }
+
     /**
      * Игнор URL для кода (или всего кода, если $urlHash === null/'').
      */
@@ -29,6 +51,72 @@ class SiteAuditIgnoreService
                 'note' => $note,
             ]
         );
+    }
+
+    /**
+     * Игнор одного блока/паттерна (html-ошибка, битая цель, форма…) на всём сайте.
+     */
+    public function ignorePattern(
+        int $projectId,
+        int $userId,
+        string $code,
+        string $groupHash,
+        ?string $label = null
+    ): ?SiteAuditIgnore {
+        $groupHash = trim($groupHash);
+        if ($groupHash === '') {
+            return null;
+        }
+        $urlHash = self::patternUrlHash($code, $groupHash);
+        if ($urlHash === '') {
+            return null;
+        }
+
+        return $this->ignore(
+            $projectId,
+            $userId,
+            $code,
+            $urlHash,
+            self::PATTERN_URL_PREFIX . mb_substr($groupHash, 0, 480),
+            $label !== null && $label !== '' ? mb_substr($label, 0, 255) : null
+        );
+    }
+
+    public function restorePattern(int $projectId, string $code, string $groupHash): int
+    {
+        $urlHash = self::patternUrlHash($code, trim($groupHash));
+        if ($urlHash === '') {
+            return 0;
+        }
+
+        return $this->restore($projectId, $code, $urlHash);
+    }
+
+    /**
+     * @return array<string,true> group_hash => true
+     */
+    public function patternHashesForCode(int $projectId, string $code): array
+    {
+        if ($projectId < 1 || $code === '') {
+            return [];
+        }
+        $rows = SiteAuditIgnore::query()
+            ->where('project_id', $projectId)
+            ->where('code', $code)
+            ->where('url_hash', 'like', self::PATTERN_HASH_PREFIX . '%')
+            ->get(['url']);
+        $out = [];
+        foreach ($rows as $row) {
+            $url = (string) ($row->url ?? '');
+            if (strpos($url, self::PATTERN_URL_PREFIX) === 0) {
+                $sig = substr($url, strlen(self::PATTERN_URL_PREFIX));
+                if ($sig !== '') {
+                    $out[$sig] = true;
+                }
+            }
+        }
+
+        return $out;
     }
 
     public function ignoreFinding(SiteAuditFinding $finding, int $projectId, int $userId, ?string $note = null): SiteAuditIgnore
@@ -198,6 +286,9 @@ class SiteAuditIgnoreService
     /**
      * Сколько findings по severity скрыты (игнор или «исправлено») — для истории проверок.
      *
+     * Не сканируем все findings краула: code-wide игнор берём из counts_json,
+     * тяжёлый COUNT — только по кодам с URL-игнором / fixed-заметками.
+     *
      * @param  array<int>  $crawlIds
      * @return array<int, array{critical:int,other:int,important:int,warning:int,info:int}>
      */
@@ -220,23 +311,131 @@ class SiteAuditIgnoreService
             $out[$id] = $empty;
         }
 
-        $notesReady = (new SiteAuditFindingNoteService())->tableReady();
+        try {
+            $crawlRows = DB::table('site_audit_crawls')
+                ->whereIn('id', $crawlIds)
+                ->get(['id', 'project_id', 'counts_json']);
+        } catch (\Throwable $e) {
+            return $out;
+        }
 
+        $projectIds = [];
+        foreach ($crawlRows as $row) {
+            $pid = (int) ($row->project_id ?? 0);
+            if ($pid > 0) {
+                $projectIds[$pid] = $pid;
+            }
+        }
+        $projectIds = array_values($projectIds);
+        if ($projectIds === []) {
+            return $out;
+        }
+
+        $ignores = SiteAuditIgnore::query()
+            ->whereIn('project_id', $projectIds)
+            ->get(['project_id', 'code', 'url_hash']);
+
+        $notesReady = (new SiteAuditFindingNoteService())->tableReady();
+        $notes = collect();
+        if ($notesReady) {
+            try {
+                $notes = SiteAuditFindingNote::query()
+                    ->whereIn('project_id', $projectIds)
+                    ->where('status', SiteAuditFindingNote::STATUS_FIXED)
+                    ->get(['project_id', 'code', 'url_hash']);
+            } catch (\Throwable $e) {
+                $notes = collect();
+            }
+        }
+
+        $codeWide = []; // project_id => [code => true]
+        $urlLevelCodes = []; // code => true (нужен scan findings)
+        foreach ($ignores as $ig) {
+            $hash = (string) ($ig->url_hash ?? '');
+            if (self::isPatternUrlHash($hash)) {
+                continue;
+            }
+            $pid = (int) $ig->project_id;
+            $code = (string) $ig->code;
+            if ($code === '') {
+                continue;
+            }
+            if ($hash === '') {
+                $codeWide[$pid][$code] = true;
+            } else {
+                $urlLevelCodes[$code] = true;
+            }
+        }
+        foreach ($notes as $note) {
+            $hash = (string) ($note->url_hash ?? '');
+            if (self::isPatternUrlHash($hash) || $hash === '') {
+                continue;
+            }
+            $code = (string) $note->code;
+            if ($code !== '') {
+                $urlLevelCodes[$code] = true;
+            }
+        }
+
+        if ($codeWide === [] && $urlLevelCodes === []) {
+            return $out;
+        }
+
+        $severityByCode = [];
+        foreach (config('site_audit.findings', []) as $code => $cfg) {
+            if (! is_array($cfg)) {
+                continue;
+            }
+            $sev = (string) ($cfg['severity'] ?? 'warning');
+            if (isset($empty[$sev])) {
+                $severityByCode[$code] = $sev;
+            }
+        }
+
+        foreach ($crawlRows as $row) {
+            $cid = (int) $row->id;
+            $pid = (int) $row->project_id;
+            $cw = $codeWide[$pid] ?? [];
+            if ($cw === []) {
+                continue;
+            }
+            $counts = json_decode((string) ($row->counts_json ?? ''), true);
+            if (! is_array($counts)) {
+                continue;
+            }
+            foreach ($cw as $code => $_) {
+                $n = (int) ($counts[$code] ?? 0);
+                if ($n < 1) {
+                    continue;
+                }
+                $sev = $severityByCode[$code] ?? 'warning';
+                if (! isset($out[$cid][$sev])) {
+                    continue;
+                }
+                $out[$cid][$sev] += $n;
+            }
+        }
+
+        if ($urlLevelCodes === []) {
+            return $out;
+        }
+
+        $codes = array_keys($urlLevelCodes);
         try {
             $rows = SiteAuditFinding::query()
                 ->from('site_audit_findings as f')
                 ->join('site_audit_crawls as c', 'c.id', '=', 'f.crawl_id')
                 ->whereIn('f.crawl_id', $crawlIds)
+                ->whereIn('f.code', $codes)
                 ->where(function ($q) use ($notesReady) {
                     $q->whereExists(function ($iq) {
                         $iq->select(DB::raw(1))
                             ->from('site_audit_ignores as sai')
                             ->whereColumn('sai.code', 'f.code')
                             ->whereColumn('sai.project_id', 'c.project_id')
-                            ->where(function ($w) {
-                                $w->where('sai.url_hash', '')
-                                    ->orWhereColumn('sai.url_hash', 'f.url_hash');
-                            });
+                            ->whereColumn('sai.url_hash', 'f.url_hash')
+                            ->where('sai.url_hash', '!=', '')
+                            ->where('sai.url_hash', 'not like', self::PATTERN_HASH_PREFIX . '%');
                     });
                     if ($notesReady) {
                         $q->orWhereExists(function ($nq) {
@@ -245,7 +444,9 @@ class SiteAuditIgnoreService
                                 ->whereColumn('san.code', 'f.code')
                                 ->whereColumn('san.url_hash', 'f.url_hash')
                                 ->whereColumn('san.project_id', 'c.project_id')
-                                ->where('san.status', \App\SiteAuditFindingNote::STATUS_FIXED);
+                                ->where('san.status', SiteAuditFindingNote::STATUS_FIXED)
+                                ->where('san.url_hash', '!=', '')
+                                ->where('san.url_hash', 'not like', self::PATTERN_HASH_PREFIX . '%');
                         });
                     }
                 })
@@ -262,7 +463,7 @@ class SiteAuditIgnoreService
             if (! isset($out[$cid][$sev])) {
                 continue;
             }
-            $out[$cid][$sev] = (int) $row->c;
+            $out[$cid][$sev] += (int) $row->c;
         }
 
         return $out;

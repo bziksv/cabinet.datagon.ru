@@ -656,7 +656,7 @@ return [
             'phase' => 'B',
             'severity' => 'warning',
             'title' => 'Дубли одной ссылки',
-            'description' => 'Один и тот же внутренний URL встречается в ссылках страницы несколько раз.',
+            'description' => 'Один и тот же внутренний URL встречается в follow-ссылках страницы несколько раз (nofollow и блоки noindex не считаются).',
         ],
         'external_links' => [
             'phase' => 'B',

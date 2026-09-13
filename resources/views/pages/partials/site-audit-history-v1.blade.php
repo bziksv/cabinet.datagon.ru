@@ -66,9 +66,6 @@
                                 $b = $c->buckets_json ?: [];
                                 $stClass = $c->statusCssClass();
                                 $sizeBytes = (int) (($crawlSizes ?? [])[$c->id] ?? 0);
-                                $pct = $c->pages_total > 0
-                                    ? (int) round(100 * $c->pages_fetched / max(1, $c->pages_total))
-                                    : 0;
                                 $finished = $c->isFinished();
                                 $rawSettings = $c->settings_json_raw ?? null;
                                 if (is_string($rawSettings)) {
@@ -82,6 +79,11 @@
                                 $speed = (string) ($s['crawl_speed'] ?? '—');
                                 $rps = isset($s['rps']) ? (float) $s['rps'] : null;
                                 $pagesOnly = ! empty($s['pages_only']);
+                                $fetchedN = (int) $c->pages_fetched;
+                                $totalN = $c->displayPagesTotal();
+                                $pct = $totalN > 0
+                                    ? (int) round(100 * $fetchedN / max(1, $totalN))
+                                    : 0;
                                 $limitShow = (int) ($c->pages_limit ?: ($s['pages_limit'] ?? 0));
                             @endphp
                             <tr data-crawl-id="{{ $c->id }}"
@@ -109,8 +111,6 @@
                                 </td>
                                 <td class="cabinet-sa-progress-cell" data-sa-progress>
                                     @php
-                                        $fetchedN = (int) $c->pages_fetched;
-                                        $totalN = max(0, (int) $c->pages_total);
                                         $isFailed = $c->status === 'failed' || $c->status === 'cancelled';
                                         $indeterminate = ! $finished && ($totalN < 1 || in_array($c->status, ['queued', 'queued_wait', 'discovering'], true));
                                         // /html/UI/general.html — Progress

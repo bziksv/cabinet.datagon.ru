@@ -58,11 +58,12 @@ class SiteAuditController extends Controller
         'info' => 'Инфо',
     ];
 
-    public function index(Request $request): View
+    public function index(Request $request)
     {
         $user = Auth::user();
         $projects = collect();
         $crawls = collect();
+        $isHistoryPartial = (string) $request->input('partial') === 'history';
 
         $checklistTeams = collect();
         $teamCandidates = collect();
@@ -76,40 +77,24 @@ class SiteAuditController extends Controller
             // Демо: только свои проекты/краулы (фикстура), без команд.
             $teamIds = $isDemo ? [] : SiteAuditProject::teamIdsForMember((int) $user->id);
 
-            $projectsQuery = SiteAuditProject::query()
+            $historyDomain = trim((string) $request->input('domain', ''));
+
+            // Доступные проекты — один pluck вместо whereHas на каждый page/count.
+            $accessibleProjectsQuery = SiteAuditProject::query()
                 ->where(function ($q) use ($user, $teamIds, $isDemo) {
                     $q->where('user_id', $user->id);
                     if (! $isDemo && $teamIds !== [] && SiteAuditProject::teamColumnReady()) {
                         $q->orWhereIn('team_id', $teamIds);
                     }
-                })
-                ->withCount('crawls')
-                ->with(['crawls' => function ($q) {
-                    $q->orderByDesc('id')->limit(1)
-                        ->select([
-                            'id', 'project_id', 'user_id', 'status',
-                            'pages_total', 'pages_fetched', 'finished_at', 'created_at',
-                        ]);
-                }]);
-            if (! $isDemo && SiteAuditProject::teamColumnReady()) {
-                $projectsQuery->with('team:id,title');
+                });
+            if ($historyDomain !== '') {
+                $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $historyDomain) . '%';
+                $accessibleProjectsQuery->where('domain', 'like', $like);
             }
-            $projects = $projectsQuery
-                ->orderByDesc('id')
-                ->limit(50)
-                ->get();
-
-            $historyDomain = trim((string) $request->input('domain', ''));
+            $accessibleProjectIds = $accessibleProjectsQuery->pluck('id')->all();
 
             $crawlsQuery = SiteAuditCrawl::query()
-                ->where(function ($q) use ($user, $teamIds, $isDemo) {
-                    $q->where('user_id', $user->id);
-                    if (! $isDemo && $teamIds !== [] && SiteAuditProject::teamColumnReady()) {
-                        $q->orWhereHas('project', function ($pq) use ($teamIds) {
-                            $pq->whereIn('team_id', $teamIds);
-                        });
-                    }
-                })
+                ->whereIn('project_id', $accessibleProjectIds !== [] ? $accessibleProjectIds : [0])
                 ->with(['project' => function ($q) use ($isDemo) {
                     if (! $isDemo && SiteAuditProject::teamColumnReady()) {
                         $q->with('team:id,title');
@@ -122,14 +107,9 @@ class SiteAuditController extends Controller
                     'started_at', 'finished_at', 'created_at', 'error',
                 ])
                 ->selectRaw("JSON_EXTRACT(COALESCE(progress_json, '{}'), '$.settings') as settings_json_raw")
-                ->selectRaw("JSON_EXTRACT(COALESCE(progress_json, '{}'), '$.engine_resume') as engine_resume_raw");
-
-            if ($historyDomain !== '') {
-                $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $historyDomain) . '%';
-                $crawlsQuery->whereHas('project', function ($q) use ($like) {
-                    $q->where('domain', 'like', $like);
-                });
-            }
+                ->selectRaw("JSON_EXTRACT(COALESCE(progress_json, '{}'), '$.engine_resume') as engine_resume_raw")
+                ->selectRaw("JSON_EXTRACT(COALESCE(progress_json, '{}'), '$.sitemap.seed_count') as sitemap_seed_count_raw")
+                ->selectRaw("JSON_EXTRACT(COALESCE(progress_json, '{}'), '$.sitemap.url_count') as sitemap_url_count_raw");
 
             $crawls = $crawlsQuery
                 ->paginate(20)
@@ -140,19 +120,50 @@ class SiteAuditController extends Controller
             $crawlHiddenBuckets = (new SiteAuditIgnoreService())
                 ->hiddenBucketsByCrawlIds($crawls->pluck('id')->all());
 
-            if ($isDemo) {
-                $schedules = collect();
-            } else {
-                $schedules = SiteAuditSchedule::query()
-                    ->where('user_id', $user->id)
-                    ->get()
-                    ->keyBy('project_id');
-
-                if ($teamAccessReady) {
-                    $svc = app(SeoChecklistService::class);
-                    $checklistTeams = $svc->teamsForUser((int) $user->id);
-                    $teamCandidates = $svc->teamCandidates((int) $user->id);
+            if (! $isHistoryPartial) {
+                $projectsQuery = SiteAuditProject::query()
+                    ->where(function ($q) use ($user, $teamIds, $isDemo) {
+                        $q->where('user_id', $user->id);
+                        if (! $isDemo && $teamIds !== [] && SiteAuditProject::teamColumnReady()) {
+                            $q->orWhereIn('team_id', $teamIds);
+                        }
+                    })
+                    ->withCount('crawls')
+                    ->with(['crawls' => function ($q) {
+                        $q->orderByDesc('id')->limit(1)
+                            ->select([
+                                'id', 'project_id', 'user_id', 'status',
+                                'pages_total', 'pages_fetched', 'finished_at', 'created_at',
+                            ]);
+                    }]);
+                if (! $isDemo && SiteAuditProject::teamColumnReady()) {
+                    $projectsQuery->with('team:id,title');
                 }
+                $projects = $projectsQuery
+                    ->orderByDesc('id')
+                    ->limit(50)
+                    ->get();
+
+                if ($isDemo) {
+                    $schedules = collect();
+                } else {
+                    $schedules = SiteAuditSchedule::query()
+                        ->where('user_id', $user->id)
+                        ->get()
+                        ->keyBy('project_id');
+
+                    if ($teamAccessReady) {
+                        $svc = app(SeoChecklistService::class);
+                        $checklistTeams = $svc->teamsForUser((int) $user->id);
+                        $teamCandidates = $svc->teamCandidates((int) $user->id);
+                    }
+                }
+
+                if (! DemoCabinet::isCurrentUser()) {
+                    SiteAuditLimits::touchDowngradeState($user);
+                }
+            } else {
+                $schedules = collect();
             }
         } else {
             $schedules = collect();
@@ -164,10 +175,6 @@ class SiteAuditController extends Controller
 
         $canSchedule = $user && ! DemoCabinet::isCurrentUser() && SiteAuditSchedule::allowedForUser($user);
 
-        if ($user && ! DemoCabinet::isCurrentUser()) {
-            SiteAuditLimits::touchDowngradeState($user);
-        }
-
         $viewData = [
             'projects' => $projects,
             'crawls' => $crawls,
@@ -178,15 +185,15 @@ class SiteAuditController extends Controller
             'canSchedule' => $canSchedule,
             'scheduleFrequencies' => SiteAuditSchedule::frequencyLabels(),
             'scheduleWeekdays' => SiteAuditSchedule::weekdayLabels(),
-            'schedulesLimit' => SiteAuditLimits::schedulesLimit(),
-            'schedulesUsed' => SiteAuditLimits::schedulesUsed(),
-            'pagesLimit' => SiteAuditLimits::pagesPerCrawlLimit(),
-            'concurrencyLimit' => SiteAuditLimits::concurrencyLimit(),
-            'projectsLimit' => SiteAuditLimits::projectsLimit(),
-            'projectsUsed' => SiteAuditLimits::projectsUsed(),
-            'crawlsLimit' => SiteAuditLimits::crawlsPerMonthLimit(),
-            'crawlsUsed' => SiteAuditLimits::crawlsUsedThisMonth(),
-            'historyPurgeNotice' => SiteAuditLimits::historyPurgeNotice($user),
+            'schedulesLimit' => $isHistoryPartial ? 0 : SiteAuditLimits::schedulesLimit(),
+            'schedulesUsed' => $isHistoryPartial ? 0 : SiteAuditLimits::schedulesUsed(),
+            'pagesLimit' => $isHistoryPartial ? 0 : SiteAuditLimits::pagesPerCrawlLimit(),
+            'concurrencyLimit' => $isHistoryPartial ? 0 : SiteAuditLimits::concurrencyLimit(),
+            'projectsLimit' => $isHistoryPartial ? 0 : SiteAuditLimits::projectsLimit(),
+            'projectsUsed' => $isHistoryPartial ? 0 : SiteAuditLimits::projectsUsed(),
+            'crawlsLimit' => $isHistoryPartial ? 0 : SiteAuditLimits::crawlsPerMonthLimit(),
+            'crawlsUsed' => $isHistoryPartial ? 0 : SiteAuditLimits::crawlsUsedThisMonth(),
+            'historyPurgeNotice' => $isHistoryPartial ? null : SiteAuditLimits::historyPurgeNotice($user),
             'findingsCatalog' => config('site_audit.findings', []),
             'bucketLabels' => self::BUCKET_LABELS,
             'checklistTeams' => $checklistTeams,
@@ -196,7 +203,7 @@ class SiteAuditController extends Controller
         ];
 
         // AJAX-поиск/пагинация истории — только блок #sa-history, без полной страницы.
-        if ((string) $request->input('partial') === 'history') {
+        if ($isHistoryPartial) {
             $saPageUi = (int) config('cabinet-site-audit.page_ui', 2);
             if (! in_array($saPageUi, [1, 2], true)) {
                 $saPageUi = 2;
@@ -610,6 +617,17 @@ class SiteAuditController extends Controller
                     $allRows = $this->enrichImagesWithoutAltRows((int) $crawl->id, $allRows);
                 }
                 $allGroups = SiteAuditDuplicateGrouper::group($allRows, $code);
+                if (SiteAuditDuplicateGrouper::usesSharedFindings($code)) {
+                    $allGroups = $this->filterSharedFindingGroups(
+                        $allGroups,
+                        $ignoreSvc,
+                        $noteSvc,
+                        $projectId,
+                        $code,
+                        $showIgnored,
+                        $showFixed
+                    );
+                }
                 $allGroupsForSummary = $allGroups;
                 $groupTotal = count($allGroups);
                 $perPage = 20;
@@ -637,6 +655,17 @@ class SiteAuditController extends Controller
                         $allForSummary = $this->enrichImagesWithoutAltRows((int) $crawl->id, $allForSummary);
                     }
                     $allGroupsForSummary = SiteAuditDuplicateGrouper::group($allForSummary, $code);
+                    if (SiteAuditDuplicateGrouper::usesSharedFindings($code)) {
+                        $allGroupsForSummary = $this->filterSharedFindingGroups(
+                            $allGroupsForSummary,
+                            $ignoreSvc,
+                            $noteSvc,
+                            $projectId,
+                            $code,
+                            $showIgnored,
+                            $showFixed
+                        );
+                    }
                 }
             }
 
@@ -1010,7 +1039,7 @@ class SiteAuditController extends Controller
                 'finished' => true,
                 'can_resume' => (new \App\Services\SiteAudit\SiteAuditCrawlEngine())->canResume($crawl),
                 'pages_fetched' => (int) $crawl->pages_fetched,
-                'pages_total' => (int) $crawl->pages_total,
+                'pages_total' => $crawl->displayPagesTotal(),
                 'id' => (int) $crawl->id,
             ]);
         }
@@ -1688,12 +1717,14 @@ class SiteAuditController extends Controller
             }
         }
 
+        $pagesTotal = $crawl->displayPagesTotal();
+
         return response()->json([
             'id' => $crawl->id,
             'status' => $crawl->status,
             'status_label' => $crawl->statusLabelRu(),
             'pages_fetched' => (int) $crawl->pages_fetched,
-            'pages_total' => (int) $crawl->pages_total,
+            'pages_total' => $pagesTotal,
             'pages_unchanged' => (int) (($crawl->progress_json['pages_unchanged'] ?? 0)),
             'buckets' => $buckets,
             'buckets_hidden' => (new SiteAuditIgnoreService())->hiddenBucketsForCrawl($crawl),
@@ -1701,8 +1732,8 @@ class SiteAuditController extends Controller
             'error' => $crawl->error,
             'finished' => $crawl->isFinished(),
             'can_resume' => (new \App\Services\SiteAudit\SiteAuditCrawlEngine())->canResume($crawl),
-            'progress_pct' => $crawl->pages_total > 0
-                ? (int) round(100 * $crawl->pages_fetched / $crawl->pages_total)
+            'progress_pct' => $pagesTotal > 0
+                ? (int) round(100 * $crawl->pages_fetched / $pagesTotal)
                 : 0,
             'started_at' => optional($crawl->started_at)->format('d.m H:i'),
             'finished_at' => optional($crawl->finished_at)->format('d.m H:i'),
@@ -2134,6 +2165,12 @@ class SiteAuditController extends Controller
                 return $this->ignoreJsonOrRedirect($request, 422, 'bad_code');
             }
             $svc->restore($projectId, $code, '');
+        } elseif ($scope === 'pattern') {
+            $groupHash = trim((string) $request->input('group_hash', ''));
+            if ($code === '' || $groupHash === '') {
+                return $this->ignoreJsonOrRedirect($request, 422, 'bad_pattern');
+            }
+            $svc->restorePattern($projectId, $code, $groupHash);
         } else {
             $finding = SiteAuditFinding::query()
                 ->where('id', $findingId)
@@ -2160,7 +2197,8 @@ class SiteAuditController extends Controller
     }
 
     /**
-     * Игнор всех находок с текущей страницы списка (пагинация).
+     * Игнор всех находок с текущей страницы списка (пагинация)
+     * или одного блока в режиме «По ошибкам» (group_hash).
      */
     public function bulkIgnoreFindings(Request $request, int $id)
     {
@@ -2169,6 +2207,33 @@ class SiteAuditController extends Controller
         }
 
         $crawl = $this->ownedCrawl($id);
+        $svc = new SiteAuditIgnoreService();
+        $projectId = (int) $crawl->project_id;
+        $userId = (int) Auth::id();
+        $code = trim((string) $request->input('code', ''));
+        $groupHash = trim((string) $request->input('group_hash', ''));
+
+        // Блок с общими finding (HTML/формы/ссылки): игнор паттерна, не всех ошибок страницы.
+        if ($request->input('bulk_scope') === 'group'
+            && $groupHash !== ''
+            && $code !== ''
+            && SiteAuditDuplicateGrouper::usesSharedFindings($code)
+        ) {
+            $label = trim((string) $request->input('group_label', ''));
+            $svc->ignorePattern($projectId, $userId, $code, $groupHash, $label !== '' ? $label : null);
+
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => true, 'code' => $code, 'count' => 1, 'scope' => 'pattern']);
+            }
+
+            return $this->redirectAfterFindingAction(
+                $request,
+                (int) $crawl->id,
+                $code,
+                'В игнор: блок «' . ($label !== '' ? \Illuminate\Support\Str::limit($label, 60) : 'паттерн') . '»'
+            );
+        }
+
         $ids = $this->bulkFindingIdsFromRequest($request);
         if ($ids === []) {
             return $this->ignoreJsonOrRedirect($request, 422, 'empty');
@@ -2182,10 +2247,6 @@ class SiteAuditController extends Controller
             return $this->ignoreJsonOrRedirect($request, 404, 'not_found');
         }
 
-        $svc = new SiteAuditIgnoreService();
-        $projectId = (int) $crawl->project_id;
-        $userId = (int) Auth::id();
-        $code = (string) ($findings->first()->code ?? $request->input('code', ''));
         $n = 0;
         foreach ($findings as $finding) {
             $svc->ignoreFinding($finding, $projectId, $userId, null);
@@ -2209,7 +2270,7 @@ class SiteAuditController extends Controller
     }
 
     /**
-     * «Исправлено» для всех находок с текущей страницы списка.
+     * «Исправлено» для страницы списка или одного блока (group_hash).
      */
     public function bulkMarkFixedFindings(Request $request, int $id)
     {
@@ -2218,6 +2279,32 @@ class SiteAuditController extends Controller
         }
 
         $crawl = $this->ownedCrawl($id);
+        $noteSvc = new SiteAuditFindingNoteService();
+        $projectId = (int) $crawl->project_id;
+        $userId = (int) Auth::id();
+        $code = trim((string) $request->input('code', ''));
+        $groupHash = trim((string) $request->input('group_hash', ''));
+
+        if ($request->input('bulk_scope') === 'group'
+            && $groupHash !== ''
+            && $code !== ''
+            && SiteAuditDuplicateGrouper::usesSharedFindings($code)
+        ) {
+            $label = trim((string) $request->input('group_label', ''));
+            $noteSvc->markPatternFixed($projectId, $userId, $code, $groupHash, $label !== '' ? $label : null);
+
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => true, 'code' => $code, 'count' => 1, 'scope' => 'pattern']);
+            }
+
+            return $this->redirectAfterFindingAction(
+                $request,
+                (int) $crawl->id,
+                $code,
+                'Исправлено: блок «' . ($label !== '' ? \Illuminate\Support\Str::limit($label, 60) : 'паттерн') . '»'
+            );
+        }
+
         $ids = $this->bulkFindingIdsFromRequest($request);
         if ($ids === []) {
             return $this->ignoreJsonOrRedirect($request, 422, 'empty');
@@ -2231,10 +2318,6 @@ class SiteAuditController extends Controller
             return $this->ignoreJsonOrRedirect($request, 404, 'not_found');
         }
 
-        $noteSvc = new SiteAuditFindingNoteService();
-        $projectId = (int) $crawl->project_id;
-        $userId = (int) Auth::id();
-        $code = (string) ($findings->first()->code ?? $request->input('code', ''));
         $n = 0;
         foreach ($findings as $finding) {
             $urlHash = (string) ($finding->url_hash ?: '');
@@ -2273,6 +2356,35 @@ class SiteAuditController extends Controller
             'Исправлено: ' . number_format($n, 0, '', ' ')
                 . ($request->input('bulk_scope') === 'group' ? ' в блоке' : ' на странице')
         );
+    }
+
+    /**
+     * @param  list<array>  $groups
+     * @return list<array>
+     */
+    private function filterSharedFindingGroups(
+        array $groups,
+        SiteAuditIgnoreService $ignoreSvc,
+        SiteAuditFindingNoteService $noteSvc,
+        int $projectId,
+        string $code,
+        bool $showIgnored,
+        bool $showFixed
+    ): array {
+        $patternIgnored = $ignoreSvc->patternHashesForCode($projectId, $code);
+        $patternFixed = $noteSvc->fixedPatternHashesForCode($projectId, $code);
+        if ($showIgnored) {
+            return SiteAuditDuplicateGrouper::filterGroupsByPatternHashes($groups, [], $patternIgnored);
+        }
+        if ($showFixed) {
+            return SiteAuditDuplicateGrouper::filterGroupsByPatternHashes($groups, [], $patternFixed);
+        }
+        $hide = $patternIgnored;
+        foreach ($patternFixed as $h => $_) {
+            $hide[$h] = true;
+        }
+
+        return SiteAuditDuplicateGrouper::filterGroupsByPatternHashes($groups, $hide, []);
     }
 
     /**
@@ -2380,6 +2492,38 @@ class SiteAuditController extends Controller
             (int) $crawl->id,
             $finding->code,
             'Статус/комментарий сброшен',
+            ['fixed' => 1]
+        );
+    }
+
+    public function clearPatternNote(Request $request, int $id)
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            return $this->ignoreJsonOrRedirect($request, 403, 'demo');
+        }
+
+        $crawl = $this->ownedCrawl($id);
+        $code = trim((string) $request->input('code', ''));
+        $groupHash = trim((string) $request->input('group_hash', ''));
+        if ($code === '' || $groupHash === '') {
+            return $this->ignoreJsonOrRedirect($request, 422, 'bad_pattern');
+        }
+
+        (new SiteAuditFindingNoteService())->clearPatternFixed(
+            (int) $crawl->project_id,
+            $code,
+            $groupHash
+        );
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'code' => $code]);
+        }
+
+        return $this->redirectAfterFindingAction(
+            $request,
+            (int) $crawl->id,
+            $code,
+            'Блок снова открыт',
             ['fixed' => 1]
         );
     }

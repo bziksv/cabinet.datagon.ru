@@ -106,6 +106,39 @@ class SiteAuditCrawl extends Model
         return ! $this->isFinished();
     }
 
+    /**
+     * Знаменатель прогресса для UI: без артефакта «весь sitemap» после stop/resume-rebuild.
+     */
+    public function displayPagesTotal(): int
+    {
+        $fetched = max(0, (int) $this->pages_fetched);
+        $total = max($fetched, (int) $this->pages_total);
+        $limit = max(0, (int) $this->pages_limit);
+        if ($limit > 0) {
+            $total = min($total, $limit);
+        }
+
+        $seed = 0;
+        $urlCount = 0;
+        if (is_array($this->progress_json)) {
+            $seed = (int) ($this->progress_json['sitemap']['seed_count'] ?? 0);
+            $urlCount = (int) ($this->progress_json['sitemap']['url_count'] ?? 0);
+        }
+        if ($seed <= 0 && isset($this->sitemap_seed_count_raw)) {
+            $seed = (int) $this->sitemap_seed_count_raw;
+        }
+        if ($urlCount <= 0 && isset($this->sitemap_url_count_raw)) {
+            $urlCount = (int) $this->sitemap_url_count_raw;
+        }
+
+        // Остановленные/готовые: total = весь sitemap при меньшем seed → показываем seed/fetched.
+        if ($this->isFinished() && $seed > 0 && $urlCount > 0 && $total >= $urlCount) {
+            $total = max($fetched, $seed);
+        }
+
+        return max($fetched, $total);
+    }
+
     public static function statusLabel(?string $status): string
     {
         $map = [

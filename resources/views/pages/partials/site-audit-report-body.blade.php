@@ -689,13 +689,15 @@
                                 <span class="cabinet-sa-dup-group__badge">{{ (!empty($isCrawlImagesReport) || !empty($isImagesWithoutAltReport) || !empty($isLinkInvertedReport) || !empty($isInsecureFormReport)) ? 'общий блок' : 'сквозной' }}</span>
                             @endif
                         </div>
-                        @include('pages.partials.site-audit-report-bulk-group', [
-                            'group' => $group,
-                            'crawl' => $crawl,
-                            'code' => $code,
-                            'canNote' => $canNote ?? false,
-                            'canIgnore' => $canIgnore ?? false,
-                        ])
+                @include('pages.partials.site-audit-report-bulk-group', [
+                    'group' => $group,
+                    'crawl' => $crawl,
+                    'code' => $code,
+                    'canNote' => $canNote ?? false,
+                    'canIgnore' => $canIgnore ?? false,
+                    'showIgnored' => $showIgnored ?? false,
+                    'showFixed' => $showFixed ?? false,
+                ])
                     </div>
                     <div class="cabinet-sa-dup-group__label">
                         @if(!empty($isInsecureFormReport))

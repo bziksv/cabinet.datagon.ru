@@ -16,7 +16,15 @@
             mb_substr(trim((string) $user->name), 0, 1)
             . mb_substr(trim((string) $user->last_name), 0, 1)
         ) ?: mb_strtoupper(mb_substr($user->email, 0, 1));
-        $balanceFormatted = number_format((float) $user->balance, 0, '.', ' ');
+        $companiesCollection = $user->relationLoaded('companies')
+            ? $user->companies
+            : $user->companies()->get();
+        $personalBalance = $user->personalBalanceAmount();
+        $totalBalance = $personalBalance + (int) $companiesCollection->sum(static function ($company) {
+            return (int) round((float) ($company->balance ?? 0));
+        });
+        $balanceFormatted = number_format($totalBalance, 0, '', ' ');
+        $personalBalanceFormatted = number_format($personalBalance, 0, '', ' ');
         $emailPending = $user->email_verified_at === null;
         $avatarUrl = $user->image ?: asset('img/user-icon.svg');
     @endphp

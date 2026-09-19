@@ -32,7 +32,7 @@ class HomeDashboard
 
         return [
             'displayName' => $user->fullName ?: $user->email,
-            'balanceFormatted' => number_format((float) $user->balance, 0, '.', ' '),
+            'balanceFormatted' => number_format($user->totalBalanceAmount(), 0, '', ' '),
             'tariffName' => $tariffName,
             'supportCount' => $supportCount,
             'supportFilter' => $supportFilter,

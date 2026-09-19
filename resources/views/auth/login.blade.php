@@ -11,6 +11,9 @@
             <div class="card-body login-card-body">
                 <form action="{{ url('/login') }}" method="POST" id="login-form">
                     @csrf
+                    @if(!empty($redirect))
+                        <input type="hidden" name="redirect" value="{{ $redirect }}">
+                    @endif
 
                     <div class="input-group mb-3">
                         <select id="select-language" name="lang"

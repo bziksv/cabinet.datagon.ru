@@ -1,26 +1,36 @@
+@php
+    $aiUiAdmin = \App\User::isUserAdmin();
+@endphp
 <ul class="nav nav-pills p-2" id="main-nav">
-    <li class="nav-item">
-        <a class="nav-link" href="{{ route('ai.generation.prompt') }}">
-            Адаптивный промпт
-        </a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ route('ai.macros.index') }}">Макросы</a>
-    </li>
-    <li class="nav-item">
-        <a class="nav-link" href="{{ route('ai.stopwords.index') }}">
-            Запрещённые слова
-        </a>
-    </li>
+    @if($aiUiAdmin)
+        <li class="nav-item">
+            <a class="nav-link" href="{{ route('ai.generation.prompt') }}">
+                Генерация текста
+                <span class="badge badge-warning ml-1" style="font-weight:500;font-size:10px;vertical-align:middle">доработка</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{{ route('ai.macros.index') }}">
+                Макросы
+                <span class="badge badge-warning ml-1" style="font-weight:500;font-size:10px;vertical-align:middle">доработка</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{{ route('ai.stopwords.index') }}">
+                Запрещённые слова
+                <span class="badge badge-warning ml-1" style="font-weight:500;font-size:10px;vertical-align:middle">доработка</span>
+            </a>
+        </li>
+    @endif
     <li class="nav-item">
         <a class="nav-link" href="{{ route('ai.generation.story') }}">
-            История
+            Моя история
         </a>
     </li>
-    @if(App\User::isUserAdmin())
+    @if($aiUiAdmin)
         <li class="nav-item">
             <a class="nav-link" href="{{ route('ai.generation.all.story') }}">
-                Общая история
+                История всех пользователей
             </a>
         </li>
     @endif

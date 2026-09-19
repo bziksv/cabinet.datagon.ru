@@ -59,7 +59,48 @@ class LoginController extends Controller
             });
         }
 
-        return view('auth.login', ['lang' => $langCache]);
+        return view('auth.login', [
+            'lang' => $langCache,
+            'redirect' => $this->safeRedirectPath(request()->query('redirect')),
+        ]);
+    }
+
+    /**
+     * После логина: session intended, иначе ?redirect=/path, иначе /.
+     *
+     * @return string
+     */
+    public function redirectTo()
+    {
+        $fromQuery = $this->safeRedirectPath(request()->input('redirect'));
+        if ($fromQuery !== null) {
+            return $fromQuery;
+        }
+        return '/';
+    }
+
+    /**
+     * Только внутренний path кабинета (без open redirect).
+     */
+    protected function safeRedirectPath($raw): ?string
+    {
+        if (!is_string($raw)) {
+            return null;
+        }
+        $raw = trim($raw);
+        if ($raw === '' || $raw[0] !== '/') {
+            return null;
+        }
+        if (strpos($raw, '//') !== false || strpos($raw, '\\') !== false) {
+            return null;
+        }
+        if (!preg_match('#^/[A-Za-z0-9/_\-.?=&%]*$#', $raw)) {
+            return null;
+        }
+        if (strpos($raw, '/login') === 0 || strpos($raw, '/logout') === 0) {
+            return null;
+        }
+        return $raw;
     }
 
     public function logout(Request $request)

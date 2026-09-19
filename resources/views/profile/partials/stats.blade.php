@@ -5,9 +5,14 @@
                 <i class="bi bi-wallet2"></i>
             </span>
             <div class="info-box-content">
-                <span class="info-box-text">{{ __('Your balance') }}</span>
+                <span class="info-box-text">{{ __('Total balance') }}</span>
                 <span class="info-box-number">{{ $balanceFormatted }} ₽</span>
-                <span class="info-box-meta text-secondary">{{ __('Top up your balance') }}</span>
+                <span class="info-box-meta text-secondary">
+                    {{ __('Personal') }}: {{ $personalBalanceFormatted }} ₽
+                    @foreach(($companiesCollection ?? collect()) as $companyItem)
+                        <br>{{ $companyItem->name }}: {{ number_format((int) round((float) $companyItem->balance), 0, '', ' ') }} ₽
+                    @endforeach
+                </span>
             </div>
         </a>
     </div>

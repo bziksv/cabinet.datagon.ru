@@ -55,6 +55,7 @@
             @include('ai-generation.blocks.nav')
         </div>
         <div class="card-body">
+            @include('ai-generation.blocks.wip-admin-notice')
             
             <div class="row">
                 <div class="col-lg-8 col-md-12">
@@ -205,15 +206,18 @@
 
                 @if(!empty($demoShowcase))
                 (function applyDemoShowcase() {
-                    var demo = @json([
-                        'id' => $demoShowcase->id,
-                        'prompt' => $demoShowcase->prompt,
-                        'result' => $demoShowcase->result,
-                        'link' => data_get($demoShowcase->parrameters, 'link', ''),
-                        'source' => data_get($demoShowcase->parrameters, 'source', 'ai_database'),
-                        'keywords' => data_get($demoShowcase->parrameters, 'keywords', []),
-                        'stopwords' => data_get($demoShowcase->parrameters, 'stopwords', []),
-                    ]);
+                    @php
+                        $demoPayload = [
+                            'id' => $demoShowcase->id,
+                            'prompt' => $demoShowcase->prompt,
+                            'result' => $demoShowcase->result,
+                            'link' => data_get($demoShowcase->parrameters, 'link', ''),
+                            'source' => data_get($demoShowcase->parrameters, 'source', 'ai_database'),
+                            'keywords' => data_get($demoShowcase->parrameters, 'keywords', []),
+                            'stopwords' => data_get($demoShowcase->parrameters, 'stopwords', []),
+                        ];
+                    @endphp
+                    var demo = {!! json_encode($demoPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!};
                     if (demo.prompt) {
                         $('#prompt-text').val(demo.prompt);
                     }

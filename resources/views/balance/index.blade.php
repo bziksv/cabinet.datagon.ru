@@ -10,7 +10,7 @@
     @php
         $user = Auth::user();
         $companiesCollection = isset($companies) ? collect($companies) : collect();
-        $personalBalance = (int) round((float) $user->balance);
+        $personalBalance = $user->personalBalanceAmount();
         $companiesBalance = (int) $companiesCollection->sum(function ($company) {
             return (int) round((float) ($company->balance ?? 0));
         });

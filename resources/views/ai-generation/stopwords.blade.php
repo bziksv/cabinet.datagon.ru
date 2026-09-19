@@ -7,8 +7,9 @@
         <div class="card-header d-flex p-0">
             @include('ai-generation.blocks.nav')
         </div>
-        
+
         <div class="card-header p-2">
+            @include('ai-generation.blocks.wip-admin-notice')
             <ul class="nav nav-pills" id="stopwords-tabs" role="tablist">
                 <li class="nav-item">
                     <a class="nav-link active" id="tab-words-link" data-bs-toggle="pill" href="#tab-words" role="tab">Слова</a>

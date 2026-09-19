@@ -23,12 +23,18 @@ class AiGenerationHistory extends Model
         'type',
         'prompt',
         'result',
+        'used_tokens',
+        'prompt_tokens',
+        'completion_tokens',
         'created_at',
         'updated_at',
     ];
 
     protected $casts = [
         'parrameters' => 'json',
+        'used_tokens' => 'integer',
+        'prompt_tokens' => 'integer',
+        'completion_tokens' => 'integer',
     ];
 
     public function user()

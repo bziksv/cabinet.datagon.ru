@@ -5,9 +5,10 @@ namespace App\Services\deepseek\prompts;
 class PromptService 
 {
 
-    public function adaptivePrompt($link, $note = null, $baseText): string
+    public function adaptivePrompt($link, $note = null, $baseText, $name = null): string
     {
-        $text = str_replace('{link}', $link, $baseText);
+        $text = str_replace('{link}', (string) $link, $baseText);
+        $text = str_replace('{name}', (string) ($name ?? ''), $text);
 
         if ($note) {
             $text .= "\nДополнительное примечание: $note\n";

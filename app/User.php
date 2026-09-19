@@ -354,6 +354,30 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(UserCompany::class);
     }
 
+    /** Личный кошелёк (users.balance), целые рубли. */
+    public function personalBalanceAmount(): int
+    {
+        return (int) round((float) $this->balance);
+    }
+
+    /** Сумма балансов юрлиц пользователя. */
+    public function companiesBalanceAmount(): int
+    {
+        if ($this->relationLoaded('companies')) {
+            return (int) $this->companies->sum(static function ($company) {
+                return (int) round((float) ($company->balance ?? 0));
+            });
+        }
+
+        return (int) round((float) $this->companies()->sum('balance'));
+    }
+
+    /** Личный + юрлица — то, что показываем как «общий баланс». */
+    public function totalBalanceAmount(): int
+    {
+        return $this->personalBalanceAmount() + $this->companiesBalanceAmount();
+    }
+
     public function companyInvoices()
     {
         return $this->hasMany(CompanyInvoice::class);

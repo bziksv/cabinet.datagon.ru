@@ -292,7 +292,8 @@ class DemoCabinet
             return null;
         }
 
-        return '/ai-generation/prompt';
+        // UI промпта пока только админам; демо ведём на историю с готовым результатом.
+        return '/ai-generation/story';
     }
 
     /**

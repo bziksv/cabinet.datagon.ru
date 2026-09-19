@@ -32,9 +32,17 @@
             @endif
         @endif
         <ul class="list-group list-group-flush text-start small mt-2">
-            <li class="list-group-item d-flex justify-content-between px-0">
-                <span class="text-secondary">{{ __('Balance') }}</span>
-                <span class="fw-semibold">{{ $balanceFormatted }} ₽</span>
+            <li class="list-group-item px-0">
+                <div class="d-flex justify-content-between">
+                    <span class="text-secondary">{{ __('Total balance') }}</span>
+                    <span class="fw-semibold">{{ $balanceFormatted }} ₽</span>
+                </div>
+                <div class="text-secondary small mt-1">
+                    {{ __('Personal') }}: {{ $personalBalanceFormatted }} ₽
+                    @foreach(($companiesCollection ?? collect()) as $companyItem)
+                        <br>{{ $companyItem->name }}: {{ number_format((int) round((float) $companyItem->balance), 0, '', ' ') }} ₽
+                    @endforeach
+                </div>
             </li>
             <li class="list-group-item d-flex justify-content-between px-0">
                 <span class="text-secondary">{{ __('Lang') }}</span>
@@ -56,6 +64,9 @@
         <div class="d-grid gap-2 mt-3">
             <a href="{{ route('balance.index') }}" class="btn btn-success btn-sm">
                 <i class="bi bi-wallet2 me-1"></i>{{ __('Top up your balance') }}
+            </a>
+            <a href="{{ route('integration.api-keys.index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-key me-1"></i>{{ __('API keys') }}
             </a>
             <a href="{{ route('support.index') }}" class="btn btn-outline-primary btn-sm">
                 <i class="bi bi-headset me-1"></i>{{ __('Support') }}

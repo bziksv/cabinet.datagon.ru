@@ -9,6 +9,7 @@
         </div>
 
         <div class="card-body">
+            @include('ai-generation.blocks.wip-admin-notice')
 
             <div class="alert alert-secondary alert-dismissible mb-4 shadow-sm">
                 <button type="button" class="close" data-bs-dismiss="alert" aria-hidden="true">×</button>

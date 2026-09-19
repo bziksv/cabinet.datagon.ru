@@ -73,3 +73,26 @@ Route::post('demo/sbor-poiskovykh-podskazok/run', 'Api\\Demo\\SearchSuggestionsD
 Route::post('demo/zapisi-domena/run', 'Api\\Demo\\DomainRecordsDemoController@run');
 Route::post('demo/tipy-saitov-v-vydache/run', 'Api\\Demo\\SiteTypesDemoController@run');
 Route::post('demo/geo-lokalizaciya-kommerciya/run', 'Api\\Demo\\PhraseCommerceDemoController@run');
+
+Route::prefix('v1')->group(function () {
+    Route::middleware(['integration.api:relevance', 'integration.api.throttle'])->group(function () {
+        Route::post('relevance/analyses', 'Api\\V1\\RelevanceAnalysisController@store');
+        Route::get('relevance/analyses/{id}', 'Api\\V1\\RelevanceAnalysisController@show');
+        Route::get('relevance/histories', 'Api\\V1\\RelevanceAnalysisController@historiesIndex');
+        Route::get('relevance/histories/{historyId}', 'Api\\V1\\RelevanceAnalysisController@history')
+            ->where('historyId', '[0-9]+');
+        Route::get('relevance/histories/{historyId}/missing-phrases', 'Api\\V1\\RelevanceAnalysisController@missingPhrases')
+            ->where('historyId', '[0-9]+');
+        Route::get('relevance/histories/{historyId}/clouds', 'Api\\V1\\RelevanceAnalysisController@clouds')
+            ->where('historyId', '[0-9]+');
+
+        Route::post('relevance/batches', 'Api\\V1\\RelevanceBatchController@store');
+        Route::get('relevance/batches/{id}', 'Api\\V1\\RelevanceBatchController@show');
+    });
+
+    Route::middleware(['integration.api:ai', 'integration.api.throttle'])->group(function () {
+        Route::post('ai/generate', 'Api\\V1\\AiGenerateController@store');
+        Route::get('ai/generate/{recordId}', 'Api\\V1\\AiGenerateController@show')
+            ->where('recordId', '[0-9]+');
+    });
+});

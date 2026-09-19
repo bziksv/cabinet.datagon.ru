@@ -19,32 +19,90 @@ class TextAnalyzer extends Model
 
     public static function curlInitV2($link)
     {
+        $url = trim((string) $link);
+        if ($url === '' || !self::isSafePublicFetchUrl($url)) {
+            return '';
+        }
+
         $refers = ['google.com', 'yandex.ru'];
+        $cookieFile = tempnam(sys_get_temp_dir(), 'titlo_cj_');
+        if ($cookieFile === false) {
+            $cookieFile = sys_get_temp_dir() . '/titlo_cj_' . uniqid('', true);
+        }
 
-        $curl = curl_init();
-        curl_setopt($curl, CURLOPT_COOKIEJAR, '/tmp/cookies.txt');
-        curl_setopt($curl, CURLOPT_COOKIEFILE, '/tmp/cookies.txt');
-        curl_setopt($curl, CURLOPT_COOKIE, 'beget=begetok; path=/; realauth=SvBD85dINu3; expires=Sat, 25 Feb 2030 02:16:43 GMT; SameSite=Lax');
-        curl_setopt($curl, CURLOPT_URL, $link);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($curl, CURLOPT_HEADER, false);
-        curl_setopt($curl, CURLOPT_FAILONERROR, true);
-        curl_setopt($curl, CURLOPT_AUTOREFERER, true);
-        curl_setopt($curl, CURLOPT_ENCODING, '');
-        curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 4);
-        curl_setopt($curl, CURLOPT_TIMEOUT, 5);
-        curl_setopt($curl, CURLOPT_REFERER, $refers[array_rand($refers)]);
+        $verifySsl = function_exists('app') && app()->environment('production');
+        $html = '';
+        $maxHops = 3;
 
-        $headers = curl_getinfo($curl);
-        $html = curl_exec($curl);
+        for ($hop = 0; $hop <= $maxHops; $hop++) {
+            if ($hop > 0 && !self::isSafePublicFetchUrl($url)) {
+                $html = '';
+                break;
+            }
+
+            $curl = curl_init();
+            curl_setopt($curl, CURLOPT_COOKIEJAR, $cookieFile);
+            curl_setopt($curl, CURLOPT_COOKIEFILE, $cookieFile);
+            curl_setopt($curl, CURLOPT_COOKIE, 'beget=begetok; path=/; SameSite=Lax');
+            curl_setopt($curl, CURLOPT_URL, $url);
+            curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($curl, CURLOPT_FOLLOWLOCATION, false);
+            curl_setopt($curl, CURLOPT_HEADER, true);
+            curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, $verifySsl ? 2 : 0);
+            curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, $verifySsl);
+            curl_setopt($curl, CURLOPT_FAILONERROR, false);
+            curl_setopt($curl, CURLOPT_AUTOREFERER, true);
+            curl_setopt($curl, CURLOPT_ENCODING, '');
+            curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 4);
+            curl_setopt($curl, CURLOPT_TIMEOUT, 5);
+            curl_setopt($curl, CURLOPT_REFERER, $refers[array_rand($refers)]);
+            curl_setopt($curl, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+
+            $raw = curl_exec($curl);
+            $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            $headerSize = (int) curl_getinfo($curl, CURLINFO_HEADER_SIZE);
+            curl_close($curl);
+
+            if (!is_string($raw) || $raw === '') {
+                $html = '';
+                break;
+            }
+
+            $headerBlob = substr($raw, 0, $headerSize);
+            $body = substr($raw, $headerSize);
+
+            if ($status >= 300 && $status < 400) {
+                if ($hop >= $maxHops) {
+                    $html = '';
+                    break;
+                }
+                $next = self::redirectLocationFromHeaders($headerBlob, $url);
+                if ($next === '' || !self::isSafePublicFetchUrl($next)) {
+                    $html = '';
+                    break;
+                }
+                $url = $next;
+                continue;
+            }
+
+            if ($status >= 400) {
+                $html = '';
+                break;
+            }
+
+            $html = is_string($body) ? $body : '';
+            break;
+        }
+
+        @unlink($cookieFile);
+
+        if (!is_string($html) || $html === '') {
+            return '';
+        }
 
         if (preg_match('/<meta[^>]+charset=["\']?([\w-]+)["\']?/i', $html, $matches)) {
             $encoding = strtoupper($matches[1]);
         } else {
-            // Если не найдено, используем UTF-8 по умолчанию
             $encoding = 'UTF-8';
         }
 
@@ -54,6 +112,92 @@ class TextAnalyzer extends Model
         }
 
         return $html;
+    }
+
+    /**
+     * Resolve Location header against current URL; empty if missing/invalid.
+     */
+    protected static function redirectLocationFromHeaders(string $headers, string $currentUrl): string
+    {
+        if (!preg_match('/^Location:\s*(.+)$/im', $headers, $m)) {
+            return '';
+        }
+        $loc = trim($m[1]);
+        $loc = trim($loc, " \t\"'");
+        if ($loc === '') {
+            return '';
+        }
+        if (preg_match('#^https?://#i', $loc)) {
+            return $loc;
+        }
+        $base = parse_url($currentUrl);
+        if (!is_array($base) || empty($base['scheme']) || empty($base['host'])) {
+            return '';
+        }
+        $origin = $base['scheme'] . '://' . $base['host']
+            . (isset($base['port']) ? (':' . $base['port']) : '');
+        if (isset($loc[0]) && $loc[0] === '/') {
+            return $origin . $loc;
+        }
+        $path = (string) ($base['path'] ?? '/');
+        $dir = preg_replace('#/[^/]*$#', '/', $path);
+        return $origin . $dir . $loc;
+    }
+
+    /**
+     * SSRF-гард: публичные http(s).
+     * local-окружение кабинета: разрешаем private/loopback (Bitrix на 127.0.0.1).
+     * prod: только публичные IP.
+     */
+    public static function isSafePublicFetchUrl(string $url): bool
+    {
+        $url = trim($url);
+        if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+        $parts = parse_url($url);
+        if (!is_array($parts)) {
+            return false;
+        }
+        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            return false;
+        }
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        if ($host === '') {
+            return false;
+        }
+
+        $allowPrivate = function_exists('app') && app()->environment('local');
+        if ($allowPrivate) {
+            return true;
+        }
+
+        if ($host === 'localhost' || substr($host, -6) === '.local') {
+            return false;
+        }
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return !self::isPrivateOrReservedIp($host);
+        }
+        $ips = @gethostbynamel($host);
+        if (!is_array($ips) || $ips === []) {
+            return false;
+        }
+        foreach ($ips as $ip) {
+            if (self::isPrivateOrReservedIp($ip)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    protected static function isPrivateOrReservedIp(string $ip): bool
+    {
+        return filter_var(
+            $ip,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+        ) === false;
     }
 
     public static function curlInit($link)

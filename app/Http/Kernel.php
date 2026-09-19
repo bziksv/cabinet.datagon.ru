@@ -77,7 +77,8 @@ class Kernel extends HttpKernel
         ],
 
         'api' => [
-            'throttle:60,1',
+            // Shop / AI poll + bulk phrase: 60/min слишком мало (Too Many Attempts).
+            'throttle:300,1',
             'bindings',
         ],
     ];
@@ -102,6 +103,9 @@ class Kernel extends HttpKernel
         'role' => RoleMiddleware::class,
         'permission' => EnsureTeamPermissionMiddleware::class,
         'role_or_permission' => RoleOrPermissionMiddleware::class,
+        'integration.api' => \App\Http\Middleware\AuthenticateIntegrationApiKey::class,
+        'integration.api.throttle' => \App\Http\Middleware\ThrottleIntegrationApiKey::class,
+        'ai.generation.ui.admin' => \App\Http\Middleware\EnsureAiGenerationUiAdmin::class,
     ];
 
     /**

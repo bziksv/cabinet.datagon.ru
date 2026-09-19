@@ -259,6 +259,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('profile/', 'ProfilesController@index')->name('profile.index');
     Route::post('profile/', 'ProfilesController@update')->name('profile.update');
     Route::patch('profile/', 'ProfilesController@password')->name('profile.password');
+
+    Route::get('integration/api-keys', 'IntegrationApiKeysController@index')->name('integration.api-keys.index');
+    Route::post('integration/api-keys', 'IntegrationApiKeysController@store')->name('integration.api-keys.store');
+    Route::delete('integration/api-keys/{id}', 'IntegrationApiKeysController@destroy')
+        ->name('integration.api-keys.destroy')
+        ->where('id', '[0-9]+');
     Route::get('test-telegram-notify', 'ProfilesController@testTelegramNotify')->name('profile.test-telegram-notify');
     Route::post('profile/telegram-connect-prompt/snooze', 'ProfilesController@snoozeTelegramConnectPrompt')
         ->name('profile.telegram-connect-prompt.snooze');
@@ -900,39 +906,46 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('/click-tracking', 'HomeController@clickTracking')->name('click.tracking');
 
-    Route::redirect('/ai-generation', '/ai-generation/prompt');
+    // UI генерации / макросов / стоп-слов пока только админам (на доработке). История — всем.
+    Route::get('/ai-generation', function () {
+        return redirect(\App\User::isUserAdmin()
+            ? route('ai.generation.prompt')
+            : route('ai.generation.story'));
+    });
     Route::get('/ai-generation/story', 'AiController@story')->name('ai.generation.story');
     Route::get('/ai-generation/all-history', 'AiController@allHistory')->name('ai.generation.all.story');
-
-    Route::get('/ai-generation/prompt', 'AiController@prompt')->name('ai.generation.prompt');
-    Route::post('/ai-generation/prompt', 'AiController@generatePrompt')->name('ai.generation.prompt.generate');
-    
-    Route::get('/ai-generation/get-result/{recordId}', 'AiController@getResult')->name('ai.generation.get.result');
-    Route::get('/relevance-history/{project}', 'AiController@relevanceHistory')->name('ai.generation.relevance.history');
-    Route::get('/relevance-history/getPhrases/{projectId}', 'AiController@getPhrases')->name('ai.generation.relevance.history.phrases');
-    Route::get('/relevance-projects', 'AiController@getProjects')->name('ai.generation.relevance.projects');
     Route::post('/ai-generation/history', 'AiController@getHistoryJson')->name('ai.generation.history.json');
+    Route::get('/ai-generation/get-result/{recordId}', 'AiController@getResult')->name('ai.generation.get.result');
 
-    Route::get('/ai-generation/stopwords', 'AiGenerationStopWordController@index')->name('ai.stopwords.index');
-    Route::post('/ai-generation/stopwords', 'AiGenerationStopWordController@store')->name('ai.stopwords.store');
-    Route::delete('/ai-generation/stopwords/{id}', 'AiGenerationStopWordController@destroy')->name('ai.stopwords.destroy');
-    Route::put('/ai-stopwords/{id}', 'AiGenerationStopWordController@update')->name('ai.stopwords.update');
-    Route::get('/ai-generation/stopwords-list', 'AiGenerationStopWordController@getJson');
+    Route::middleware(['ai.generation.ui.admin'])->group(function () {
+        Route::get('/ai-generation/prompt', 'AiController@prompt')->name('ai.generation.prompt');
+        Route::post('/ai-generation/prompt', 'AiController@generatePrompt')->name('ai.generation.prompt.generate');
 
-    Route::get('/ai-stopwords/datatable', 'AiGenerationStopWordController@datatable')->name('ai.stopwords.datatable');
-    Route::get('/ai-stopwords-categories/datatable', 'AiGenerationStopWordCategoryController@datatable')->name('ai.stopwords.categories.datatable');
+        Route::get('/relevance-history/{project}', 'AiController@relevanceHistory')->name('ai.generation.relevance.history');
+        Route::get('/relevance-history/getPhrases/{projectId}', 'AiController@getPhrases')->name('ai.generation.relevance.history.phrases');
+        Route::get('/relevance-projects', 'AiController@getProjects')->name('ai.generation.relevance.projects');
 
-    Route::prefix('ai-stopwords-categories')->name('ai.stopwords.categories.')->group(function () {
-        Route::post('/', 'AiGenerationStopWordCategoryController@store')->name('store');
-        Route::put('/{id}', 'AiGenerationStopWordCategoryController@update')->name('update');
-        Route::delete('/{id}', 'AiGenerationStopWordCategoryController@destroy')->name('destroy');
-    });
+        Route::get('/ai-generation/stopwords', 'AiGenerationStopWordController@index')->name('ai.stopwords.index');
+        Route::post('/ai-generation/stopwords', 'AiGenerationStopWordController@store')->name('ai.stopwords.store');
+        Route::delete('/ai-generation/stopwords/{id}', 'AiGenerationStopWordController@destroy')->name('ai.stopwords.destroy');
+        Route::put('/ai-stopwords/{id}', 'AiGenerationStopWordController@update')->name('ai.stopwords.update');
+        Route::get('/ai-generation/stopwords-list', 'AiGenerationStopWordController@getJson');
 
-    Route::prefix('ai-macros')->name('ai.macros.')->group(function () {
-        Route::get('/', 'AiGenerationMacroController@index')->name('index');
-        Route::get('/datatable', 'AiGenerationMacroController@datatable')->name('datatable');
-        Route::post('/', 'AiGenerationMacroController@store')->name('store');
-        Route::put('/{id}', 'AiGenerationMacroController@update')->name('update');
-        Route::delete('/{id}', 'AiGenerationMacroController@destroy')->name('destroy');
+        Route::get('/ai-stopwords/datatable', 'AiGenerationStopWordController@datatable')->name('ai.stopwords.datatable');
+        Route::get('/ai-stopwords-categories/datatable', 'AiGenerationStopWordCategoryController@datatable')->name('ai.stopwords.categories.datatable');
+
+        Route::prefix('ai-stopwords-categories')->name('ai.stopwords.categories.')->group(function () {
+            Route::post('/', 'AiGenerationStopWordCategoryController@store')->name('store');
+            Route::put('/{id}', 'AiGenerationStopWordCategoryController@update')->name('update');
+            Route::delete('/{id}', 'AiGenerationStopWordCategoryController@destroy')->name('destroy');
+        });
+
+        Route::prefix('ai-macros')->name('ai.macros.')->group(function () {
+            Route::get('/', 'AiGenerationMacroController@index')->name('index');
+            Route::get('/datatable', 'AiGenerationMacroController@datatable')->name('datatable');
+            Route::post('/', 'AiGenerationMacroController@store')->name('store');
+            Route::put('/{id}', 'AiGenerationMacroController@update')->name('update');
+            Route::delete('/{id}', 'AiGenerationMacroController@destroy')->name('destroy');
+        });
     });
 });

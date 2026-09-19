@@ -2789,7 +2789,6 @@ class Relevance
 
     public function saveHistory($historyId)
     {
-        RelevanceProgress::editProgress(100, $this->request);
         $this->saveResults();
         $this->saveStatistic();
 
@@ -2837,6 +2836,9 @@ class Relevance
                 $this->saveHistoryResult($id);
             }
         }
+
+        // 100% только после записи result — иначе API отдаёт history без TLP/облаков
+        RelevanceProgress::editProgress(100, $this->request);
     }
 
     public function saveHistoryResult($id)
@@ -2973,13 +2975,17 @@ class Relevance
         rsort($points);
         rsort($countSymbols);
 
-        for ($i = 0; $i <= 4; $i++) {
-            $this->calculate('coverage', $coverage[$i] / 5);
-            $this->calculate('coverageTf', $coverageTf[$i] / 5);
-            $this->calculate('densityPercent', $density[$i] / 5);
-            $this->calculate('width', $width[$i] / 5);
-            $this->calculate('points', $points[$i] / 5);
-            $this->calculate('countSymbols', $countSymbols[$i] / 5);
+        $n = min(5, count($coverage));
+        if ($n <= 0) {
+            return;
+        }
+        for ($i = 0; $i < $n; $i++) {
+            $this->calculate('coverage', $coverage[$i] / $n);
+            $this->calculate('coverageTf', $coverageTf[$i] / $n);
+            $this->calculate('densityPercent', $density[$i] / $n);
+            $this->calculate('width', $width[$i] / $n);
+            $this->calculate('points', $points[$i] / $n);
+            $this->calculate('countSymbols', $countSymbols[$i] / $n);
         }
     }
 
@@ -3006,6 +3012,63 @@ class Relevance
 
         UsersJobs::where('user_id', '=', $this->params['user_id'])->decrement('count_jobs');
         RelevanceProgress::where('hash', $this->scanHash)->update(['error' => 1]);
+
+        // Integration API: в progress.error только tinyint, текст кладём в analysis.
+        try {
+            $public = self::publicIntegrationFailureCode($exception);
+            Log::warning('Relevance integration analysis failed', [
+                'hash' => $this->scanHash,
+                'public' => $public,
+                'message' => $exception->getMessage(),
+            ]);
+            IntegrationAnalysis::where('progress_hash', $this->scanHash)
+                ->whereIn('status', [
+                    IntegrationAnalysis::STATUS_QUEUED,
+                    IntegrationAnalysis::STATUS_RUNNING,
+                ])
+                ->update([
+                    'status' => IntegrationAnalysis::STATUS_FAILED,
+                    'error' => $public,
+                ]);
+        } catch (\Throwable $e) {
+            // не критично для UI-сканов без integration_analyses
+        }
+    }
+
+    /**
+     * Стабильный код ошибки для магазина (без путей/SQL/hostnames).
+     */
+    public static function publicIntegrationFailureCode($exception): string
+    {
+        $msg = '';
+        if (is_object($exception) && method_exists($exception, 'getMessage')) {
+            $msg = trim((string) $exception->getMessage());
+        } elseif (is_string($exception)) {
+            $msg = trim($exception);
+        }
+        $lower = mb_strtolower($msg);
+        if ($msg === '') {
+            return 'analysis_failed';
+        }
+        if (strpos($lower, 'fetch') !== false
+            || strpos($lower, 'curl') !== false
+            || strpos($lower, 'empty html') !== false
+            || strpos($lower, 'не удалось получить') !== false
+            || strpos($lower, 'timeout') !== false
+            || strpos($lower, 'timed out') !== false
+        ) {
+            return 'fetch_failed';
+        }
+        if (strpos($lower, 'serp') !== false
+            || strpos($lower, 'xml') !== false
+            || strpos($lower, 'выдач') !== false
+        ) {
+            return 'serp_failed';
+        }
+        if (strpos($lower, 'limit') !== false || strpos($lower, 'баланс') !== false) {
+            return 'limit_exhausted';
+        }
+        return 'analysis_failed';
     }
 
     /**

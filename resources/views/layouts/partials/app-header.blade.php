@@ -136,8 +136,8 @@
                 <li class="nav-item d-none d-lg-block">
                     <a class="nav-link" href="{{ route('balance.index') }}">
                         <i class="bi bi-wallet2 me-1 text-success" aria-hidden="true"></i>
-                        <span class="text-secondary">{{ __('Your balance') }}:</span>
-                        <strong class="ms-1">{{ number_format((float) Auth::user()->balance, 0, '.', ' ') }}</strong>
+                        <span class="text-secondary">{{ __('Total balance') }}:</span>
+                        <strong class="ms-1">{{ number_format(Auth::user()->totalBalanceAmount(), 0, '', ' ') }}</strong>
                     </a>
                 </li>
                 @if(!empty($name))

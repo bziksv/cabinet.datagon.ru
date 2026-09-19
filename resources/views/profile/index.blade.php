@@ -5,7 +5,7 @@
 @section('css')
     <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.css') }}">
     <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/cabinet-profile.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/cabinet-profile.css') }}?v={{ @filemtime(public_path('css/cabinet-profile.css')) ?: time() }}">
     <link rel="stylesheet" href="{{ asset('css/cabinet-seo-checklist.css') }}?v={{ @filemtime(public_path('css/cabinet-seo-checklist.css')) ?: time() }}">
 @endsection
 

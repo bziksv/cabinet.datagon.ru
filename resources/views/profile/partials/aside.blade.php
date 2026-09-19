@@ -32,17 +32,19 @@
             @endif
         @endif
         <ul class="list-group list-group-flush text-start small mt-2">
-            <li class="list-group-item px-0">
-                <div class="d-flex justify-content-between">
-                    <span class="text-secondary">{{ __('Total balance') }}</span>
+            <li class="list-group-item d-flex justify-content-between align-items-baseline px-0 py-1">
+                <span class="text-secondary">{{ __('Total balance') }}</span>
+                <span class="text-end">
                     <span class="fw-semibold">{{ $balanceFormatted }} ₽</span>
-                </div>
-                <div class="text-secondary small mt-1">
-                    {{ __('Personal') }}: {{ $personalBalanceFormatted }} ₽
-                    @foreach(($companiesCollection ?? collect()) as $companyItem)
-                        <br>{{ $companyItem->name }}: {{ number_format((int) round((float) $companyItem->balance), 0, '', ' ') }} ₽
-                    @endforeach
-                </div>
+                    @if(($companiesCollection ?? collect())->isNotEmpty())
+                        <span class="cabinet-profile-balance-split text-secondary">
+                            {{ __('Personal') }} {{ $personalBalanceFormatted }}
+                            @foreach($companiesCollection as $companyItem)
+                                · {{ $companyItem->name }} {{ number_format((int) round((float) $companyItem->balance), 0, '', ' ') }}
+                            @endforeach
+                        </span>
+                    @endif
+                </span>
             </li>
             <li class="list-group-item d-flex justify-content-between px-0">
                 <span class="text-secondary">{{ __('Lang') }}</span>

@@ -99,18 +99,29 @@ class SiteAuditDuplicateGrouper
         return $out;
     }
 
-    /** Лимит findings в память для режима groups (иначе fallback в list). */
+    /** Сколько URL держать в карточке группы (size всё равно полный). */
+    private const URL_PREVIEW_LIMIT = 50;
+
+    /** Лимит findings в память для режима groups без чанков (иначе fallback в list). */
     public static function groupsMemoryLimit(string $code): int
     {
-        if (self::isHtmlErrors($code)
-            || self::isLinkInverted($code)
-            || self::isTextInNoindex($code)
-            || self::isInsecureForm($code)
-        ) {
+        if (self::supportsChunkedGrouping($code)) {
             return 2500;
         }
 
         return 400;
+    }
+
+    /**
+     * Большие отчёты (HTML / исходящие / формы / noindex) группируем чанками —
+     * без тихого отката в «По страницам».
+     */
+    public static function supportsChunkedGrouping(string $code): bool
+    {
+        return self::isHtmlErrors($code)
+            || self::isLinkInverted($code)
+            || self::isTextInNoindex($code)
+            || self::isInsecureForm($code);
     }
 
     /**
@@ -119,22 +130,67 @@ class SiteAuditDuplicateGrouper
      */
     public static function group($rows, string $code): array
     {
+        $buckets = [];
+        $pageTotal = 0;
+        self::accumulateInto($buckets, $pageTotal, $rows, $code);
+
+        $computeTemplate = self::supportsChunkedGrouping($code);
+
+        return self::finalizeBuckets($buckets, $pageTotal, $computeTemplate);
+    }
+
+    /**
+     * Группировка без загрузки всех findings сразу (для 10k+ URL).
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder  $query
+     * @return array<int, array{hash:string,size:int,label:string,severity:string,urls:array<int,array{url:string,severity:string}>,hint:?string,likely_template:bool,href?:string,host?:string}>
+     */
+    public static function groupFromQuery($query, string $code, int $chunkSize = 250): array
+    {
+        $buckets = [];
+        $pageTotal = 0;
+        $chunkSize = max(50, min(500, $chunkSize));
+
+        $base = clone $query;
+        $base->getQuery()->orders = null;
+        $base->select(['id', 'url', 'severity', 'meta_json'])
+            ->orderBy('id')
+            ->chunkById($chunkSize, static function ($rows) use (&$buckets, &$pageTotal, $code) {
+                self::accumulateInto($buckets, $pageTotal, $rows, $code);
+            });
+
+        return self::finalizeBuckets($buckets, $pageTotal, true);
+    }
+
+    /**
+     * @param  array<string,array<string,mixed>>  $buckets
+     * @param  Collection|iterable  $rows
+     */
+    private static function accumulateInto(array &$buckets, int &$pageTotal, $rows, string $code): void
+    {
         if (self::isHtmlErrors($code)) {
-            return self::groupHtmlErrors($rows);
+            self::accumulateHtmlErrors($buckets, $pageTotal, $rows);
+
+            return;
         }
         if (self::isLinkInverted($code)) {
-            return self::groupByOutboundUrl($rows, $code);
+            self::accumulateByOutboundUrl($buckets, $pageTotal, $rows, $code);
+
+            return;
         }
         if (self::isTextInNoindex($code)) {
-            return self::groupTextInNoindex($rows);
+            self::accumulateTextInNoindex($buckets, $pageTotal, $rows);
+
+            return;
         }
         if (self::isInsecureForm($code)) {
-            return self::groupByInsecureForm($rows);
+            self::accumulateByInsecureForm($buckets, $pageTotal, $rows);
+
+            return;
         }
 
-        $buckets = [];
-
         foreach ($rows as $row) {
+            $pageTotal++;
             $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
             $hash = (string) ($meta['hash'] ?? '');
             if ($hash === '') {
@@ -160,27 +216,21 @@ class SiteAuditDuplicateGrouper
                 $buckets[$hash],
                 $row,
                 (string) ($row->url ?? ''),
-                (string) ($row->severity ?? 'other')
+                (string) ($row->severity ?? 'other'),
+                false
             );
             if ($prevSize > (int) $buckets[$hash]['size']) {
                 $buckets[$hash]['size'] = $prevSize;
             }
         }
-
-        return self::finalizeBuckets($buckets, 0, false);
     }
 
     /**
-     * Одинаковое содержимое <!--noindex--> (соцсети в шаблоне) → одна группа.
-     *
+     * @param  array<string,array<string,mixed>>  $buckets
      * @param  Collection|iterable  $rows
-     * @return array<int, array{hash:string,size:int,label:string,severity:string,urls:array<int,array{url:string,severity:string}>,hint:?string,likely_template:bool}>
      */
-    private static function groupTextInNoindex($rows): array
+    private static function accumulateTextInNoindex(array &$buckets, int &$pageTotal, $rows): void
     {
-        $buckets = [];
-        $pageTotal = 0;
-
         foreach ($rows as $row) {
             $pageTotal++;
             $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
@@ -216,24 +266,18 @@ class SiteAuditDuplicateGrouper
                 $buckets[$hash],
                 $row,
                 (string) ($row->url ?? ''),
-                (string) ($row->severity ?? 'warning')
+                (string) ($row->severity ?? 'warning'),
+                true
             );
         }
-
-        return self::finalizeBuckets($buckets, $pageTotal);
     }
 
     /**
-     * Группировка HTML-ошибок по тексту (без номера строки): одна правка в шаблоне → много URL.
-     *
+     * @param  array<string,array<string,mixed>>  $buckets
      * @param  Collection|iterable  $rows
-     * @return array<int, array{hash:string,size:int,label:string,severity:string,urls:array<int,array{url:string,severity:string}>,hint:?string,likely_template:bool}>
      */
-    private static function groupHtmlErrors($rows): array
+    private static function accumulateHtmlErrors(array &$buckets, int &$pageTotal, $rows): void
     {
-        $buckets = [];
-        $pageTotal = 0;
-
         foreach ($rows as $row) {
             $pageTotal++;
             $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
@@ -243,10 +287,7 @@ class SiteAuditDuplicateGrouper
             $seenOnPage = [];
 
             if ($samples === []) {
-                $sig = 'empty';
-                $label = 'Ошибка HTML без текста сэмпла';
-                $hint = null;
-                $samples = [['message' => $label]];
+                $samples = [['message' => 'Ошибка HTML без текста сэмпла']];
             }
 
             foreach ($samples as $sample) {
@@ -277,24 +318,17 @@ class SiteAuditDuplicateGrouper
                     ];
                 }
 
-                self::appendUrlToBucket($buckets[$sig], $row, $url, $severity);
+                self::appendUrlToBucket($buckets[$sig], $row, $url, $severity, true);
             }
         }
-
-        return self::finalizeBuckets($buckets, $pageTotal);
     }
 
     /**
-     * Одна и та же form action=http на многих страницах → группа = форма, внутри URL.
-     *
+     * @param  array<string,array<string,mixed>>  $buckets
      * @param  Collection|iterable  $rows
-     * @return array<int, array{hash:string,size:int,label:string,severity:string,urls:array<int,array{url:string,severity:string}>,hint:?string,likely_template:bool,href:string,host:string}>
      */
-    private static function groupByInsecureForm($rows): array
+    private static function accumulateByInsecureForm(array &$buckets, int &$pageTotal, $rows): void
     {
-        $buckets = [];
-        $pageTotal = 0;
-
         foreach ($rows as $row) {
             $pageTotal++;
             $meta = is_array($row->meta_json ?? null) ? $row->meta_json : [];
@@ -320,7 +354,7 @@ class SiteAuditDuplicateGrouper
                         '_urls' => [],
                     ];
                 }
-                self::appendUrlToBucket($buckets[$sig], $row, $pageUrl, $severity);
+                self::appendUrlToBucket($buckets[$sig], $row, $pageUrl, $severity, true);
                 continue;
             }
 
@@ -355,11 +389,9 @@ class SiteAuditDuplicateGrouper
                     ];
                 }
 
-                self::appendUrlToBucket($buckets[$sig], $row, $pageUrl, $severity);
+                self::appendUrlToBucket($buckets[$sig], $row, $pageUrl, $severity, true);
             }
         }
-
-        return self::finalizeBuckets($buckets, $pageTotal);
     }
 
     /**
@@ -433,16 +465,11 @@ class SiteAuditDuplicateGrouper
     }
 
     /**
-     * Группировка исходящих ссылок/ассетов: одна цель → список страниц.
-     * Удобно, когда vk/t.me/иконка в шапке повторяется на всём сайте.
-     *
+     * @param  array<string,array<string,mixed>>  $buckets
      * @param  Collection|iterable  $rows
-     * @return array<int, array{hash:string,size:int,label:string,severity:string,urls:array<int,array{url:string,severity:string}>,hint:?string,likely_template:bool,href:string,host:string}>
      */
-    private static function groupByOutboundUrl($rows, string $code): array
+    private static function accumulateByOutboundUrl(array &$buckets, int &$pageTotal, $rows, string $code): void
     {
-        $buckets = [];
-        $pageTotal = 0;
         $isBrokenTarget = in_array($code, ['page_has_broken_links', 'page_has_broken_external_links'], true);
         $kindNoun = $code === 'external_assets'
             ? 'файл'
@@ -473,7 +500,7 @@ class SiteAuditDuplicateGrouper
                         '_urls' => [],
                     ];
                 }
-                self::appendUrlToBucket($buckets[$sig], $row, $pageUrl, $severity);
+                self::appendUrlToBucket($buckets[$sig], $row, $pageUrl, $severity, true);
                 continue;
             }
 
@@ -551,11 +578,9 @@ class SiteAuditDuplicateGrouper
                     }
                 }
 
-                self::appendUrlToBucket($buckets[$sig], $row, $pageUrl, $severity);
+                self::appendUrlToBucket($buckets[$sig], $row, $pageUrl, $severity, true);
             }
         }
-
-        return self::finalizeBuckets($buckets, $pageTotal);
     }
 
     public static function normalizeOutboundSignature(string $url): string
@@ -649,8 +674,13 @@ class SiteAuditDuplicateGrouper
      * @param  array<string,mixed>  $bucket
      * @param  object|array  $row
      */
-    private static function appendUrlToBucket(array &$bucket, $row, string $url, string $severity): void
-    {
+    private static function appendUrlToBucket(
+        array &$bucket,
+        $row,
+        string $url,
+        string $severity,
+        bool $capPreview = false
+    ): void {
         if ($url === '' || isset($bucket['_urls'][$url])) {
             return;
         }
@@ -665,10 +695,15 @@ class SiteAuditDuplicateGrouper
             if (! isset($bucket['finding_ids']) || ! is_array($bucket['finding_ids'])) {
                 $bucket['finding_ids'] = [];
             }
-            $bucket['finding_ids'][$fid] = $fid;
+            // Для сквозных паттернов bulk идёт по group_hash — ids только для превью/совместимости.
+            if (! $capPreview || count($bucket['finding_ids']) < self::URL_PREVIEW_LIMIT) {
+                $bucket['finding_ids'][$fid] = $fid;
+            }
         }
-        $bucket['urls'][] = $entry;
-        $bucket['size'] = count($bucket['urls']);
+        if (! $capPreview || count($bucket['urls']) < self::URL_PREVIEW_LIMIT) {
+            $bucket['urls'][] = $entry;
+        }
+        $bucket['size'] = count($bucket['_urls']);
     }
 
     /**

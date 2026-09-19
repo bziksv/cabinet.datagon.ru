@@ -539,6 +539,15 @@
             @endif
         @endif
     </div>
+    @if(!empty($groupsForcedToList))
+        <div class="alert alert-light border small mb-3">
+            Режим «по группам» недоступен: в отчёте
+            {{ number_format((int) $total, 0, '', ' ') }} URL
+            (лимит группировки для этого типа —
+            {{ number_format((int) (\App\Services\SiteAudit\SiteAuditDuplicateGrouper::groupsMemoryLimit((string) ($code ?? ''))), 0, '', ' ') }}).
+            Показан список по страницам.
+        </div>
+    @endif
 @endif
 
 @if(!empty($htmlSitewide) && is_array($htmlSitewide))

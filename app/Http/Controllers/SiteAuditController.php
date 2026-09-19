@@ -512,6 +512,7 @@ class SiteAuditController extends Controller
         $groups = [];
         $groupTotal = 0;
         $htmlSitewide = null;
+        $groupsForcedToList = false;
         $rows = collect();
         $total = 0;
         $pages = 1;
@@ -598,11 +599,14 @@ class SiteAuditController extends Controller
 
             $total = (clone $query)->count();
 
-            // Groups тянут findings в память — на больших отчётах уходим в list.
-            // HTML / исходящие: лимит выше — сквозной шаблон как раз на сотнях–тысячах URL.
+            // Groups без чанков тянут findings в память — на больших отчётах уходим в list.
+            // HTML / исходящие / формы / noindex: чанки, без тихого отката.
             $groupsMax = SiteAuditDuplicateGrouper::groupsMemoryLimit($code);
-            if ($viewMode === 'groups' && $total > $groupsMax) {
+            $groupsChunked = SiteAuditDuplicateGrouper::supportsChunkedGrouping($code);
+            $wantedGroups = $viewMode === 'groups';
+            if ($wantedGroups && ! $groupsChunked && $total > $groupsMax) {
                 $viewMode = 'list';
+                $groupsForcedToList = true;
             }
 
             $allGroupsForSummary = [];
@@ -612,33 +616,57 @@ class SiteAuditController extends Controller
                 || SiteAuditDuplicateGrouper::isInsecureForm($code);
 
             if ($viewMode === 'groups') {
-                $allRows = $query->get();
-                if ($code === 'images_without_alt') {
-                    $allRows = $this->enrichImagesWithoutAltRows((int) $crawl->id, $allRows);
+                if ($groupsChunked) {
+                    $allGroups = SiteAuditDuplicateGrouper::groupFromQuery($query, $code);
+                    if (SiteAuditDuplicateGrouper::usesSharedFindings($code)) {
+                        $allGroups = $this->filterSharedFindingGroups(
+                            $allGroups,
+                            $ignoreSvc,
+                            $noteSvc,
+                            $projectId,
+                            $code,
+                            $showIgnored,
+                            $showFixed
+                        );
+                    }
+                    $allGroupsForSummary = $allGroups;
+                    $groupTotal = count($allGroups);
+                    $perPage = 20;
+                    $pages = max(1, (int) ceil(max(1, $groupTotal) / $perPage));
+                    $page = min($page, $pages);
+                    $groups = array_slice($allGroups, ($page - 1) * $perPage, $perPage);
+                    $rows = collect();
+                    $ignoredMap = [];
+                    $notesMap = [];
+                } else {
+                    $allRows = $query->get();
+                    if ($code === 'images_without_alt') {
+                        $allRows = $this->enrichImagesWithoutAltRows((int) $crawl->id, $allRows);
+                    }
+                    $allGroups = SiteAuditDuplicateGrouper::group($allRows, $code);
+                    if (SiteAuditDuplicateGrouper::usesSharedFindings($code)) {
+                        $allGroups = $this->filterSharedFindingGroups(
+                            $allGroups,
+                            $ignoreSvc,
+                            $noteSvc,
+                            $projectId,
+                            $code,
+                            $showIgnored,
+                            $showFixed
+                        );
+                    }
+                    $allGroupsForSummary = $allGroups;
+                    $groupTotal = count($allGroups);
+                    $perPage = 20;
+                    $pages = max(1, (int) ceil(max(1, $groupTotal) / $perPage));
+                    $page = min($page, $pages);
+                    $groups = array_slice($allGroups, ($page - 1) * $perPage, $perPage);
+                    $rows = collect();
+                    if ($showIgnored) {
+                        $ignoredMap = $ignoreSvc->ignoredMapForFindings($projectId, $allRows);
+                    }
+                    $notesMap = $noteSvc->mapForFindings($projectId, $allRows);
                 }
-                $allGroups = SiteAuditDuplicateGrouper::group($allRows, $code);
-                if (SiteAuditDuplicateGrouper::usesSharedFindings($code)) {
-                    $allGroups = $this->filterSharedFindingGroups(
-                        $allGroups,
-                        $ignoreSvc,
-                        $noteSvc,
-                        $projectId,
-                        $code,
-                        $showIgnored,
-                        $showFixed
-                    );
-                }
-                $allGroupsForSummary = $allGroups;
-                $groupTotal = count($allGroups);
-                $perPage = 20;
-                $pages = max(1, (int) ceil(max(1, $groupTotal) / $perPage));
-                $page = min($page, $pages);
-                $groups = array_slice($allGroups, ($page - 1) * $perPage, $perPage);
-                $rows = collect();
-                if ($showIgnored) {
-                    $ignoredMap = $ignoreSvc->ignoredMapForFindings($projectId, $allRows);
-                }
-                $notesMap = $noteSvc->mapForFindings($projectId, $allRows);
             } else {
                 $rows = $query->forPage($page, $perPage)->get();
                 $pages = max(1, (int) ceil($total / $perPage));
@@ -648,13 +676,18 @@ class SiteAuditController extends Controller
                 $ignoredMap = $ignoreSvc->ignoredMapForFindings($projectId, $rows);
                 $notesMap = $noteSvc->mapForFindings($projectId, $rows);
 
-                // В списке страниц всё равно ловим доминантный паттерн (сквозной блок).
+                // В списке страниц ловим доминантный паттерн, но не на 10k+ URL
+                // (там переключайтесь в «По ошибкам» — группировка чанками).
                 if ($needsSitewide && $total >= 3 && $total <= $groupsMax) {
-                    $allForSummary = (clone $query)->get();
-                    if ($code === 'images_without_alt') {
-                        $allForSummary = $this->enrichImagesWithoutAltRows((int) $crawl->id, $allForSummary);
+                    if ($groupsChunked) {
+                        $allGroupsForSummary = SiteAuditDuplicateGrouper::groupFromQuery($query, $code);
+                    } else {
+                        $allForSummary = (clone $query)->get();
+                        if ($code === 'images_without_alt') {
+                            $allForSummary = $this->enrichImagesWithoutAltRows((int) $crawl->id, $allForSummary);
+                        }
+                        $allGroupsForSummary = SiteAuditDuplicateGrouper::group($allForSummary, $code);
                     }
-                    $allGroupsForSummary = SiteAuditDuplicateGrouper::group($allForSummary, $code);
                     if (SiteAuditDuplicateGrouper::usesSharedFindings($code)) {
                         $allGroupsForSummary = $this->filterSharedFindingGroups(
                             $allGroupsForSummary,
@@ -850,6 +883,7 @@ class SiteAuditController extends Controller
             'groupable' => $groupable,
             'viewMode' => $viewMode,
             'groupTotal' => $groupTotal,
+            'groupsForcedToList' => $groupsForcedToList,
             'htmlSitewide' => $htmlSitewide,
             'isHtmlErrorReport' => SiteAuditDuplicateGrouper::isHtmlErrors($code),
             'isLinkInvertedReport' => SiteAuditDuplicateGrouper::isLinkInverted($code) || $isCrawlImages,

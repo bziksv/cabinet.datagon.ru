@@ -44,7 +44,7 @@ class TextAnalyzer extends Model
             curl_setopt($curl, CURLOPT_COOKIEJAR, $cookieFile);
             curl_setopt($curl, CURLOPT_COOKIEFILE, $cookieFile);
             curl_setopt($curl, CURLOPT_COOKIE, 'beget=begetok; path=/; SameSite=Lax');
-            curl_setopt($curl, CURLOPT_URL, $url);
+            curl_setopt($curl, CURLOPT_URL, self::urlBypassingHtmlCache($url));
             curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($curl, CURLOPT_FOLLOWLOCATION, false);
             curl_setopt($curl, CURLOPT_HEADER, true);
@@ -112,6 +112,25 @@ class TextAnalyzer extends Model
         }
 
         return $html;
+    }
+
+    /**
+     * Bitrix composite отдаёт статику до PHP, если в URL нет ncc.
+     * Параметр только на запрос: в истории анализа остаётся исходный URL.
+     */
+    protected static function urlBypassingHtmlCache(string $url): string
+    {
+        if (stripos($url, 'ncc=') !== false) {
+            return $url;
+        }
+        $hash = '';
+        $pos = strpos($url, '#');
+        if ($pos !== false) {
+            $hash = substr($url, $pos);
+            $url = substr($url, 0, $pos);
+        }
+
+        return $url . (strpos($url, '?') === false ? '?' : '&') . 'ncc=1' . $hash;
     }
 
     /**

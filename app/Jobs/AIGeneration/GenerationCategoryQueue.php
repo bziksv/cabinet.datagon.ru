@@ -18,6 +18,9 @@ class GenerationCategoryQueue implements ShouldQueue
 
     private $data;
 
+    /** Воркер ai_generation --timeout=600. Две попытки DeepSeek по 240 с. */
+    public $timeout = 520;
+
     public function __construct(AiGenerationHistory $data)
     {
         $this->data = $data;

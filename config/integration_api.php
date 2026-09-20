@@ -33,7 +33,7 @@ return [
     'throttle_read_per_minute' => 300,
 
     /** Серверные лимиты TLP / missing-phrases. */
-    'tlp_missing_limit' => 200,
+    'tlp_missing_limit' => 300,
     'tlp_diff_limit' => 5,
     'missing_phrases_max' => 500,
 

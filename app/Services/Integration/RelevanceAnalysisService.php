@@ -252,7 +252,7 @@ class RelevanceAnalysisService
      * Важно: без leading-wildcard LIKE на remote MySQL (десятки секунд).
      * Сначала точные URL-варианты, потом суффикс path.
      *
-     * @return array<int, array{history_id:int,phrase:string,url:string,points:mixed,points_ideal:?int,coverage:mixed,density:mixed,position:mixed,engine:string,region:string,top:?int,last_check:mixed,created_at:?string,delta_points:?float}>
+     * @return array<int, array{history_id:int,phrase:string,url:string,points:mixed,points_ideal:?int,coverage:mixed,density:mixed,position:mixed,engine:string,region:string,top:?int,text_words:?int,text_words_avg:?int,last_check:mixed,created_at:?string,delta_points:?float,delta_text_words:?int}>
      */
     public function listHistoriesForLanding(User $user, ?string $url, ?string $phrase, int $limit = 10, ?string $siteHost = null): array
     {
@@ -363,12 +363,13 @@ class RelevanceAnalysisService
 
         $items = [];
         $prevPoints = null;
+        $prevTextWords = null;
         $chrono = $rows->sortBy('id')->values();
-        $idealByHistoryId = $this->idealPointsByHistoryIds(
-            $chrono->pluck('id')->map(static function ($id) {
-                return (int) $id;
-            })->all()
-        );
+        $historyIds = $chrono->pluck('id')->map(static function ($id) {
+            return (int) $id;
+        })->all();
+        $idealByHistoryId = $this->idealPointsByHistoryIds($historyIds);
+        $textStatsByHistoryId = $this->landingTextStatsByHistoryIds($historyIds);
         foreach ($chrono as $history) {
             $points = $history->points;
             $delta = null;
@@ -380,6 +381,15 @@ class RelevanceAnalysisService
             }
             $hid = (int) $history->id;
             $params = $this->analysisParamsFromHistory($history);
+            $textWords = $textStatsByHistoryId[$hid]['text_words'] ?? null;
+            $textWordsAvg = $textStatsByHistoryId[$hid]['text_words_avg'] ?? null;
+            $deltaText = null;
+            if ($prevTextWords !== null && $textWords !== null) {
+                $deltaText = (int) $textWords - (int) $prevTextWords;
+            }
+            if ($textWords !== null) {
+                $prevTextWords = (int) $textWords;
+            }
             $items[] = [
                 'history_id' => $hid,
                 'phrase' => (string) $history->phrase,
@@ -392,9 +402,12 @@ class RelevanceAnalysisService
                 'engine' => $params['engine'],
                 'region' => $params['region'],
                 'top' => $params['top'],
+                'text_words' => $textWords,
+                'text_words_avg' => $textWordsAvg,
                 'last_check' => $history->last_check,
                 'created_at' => optional($history->created_at)->toIso8601String(),
                 'delta_points' => $delta,
+                'delta_text_words' => $deltaText,
             ];
         }
 
@@ -463,6 +476,86 @@ class RelevanceAnalysisService
         }
 
         return $out;
+    }
+
+    /**
+     * Размер текста посадочной и средний по конкурентам из main_page / avg.
+     *
+     * @param  int[]  $historyIds
+     * @return array<int, array{text_words:?int,text_words_avg:?int}>
+     */
+    public function landingTextStatsByHistoryIds(array $historyIds): array
+    {
+        $historyIds = array_values(array_unique(array_filter(array_map('intval', $historyIds))));
+        if ($historyIds === []) {
+            return [];
+        }
+
+        $out = [];
+        $rows = RelevanceHistoryResult::whereIn('project_id', $historyIds)
+            ->get(['project_id', 'main_page', 'avg']);
+        foreach ($rows as $row) {
+            $hid = (int) $row->project_id;
+            $main = $this->decodeLandingMetaField($row->main_page ?? null);
+            $avg = $this->decodeLandingMetaField($row->avg ?? null);
+            $words = $this->numericMetaValue($main['countWords'] ?? null);
+            $avgWords = $this->numericMetaValue($avg['countWords'] ?? null);
+            $out[$hid] = [
+                'text_words' => $words !== null && $words > 0 ? $words : null,
+                'text_words_avg' => $avgWords !== null && $avgWords > 0 ? $avgWords : null,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * main_page / avg: base64+gz JSON, иногда сырой JSON.
+     *
+     * @param  mixed  $value
+     * @return array<string, mixed>
+     */
+    protected function decodeLandingMetaField($value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+        if (!is_string($value) || $value === '') {
+            return [];
+        }
+        $decoded = Relevance::decodeCompressedJsonField($value);
+        if ($decoded !== []) {
+            return $decoded;
+        }
+        $json = json_decode($value, true);
+
+        return is_array($json) ? $json : [];
+    }
+
+    /**
+     * @param  mixed  $value
+     */
+    protected function numericMetaValue($value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (is_string($value)) {
+            $trim = trim($value);
+            if ($trim !== '' && ($trim[0] === '{' || $trim[0] === '[' || $trim[0] === '"')) {
+                $decoded = json_decode($trim, true);
+                if (is_numeric($decoded)) {
+                    $value = $decoded;
+                } elseif (is_array($decoded) && isset($decoded['countWords']) && is_numeric($decoded['countWords'])) {
+                    $value = $decoded['countWords'];
+                }
+            }
+        }
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        return (int) round((float) $value);
     }
 
     /**
@@ -657,7 +750,7 @@ class RelevanceAnalysisService
         usort($missing, $sortTfidf);
         usort($diff, $sortTfidf);
 
-        $missingCap = max(0, (int) config('integration_api.tlp_missing_limit', 200));
+        $missingCap = max(0, (int) config('integration_api.tlp_missing_limit', 300));
         $diffCap = max(0, (int) config('integration_api.tlp_diff_limit', 5));
 
         return [

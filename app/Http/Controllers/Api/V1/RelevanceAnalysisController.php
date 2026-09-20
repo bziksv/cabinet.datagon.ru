@@ -117,6 +117,8 @@ class RelevanceAnalysisController extends Controller
 
         $avgRaw = $history->results ? ($history->results->average_values ?? null) : null;
         $params = $this->analyses->analysisParamsFromHistory($history);
+        $textStats = $this->analyses->landingTextStatsByHistoryIds([(int) $history->id]);
+        $text = $textStats[(int) $history->id] ?? [];
 
         return response()->json([
             'history_id' => $history->id,
@@ -130,6 +132,8 @@ class RelevanceAnalysisController extends Controller
             'coverage' => $history->coverage,
             'density' => $history->density,
             'position' => $history->position,
+            'text_words' => $text['text_words'] ?? null,
+            'text_words_avg' => $text['text_words_avg'] ?? null,
             'last_check' => $history->last_check,
             'created_at' => optional($history->created_at)->toIso8601String(),
         ]);
@@ -162,7 +166,7 @@ class RelevanceAnalysisController extends Controller
                 'missing_total' => $tlp['missing_total'],
                 'diff_total' => $tlp['diff_total'],
                 'defaults' => [
-                    'missing_limit' => (int) config('integration_api.tlp_missing_limit', 200),
+                    'missing_limit' => (int) config('integration_api.tlp_missing_limit', 300),
                     'diff_limit' => (int) config('integration_api.tlp_diff_limit', 5),
                 ],
             ]);

@@ -3,6 +3,11 @@
     $showViewTabs = $showViewTabs ?? true;
     $projectUrl = trim((string) ($project->url ?? ''));
     $projectHost = $projectUrl !== '' ? preg_replace('#^https?://#i', '', rtrim($projectUrl, '/')) : e($project->name);
+    // В БД url без схемы (vtorma-vrn.ru) — иначе href относительный → /monitoring/{host} и 500.
+    $projectHref = $projectUrl;
+    if ($projectHref !== '' && !preg_match('#^https?://#i', $projectHref)) {
+        $projectHref = 'https://' . ltrim($projectHref, '/');
+    }
     $faviconUrl = route('monitoring.v2.favicon', ['project' => $project->id]);
     $regionLabel = '';
     if (request('region')) {
@@ -25,8 +30,8 @@
             <div>
                 <h1 class="cabinet-mon-project-chrome__title">{{ $project->name }}</h1>
                 <p class="cabinet-mon-project-chrome__meta mb-0">
-                    @if($projectUrl !== '')
-                        <a href="{{ $projectUrl }}" target="_blank" rel="noopener noreferrer">{{ $projectHost }}</a>
+                    @if($projectHref !== '')
+                        <a href="{{ $projectHref }}" target="_blank" rel="noopener noreferrer">{{ $projectHost }}</a>
                         <span class="text-secondary">·</span>
                     @endif
                     <span class="text-secondary">#{{ $project->id }}</span>

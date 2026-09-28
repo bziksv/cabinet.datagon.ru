@@ -13,11 +13,12 @@ class AddLinkCountsToSiteAuditPages extends Migration
         }
 
         Schema::table('site_audit_pages', function (Blueprint $table) {
+            // Без AFTER: Instant ADD в конец (MariaDB) — иначе rebuild 48G и «table is full».
             if (! Schema::hasColumn('site_audit_pages', 'out_links_count')) {
-                $table->unsignedInteger('out_links_count')->default(0)->after('out_links_json');
+                $table->unsignedInteger('out_links_count')->default(0);
             }
             if (! Schema::hasColumn('site_audit_pages', 'ext_links_count')) {
-                $table->unsignedInteger('ext_links_count')->default(0)->after('ext_links_json');
+                $table->unsignedInteger('ext_links_count')->default(0);
             }
         });
     }

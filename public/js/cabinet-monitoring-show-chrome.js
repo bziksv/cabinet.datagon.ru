@@ -1040,11 +1040,21 @@
         scrollEl.addEventListener('scroll', scrollEl._monTableColsScrollAfter, { passive: true });
 
         scrollEl._monTableColsWheel = function (e) {
-            if (!e.deltaY || Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+            var dx = e.deltaX || 0;
+            var dy = e.deltaY || 0;
+            // Shift+колесо: браузер часто оставляет deltaY — крутим таблицу вбок сами.
+            if (e.shiftKey && Math.abs(dy) >= Math.abs(dx) && dy) {
+                scrollEl.scrollLeft += dy;
+                syncMonTableScrollPositions($wrapper, scrollEl, true);
+                kickMonTableScrollSync();
+                e.preventDefault();
+                return;
+            }
+            if (!dy || Math.abs(dx) > Math.abs(dy)) {
                 kickMonTableScrollSync();
                 return;
             }
-            scrollEl.scrollTop += e.deltaY;
+            scrollEl.scrollTop += dy;
             syncMonTableScrollPositions($wrapper, scrollEl, true);
             kickMonTableScrollSync();
             e.preventDefault();
@@ -1065,10 +1075,21 @@
 
         $wrapper.find('.DTFC_LeftBodyWrapper, .DTFC_LeftBodyLiner').off('wheel.monTableCols').on('wheel.monTableCols', function (e) {
             var oe = e.originalEvent;
-            if (!oe || !Math.abs(oe.deltaY)) {
+            if (!oe) {
                 return;
             }
-            scrollEl.scrollTop += oe.deltaY;
+            var dx = oe.deltaX || 0;
+            var dy = oe.deltaY || 0;
+            if (oe.shiftKey && Math.abs(dy) >= Math.abs(dx) && dy) {
+                scrollEl.scrollLeft += dy;
+                kickMonTableScrollSync();
+                e.preventDefault();
+                return;
+            }
+            if (!Math.abs(dy) || Math.abs(dx) > Math.abs(dy)) {
+                return;
+            }
+            scrollEl.scrollTop += dy;
             kickMonTableScrollSync();
             e.preventDefault();
         });

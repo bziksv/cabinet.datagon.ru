@@ -360,6 +360,8 @@ class SiteAuditPageProcessor
             'simhash' => null,
             'out_links_json' => null,
             'ext_links_json' => null,
+            'out_links_count' => 0,
+            'ext_links_count' => 0,
             'img_count' => 0,
             'img_without_alt' => 0,
         ];
@@ -520,6 +522,9 @@ class SiteAuditPageProcessor
                 // URL-строки (не только hash) — для orphan + broken links
                 // Больше ссылок — точнее колонка «Откуда» на крупных сайтах с жирным меню.
                 $pageData['out_links_json'] = array_slice($internalLinks, 0, 400) ?: null;
+                $pageData['out_links_count'] = is_array($pageData['out_links_json'])
+                    ? count($pageData['out_links_json'])
+                    : 0;
                 $pageData['img_srcs_json'] = ! empty($links['img_srcs'])
                     ? array_slice($links['img_srcs'], 0, 40)
                     : null;
@@ -677,6 +682,7 @@ class SiteAuditPageProcessor
                     if ($pageData['ext_links_json'] === []) {
                         $pageData['ext_links_json'] = array_slice($links['external'], 0, 80);
                     }
+                    $pageData['ext_links_count'] = count($links['external']);
                     $aff = SiteAuditAffiliateDetector::fromExternalUrls($links['external']);
                     if ($aff) {
                         $findings[] = $this->finding('probable_affiliate', $url, $urlHash, $aff);

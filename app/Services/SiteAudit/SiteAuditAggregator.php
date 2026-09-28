@@ -457,6 +457,17 @@ class SiteAuditAggregator
 
         Cache::forget($this->brokenLinksCacheKey((int) $crawl->id));
 
+        // Рабочий JSON (ссылки/шинглы/img) больше не нужен — findings уже в таблице, инвентарь по скалярам.
+        if (config('site_audit.compact_pages_after_aggregate', true)) {
+            try {
+                (new SiteAuditPageCompactor())->compactCrawl((int) $crawl->id);
+            } catch (\Throwable $e) {
+                Log::warning('SiteAudit page compact failed: ' . $e->getMessage(), [
+                    'crawl_id' => $crawl->id,
+                ]);
+            }
+        }
+
         try {
             (new SiteAuditExternalPlagiarismRunner())->queueAutoSample($crawl);
         } catch (\Throwable $e) {

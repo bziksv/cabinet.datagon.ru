@@ -64,6 +64,8 @@ return [
     'description_max' => (int) env('SITE_AUDIT_DESC_MAX', 160),
     // сколько детальных краулов хранить на проект (старше — prune)
     'history_keep_per_project' => (int) env('SITE_AUDIT_HISTORY_KEEP', 200),
+    // После finalize агрегации обнулять heavy JSON в site_audit_pages (ссылки/шинглы/img).
+    'compact_pages_after_aggregate' => (bool) env('SITE_AUDIT_COMPACT_PAGES', true),
     // После перехода с платного на Free — через N дней удаляем всю историю аудита
     'free_history_keep_days' => (int) env('SITE_AUDIT_FREE_HISTORY_DAYS', 14),
     // Повторный краул: если content_hash+status совпали с прошлым done — пропускаем HEAD картинок/ассетов

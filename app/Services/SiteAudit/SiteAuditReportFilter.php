@@ -1389,8 +1389,24 @@ class SiteAuditReportFilter
         self::applyColumnIntRange($query, 'CHAR_LENGTH(COALESCE(site_audit_pages.title, \'\'))', $values, 'title_len', true);
         self::applyColumnIntRange($query, 'CHAR_LENGTH(COALESCE(site_audit_pages.description, \'\'))', $values, 'desc_len', true);
         self::applyColumnIntRange($query, 'CHAR_LENGTH(site_audit_pages.url)', $values, 'url_len', true);
-        self::applyColumnIntRange($query, 'COALESCE(JSON_LENGTH(site_audit_pages.out_links_json), 0)', $values, 'out_links', true);
-        self::applyColumnIntRange($query, 'COALESCE(JSON_LENGTH(site_audit_pages.ext_links_json), 0)', $values, 'ext_links', true);
+        self::applyColumnIntRange(
+            $query,
+            \Illuminate\Support\Facades\Schema::hasColumn('site_audit_pages', 'out_links_count')
+                ? 'COALESCE(site_audit_pages.out_links_count, JSON_LENGTH(site_audit_pages.out_links_json), 0)'
+                : 'COALESCE(JSON_LENGTH(site_audit_pages.out_links_json), 0)',
+            $values,
+            'out_links',
+            true
+        );
+        self::applyColumnIntRange(
+            $query,
+            \Illuminate\Support\Facades\Schema::hasColumn('site_audit_pages', 'ext_links_count')
+                ? 'COALESCE(site_audit_pages.ext_links_count, JSON_LENGTH(site_audit_pages.ext_links_json), 0)'
+                : 'COALESCE(JSON_LENGTH(site_audit_pages.ext_links_json), 0)',
+            $values,
+            'ext_links',
+            true
+        );
 
         // Размер: фильтр в Кб → байты.
         $sizeMin = isset($values['size_kb_min']) ? (int) $values['size_kb_min'] : null;

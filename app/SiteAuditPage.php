@@ -37,6 +37,8 @@ class SiteAuditPage extends Model
         'shingles_json',
         'out_links_json',
         'ext_links_json',
+        'out_links_count',
+        'ext_links_count',
         'img_srcs_json',
         'asset_srcs_json',
         'click_depth',

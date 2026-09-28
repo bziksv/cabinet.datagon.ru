@@ -153,8 +153,12 @@ class SiteAuditCrawlPagesColumns
             'text_len' => 'site_audit_pages.text_len',
             'img' => 'site_audit_pages.img_count',
             'img_no_alt' => 'site_audit_pages.img_without_alt',
-            'out_links' => 'COALESCE(JSON_LENGTH(site_audit_pages.out_links_json), 0)',
-            'ext_links' => 'COALESCE(JSON_LENGTH(site_audit_pages.ext_links_json), 0)',
+            'out_links' => \Illuminate\Support\Facades\Schema::hasColumn('site_audit_pages', 'out_links_count')
+                ? 'COALESCE(site_audit_pages.out_links_count, JSON_LENGTH(site_audit_pages.out_links_json), 0)'
+                : 'COALESCE(JSON_LENGTH(site_audit_pages.out_links_json), 0)',
+            'ext_links' => \Illuminate\Support\Facades\Schema::hasColumn('site_audit_pages', 'ext_links_count')
+                ? 'COALESCE(site_audit_pages.ext_links_count, JSON_LENGTH(site_audit_pages.ext_links_json), 0)'
+                : 'COALESCE(JSON_LENGTH(site_audit_pages.ext_links_json), 0)',
             'depth' => 'site_audit_pages.click_depth',
             'via' => 'site_audit_pages.discovered_via',
         ];

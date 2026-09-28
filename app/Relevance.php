@@ -899,6 +899,9 @@ class Relevance
 
     public function analyseRecommendations()
     {
+        // Иначе при refresh посадочной остаются рекомендации из снимка hydrate.
+        $this->recommendations = [];
+
         foreach ($this->wordForms as $wordForm) {
             if (empty($wordForm['total']) || !is_array($wordForm['total'])) {
                 continue;
@@ -2958,6 +2961,10 @@ class Relevance
 
     public function calculateAvg()
     {
+        // Всегда с нуля: иначе при «Повторный анализ посадочной» hydrateFromStoredResult
+        // подставляет старые average_values, а calculate() их суммирует → 99+99≈196.
+        $this->avg = [];
+
         $coverage = $coverageTf = $density = $width = $points = $countSymbols = [];
         foreach ($this->sites as $site) {
             $coverage[] = $site['coverage'];

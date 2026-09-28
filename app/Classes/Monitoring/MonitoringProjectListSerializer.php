@@ -19,7 +19,7 @@ class MonitoringProjectListSerializer
     private const CACHE_TTL_SECONDS = 120;
 
     /** Смена схемы ответа — сброс старого кэша с пустыми снимками. */
-    private const CACHE_KEY_SUFFIX = 's24';
+    private const CACHE_KEY_SUFFIX = 's25';
 
     /**
      * Снимки до этого момента могли быть посчитаны через addLastPositions
@@ -43,8 +43,8 @@ class MonitoringProjectListSerializer
     /** @var Collection<int, MonitoringUserStatus> */
     private $statusById;
 
-    /** @var array<string, bool> */
-    private $authPermissions = [];
+    /** @var array<int, array<string, bool>> project_id => flags */
+    private $authPermissionsByProject = [];
 
     public function forUser(User $user, bool $useCache = true, bool $rebuildSnapshots = false): array
     {
@@ -309,7 +309,6 @@ class MonitoringProjectListSerializer
     private function buildPayload(User $user, bool $rebuildSnapshots = false): array
     {
         $this->statusById = MonitoringUserStatus::all()->keyBy('id');
-        $this->authPermissions = $this->resolveAuthPermissions($user);
 
         $projects = $user->monitoringProjectsDataTable()
             ->select(
@@ -342,6 +341,8 @@ class MonitoringProjectListSerializer
             ])
             ->orderBy('monitoring_projects.name')
             ->get();
+
+        $this->authPermissionsByProject = $this->resolveAuthPermissionsByProject($user, $projects);
 
         if ($projects->isEmpty()) {
             return [
@@ -566,23 +567,115 @@ class MonitoringProjectListSerializer
     }
 
     /**
-     * Права для меню — один раз в контексте global team (список не требует team=project).
+     * Права меню по каждому проекту (Spatie team_id = id проекта).
+     * Нельзя проверять can() на global team=1 — там нет ролей *_monitoring.
      *
-     * @return array<string, bool>
+     * @param  \Illuminate\Support\Collection<int, MonitoringProject>  $projects
+     * @return array<int, array<string, bool>>
      */
-    private function resolveAuthPermissions(User $auth): array
+    private function resolveAuthPermissionsByProject(User $auth, $projects): array
     {
-        apply_global_team_permissions();
-
-        return [
-            'add_user' => $auth->can('add_user_to_project_monitoring'),
-            'export' => $auth->can('export_report_monitoring'),
-            'create_query' => $auth->can('create_query_monitoring'),
-            'edit_project' => $auth->can('edit_project_monitoring'),
-            'leave' => $auth->can('leave_project_monitoring'),
-            'detach_user' => $auth->can('delete_user_from_project_monitoring'),
-            'change_status' => $auth->can('change_user_status_project_monitoring'),
+        $empty = [
+            'add_user' => false,
+            'export' => false,
+            'create_query' => false,
+            'edit_project' => false,
+            'leave' => false,
+            'detach_user' => false,
+            'change_status' => false,
         ];
+
+        $projectIds = $projects->pluck('id')->map(static function ($id) {
+            return (int) $id;
+        })->filter()->values()->all();
+
+        $byProject = [];
+        foreach ($projectIds as $projectId) {
+            $byProject[$projectId] = $empty;
+        }
+
+        if ($projectIds === []) {
+            return $byProject;
+        }
+
+        // Super Admin видит полное меню везде (как Gate::before).
+        apply_global_team_permissions();
+        $auth->unsetRelation('roles');
+        $auth->unsetRelation('permissions');
+        if ($auth->hasRole('Super Admin')) {
+            $all = [
+                'add_user' => true,
+                'export' => true,
+                'create_query' => true,
+                'edit_project' => true,
+                'leave' => true,
+                'detach_user' => true,
+                'change_status' => true,
+            ];
+            foreach ($projectIds as $projectId) {
+                $byProject[$projectId] = $all;
+            }
+
+            return $byProject;
+        }
+
+        $permMap = [
+            'add_user_to_project_monitoring' => 'add_user',
+            'export_report_monitoring' => 'export',
+            'create_query_monitoring' => 'create_query',
+            'edit_project_monitoring' => 'edit_project',
+            'leave_project_monitoring' => 'leave',
+            'delete_user_from_project_monitoring' => 'detach_user',
+            'change_user_status_project_monitoring' => 'change_status',
+        ];
+
+        $roleLinks = \DB::table('model_has_roles as mhr')
+            ->where('mhr.model_type', User::class)
+            ->where('mhr.model_id', (int) $auth->id)
+            ->whereIn('mhr.team_id', $projectIds)
+            ->get(['mhr.team_id', 'mhr.role_id']);
+
+        if ($roleLinks->isEmpty()) {
+            return $byProject;
+        }
+
+        $roleIds = $roleLinks->pluck('role_id')->map(static function ($id) {
+            return (int) $id;
+        })->unique()->values()->all();
+
+        $rolePermFlags = [];
+        foreach ($roleIds as $roleId) {
+            $rolePermFlags[$roleId] = $empty;
+        }
+
+        $rows = \DB::table('role_has_permissions as rhp')
+            ->join('permissions as p', 'p.id', '=', 'rhp.permission_id')
+            ->whereIn('rhp.role_id', $roleIds)
+            ->whereIn('p.name', array_keys($permMap))
+            ->get(['rhp.role_id', 'p.name']);
+
+        foreach ($rows as $row) {
+            $flag = $permMap[$row->name] ?? null;
+            if ($flag === null) {
+                continue;
+            }
+            $rolePermFlags[(int) $row->role_id][$flag] = true;
+        }
+
+        foreach ($roleLinks as $link) {
+            $projectId = (int) $link->team_id;
+            $roleId = (int) $link->role_id;
+            if (!isset($byProject[$projectId], $rolePermFlags[$roleId])) {
+                continue;
+            }
+            foreach ($rolePermFlags[$roleId] as $flag => $on) {
+                if ($on) {
+                    $byProject[$projectId][$flag] = true;
+                }
+            }
+        }
+
+        return $byProject;
     }
 
     /**
@@ -599,7 +692,15 @@ class MonitoringProjectListSerializer
         $engineRegions = $this->buildEngineRegions($project->searchengines);
         $engines = array_keys($engineRegions);
 
-        $perms = $this->authPermissions;
+        $perms = $this->authPermissionsByProject[(int) $project->id] ?? [
+            'add_user' => false,
+            'export' => false,
+            'create_query' => false,
+            'edit_project' => false,
+            'leave' => false,
+            'detach_user' => false,
+            'change_status' => false,
+        ];
         $authId = $auth->id;
 
         $users = $project->users->map(function ($member) use ($project, $perms, $authId) {

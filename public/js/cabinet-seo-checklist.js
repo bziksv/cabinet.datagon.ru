@@ -300,16 +300,18 @@
     }
 
     function postJson(url, payload) {
+        var isForm = typeof FormData !== 'undefined' && payload instanceof FormData;
+        var headers = {
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': csrf,
+            'X-Requested-With': 'XMLHttpRequest',
+        };
+        if (!isForm) headers['Content-Type'] = 'application/json';
         return fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': csrf,
-                'X-Requested-With': 'XMLHttpRequest',
-            },
+            headers: headers,
             credentials: 'same-origin',
-            body: JSON.stringify(payload || {}),
+            body: isForm ? payload : JSON.stringify(payload || {}),
         }).then(function (r) {
             return r.json().then(function (data) {
                 return { ok: r.ok && data && data.ok, status: r.status, data: data };
@@ -1439,9 +1441,14 @@
             if (saveNote && noteBody && notesList) {
                 saveNote.addEventListener('click', function () {
                     var body = noteBody.value.trim();
-                    if (!body) return;
+                    var noteForm = saveNote.closest('.cabinet-sc-notes-form');
+                    var noteFiles = window.cabinetScAttach ? window.cabinetScAttach.files(noteForm) : [];
+                    if (!body && !noteFiles.length) return;
                     saveNote.disabled = true;
-                    postJson(urlFor(noteTpl, el.getAttribute('data-id')), { body: body })
+                    var notePayload = noteFiles.length
+                        ? window.cabinetScAttach.formData({ body: body }, noteFiles)
+                        : { body: body };
+                    postJson(urlFor(noteTpl, el.getAttribute('data-id')), notePayload)
                         .then(function (result) {
                             saveNote.disabled = false;
                             if (!result.ok) {
@@ -1457,13 +1464,16 @@
                                 : String((result.data.note && result.data.note.body) || '').replace(/</g, '&lt;');
                             if (noteId > 0) li.setAttribute('data-note-id', String(noteId));
                             li.setAttribute('data-note-own', '1');
-                            li.innerHTML = '<div class="cabinet-sc-notes-list__main">' +
+                            li.innerHTML = ((result.data.note && result.data.note.avatar_html) || '') +
+                                '<div class="cabinet-sc-notes-list__main">' +
                                 '<div class="cabinet-sc-notes-list__meta">' +
                                 (author ? '<strong class="cabinet-sc-notes-list__author">' + author + '</strong> ' : '') +
                                 '<span class="text-secondary small">' + created + '</span></div>' +
-                                '<div class="cabinet-sc-notes-list__body">' + bodyHtml + '</div></div>';
+                                '<div class="cabinet-sc-notes-list__body">' + bodyHtml + '</div>' +
+                                ((result.data.note && result.data.note.attachments_html) || '') + '</div>';
                             notesList.insertBefore(li, notesList.firstChild);
                             noteBody.value = '';
+                            if (window.cabinetScAttach) window.cabinetScAttach.reset(noteForm);
                             var total = (parseInt(el.getAttribute('data-notes-count') || '0', 10) || 0) + 1;
                             var unread = parseInt(el.getAttribute('data-unread-notes-count') || '0', 10) || 0;
                             setNotesBadge(el, total, unread);
@@ -1497,11 +1507,23 @@
                 if (!title) return;
                 var includeCb = el.querySelector('[data-sc-subtask-include-report]');
                 var includeInReport = includeCb ? !!includeCb.checked : false;
-                addSub.disabled = true;
-                postJson(urlFor(subtaskTpl, el.getAttribute('data-id')), {
+                var dueInput = el.querySelector('[data-sc-sub-form] [data-sc-sub-due]');
+                var assigneeSelect = el.querySelector('[data-sc-sub-form] [data-sc-sub-assignee]');
+                var commentInput = el.querySelector('[data-sc-sub-form] [data-sc-sub-comment]');
+                var subFormEl = el.querySelector('[data-sc-sub-form]');
+                var subFiles = window.cabinetScAttach ? window.cabinetScAttach.files(subFormEl) : [];
+                var subPayload = {
                     title: title,
                     include_in_report: includeInReport ? 1 : 0,
-                })
+                    due_at: dueInput ? dueInput.value : '',
+                    assignee_user_id: assigneeSelect ? assigneeSelect.value : '',
+                    comment: commentInput ? String(commentInput.value || '').trim() : '',
+                };
+                addSub.disabled = true;
+                postJson(
+                    urlFor(subtaskTpl, el.getAttribute('data-id')),
+                    subFiles.length ? window.cabinetScAttach.formData(subPayload, subFiles) : subPayload
+                )
                     .then(function (result) {
                         addSub.disabled = false;
                         if (!result.ok) {
@@ -1600,6 +1622,9 @@
                         var titleBtn = li.querySelector('[data-sc-title]');
                         titleBtn.textContent = result.data.item.title;
                         titleBtn.setAttribute('data-tip', root.getAttribute('data-i18n-click-to-edit') || 'Click to edit');
+                        if (result.data.item.meta_html) {
+                            titleBtn.insertAdjacentHTML('afterend', result.data.item.meta_html);
+                        }
                         var statusSelect = li.querySelector('[data-sc-status]');
                         if (statusSelect && statusValue) {
                             statusSelect.value = statusValue;
@@ -1611,6 +1636,10 @@
                         bindRow(li, true);
                         subTitle.value = '';
                         if (includeCb) includeCb.checked = false;
+                        if (dueInput) dueInput.value = '';
+                        if (assigneeSelect) assigneeSelect.value = '';
+                        if (commentInput) commentInput.value = '';
+                        if (window.cabinetScAttach) window.cabinetScAttach.reset(subFormEl);
                         refreshSubCount();
                         subTitle.focus();
                     })

@@ -30,6 +30,11 @@ class SeoChecklistItemNote extends Model
         return $this->hasMany(SeoChecklistNoteRead::class, 'note_id');
     }
 
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(SeoChecklistItemAttachment::class, 'note_id')->orderBy('id');
+    }
+
     public function authorLabel(): string
     {
         $user = $this->user;

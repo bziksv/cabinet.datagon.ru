@@ -597,6 +597,10 @@ class MonitoringController extends Controller
         $kpiSummary = MonitoringProjectPageSummary::build($project, $kpiRegionId);
         $columnSettings = MonitoringProjectColumnsSetting::visibilityMapForProject((int) $project->id);
 
+        // PageSummary в finally сбрасывает team на global — без повторного apply
+        // @can в keywords/controls (прицел / частоты) рисует пустые группы.
+        apply_team_permissions((int) $project->id);
+
         return view('monitoring.show', compact('navigations', 'project', 'length', 'lengthMenu', 'kpiSummary', 'columnSettings'));
     }
 

@@ -273,6 +273,7 @@
                     @if($noteIsUnread) data-sc-note-unread="1" @endif
                     data-note-id="{{ $note->id }}"
                     data-note-own="{{ $noteIsOwn ? '1' : '0' }}">
+                    @include('pages.partials.seo-checklist-note-avatar', ['user' => $note->user, 'name' => $note->authorLabel()])
                     <div class="cabinet-sc-notes-list__main">
                         <div class="cabinet-sc-notes-list__meta">
                             <strong class="cabinet-sc-notes-list__author">{{ $note->authorLabel() }}</strong>
@@ -282,6 +283,7 @@
                             @endif
                         </div>
                         <div class="cabinet-sc-notes-list__body">{!! \App\Support\TextAutoLinker::format((string) $note->body) !!}</div>
+                        @include('pages.partials.seo-checklist-note-attachments', ['note' => $note, 'projectId' => $item->project_id])
                     </div>
                     @if(!$noteIsOwn)
                         <div class="cabinet-sc-notes-list__side" data-sc-note-side>
@@ -311,7 +313,10 @@
         </ul>
         @if(!$projectArchived)
             <div class="cabinet-sc-notes-form">
-                <textarea class="form-control form-control-sm" rows="2" data-sc-note-body placeholder="{{ __('Add a note') }}…"></textarea>
+                <div class="cabinet-sc-notes-form__main">
+                    <textarea class="form-control form-control-sm" rows="2" data-sc-note-body placeholder="{{ __('Add a note') }}…"></textarea>
+                    @include('pages.partials.seo-checklist-attach-input')
+                </div>
                 <button type="button" class="btn btn-sm btn-primary" data-sc-note-save>{{ __('Save') }}</button>
             </div>
         @endif
@@ -392,6 +397,7 @@
                         <div class="cabinet-sc-subtask__body">
                             <span class="cabinet-sc-subtask__title {{ $childDone ? 'is-done-text' : '' }} {{ $child->status === 'review' ? 'is-review-text' : '' }}"
                                   data-sc-title>{{ $child->title }}</span>
+                            @include('pages.partials.seo-checklist-subtask-meta', ['child' => $child, 'project' => $project])
                         </div>
                         <div class="cabinet-sc-subtask__controls">
                             <span class="cabinet-sc-review-hint" data-sc-review-hint @if($child->status !== 'review') hidden @endif>{{ __('Waiting for review') }}</span>
@@ -478,6 +484,7 @@
                         <i class="bi bi-plus-lg" aria-hidden="true"></i>
                         {{ __('Add') }}
                     </button>
+                    @include('pages.partials.seo-checklist-subtask-form-extras', ['project' => $project])
                 </div>
             @endif
         </div>

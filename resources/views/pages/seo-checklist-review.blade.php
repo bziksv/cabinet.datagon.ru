@@ -6,7 +6,7 @@
         <link rel="stylesheet" href="{{ asset('css/cabinet-seo-checklist.css') }}?v={{ @filemtime(public_path('css/cabinet-seo-checklist.css')) ?: time() }}">
     @endslot
 
-    <div class="cabinet-sc-page"
+    <div class="cabinet-sc-page cabinet-sc-plan-v2"
          id="cabinetSeoChecklistPlan"
          data-sc-hub="review"
          data-csrf="{{ csrf_token() }}"
@@ -85,6 +85,7 @@
     @include('pages.partials.seo-checklist-status-modal')
 
     @slot('js')
+        <script src="{{ asset('js/cabinet-seo-checklist-attach.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-attach.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-status-modal.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-status-modal.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-plan.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-plan.js')) ?: time() }}"></script>
     @endslot

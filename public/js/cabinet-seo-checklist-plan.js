@@ -60,16 +60,18 @@
     }
 
     function postJson(url, payload) {
+        var isForm = typeof FormData !== 'undefined' && payload instanceof FormData;
+        var headers = {
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': csrf,
+            'X-Requested-With': 'XMLHttpRequest',
+        };
+        if (!isForm) headers['Content-Type'] = 'application/json';
         return fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': csrf,
-                'X-Requested-With': 'XMLHttpRequest',
-            },
+            headers: headers,
             credentials: 'same-origin',
-            body: JSON.stringify(payload || {}),
+            body: isForm ? payload : JSON.stringify(payload || {}),
         }).then(function (r) {
             return r.text().then(function (text) {
                 var data = null;
@@ -813,6 +815,7 @@
 
         var titleEl = li.querySelector('[data-sc-title]');
         if (titleEl) titleEl.textContent = itemData.title || '';
+        if (titleEl && itemData.meta_html) titleEl.insertAdjacentHTML('afterend', itemData.meta_html);
         var statusSelect = li.querySelector('[data-sc-status]');
         if (statusSelect && itemData.status) statusSelect.value = itemData.status;
 
@@ -840,12 +843,24 @@
         if (!projectId || !itemId) return;
         var includeCb = parentItem.querySelector('[data-sc-plan-subtask-include-report]');
         var includeInReport = !!(includeCb && includeCb.checked);
-        addBtn.disabled = true;
-        parentItem.classList.add('is-busy');
-        postJson(urlFor(subtaskTpl, projectId, itemId), {
+        var dueInput = parentItem.querySelector('[data-sc-plan-sub-form] [data-sc-sub-due]');
+        var assigneeSelect = parentItem.querySelector('[data-sc-plan-sub-form] [data-sc-sub-assignee]');
+        var commentInput = parentItem.querySelector('[data-sc-plan-sub-form] [data-sc-sub-comment]');
+        var subForm = parentItem.querySelector('[data-sc-plan-sub-form]');
+        var subFiles = window.cabinetScAttach ? window.cabinetScAttach.files(subForm) : [];
+        var subPayload = {
             title: title,
             include_in_report: includeInReport ? 1 : 0,
-        })
+            due_at: dueInput ? dueInput.value : '',
+            assignee_user_id: assigneeSelect ? assigneeSelect.value : '',
+            comment: commentInput ? String(commentInput.value || '').trim() : '',
+        };
+        addBtn.disabled = true;
+        parentItem.classList.add('is-busy');
+        postJson(
+            urlFor(subtaskTpl, projectId, itemId),
+            subFiles.length ? window.cabinetScAttach.formData(subPayload, subFiles) : subPayload
+        )
             .then(function (result) {
                 addBtn.disabled = false;
                 parentItem.classList.remove('is-busy');
@@ -856,6 +871,10 @@
                 appendPlanSubtask(parentItem, (result.data && result.data.item) || {});
                 input.value = '';
                 if (includeCb) includeCb.checked = false;
+                if (dueInput) dueInput.value = '';
+                if (assigneeSelect) assigneeSelect.value = '';
+                if (commentInput) commentInput.value = '';
+                if (window.cabinetScAttach) window.cabinetScAttach.reset(subForm);
                 input.focus();
             })
             .catch(function () {
@@ -975,12 +994,17 @@
         var notesList = noteItem.querySelector('[data-sc-notes-list]');
         if (!noteBody || !notesList) return;
         var body = String(noteBody.value || '').trim();
-        if (!body) return;
+        var noteForm = saveNote.closest('.cabinet-sc-notes-form');
+        var noteFiles = window.cabinetScAttach ? window.cabinetScAttach.files(noteForm) : [];
+        if (!body && !noteFiles.length) return;
         var projectId = noteItem.getAttribute('data-project-id');
         var itemId = noteItem.getAttribute('data-id');
         if (!projectId || !itemId) return;
         saveNote.disabled = true;
-        postJson(urlFor(noteTpl, projectId, itemId), { body: body })
+        var notePayload = noteFiles.length
+            ? window.cabinetScAttach.formData({ body: body }, noteFiles)
+            : { body: body };
+        postJson(urlFor(noteTpl, projectId, itemId), notePayload)
             .then(function (result) {
                 saveNote.disabled = false;
                 if (!result.ok) {
@@ -993,12 +1017,18 @@
                 var bodyHtml = (result.data.note && result.data.note.body_html)
                     ? String(result.data.note.body_html)
                     : String((result.data.note && result.data.note.body) || '').replace(/</g, '&lt;');
-                li.innerHTML = '<div class="cabinet-sc-notes-list__meta">' +
+                if (result.data.note && result.data.note.id) li.setAttribute('data-note-id', String(result.data.note.id));
+                li.setAttribute('data-note-own', '1');
+                li.innerHTML = ((result.data.note && result.data.note.avatar_html) || '') +
+                    '<div class="cabinet-sc-notes-list__main">' +
+                    '<div class="cabinet-sc-notes-list__meta">' +
                     (author ? '<strong class="cabinet-sc-notes-list__author">' + author + '</strong> ' : '') +
                     '<span class="text-secondary small">' + created + '</span></div>' +
-                    '<div class="cabinet-sc-notes-list__body">' + bodyHtml + '</div>';
+                    '<div class="cabinet-sc-notes-list__body">' + bodyHtml + '</div>' +
+                    ((result.data.note && result.data.note.attachments_html) || '') + '</div>';
                 notesList.insertBefore(li, notesList.firstChild);
                 noteBody.value = '';
+                if (window.cabinetScAttach) window.cabinetScAttach.reset(noteForm);
                 bumpNotesCount(noteItem);
             })
             .catch(function () {

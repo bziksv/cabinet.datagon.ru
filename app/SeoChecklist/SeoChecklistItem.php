@@ -83,9 +83,19 @@ class SeoChecklistItem extends Model
         return $this->belongsTo(\App\User::class, 'created_by');
     }
 
+    public function assigneeUser(): BelongsTo
+    {
+        return $this->belongsTo(\App\User::class, 'assignee_user_id');
+    }
+
     public function notes(): HasMany
     {
         return $this->hasMany(SeoChecklistItemNote::class, 'item_id')->orderByDesc('id');
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(SeoChecklistItemAttachment::class, 'item_id')->orderBy('id');
     }
 
     public function timeLogs(): HasMany

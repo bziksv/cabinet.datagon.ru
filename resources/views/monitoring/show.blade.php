@@ -76,6 +76,10 @@
     @include('monitoring.partials.queue-confirm-modal')
 
     <div id="cabinetMonTableControlsTpl" hidden aria-hidden="true">
+        @php
+            // MenuComposer / PageSummary могут сбросить Spatie team на global до рендера слота.
+            apply_team_permissions((int) $project->id);
+        @endphp
         @include('monitoring.keywords.controls', [
             'columnSettings' => $columnSettings ?? [],
             'isMultiRegionView' => !request('region') && $project->searchengines->count() > 1,

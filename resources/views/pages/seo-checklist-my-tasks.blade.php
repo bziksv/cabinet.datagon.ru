@@ -260,6 +260,7 @@
 
     @slot('js')
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
+        <script src="{{ asset('js/cabinet-seo-checklist-attach.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-attach.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-status-modal.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-status-modal.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-plan.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-plan.js')) ?: time() }}"></script>
         <script>

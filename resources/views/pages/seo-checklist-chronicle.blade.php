@@ -196,6 +196,7 @@
                 });
             }
             $logs = $chronicle['items'] ?? collect();
+            $feedNotes = $chronicle['feed_notes'] ?? collect();
             $unreadPrefs = $unreadPrefs ?? ($chronicle['unread_prefs'] ?? [
                 'notes' => true,
                 'review' => false,
@@ -292,9 +293,10 @@
                                     $item = $note->item;
                                     $project = $item ? $item->project : null;
                                     $author = $note->authorLabel();
+                                    $noteAnchorId = $item ? ((int) $item->parent_id ?: (int) $item->id) : 0;
                                     $url = ($project && $item)
                                         ? route('pages.seo-checklist.show', ['id' => $project->id])
-                                            . '?focus=' . $item->id . '#sc-item-' . $item->id
+                                            . '?focus=' . $noteAnchorId . '#sc-item-' . $noteAnchorId
                                         : route('pages.seo-checklist');
                                 @endphp
                                 <li class="cabinet-sc-feed__item is-unread" data-sc-unread-item data-note-id="{{ $note->id }}">
@@ -312,11 +314,19 @@
                                         </div>
                                         @if($item)
                                             <a class="cabinet-sc-feed__task" href="{{ $url }}">
-                                                <span class="cabinet-sc-feed__task-title">{{ $item->title }}</span>
+                                                <span class="cabinet-sc-feed__task-title">
+                                                    @if($item->parent)
+                                                        <span class="cabinet-sc-feed__task-parent">{{ $item->parent->title }} ›</span>
+                                                    @endif
+                                                    {{ $item->title }}
+                                                </span>
                                                 <span class="cabinet-sc-feed__task-go">{{ __('Open in project') }}</span>
                                             </a>
                                         @endif
-                                        <div class="cabinet-sc-feed__note">{!! \App\Support\TextAutoLinker::format((string) $note->body) !!}</div>
+                                        @if(trim((string) $note->body) !== '')
+                                            <div class="cabinet-sc-feed__note">{!! \App\Support\TextAutoLinker::format((string) $note->body) !!}</div>
+                                        @endif
+                                        @include('pages.partials.seo-checklist-note-attachments', ['note' => $note, 'projectId' => $project ? $project->id : 0])
                                         <div class="cabinet-sc-feed__actions">
                                             <form method="post" action="{{ route('pages.seo-checklist.chronicle.read') }}" data-sc-mark-read data-note-id="{{ $note->id }}">
                                                 @csrf
@@ -480,6 +490,8 @@
                                         $isNote = $log->type === 'note';
                                         $isStatus = $log->type === 'status_change';
                                         $isCreated = $log->type === 'item_created';
+                                        $isItemMeta = $log->type === 'item_meta';
+                                        $parentTitle = $meta['parent_title'] ?? optional(optional($item)->parent)->title;
                                         $statusTo = $meta['to'] ?? null;
                                         $isDoneEvent = $isStatus && in_array($statusTo, ['done', 'skip'], true);
                                         $createdByName = $meta['created_by_name']
@@ -538,12 +550,19 @@
                                                     <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--done">{{ __('Chronicle kind completed') }}</span>
                                                 @elseif($isStatus)
                                                     <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--status">{{ __('Status') }}</span>
+                                                @elseif($isItemMeta)
+                                                    <span class="cabinet-sc-feed__kind cabinet-sc-feed__kind--status">{{ __('Deadline and assignee') }}</span>
                                                 @endif
                                             </div>
 
                                             @if($taskTitle && $anchorId > 0)
                                                 <a class="cabinet-sc-feed__task" href="{{ $url }}">
-                                                    <span class="cabinet-sc-feed__task-title">{{ $taskTitle }}</span>
+                                                    <span class="cabinet-sc-feed__task-title">
+                                                        @if($parentTitle)
+                                                            <span class="cabinet-sc-feed__task-parent">{{ $parentTitle }} ›</span>
+                                                        @endif
+                                                        {{ $taskTitle }}
+                                                    </span>
                                                     <span class="cabinet-sc-feed__task-go">{{ __('Open in project') }}</span>
                                                 </a>
                                             @elseif($taskTitle)
@@ -567,6 +586,28 @@
                                                 </div>
                                             @elseif($isNote)
                                                 <div class="cabinet-sc-feed__note">{!! \App\Support\TextAutoLinker::format((string) ($meta['body'] ?? ''), 220) !!}</div>
+                                                @if($noteId > 0 && $feedNotes->has($noteId))
+                                                    @include('pages.partials.seo-checklist-note-attachments', ['note' => $feedNotes->get($noteId), 'projectId' => $project ? $project->id : 0])
+                                                @endif
+                                            @elseif($isItemMeta)
+                                                <div class="cabinet-sc-feed__changes">
+                                                    @if(array_key_exists('due_to', $meta))
+                                                        <div>
+                                                            <span class="text-secondary">{{ __('Checklist item deadline') }}:</span>
+                                                            {{ $meta['due_from'] ?? '—' }}
+                                                            <span class="cabinet-sc-feed__arrow" aria-hidden="true">→</span>
+                                                            <strong>{{ $meta['due_to'] ?? '—' }}</strong>
+                                                        </div>
+                                                    @endif
+                                                    @if(array_key_exists('assignee_to', $meta))
+                                                        <div>
+                                                            <span class="text-secondary">{{ __('Checklist item assignee') }}:</span>
+                                                            {{ $meta['assignee_from'] ?? '—' }}
+                                                            <span class="cabinet-sc-feed__arrow" aria-hidden="true">→</span>
+                                                            <strong>{{ $meta['assignee_to'] ?? '—' }}</strong>
+                                                        </div>
+                                                    @endif
+                                                </div>
                                             @else
                                                 <div class="cabinet-sc-feed__note text-secondary">{{ $log->type }}</div>
                                             @endif
@@ -617,6 +658,7 @@
     @slot('js')
         <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-hub.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-hub.js')) ?: time() }}"></script>
+        <script src="{{ asset('js/cabinet-seo-checklist-attach.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-attach.js')) ?: time() }}"></script>
         <script>
             (function () {
                 if (!window.jQuery || !jQuery.fn.select2) return;

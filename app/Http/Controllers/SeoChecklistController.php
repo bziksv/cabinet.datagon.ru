@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\SeoChecklist\SeoChecklistItem;
+use App\SeoChecklist\SeoChecklistItemAttachment;
 use App\SeoChecklist\SeoChecklistItemNote;
 use App\SeoChecklist\SeoChecklistProject;
 use App\SeoChecklist\SeoChecklistTemplate;
 use App\SeoChecklist\SeoChecklistUserPreference;
+use App\Services\SeoChecklist\SeoChecklistAttachmentService;
 use App\Services\SeoChecklist\SeoChecklistService;
 use App\Support\HomeUserSites;
 use App\Support\SeoChecklistDefaultTemplate;
@@ -16,6 +18,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class SeoChecklistController extends Controller
@@ -1335,7 +1338,7 @@ class SeoChecklistController extends Controller
         $this->service->syncAutoStatuses($project, $authId);
         $project->refresh();
         $project->load(['ownerUser', 'pmUser', 'team.members.user']);
-        $noteWith = ['notes.user'];
+        $noteWith = ['notes.user', 'notes.attachments'];
         if (\App\SeoChecklist\SeoChecklistNoteRead::tableReady()) {
             $noteWith['notes.reads'] = function ($q) use ($authId) {
                 $q->where('user_id', $authId);
@@ -1346,6 +1349,9 @@ class SeoChecklistController extends Controller
             'doneByUser',
             'children.createdByUser',
             'children.doneByUser',
+            'children.assigneeUser',
+            'children.notes.user',
+            'children.notes.attachments',
             'children.timeLogs' => function ($q) use ($authId) {
                 $q->where('user_id', $authId)->whereNull('ended_at')->orderByDesc('id');
             },
@@ -1605,6 +1611,17 @@ class SeoChecklistController extends Controller
         if ($request->exists('repeat_rule')) {
             $payload['repeat_rule'] = $request->input('repeat_rule');
         }
+        if ($item->isSubtask()) {
+            if ($request->exists('due_at')) {
+                $payload['due_at'] = $request->input('due_at');
+            }
+            if ($request->exists('assignee_user_id')) {
+                $payload['assignee_user_id'] = $request->input('assignee_user_id');
+            }
+        }
+
+        $dueBefore = $item->due_at ? $item->due_at->format('d.m.Y') : null;
+        $assigneeBefore = $item->assignee_user_id ? (int) $item->assignee_user_id : null;
 
         $result = $this->service->updateProjectItem($item, $payload);
         if (empty($result['ok'])) {
@@ -1612,6 +1629,30 @@ class SeoChecklistController extends Controller
         }
 
         $item->refresh();
+
+        if ($item->isSubtask()) {
+            $dueAfter = $item->due_at ? $item->due_at->format('d.m.Y') : null;
+            $assigneeAfter = $item->assignee_user_id ? (int) $item->assignee_user_id : null;
+            $changes = [];
+            if ($dueAfter !== $dueBefore) {
+                $changes['due_from'] = $dueBefore;
+                $changes['due_to'] = $dueAfter;
+            }
+            if ($assigneeAfter !== $assigneeBefore) {
+                $names = collect($this->service->projectAssigneeOptions($project))->pluck('name', 'id');
+                $changes['assignee_from'] = $assigneeBefore ? ($names[$assigneeBefore] ?? null) : null;
+                $changes['assignee_to'] = $assigneeAfter ? ($names[$assigneeAfter] ?? null) : null;
+            }
+            if ($changes !== []) {
+                $this->service->logActivity(
+                    (int) $project->id,
+                    (int) $item->id,
+                    (int) Auth::id(),
+                    'item_meta',
+                    $this->service->itemActivitySnapshot($item) + $changes
+                );
+            }
+        }
 
         return response()->json([
             'ok' => true,
@@ -1624,6 +1665,12 @@ class SeoChecklistController extends Controller
                 'include_in_report' => (bool) $item->include_in_report,
                 'allows_subtasks' => (bool) $item->allows_subtasks,
                 'repeat_rule' => $item->repeat_rule,
+                'meta_html' => $item->isSubtask()
+                    ? view('pages.partials.seo-checklist-subtask-meta', [
+                        'child' => $item->load(['assigneeUser', 'notes.user', 'notes.attachments']),
+                        'project' => $project,
+                    ])->render()
+                    : null,
             ],
         ]);
     }
@@ -1688,8 +1735,14 @@ class SeoChecklistController extends Controller
         }
 
         $body = trim((string) $request->input('body', ''));
-        if ($body === '') {
+        $attachments = app(SeoChecklistAttachmentService::class);
+        $files = $attachments->filesFromRequest($request);
+        if ($body === '' && $files === []) {
             return response()->json(['ok' => false, 'message' => __('Note cannot be empty')], 422);
+        }
+        $fileError = $attachments->validate($files);
+        if ($fileError !== null) {
+            return response()->json(['ok' => false, 'message' => $fileError], 422);
         }
 
         $note = SeoChecklistItemNote::query()->create([
@@ -1697,11 +1750,12 @@ class SeoChecklistController extends Controller
             'user_id' => (int) Auth::id(),
             'body' => $body,
         ]);
-        $note->load('user');
+        $saved = $attachments->store($item, (int) $note->id, (int) Auth::id(), $files);
+        $note->load(['user', 'attachments']);
         $project->forceFill(['last_activity_at' => now()])->save();
         $this->service->logActivity((int) $project->id, (int) $item->id, (int) Auth::id(), 'note', [
             'note_id' => $note->id,
-            'body' => $body,
+            'body' => $body !== '' ? $body : $this->attachmentsActivityLabel($saved),
             'title' => $item->title,
         ]);
 
@@ -1711,10 +1765,122 @@ class SeoChecklistController extends Controller
                 'id' => $note->id,
                 'body' => $note->body,
                 'body_html' => \App\Support\TextAutoLinker::format((string) $note->body),
+                'attachments_html' => $this->noteAttachmentsHtml($note, (int) $project->id),
+                'avatar_html' => view('pages.partials.seo-checklist-note-avatar', [
+                    'user' => $note->loadMissing('user')->user,
+                    'name' => $note->authorLabel(),
+                ])->render(),
                 'author' => $note->authorLabel(),
                 'created_at' => $note->created_at->format('d.m.Y H:i'),
             ],
+            'meta_html' => $item->isSubtask()
+                ? view('pages.partials.seo-checklist-subtask-meta', [
+                    'child' => $item->load(['assigneeUser', 'notes.user', 'notes.attachments']),
+                    'project' => $project,
+                ])->render()
+                : null,
         ]);
+    }
+
+    public function downloadAttachment(Request $request, int $id, int $attachmentId)
+    {
+        $project = $this->findAccessibleProject($id);
+        if (!$project) {
+            abort(404);
+        }
+
+        /** @var SeoChecklistItemAttachment|null $attachment */
+        $attachment = SeoChecklistItemAttachment::query()->with('item:id,project_id')->find($attachmentId);
+        $disk = Storage::disk(SeoChecklistItemAttachment::DISK);
+        if (
+            !$attachment
+            || !$attachment->item
+            || (int) $attachment->item->project_id !== (int) $project->id
+            || !$disk->exists((string) $attachment->path)
+        ) {
+            abort(404);
+        }
+
+        $name = (string) $attachment->original_name;
+        $headers = ['X-Content-Type-Options' => 'nosniff'];
+        $inlineTypes = [
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'pdf' => 'application/pdf',
+        ];
+        $ext = $attachment->extension();
+        if (isset($inlineTypes[$ext]) && !$request->boolean('dl')) {
+            return response()->file($disk->path((string) $attachment->path), $headers + [
+                'Content-Type' => $inlineTypes[$ext],
+                'Content-Disposition' => 'inline; filename*=UTF-8\'\'' . rawurlencode($name),
+            ]);
+        }
+
+        return response()->download($disk->path((string) $attachment->path), $name, $headers);
+    }
+
+    public function downloadNoteAttachmentsZip(int $id, int $noteId)
+    {
+        $project = $this->findAccessibleProject($id);
+        if (!$project) {
+            abort(404);
+        }
+
+        /** @var SeoChecklistItemNote|null $note */
+        $note = SeoChecklistItemNote::query()->with(['item:id,project_id,title', 'attachments'])->find($noteId);
+        if (!$note || !$note->item || (int) $note->item->project_id !== (int) $project->id || $note->attachments->isEmpty()) {
+            abort(404);
+        }
+
+        $disk = Storage::disk(SeoChecklistItemAttachment::DISK);
+        $tmp = tempnam(sys_get_temp_dir(), 'sc-zip-');
+        $zip = new \ZipArchive();
+        if ($zip->open($tmp, \ZipArchive::OVERWRITE) !== true) {
+            abort(500);
+        }
+        $used = [];
+        foreach ($note->attachments as $att) {
+            $path = (string) $att->path;
+            if (!$disk->exists($path)) {
+                continue;
+            }
+            $name = str_replace(['/', '\\'], '_', (string) $att->original_name) ?: ('file-' . $att->id);
+            $base = $name;
+            $n = 1;
+            while (isset($used[mb_strtolower($name)])) {
+                $n++;
+                $ext = pathinfo($base, PATHINFO_EXTENSION);
+                $stem = $ext !== '' ? mb_substr($base, 0, -mb_strlen($ext) - 1) : $base;
+                $name = $stem . ' (' . $n . ')' . ($ext !== '' ? '.' . $ext : '');
+            }
+            $used[mb_strtolower($name)] = true;
+            $zip->addFile($disk->path($path), $name);
+        }
+        $zip->close();
+
+        $zipName = 'files-' . $project->domain . '-' . $note->created_at->format('Y-m-d') . '.zip';
+
+        return response()->download($tmp, $zipName, ['Content-Type' => 'application/zip'])->deleteFileAfterSend(true);
+    }
+
+    private function noteAttachmentsHtml(SeoChecklistItemNote $note, int $projectId): string
+    {
+        return view('pages.partials.seo-checklist-note-attachments', ['note' => $note, 'projectId' => $projectId])->render();
+    }
+
+    /**
+     * @param  list<SeoChecklistItemAttachment>  $saved
+     */
+    private function attachmentsActivityLabel(array $saved): string
+    {
+        $names = array_map(function (SeoChecklistItemAttachment $a) {
+            return (string) $a->original_name;
+        }, $saved);
+
+        return __('Attached files') . ': ' . implode(', ', $names);
     }
 
     public function addSubtask(Request $request, int $id, int $itemId): JsonResponse
@@ -1738,6 +1904,29 @@ class SeoChecklistController extends Controller
             return response()->json(['ok' => false, 'message' => __('Title required')], 422);
         }
 
+        $dueAt = null;
+        $dueRaw = trim((string) $request->input('due_at', ''));
+        if ($dueRaw !== '') {
+            try {
+                $dueAt = \Carbon\Carbon::createFromFormat('Y-m-d', $dueRaw)->endOfDay();
+            } catch (\Throwable $e) {
+                return response()->json(['ok' => false, 'message' => __('Invalid due date')], 422);
+            }
+        }
+
+        $assigneeId = (int) $request->input('assignee_user_id', 0);
+        if ($assigneeId > 0 && !$this->service->isProjectAssignee($project, $assigneeId)) {
+            return response()->json(['ok' => false, 'message' => __('Assignee must be a project member')], 422);
+        }
+
+        $comment = trim((string) $request->input('comment', ''));
+        $attachments = app(SeoChecklistAttachmentService::class);
+        $files = $attachments->filesFromRequest($request);
+        $fileError = $attachments->validate($files);
+        if ($fileError !== null) {
+            return response()->json(['ok' => false, 'message' => $fileError], 422);
+        }
+
         if (!$parent->allows_subtasks) {
             $parent->forceFill(['allows_subtasks' => true])->save();
         }
@@ -1757,11 +1946,13 @@ class SeoChecklistController extends Controller
             'include_in_report' => $request->boolean('include_in_report'),
             'allows_subtasks' => false,
             'status' => 'todo',
+            'due_at' => $dueAt,
+            'assignee_user_id' => $assigneeId > 0 ? $assigneeId : null,
             'links_json' => [],
             'created_by' => (int) Auth::id(),
         ]);
         $project->forceFill(['last_activity_at' => now()])->save();
-        $child->loadMissing(['createdByUser', 'doneByUser', 'parent:id,title']);
+        $child->loadMissing(['createdByUser', 'doneByUser', 'assigneeUser', 'parent:id,title']);
         $this->service->logActivity(
             (int) $project->id,
             (int) $child->id,
@@ -1769,6 +1960,21 @@ class SeoChecklistController extends Controller
             'item_created',
             $this->service->itemActivitySnapshot($child)
         );
+
+        if ($comment !== '' || $files !== []) {
+            $note = SeoChecklistItemNote::query()->create([
+                'item_id' => $child->id,
+                'user_id' => (int) Auth::id(),
+                'body' => $comment,
+            ]);
+            $saved = $attachments->store($child, (int) $note->id, (int) Auth::id(), $files);
+            $this->service->logActivity((int) $project->id, (int) $child->id, (int) Auth::id(), 'note', [
+                'note_id' => $note->id,
+                'body' => $comment !== '' ? $comment : $this->attachmentsActivityLabel($saved),
+                'title' => $child->title,
+            ]);
+        }
+        $child->load(['notes.user', 'notes.attachments']);
 
         return response()->json([
             'ok' => true,
@@ -1780,6 +1986,7 @@ class SeoChecklistController extends Controller
                 'include_in_report' => (bool) $child->include_in_report,
                 'created_by' => (int) $child->created_by,
                 'audit' => $this->itemAuditPayload($child),
+                'meta_html' => view('pages.partials.seo-checklist-subtask-meta', ['child' => $child, 'project' => $project])->render(),
             ],
         ]);
     }

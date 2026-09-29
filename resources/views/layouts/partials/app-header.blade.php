@@ -207,13 +207,13 @@
                             <span class="dropdown-item dropdown-header">{{ __('Your limits') }}</span>
                             <div class="dropdown-divider"></div>
                             <div class="px-2 pb-2">
-                                <div class="table-responsive cabinet-header-limits-menu__table-wrap">
+                                <div class="cabinet-header-limits-menu__table-wrap">
                                     <table class="table table-sm table-hover mb-0">
                                         <thead>
                                         <tr>
-                                            <th>{{ __('Module') }}</th>
-                                            <th class="text-end">{{ __('Limits') }}</th>
-                                            <th class="text-end">{{ __('Left') }}</th>
+                                            <th scope="col">{{ __('Module') }}</th>
+                                            <th scope="col" class="text-end">{{ __('Limits') }}</th>
+                                            <th scope="col" class="text-end">{{ __('Left') }}</th>
                                         </tr>
                                         </thead>
                                         <tbody>

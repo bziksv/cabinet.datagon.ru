@@ -315,8 +315,40 @@
     display: none !important;
 }
 
+/* AdminLTE .dropdown-menu-lg = max 300px — таблица лимитов не влезает */
+#header-nav-bar .cabinet-header-limits-menu.dropdown-menu-lg {
+    min-width: min(92vw, 28rem);
+    max-width: min(96vw, 32rem);
+    width: max-content;
+}
+
 .cabinet-header-limits-menu__table-wrap {
     max-height: 18rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+#header-nav-bar .cabinet-header-limits-menu table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+#header-nav-bar .cabinet-header-limits-menu th:first-child,
+#header-nav-bar .cabinet-header-limits-menu td:first-child {
+    width: auto;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+}
+
+#header-nav-bar .cabinet-header-limits-menu th:nth-child(2),
+#header-nav-bar .cabinet-header-limits-menu td:nth-child(2),
+#header-nav-bar .cabinet-header-limits-menu th:nth-child(3),
+#header-nav-bar .cabinet-header-limits-menu td:nth-child(3) {
+    width: 4.75rem;
+    white-space: nowrap;
+    vertical-align: top;
 }
 
 #header-nav-bar .cabinet-header-limits-menu tr.cabinet-header-limits-menu__row--current {

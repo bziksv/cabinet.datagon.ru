@@ -4,9 +4,10 @@
             <h2 class="cabinet-sa-sites__title">Ваши сайты</h2>
             <p class="cabinet-sa-sites__sub mb-0">
                 @if(isset($projectsLimit))
-                    {{ $projects->count() }} / {{ (int) $projectsLimit }}
+                    проверок {{ (int) ($projectsUsed ?? 0) }}/{{ (int) $projectsLimit }}
+                    · сайтов {{ $projects->count() }}
                 @else
-                    {{ $projects->count() }}
+                    сайтов {{ $projects->count() }}
                 @endif
                 @if(isset($schedulesLimit))
                     <span data-sa-pro>· авто {{ (int) ($schedulesUsed ?? 0) }}/{{ (int) $schedulesLimit }}</span>

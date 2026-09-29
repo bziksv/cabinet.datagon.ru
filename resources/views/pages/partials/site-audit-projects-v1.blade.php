@@ -3,8 +3,9 @@
                         <h2 class="h6 mb-0 fw-semibold">Ваши сайты</h2>
                         <div class="small text-secondary" data-sa-pro>
                             @if(isset($projectsLimit))
-                                проектов {{ $projects->count() }} / {{ (int) $projectsLimit }}
+                                проверок {{ (int) ($projectsUsed ?? 0) }} / {{ (int) $projectsLimit }}
                             @endif
+                            · сайтов {{ $projects->count() }}
                             @if(isset($schedulesLimit))
                                 · автоснятий {{ (int) ($schedulesUsed ?? 0) }} / {{ (int) $schedulesLimit }}
                             @endif

@@ -48,12 +48,7 @@ class SiteAuditCrawlStarter
             $settings['concurrency'] = SiteAuditLimits::resolveConcurrency($user, $settings['concurrency'] ?? 1);
         }
 
-        if (! $bypassLimits && ! SiteAuditLimits::canCreateProject($user, $domain)) {
-            $lim = SiteAuditLimits::projectsLimit($user);
-            throw new RuntimeException(
-                "Лимит проектов аудита сайта исчерпан ({$lim}). Удалите старый проект или увеличьте тариф."
-            );
-        }
+        // Домены не лимитируем: SiteAuditProjects = проверок в памяти (prune ниже).
 
         $project = SiteAuditProject::query()->firstOrCreate(
             ['user_id' => $user->id, 'domain' => $domain],
@@ -108,6 +103,14 @@ class SiteAuditCrawlStarter
             ],
             'started_at' => null,
         ]);
+
+        if (! $bypassLimits) {
+            try {
+                (new SiteAuditPruner())->pruneUserToLimit((int) $user->id);
+            } catch (\Throwable $e) {
+                // не блокируем старт из‑за prune
+            }
+        }
 
         if ($dispatch) {
             SiteAuditGlobalCap::tryDispatch($crawl);

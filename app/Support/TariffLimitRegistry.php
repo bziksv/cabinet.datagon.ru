@@ -182,8 +182,8 @@ class TariffLimitRegistry
             ],
             [
                 'code' => 'SiteAuditProjects',
-                'module' => 'Аудит сайта (проектов)',
-                'hint' => 'Доменов/проектов в памяти. Free 1 / Optimal 20 / Ultimate 50 / Maximum 100.',
+                'module' => 'Аудит сайта (проверок в памяти)',
+                'hint' => 'Сколько завершённых проверок хранится. Free 1 / Optimal 10 / Ultimate 20 / Maximum 30. Домены не лимитируются.',
                 'enforcement' => self::ENFORCEMENT_STRICT,
             ],
             [

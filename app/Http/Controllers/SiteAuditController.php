@@ -338,6 +338,7 @@ class SiteAuditController extends Controller
             'history' => $history,
             'historyRows' => $historyRows,
             'archiveCrawls' => $archiveCrawls,
+            'projectsLimit' => SiteAuditLimits::projectsLimit(),
             'compareCandidates' => $history->where('id', '!=', $crawl->id)->values(),
             'shareUrl' => $crawl->publicShareUrl(),
             'shareWhiteLabel' => $crawl->whiteLabelMeta(),

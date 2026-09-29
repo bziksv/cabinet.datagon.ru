@@ -69,7 +69,7 @@
                     </div>
                 </div>
                 <div class="modal-footer justify-content-between">
-                    <span class="small text-muted">Хранится до {{ (int) config('site_audit.history_keep_per_project', 200) }} проверок на проект</span>
+                    <span class="small text-muted">По тарифу хранится до {{ number_format((int) ($projectsLimit ?? 1), 0, '', ' ') }} проверок — старые удаляются автоматически</span>
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Закрыть</button>
                 </div>
             </div>

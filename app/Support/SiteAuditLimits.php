@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\SiteAuditCrawl;
-use App\SiteAuditProject;
 use App\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -18,10 +17,11 @@ class SiteAuditLimits
 
     /** Дефолты, если в тарифе нет настройки (должны совпадать с миграцией сетки). */
     private const TIER_DEFAULTS = [
+        // projects = проверок (crawl) в памяти, не доменов
         'Free' => ['pages' => 100, 'concurrency' => 1, 'projects' => 1, 'schedules' => 0],
-        'Optimal' => ['pages' => 1000, 'concurrency' => 2, 'projects' => 20, 'schedules' => 20],
-        'Ultimate' => ['pages' => 5000, 'concurrency' => 4, 'projects' => 50, 'schedules' => 50],
-        'Maximum' => ['pages' => 10000, 'concurrency' => 8, 'projects' => 100, 'schedules' => 100],
+        'Optimal' => ['pages' => 1000, 'concurrency' => 2, 'projects' => 10, 'schedules' => 20],
+        'Ultimate' => ['pages' => 5000, 'concurrency' => 4, 'projects' => 20, 'schedules' => 50],
+        'Maximum' => ['pages' => 10000, 'concurrency' => 8, 'projects' => 30, 'schedules' => 100],
     ];
 
     public static function periodKey(?Carbon $at = null): string
@@ -88,6 +88,38 @@ class SiteAuditLimits
         return (int) (self::TIER_DEFAULTS[$tier]['projects'] ?? 1);
     }
 
+    /**
+     * Сколько проверок (crawl) хранится у пользователя — лимит «в памяти».
+     * Домены/проекты не лимитируются этим кодом.
+     */
+    public static function projectsUsed(?User $user = null): int
+    {
+        $user = $user ?? Auth::user();
+        if (! $user) {
+            return 0;
+        }
+
+        return (int) SiteAuditCrawl::query()->where('user_id', $user->id)->count();
+    }
+
+    /**
+     * Домены больше не лимитируем тарифом SiteAuditProjects (это лимит проверок в памяти).
+     */
+    public static function canCreateProject(User $user, string $domain): bool
+    {
+        return true;
+    }
+
+    /**
+     * Есть ли запас под ещё одну проверку в хранилище (после prune стартер всё равно подчистит).
+     */
+    public static function canStoreAnotherCrawl(?User $user = null): bool
+    {
+        $limit = self::projectsLimit($user);
+
+        return self::projectsUsed($user) < $limit;
+    }
+
     public static function schedulesLimit(?User $user = null): int
     {
         $fromTariff = self::settingValue('SiteAuditSchedules', $user);
@@ -131,31 +163,6 @@ class SiteAuditLimits
         }
 
         return $q->count() < $limit;
-    }
-
-    public static function projectsUsed(?User $user = null): int
-    {
-        $user = $user ?? Auth::user();
-        if (! $user) {
-            return 0;
-        }
-
-        return (int) SiteAuditProject::query()->where('user_id', $user->id)->count();
-    }
-
-    public static function canCreateProject(User $user, string $domain): bool
-    {
-        $domain = preg_replace('#^https?://#i', '', trim($domain));
-        $domain = rtrim((string) $domain, '/');
-        $exists = SiteAuditProject::query()
-            ->where('user_id', $user->id)
-            ->where('domain', $domain)
-            ->exists();
-        if ($exists) {
-            return true;
-        }
-
-        return self::projectsUsed($user) < self::projectsLimit($user);
     }
 
     /**

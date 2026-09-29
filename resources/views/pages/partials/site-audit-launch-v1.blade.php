@@ -67,7 +67,7 @@
                                 <label class="form-label fw-medium" for="sa-domain">
                                     <span class="cabinet-sa-label-lite">Сайт</span>
                                     <span class="cabinet-sa-label-pro">Домены</span>
-                                    @include('pages.partials.site-audit-tip', ['tip' => "Один или несколько сайтов — каждый домен с новой строки.\nМожно без https://: titlo.ru\nИли целиком URL: https://titlo.ru/ — возьмём только хост.\nДля каждого домена создаётся свой проект и проверка (лимит — по тарифу). Доп. URL и исключения применяются ко всем."])
+                                    @include('pages.partials.site-audit-tip', ['tip' => "Один или несколько сайтов — каждый домен с новой строки.\nМожно без https://: titlo.ru\nИли целиком URL: https://titlo.ru/ — возьмём только хост.\nДля каждого домена — свой проект; число доменов не ограничено. Лимит тарифа — сколько проверок хранится в памяти (старые удаляются). Доп. URL и исключения применяются ко всем."])
                                 </label>
                                 <textarea class="form-control cabinet-sa-domain-input" id="sa-domain" rows="3" placeholder="example.com" data-placeholder-lite="сайт.ru" data-placeholder-pro="example.com&#10;shop.example.com&#10;https://another.ru/" autocomplete="off"></textarea>
                                 <div class="form-text cabinet-sa-domain-hint-lite">Можно без https:// — например kawe.su</div>
@@ -153,7 +153,7 @@
                                    data-max="{{ (int) ($pagesLimit ?? 100) }}">
                             <div class="form-text">
                                 Макс. по тарифу: {{ number_format((int) ($pagesLimit ?? 100), 0, '', ' ') }}
-                                · проектов {{ (int) ($projectsUsed ?? 0) }}/{{ (int) ($projectsLimit ?? 1) }}
+                                · проверок {{ (int) ($projectsUsed ?? 0) }}/{{ (int) ($projectsLimit ?? 1) }}
                             </div>
                         </div>
                         </div>

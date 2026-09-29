@@ -477,10 +477,13 @@ class SiteAuditAggregator
         }
 
         try {
-            (new SiteAuditPruner())->pruneProject((int) $crawl->project_id);
+            $pruner = new SiteAuditPruner();
+            $pruner->pruneUserToLimit((int) $crawl->user_id);
+            $pruner->pruneProject((int) $crawl->project_id);
         } catch (\Throwable $e) {
             Log::warning('SiteAudit prune failed: ' . $e->getMessage(), [
                 'project_id' => $crawl->project_id,
+                'user_id' => $crawl->user_id,
             ]);
         }
 

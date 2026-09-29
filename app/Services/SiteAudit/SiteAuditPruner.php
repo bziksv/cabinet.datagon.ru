@@ -64,6 +64,47 @@ class SiteAuditPruner
     }
 
     /**
+     * Тариф SiteAuditProjects: сколько проверок (crawl) хранить у пользователя.
+     * Удаляет самые старые завершённые; активные не трогает.
+     *
+     * @return int сколько краулов удалено
+     */
+    public function pruneUserToLimit(int $userId, ?int $keep = null): int
+    {
+        if ($keep === null) {
+            $user = \App\User::query()->find($userId);
+            $keep = \App\Support\SiteAuditLimits::projectsLimit($user);
+        }
+        $keep = max(1, (int) $keep);
+
+        $ids = SiteAuditCrawl::query()
+            ->where('user_id', $userId)
+            ->orderByDesc('id')
+            ->pluck('id');
+
+        if ($ids->count() <= $keep) {
+            return 0;
+        }
+
+        $keepIds = $ids->take($keep)->flip();
+        $deleted = 0;
+
+        foreach ($ids as $id) {
+            if ($keepIds->has($id)) {
+                continue;
+            }
+            $crawl = SiteAuditCrawl::query()->find($id);
+            if (! $crawl || ! $crawl->isFinished()) {
+                continue;
+            }
+            $this->deleteCrawl($crawl);
+            $deleted++;
+        }
+
+        return $deleted;
+    }
+
+    /**
      * Удалить все краулы пользователя (история аудита). Проекты тоже.
      */
     public function purgeUserHistory(int $userId): int

@@ -221,18 +221,25 @@
                                             @if($key != 'price')
                                                 <tr class="{{ $key }}">
                                                     <td>{{ $tariff['name'] }}</td>
+                                                    @php
+                                                        $limitVal = $tariff['value'];
+                                                        $usedVal = $tariff['used'];
+                                                        $isUnlimited = ((int) $limitVal === 1000000);
+                                                    @endphp
                                                     <td class="text-end">
-                                                        @if($tariff['value'] === 1000000)
+                                                        @if($isUnlimited)
                                                             {{ __('No restrictions') }}
                                                         @else
-                                                            {{ $tariff['value'] }}
+                                                            {{ number_format((int) $limitVal, 0, '', ' ') }}
                                                         @endif
                                                     </td>
                                                     <td class="text-end">
-                                                        @if(gettype($tariff['used']) == 'integer')
-                                                            {{ $tariff['value'] - $tariff['used'] }}
+                                                        @if($isUnlimited)
+                                                            —
+                                                        @elseif(is_int($usedVal))
+                                                            {{ number_format(max(0, (int) $limitVal - (int) $usedVal), 0, '', ' ') }}
                                                         @else
-                                                            {{ $tariff['used'] }}
+                                                            {{ $usedVal }}
                                                         @endif
                                                     </td>
                                                 </tr>

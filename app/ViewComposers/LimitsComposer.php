@@ -234,6 +234,25 @@ class LimitsComposer
                     'position' => 5,
                 ];
 
+            case 'SiteAuditConcurrency':
+                // Потолок параллелизма, не расход — в «Осталось» не считаем.
+                return [
+                    'count' => '—',
+                    'position' => 26,
+                ];
+
+            case 'SiteAuditProjects':
+                return [
+                    'count' => \App\Support\SiteAuditLimits::projectsUsed($user),
+                    'position' => 27,
+                ];
+
+            case 'SiteAuditSchedules':
+                return [
+                    'count' => \App\Support\SiteAuditLimits::schedulesUsed($user),
+                    'position' => 28,
+                ];
+
             case 'SeoReportProjects':
                 return [
                     'count' => (int) \App\SeoReports\SeoReportProject::query()

@@ -1680,104 +1680,185 @@
         syncPageFromActive(null);
     };
 
+    // Липкие фильтры + рейка на show: только JS fixed (без CSS sticky — иначе мигание
+    // sticky→fixed на каждом пересечении порога). Паттерн как у plan.js.
     (function initShowStickyChrome() {
         if (!root.classList.contains('cabinet-sc-show-v2')) return;
+
         var filters = root.querySelector('[data-sc-show-filters]');
+        var workspace = root.querySelector('.cabinet-sc-plan-workspace');
+        var railSlot = root.querySelector('[data-sc-show-rail-slot]');
         var rail = root.querySelector('[data-sc-show-rail]');
+        var layout = root.querySelector('.cabinet-sc-plan-layout');
         if (!filters && !rail) return;
 
-        var filtersPlaceholder = null;
-        var railPlaceholder = null;
-        var pinnedFilters = false;
-        var pinnedRail = false;
-        var filtersTop = 0;
-        var railTop = 0;
+        var topGap = 12;
+        var bottomGap = 16;
+        var ticking = false;
+        var mobileMq = window.matchMedia('(max-width: 900px)');
+        var mainEl = document.querySelector('.app-main');
 
-        function measure() {
-            if (filters && !pinnedFilters) {
-                filtersTop = filters.getBoundingClientRect().top + window.pageYOffset;
-            }
-            if (rail && !pinnedRail) {
-                railTop = rail.getBoundingClientRect().top + window.pageYOffset;
-            }
+        var filtersSpacer = null;
+        if (filters && workspace && filters.parentNode) {
+            filtersSpacer = document.createElement('div');
+            filtersSpacer.setAttribute('data-sc-show-filters-spacer', '');
+            filtersSpacer.style.display = 'none';
+            filters.parentNode.insertBefore(filtersSpacer, filters);
         }
 
-        function pinFilters() {
-            if (!filters || pinnedFilters) return;
-            var rect = filters.getBoundingClientRect();
-            filtersPlaceholder = document.createElement('div');
-            filtersPlaceholder.style.height = rect.height + 'px';
-            filtersPlaceholder.style.margin = getComputedStyle(filters).margin;
-            filters.parentNode.insertBefore(filtersPlaceholder, filters);
-            filters.classList.add('is-pinned');
-            filters.style.width = rect.width + 'px';
-            filters.style.left = rect.left + 'px';
-            filters.style.top = '0.75rem';
-            pinnedFilters = true;
+        function stickLine() {
+            var mainScrolls = !!(mainEl && mainEl.scrollHeight > mainEl.clientHeight + 5);
+            if (mainScrolls) {
+                return mainEl.getBoundingClientRect().top + topGap;
+            }
+            return topGap;
+        }
+
+        function viewportH() {
+            var mainScrolls = !!(mainEl && mainEl.scrollHeight > mainEl.clientHeight + 5);
+            if (mainScrolls) {
+                return mainEl.clientHeight || mainEl.getBoundingClientRect().height || 800;
+            }
+            return window.innerHeight || document.documentElement.clientHeight || 800;
         }
 
         function unpinFilters() {
-            if (!filters || !pinnedFilters) return;
+            if (!filters) return;
             filters.classList.remove('is-pinned');
-            filters.style.width = '';
-            filters.style.left = '';
             filters.style.top = '';
-            if (filtersPlaceholder && filtersPlaceholder.parentNode) {
-                filtersPlaceholder.parentNode.removeChild(filtersPlaceholder);
+            filters.style.left = '';
+            filters.style.width = '';
+            filters.style.maxWidth = '';
+            filters.style.boxSizing = '';
+            if (filtersSpacer) {
+                filtersSpacer.style.display = 'none';
+                filtersSpacer.style.height = '';
             }
-            filtersPlaceholder = null;
-            pinnedFilters = false;
         }
 
-        function pinRail() {
-            if (!rail || pinnedRail) return;
-            var rect = rail.getBoundingClientRect();
-            railPlaceholder = document.createElement('div');
-            railPlaceholder.style.height = rect.height + 'px';
-            rail.parentNode.insertBefore(railPlaceholder, rail);
-            rail.classList.add('is-pinned');
-            rail.style.width = rect.width + 'px';
-            rail.style.left = rect.left + 'px';
-            rail.style.top = '0.75rem';
-            pinnedRail = true;
+        function syncFilters() {
+            if (!filters || !workspace || !filtersSpacer) return;
+            var line = stickLine();
+            var workspaceRect = workspace.getBoundingClientRect();
+            var refTop = filters.classList.contains('is-pinned')
+                ? filtersSpacer.getBoundingClientRect().top
+                : filters.getBoundingClientRect().top;
+
+            if (workspaceRect.bottom <= line + 60 || refTop > line + 1) {
+                unpinFilters();
+                return;
+            }
+
+            var left = filters.classList.contains('is-pinned')
+                ? filtersSpacer.getBoundingClientRect().left
+                : workspaceRect.left;
+            var width = workspaceRect.width;
+            var height = filters.offsetHeight;
+
+            filtersSpacer.style.display = 'block';
+            filtersSpacer.style.height = height + 'px';
+            filters.classList.add('is-pinned');
+            filters.style.left = Math.round(left) + 'px';
+            filters.style.width = Math.round(width) + 'px';
+            filters.style.maxWidth = Math.round(width) + 'px';
+            filters.style.top = Math.round(line) + 'px';
+            filters.style.boxSizing = 'border-box';
         }
 
         function unpinRail() {
-            if (!rail || !pinnedRail) return;
+            if (!rail || !railSlot) return;
             rail.classList.remove('is-pinned');
-            rail.style.width = '';
-            rail.style.left = '';
             rail.style.top = '';
-            if (railPlaceholder && railPlaceholder.parentNode) {
-                railPlaceholder.parentNode.removeChild(railPlaceholder);
-            }
-            railPlaceholder = null;
-            pinnedRail = false;
+            rail.style.left = '';
+            rail.style.width = '';
+            rail.style.height = '';
+            rail.style.maxHeight = '';
+            railSlot.style.height = '';
+            railSlot.style.maxHeight = '';
         }
 
-        function onScroll() {
-            var y = window.pageYOffset || document.documentElement.scrollTop || 0;
-            if (filters) {
-                if (!pinnedFilters && y + 12 > filtersTop) pinFilters();
-                else if (pinnedFilters && y + 12 <= filtersTop) unpinFilters();
-            }
-            if (rail && window.matchMedia('(min-width: 1101px)').matches) {
-                if (!pinnedRail && y + 12 > railTop) pinRail();
-                else if (pinnedRail && y + 12 <= railTop) unpinRail();
-            } else {
+        function railContentHeight(maxH) {
+            var head = rail.querySelector('.cabinet-sc-plan-rail__head');
+            var list = rail.querySelector('.cabinet-sc-plan-rail__list');
+            var h = 20;
+            if (head) h += head.offsetHeight || 0;
+            if (list) h += list.scrollHeight || list.offsetHeight || 0;
+            return Math.min(Math.max(h, 120), maxH);
+        }
+
+        function syncRail() {
+            if (!rail || !railSlot || !layout) return;
+            if (mobileMq.matches) {
                 unpinRail();
+                return;
             }
+
+            var line = stickLine();
+            var viewH = viewportH();
+            var maxH = Math.max(160, Math.floor(viewH - topGap - bottomGap));
+            var layoutRect = layout.getBoundingClientRect();
+            var slotRect = railSlot.getBoundingClientRect();
+
+            railSlot.style.maxHeight = maxH + 'px';
+
+            if (layoutRect.bottom <= line + 40) {
+                unpinRail();
+                railSlot.style.maxHeight = maxH + 'px';
+                return;
+            }
+
+            if (slotRect.top > line + 1) {
+                if (rail.classList.contains('is-pinned')) {
+                    unpinRail();
+                    railSlot.style.maxHeight = maxH + 'px';
+                }
+                rail.style.maxHeight = maxH + 'px';
+                return;
+            }
+
+            var naturalH = railContentHeight(maxH);
+            var pinTop = line;
+            var maxTop = layoutRect.bottom - bottomGap - naturalH;
+            if (maxTop < pinTop) {
+                pinTop = Math.max(8, maxTop);
+            }
+
+            railSlot.style.height = naturalH + 'px';
+            rail.classList.add('is-pinned');
+            rail.style.left = Math.round(slotRect.left) + 'px';
+            rail.style.width = Math.round(slotRect.width) + 'px';
+            rail.style.top = Math.round(pinTop) + 'px';
+            rail.style.height = naturalH + 'px';
+            rail.style.maxHeight = naturalH + 'px';
         }
 
-        measure();
-        window.addEventListener('scroll', onScroll, { passive: true });
-        window.addEventListener('resize', function () {
-            unpinFilters();
-            unpinRail();
-            measure();
-            onScroll();
-        });
-        onScroll();
+        function sync() {
+            syncFilters();
+            syncRail();
+        }
+
+        function requestSync() {
+            if (ticking) return;
+            ticking = true;
+            window.requestAnimationFrame(function () {
+                ticking = false;
+                sync();
+            });
+        }
+
+        if (mainEl) {
+            mainEl.addEventListener('scroll', requestSync, { passive: true });
+        }
+        window.addEventListener('scroll', requestSync, { passive: true, capture: true });
+        window.addEventListener('resize', requestSync);
+        if (mobileMq.addEventListener) {
+            mobileMq.addEventListener('change', requestSync);
+        } else if (mobileMq.addListener) {
+            mobileMq.addListener(requestSync);
+        }
+
+        requestSync();
+        window.setTimeout(requestSync, 80);
     })();
 
     // —— Checklist subitems: drag-and-drop reorder ——

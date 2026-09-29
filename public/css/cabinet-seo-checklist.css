@@ -7231,6 +7231,12 @@ html.cabinet-sc-lightbox-open {
     z-index: 25;
 }
 
+/* Show: CSS sticky + JS fixed одновременно → мигание на скролле. Липкость только через JS. */
+.cabinet-sc-show-v2 .cabinet-sc-plan-filters--sticky {
+    position: relative;
+    top: auto;
+}
+
 .cabinet-sc-plan-v2 .cabinet-sc-plan-filters__label {
     display: none;
 }

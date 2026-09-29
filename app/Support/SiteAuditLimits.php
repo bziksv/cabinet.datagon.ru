@@ -20,8 +20,8 @@ class SiteAuditLimits
     private const TIER_DEFAULTS = [
         'Free' => ['pages' => 100, 'concurrency' => 1, 'projects' => 1, 'schedules' => 0],
         'Optimal' => ['pages' => 1000, 'concurrency' => 2, 'projects' => 20, 'schedules' => 20],
-        'Ultimate' => ['pages' => 10000, 'concurrency' => 4, 'projects' => 50, 'schedules' => 50],
-        'Maximum' => ['pages' => 100000, 'concurrency' => 8, 'projects' => 100, 'schedules' => 100],
+        'Ultimate' => ['pages' => 5000, 'concurrency' => 4, 'projects' => 50, 'schedules' => 50],
+        'Maximum' => ['pages' => 10000, 'concurrency' => 8, 'projects' => 100, 'schedules' => 100],
     ];
 
     public static function periodKey(?Carbon $at = null): string

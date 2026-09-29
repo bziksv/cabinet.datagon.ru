@@ -165,7 +165,7 @@ class TariffLimitRegistry
             [
                 'code' => 'SiteAudit',
                 'module' => 'Аудит сайта (страниц/проверка)',
-                'hint' => 'Макс. URL за одну проверку на домен. Free 100 / Optimal 1000 / Ultimate 10000 / Maximum 100000.',
+                'hint' => 'Макс. URL за одну проверку на домен. Free 100 / Optimal 1000 / Ultimate 5000 / Maximum 10000.',
                 'enforcement' => self::ENFORCEMENT_STRICT,
             ],
             [

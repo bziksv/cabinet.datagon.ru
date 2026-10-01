@@ -15,6 +15,11 @@ return [
     'aggregate_queue' => env('SITE_AUDIT_AGGREGATE_QUEUE')
         ?: (env('APP_ENV') === 'local' ? 'site_audit_aggregate_local' : 'site_audit_aggregate'),
 
+    // Фоновая зачистка pages/findings после удаления проверки из UI.
+    'delete_queue' => env('SITE_AUDIT_DELETE_QUEUE', 'default'),
+    'delete_findings_batch' => (int) env('SITE_AUDIT_DELETE_FINDINGS_BATCH', 5000),
+    'delete_pages_batch' => (int) env('SITE_AUDIT_DELETE_PAGES_BATCH', 2000),
+
     'user_agent' => env('SITE_AUDIT_UA', 'TitloSiteAuditBot/1.0 (+https://titlo.ru)'),
     // Повтор внешней проверки без слова Bot в UA — иначе WAF рвёт TLS (пример: almamed.su).
     'link_check_browser_ua' => env(

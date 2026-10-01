@@ -1116,7 +1116,7 @@ class SiteAuditController extends Controller
                 ->with('status', 'Нельзя удалить незавершённую проверку — сначала остановите');
         }
 
-        (new SiteAuditPruner())->deleteCrawl($crawl);
+        (new SiteAuditPruner())->queueDeleteCrawl($crawl);
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -1125,7 +1125,7 @@ class SiteAuditController extends Controller
             ]);
         }
 
-        return redirect()->route('pages.site-audit')->with('status', 'Проверка удалена');
+        return redirect()->route('pages.site-audit')->with('status', 'Проверка удалена (очистка данных в фоне)');
     }
 
     public function destroyProject(Request $request, int $id)
@@ -1158,11 +1158,11 @@ class SiteAuditController extends Controller
 
         $pruner = new SiteAuditPruner();
         foreach ($project->crawls()->orderBy('id')->get() as $crawl) {
-            $pruner->deleteCrawl($crawl);
+            $pruner->queueDeleteCrawl($crawl);
         }
         $project->delete();
 
-        return redirect()->route('pages.site-audit')->with('status', 'Проект удалён');
+        return redirect()->route('pages.site-audit')->with('status', 'Проект удалён (очистка данных в фоне)');
     }
 
     public function saveSchedule(Request $request, int $projectId)

@@ -259,9 +259,6 @@
                                     @csrf
                                     <button type="submit"
                                             class="btn btn-sm btn-outline-secondary cabinet-sa-icon-btn"
-                                            data-toggle="tooltip"
-                                            data-placement="top"
-                                            title="Повторить с нуля"
                                             aria-label="Повторить с нуля">
                                         <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
                                     </button>
@@ -275,9 +272,6 @@
                                     @method('DELETE')
                                     <button type="submit"
                                             class="btn btn-sm btn-outline-danger cabinet-sa-icon-btn"
-                                            data-toggle="tooltip"
-                                            data-placement="top"
-                                            title="Удалить проверку"
                                             aria-label="Удалить проверку">
                                         <i class="bi bi-trash" aria-hidden="true"></i>
                                     </button>

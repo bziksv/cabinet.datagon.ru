@@ -21,7 +21,7 @@ HTTP API кабинета для внешних админок (пилот: vilm
 | GET | `/relevance/histories?url=&phrase=&limit=10` | список прошлых проверок посадочной (динамика баллов, `delta_points`) |
 | GET | `/relevance/histories/{id}` | краткая сводка |
 | GET | `/relevance/histories/{id}/missing-phrases?filter=zero\|diff\|all` | legacy: недостающие фразы |
-| GET | `/relevance/histories/{id}/missing-phrases?mode=tlp` | TLP unigram: `missing` + `diff`, сортировка `tfidf_top` |
+| GET | `/relevance/histories/{id}/missing-phrases?mode=tlp` | TLP unigram: `missing` + `diff`, сортировка `tfidf_top`; без союзов/предлогов и слов короче 3 символов |
 | GET | `/relevance/histories/{id}/clouds` | TF-IDF облака |
 | POST | `/relevance/histories/{id}/public-share` | `{ttl_days?}` → публичная ссылка на проверку (без логина) |
 | GET | `/relevance/histories/{id}/public-share` | текущая активная публичная ссылка |

@@ -10,6 +10,7 @@ use App\Relevance;
 use App\RelevanceHistory;
 use App\RelevanceHistoryResult;
 use App\RelevanceProgress;
+use App\Support\TextAnalyzerStopWords;
 use App\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -684,8 +685,28 @@ class RelevanceAnalysisService
     }
 
     /**
+     * Слово годится в TLP для генерации: не союз/предлог/служебное и не короче 3 символов.
+     */
+    public static function isEligibleTlpGenerationWord(string $word): bool
+    {
+        $word = mb_strtolower(trim($word));
+        if ($word === '') {
+            return false;
+        }
+        if (mb_strlen($word) < 3) {
+            return false;
+        }
+        if (TextAnalyzerStopWords::isPhraseStopWord($word)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * TLP (unigram) для генерации: сортировка по TF-IDF ТОП.
      * Сначала полностью отсутствующие на посадочной, потом с разницей.
+     * Союзы/предлоги и слова короче 3 символов не попадают в таблицы и в промпт ИИ.
      *
      * @return array{
      *   missing: array<int, array{word:string,avg_competitors:float,on_landing:float,suggested_count:int,tfidf_top:float,tfidf_site:float,bucket:string}>,
@@ -705,6 +726,9 @@ class RelevanceAnalysisService
 
         foreach ($unigramRaw as $word => $item) {
             if ($word === '' || !is_array($item)) {
+                continue;
+            }
+            if (!self::isEligibleTlpGenerationWord((string) $word)) {
                 continue;
             }
             $totalBlock = is_array($item['total'] ?? null) ? $item['total'] : $item;

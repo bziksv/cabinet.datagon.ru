@@ -41,6 +41,8 @@ Route::get('public/http-headers/{id}', 'PublicController@httpHeaders');
 Route::get('public/share/relevance/{token}', 'RelevancePublicShareController@showProject')->name('relevance.public.share.view');
 Route::get('public/share/relevance/{token}/history/{id}', 'RelevancePublicShareController@showHistory')->name('relevance.public.share.history');
 Route::post('public/share/relevance/{token}/details', 'RelevancePublicShareController@getDetails')->name('relevance.public.share.details');
+Route::get('public/share/relevance-check/{token}', 'RelevancePublicShareController@showCheck')->name('relevance.public.share.check');
+Route::post('public/share/relevance-check/{token}/details', 'RelevancePublicShareController@getCheckDetails')->name('relevance.public.share.check.details');
 Route::get('public/share/text-analyzer/{token}', 'TextAnalyzerPublicShareController@show')->name('text.analyzer.public.share.view');
 Route::get('public/share/html-editor/{token}', 'HtmlEditorPublicShareController@show')->name('html.editor.public.share.view');
 Route::get('public/share/site-monitoring/{token}', 'SiteMonitoringPublicShareController@show')->name('site.monitoring.public.share.view');

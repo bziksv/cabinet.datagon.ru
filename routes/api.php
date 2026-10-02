@@ -85,6 +85,12 @@ Route::prefix('v1')->group(function () {
             ->where('historyId', '[0-9]+');
         Route::get('relevance/histories/{historyId}/clouds', 'Api\\V1\\RelevanceAnalysisController@clouds')
             ->where('historyId', '[0-9]+');
+        Route::post('relevance/histories/{historyId}/public-share', 'Api\\V1\\RelevanceAnalysisController@createPublicShare')
+            ->where('historyId', '[0-9]+');
+        Route::get('relevance/histories/{historyId}/public-share', 'Api\\V1\\RelevanceAnalysisController@showPublicShare')
+            ->where('historyId', '[0-9]+');
+        Route::delete('relevance/histories/{historyId}/public-share', 'Api\\V1\\RelevanceAnalysisController@revokePublicShare')
+            ->where('historyId', '[0-9]+');
 
         Route::post('relevance/batches', 'Api\\V1\\RelevanceBatchController@store');
         Route::get('relevance/batches/{id}', 'Api\\V1\\RelevanceBatchController@show');

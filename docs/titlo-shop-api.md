@@ -22,6 +22,10 @@ HTTP API кабинета для внешних админок (пилот: vilm
 | GET | `/relevance/histories/{id}` | краткая сводка |
 | GET | `/relevance/histories/{id}/missing-phrases?filter=zero\|diff\|all` | legacy: недостающие фразы |
 | GET | `/relevance/histories/{id}/missing-phrases?mode=tlp` | TLP unigram: `missing` + `diff`, сортировка `tfidf_top` |
+| GET | `/relevance/histories/{id}/clouds` | TF-IDF облака |
+| POST | `/relevance/histories/{id}/public-share` | `{ttl_days?}` → публичная ссылка на проверку (без логина) |
+| GET | `/relevance/histories/{id}/public-share` | текущая активная публичная ссылка |
+| DELETE | `/relevance/histories/{id}/public-share` | отозвать публичную ссылку |
 | POST | `/ai/generate` | `{type: category\|preview\|detail\|phrase, url?, name?, keywords[], note?}` |
 | GET | `/ai/generate/{record_id}` | poll результата |
 | POST | `/relevance/batches` | `{items:[{external_id?, url, phrase}]}` до 100 |

@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\ProjectRelevanceHistory;
 use App\Relevance;
 use App\RelevanceAnalysisConfig;
 use App\RelevanceHistory;
+use App\RelevanceHistoryPublicShare;
 use App\RelevanceHistoryResult;
 use App\RelevancePublicShare;
 use Illuminate\Http\JsonResponse;
@@ -55,27 +55,35 @@ class RelevancePublicShareController extends Controller
             abort(403, __("You don't have access to this object"));
         }
 
-        $object->request = json_decode($object->request, true);
-        $req = is_array($object->request) ? $object->request : [];
-        $defaultEngine = strtolower((string) ($req['searchEngine'] ?? 'yandex')) === 'google' ? 'google' : 'yandex';
-        $regionId = (string) ($req['region'] ?? '');
-        $defaultRegion = $regionId !== ''
-            ? (\App\Support\CompetitorSearchRegions::find($defaultEngine, $regionId)
-                ?? \App\Support\CompetitorSearchRegions::defaultRegion($defaultEngine))
-            : \App\Support\CompetitorSearchRegions::defaultRegion($defaultEngine);
-        $viewOnlyAccess = (object) ['access' => 1];
-
-        return view('relevance-analysis.show-history', [
-            'admin' => false,
-            'id' => $id,
-            'object' => $object,
-            'access' => $viewOnlyAccess,
-            'defaultSearchEngine' => $defaultEngine,
-            'defaultRegion' => $defaultRegion,
+        return $this->renderHistoryView($object, [
             'publicShareToken' => $token,
+            'publicShareKind' => 'project',
             'publicShareExpires' => $share->isUnlimited()
                 ? (string) __('Relevance share ttl unlimited')
                 : $share->expires_at->format('d.m.Y H:i'),
+            'publicShareDetailsRoute' => route('relevance.public.share.details', $token),
+            'publicShareBackUrl' => route('relevance.public.share.view', $token),
+        ]);
+    }
+
+    /**
+     * Публичный просмотр одной проверки (без списка проекта).
+     */
+    public function showCheck(string $token)
+    {
+        $share = $this->resolveHistoryShare($token);
+        $object = RelevanceHistory::with('projectRelevanceHistory:id,user_id,name')
+            ->where('id', $share->history_id)
+            ->firstOrFail();
+
+        return $this->renderHistoryView($object, [
+            'publicShareToken' => $token,
+            'publicShareKind' => 'history',
+            'publicShareExpires' => $share->isUnlimited()
+                ? (string) __('Relevance share ttl unlimited')
+                : $share->expires_at->format('d.m.Y H:i'),
+            'publicShareDetailsRoute' => route('relevance.public.share.check.details', $token),
+            'publicShareBackUrl' => null,
         ]);
     }
 
@@ -91,6 +99,49 @@ class RelevancePublicShareController extends Controller
             ]);
         }
 
+        return $this->detailsPayload($historyRow, $request);
+    }
+
+    public function getCheckDetails(string $token, Request $request): JsonResponse
+    {
+        $share = $this->resolveHistoryShare($token);
+        $historyRow = RelevanceHistory::findOrFail((int) $share->history_id);
+
+        $requestedId = (int) $request->input('id');
+        if ($requestedId > 0 && $requestedId !== (int) $historyRow->id) {
+            return response()->json([
+                'code' => 415,
+                'message' => __("You don't have access to this object"),
+            ]);
+        }
+
+        return $this->detailsPayload($historyRow, $request);
+    }
+
+    protected function renderHistoryView(RelevanceHistory $object, array $extra)
+    {
+        $object->request = json_decode($object->request, true);
+        $req = is_array($object->request) ? $object->request : [];
+        $defaultEngine = strtolower((string) ($req['searchEngine'] ?? 'yandex')) === 'google' ? 'google' : 'yandex';
+        $regionId = (string) ($req['region'] ?? '');
+        $defaultRegion = $regionId !== ''
+            ? (\App\Support\CompetitorSearchRegions::find($defaultEngine, $regionId)
+                ?? \App\Support\CompetitorSearchRegions::defaultRegion($defaultEngine))
+            : \App\Support\CompetitorSearchRegions::defaultRegion($defaultEngine);
+        $viewOnlyAccess = (object) ['access' => 1];
+
+        return view('relevance-analysis.show-history', array_merge([
+            'admin' => false,
+            'id' => (int) $object->id,
+            'object' => $object,
+            'access' => $viewOnlyAccess,
+            'defaultSearchEngine' => $defaultEngine,
+            'defaultRegion' => $defaultRegion,
+        ], $extra));
+    }
+
+    protected function detailsPayload(RelevanceHistory $historyRow, Request $request): JsonResponse
+    {
         $part = (string) $request->input('part', 'full');
         if (!in_array($part, ['full', 'meta', 'tables', 'sites'], true)) {
             $part = 'full';
@@ -157,6 +208,17 @@ class RelevancePublicShareController extends Controller
     protected function resolveShare(string $token): RelevancePublicShare
     {
         $share = RelevancePublicShare::where('token', $token)->first();
+
+        if ($share === null || !$share->isActive()) {
+            abort(404, __('This public link has expired or does not exist.'));
+        }
+
+        return $share;
+    }
+
+    protected function resolveHistoryShare(string $token): RelevanceHistoryPublicShare
+    {
+        $share = RelevanceHistoryPublicShare::where('token', $token)->first();
 
         if ($share === null || !$share->isActive()) {
             abort(404, __('This public link has expired or does not exist.'));

@@ -201,4 +201,74 @@ class RelevanceAnalysisController extends Controller
             'landing' => $clouds['landing'],
         ]);
     }
+
+    public function createPublicShare(Request $request, int $historyId): JsonResponse
+    {
+        $history = RelevanceHistory::where('id', $historyId)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if (!$history) {
+            return response()->json(['error' => 'not_found'], 404);
+        }
+
+        $ttlDays = \App\Support\RelevancePublicShareTtl::normalize($request->input('ttl_days', 30));
+        $share = \App\RelevanceHistoryPublicShare::issueForHistory($history, (int) Auth::id(), $ttlDays);
+
+        return response()->json([
+            'history_id' => $history->id,
+            'url' => $share->publicUrl(),
+            'token' => $share->token,
+            'expires_at' => $share->expires_at ? $share->expires_at->toIso8601String() : null,
+            'expires_label' => $share->expiresLabel(),
+            'ttl_days' => $ttlDays,
+        ], 201);
+    }
+
+    public function showPublicShare(int $historyId): JsonResponse
+    {
+        $history = RelevanceHistory::where('id', $historyId)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if (!$history) {
+            return response()->json(['error' => 'not_found'], 404);
+        }
+
+        $share = \App\RelevanceHistoryPublicShare::activeForHistory($history->id);
+        if (!$share) {
+            return response()->json([
+                'history_id' => $history->id,
+                'active' => false,
+            ]);
+        }
+
+        return response()->json([
+            'history_id' => $history->id,
+            'active' => true,
+            'url' => $share->publicUrl(),
+            'token' => $share->token,
+            'expires_at' => $share->expires_at ? $share->expires_at->toIso8601String() : null,
+            'expires_label' => $share->expiresLabel(),
+            'ttl_days' => $share->ttl_days,
+        ]);
+    }
+
+    public function revokePublicShare(int $historyId): JsonResponse
+    {
+        $history = RelevanceHistory::where('id', $historyId)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if (!$history) {
+            return response()->json(['error' => 'not_found'], 404);
+        }
+
+        $n = \App\RelevanceHistoryPublicShare::revokeForHistory($history->id, (int) Auth::id());
+
+        return response()->json([
+            'history_id' => $history->id,
+            'revoked' => $n,
+        ]);
+    }
 }

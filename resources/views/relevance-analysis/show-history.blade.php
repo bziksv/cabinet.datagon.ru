@@ -183,12 +183,21 @@
     </div>
 
     <div class="alert alert-info mb-3" @if(empty($publicShareToken)) style="display:none;" @endif>
-        {{ __('Public project access') }} — {{ __('View-only access without registration. Link expires on') }}
-        <strong>{{ $publicShareExpires ?? '' }}</strong>.
-        @if(!empty($publicShareToken))
-            <a href="{{ route('relevance.public.share.view', $publicShareToken) }}" class="alert-link ms-1" target="_blank" rel="noopener">
-                {{ __('Back to project') }}
-            </a>
+        @if(($publicShareKind ?? 'project') === 'history')
+            {{ __('Public check access') }} — {{ __('View-only access without registration. Link expires on') }}
+            <strong>{{ $publicShareExpires ?? '' }}</strong>.
+        @else
+            {{ __('Public project access') }} — {{ __('View-only access without registration. Link expires on') }}
+            <strong>{{ $publicShareExpires ?? '' }}</strong>.
+            @if(!empty($publicShareBackUrl))
+                <a href="{{ $publicShareBackUrl }}" class="alert-link ms-1" target="_blank" rel="noopener">
+                    {{ __('Back to project') }}
+                </a>
+            @elseif(!empty($publicShareToken))
+                <a href="{{ route('relevance.public.share.view', $publicShareToken) }}" class="alert-link ms-1" target="_blank" rel="noopener">
+                    {{ __('Back to project') }}
+                </a>
+            @endif
         @endif
     </div>
 
@@ -813,7 +822,9 @@
             }
 
             function historyDetailsUrl() {
-                return @if(!empty($publicShareToken))
+                return @if(!empty($publicShareDetailsRoute))
+                    @json($publicShareDetailsRoute)
+                @elseif(!empty($publicShareToken))
                     "{{ route('relevance.public.share.details', $publicShareToken) }}"
                 @else
                     "{{ route('get.details.info') }}"

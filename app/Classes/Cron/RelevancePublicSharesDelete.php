@@ -3,6 +3,7 @@
 namespace App\Classes\Cron;
 
 use App\RelevancePublicShare;
+use App\RelevanceHistoryPublicShare;
 use Carbon\Carbon;
 
 class RelevancePublicSharesDelete
@@ -14,6 +15,14 @@ class RelevancePublicSharesDelete
             ->delete();
 
         RelevancePublicShare::whereNotNull('revoked_at')
+            ->where('revoked_at', '<', Carbon::now()->subDays(7))
+            ->delete();
+
+        RelevanceHistoryPublicShare::whereNotNull('expires_at')
+            ->where('expires_at', '<', Carbon::now())
+            ->delete();
+
+        RelevanceHistoryPublicShare::whereNotNull('revoked_at')
             ->where('revoked_at', '<', Carbon::now()->subDays(7))
             ->delete();
     }

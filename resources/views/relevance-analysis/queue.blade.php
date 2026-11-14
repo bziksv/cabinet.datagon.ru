@@ -60,6 +60,7 @@
             </ul>
         </div>
         <div class="card-body">
+            @include('partials.cabinet-yandex-night-window-notice', ['context' => 'relevance'])
             <div class="tab-content">
                 <div class="tab-pane active" id="tab_1">
                     <div class="col-6 pt-3 pb-3">

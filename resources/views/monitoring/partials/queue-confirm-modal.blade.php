@@ -15,6 +15,11 @@
                     <span data-mon-queue-duration></span>
                 </div>
 
+                <div class="alert alert-warning border py-2 px-3 small mb-3" role="note">
+                    Из‑за ограничения Яндекса запросы к нему сейчас возможны только с <strong>00:00 до 06:00</strong> (МСК).
+                    Рекомендуем поставить съём на ночь; когда ограничение снимут — напишем в новостях.
+                </div>
+
                 <div class="d-none mb-3" data-mon-queue-regions-wrap>
                     <label class="form-label small fw-semibold mb-2">{{ __('Monitoring position pick regions') }}</label>
                     <div class="cabinet-mon-queue-confirm-modal__regions" data-mon-queue-regions-list></div>

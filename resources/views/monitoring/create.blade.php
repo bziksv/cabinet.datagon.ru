@@ -19,6 +19,11 @@
             <p class="cabinet-mon-create__lead mb-0">{{ __('Monitoring v2 create wizard lead') }}</p>
         </div>
 
+        @include('partials.cabinet-yandex-night-window-notice', [
+            'context' => 'monitoring',
+            'extraClass' => 'mb-3',
+        ])
+
         <div id="cabinet-mon-create-status" class="alert alert-info mb-3" role="status">
             {{ __('Monitoring v2 create status new') }}
         </div>

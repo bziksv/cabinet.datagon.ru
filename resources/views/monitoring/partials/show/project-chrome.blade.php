@@ -71,6 +71,11 @@
         <p class="cabinet-mon-project-view-hint text-secondary mb-0">{{ $pageHint }}</p>
     @endif
 
+    @include('partials.cabinet-yandex-night-window-notice', [
+        'context' => 'monitoring',
+        'extraClass' => 'mb-3 mt-2',
+    ])
+
     <nav class="cabinet-mon-project-module-nav" aria-label="{{ __('Monitoring project shortcuts') }}">
         @if($activeModule === 'positions')
             <span class="cabinet-mon-project-module-nav__item is-active" title="{{ __('Monitoring show nav positions title') }}">

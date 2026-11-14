@@ -90,7 +90,7 @@ return [
         ],
         'cabinet-titlo-relevance' => [
             'queues' => ['relevance_high_priority', 'relevance_medium_priority', 'relevance_normal_priority'],
-            'numprocs_lk' => 6,
+            'numprocs_lk' => 10,
         ],
         'cabinet-titlo-monitoring-helper' => [
             'queues' => ['monitoring_helper'],

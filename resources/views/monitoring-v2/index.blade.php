@@ -23,6 +23,11 @@
 
         @include('partials.cabinet-telegram-notify-notice', ['extraClass' => 'mb-0'])
 
+        @include('partials.cabinet-yandex-night-window-notice', [
+            'context' => 'monitoring',
+            'extraClass' => 'mb-3',
+        ])
+
         @include('monitoring-v2.partials.portfolio', ['count' => $count])
 
         @include('monitoring-v2.partials.workspace', [

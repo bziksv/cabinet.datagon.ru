@@ -79,6 +79,42 @@ class RelevanceHistory extends Model
     }
 
     /**
+     * ПС и глубина ТОПа из JSON request прогона (для таблицы истории).
+     *
+     * @param  mixed  $requestJson
+     * @return array{search_engine: string, search_engine_label: string, top: int|null, top_label: string}
+     */
+    public static function serpMetaFromRequest($requestJson): array
+    {
+        $req = is_array($requestJson) ? $requestJson : json_decode((string) $requestJson, true);
+        if (! is_array($req)) {
+            $req = [];
+        }
+
+        $engine = strtolower((string) ($req['searchEngine'] ?? 'yandex'));
+        if ($engine !== 'google') {
+            $engine = 'yandex';
+        }
+
+        $type = (string) ($req['type'] ?? 'phrase');
+        $top = null;
+        $topLabel = '—';
+        if ($type === 'list') {
+            $topLabel = 'список';
+        } else {
+            $top = max(10, (int) ($req['count'] ?? 10));
+            $topLabel = 'ТОП-' . $top;
+        }
+
+        return [
+            'search_engine' => $engine,
+            'search_engine_label' => $engine === 'google' ? 'Google' : 'Яндекс',
+            'top' => $top,
+            'top_label' => $topLabel,
+        ];
+    }
+
+    /**
      * Стоимость одного запуска: Яндекс = 1; Google = ceil(TOP/10).
      */
     public static function serpRequestCost(array $request): int

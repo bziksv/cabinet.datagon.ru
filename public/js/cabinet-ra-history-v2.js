@@ -132,7 +132,9 @@
                 val.phrase,
                 val.comment,
                 val.region_name,
-                typeof getRegionName === 'function' ? getRegionName(val.region) : val.region
+                typeof getRegionName === 'function' ? getRegionName(val.region) : val.region,
+                val.search_engine_label,
+                val.top_label
             ].join(' ').toLowerCase();
             return hay.indexOf(q) !== -1;
         });
@@ -181,6 +183,8 @@
             phrase = 'Анализ без ключевой фразы';
         }
         var region = val.region_name || (typeof getRegionName === 'function' ? getRegionName(val.region) : (val.region || ''));
+        var engine = val.search_engine_label || '—';
+        var top = val.top_label || '—';
         var avg = val.average_values;
         var checked = val.calculate ? ' checked' : '';
         var url = val.main_link || '';
@@ -218,6 +222,8 @@
             '<button type="button" class="ra-hist-v2__copy" data-copy="' + esc(phrase) + '" data-ra-tip="Копировать" aria-label="Копировать">' +
             '<i class="fa fa-copy" aria-hidden="true"></i></button>' +
             '</td>' +
+            '<td class="ra-hist-v2__td-engine">' + esc(engine) + '</td>' +
+            '<td class="ra-hist-v2__td-top">' + esc(top) + '</td>' +
             '<td class="ra-hist-v2__td-region">' + esc(region) + '</td>' +
             '<td class="ra-hist-v2__td-url">' +
             (url
@@ -246,6 +252,8 @@
             '<th>Действия</th>' +
             '<th>Коммент.</th>' +
             '<th>Фраза</th>' +
+            '<th>ПС</th>' +
+            '<th>Топ</th>' +
             '<th>Регион</th>' +
             '<th>URL</th>' +
             '<th>Поз.</th>' +
@@ -372,7 +380,7 @@
                 '<div class="ra-hist-v2__toolbar">' +
                 '<div class="ra-hist-v2__toolbar-row">' +
                 '<input type="search" class="form-control form-control-sm ra-hist-v2__search" ' +
-                'id="ra-hist-v2-search" placeholder="Поиск: фраза, комментарий, регион" autocomplete="off">' +
+                'id="ra-hist-v2-search" placeholder="Поиск: фраза, комментарий, ПС, регион" autocomplete="off">' +
                 '<input type="date" class="form-control form-control-sm ra-hist-v2__date" id="ra-hist-v2-date-min" ' +
                 'value="2022-03-01" aria-label="Дата от">' +
                 '<input type="date" class="form-control form-control-sm ra-hist-v2__date" id="ra-hist-v2-date-max" ' +
@@ -445,7 +453,7 @@
             if ($tb.length && !$tb.find('.ra-hist-v2__toolbar-row').length) {
                 $tb.children().wrapAll('<div class="ra-hist-v2__toolbar-row"></div>');
             }
-            $history.find('#ra-hist-v2-search').attr('placeholder', 'Поиск: фраза, комментарий, регион');
+            $history.find('#ra-hist-v2-search').attr('placeholder', 'Поиск: фраза, комментарий, ПС, регион');
             $tb.append(
                 '<div class="ra-hist-v2__toolbar-row ra-hist-v2__toolbar-row--url">' +
                 '<label class="ra-hist-v2__url-label" for="ra-hist-v2-url">URL</label>' +

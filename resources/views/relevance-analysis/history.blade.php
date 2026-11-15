@@ -859,6 +859,8 @@
                                 <input class="form-control form-control-sm search-input ra-hist-list-text" type="text"
                                        name="phraseSearchList" id="phraseSearchList" placeholder="{{ __('phrase') }}">
                             </th>
+                            <th></th>
+                            <th></th>
                             <th>
                                 <input class="form-control form-control-sm search-input ra-hist-list-text" type="text"
                                        name="regionSearchList" id="regionSearchList" placeholder="{{ __('region') }}">
@@ -917,6 +919,8 @@
                             <th class="table-header"></th>
                             <th class="table-header">Дата</th>
                             <th class="table-header">Фраза</th>
+                            <th class="table-header">ПС</th>
+                            <th class="table-header">Топ</th>
                             <th class="table-header">Регион</th>
                             <th class="table-header">URL</th>
                             <th class="table-header">Поз.</th>
@@ -1278,6 +1282,8 @@
                                             "      <input type='text' data-target='" + val.id + "' class='history-comment form-control form-control-sm' value='" + String(val.comment || '').replace(/'/g, '&#39;') + "'>" +
                                             "   </td>" +
                                             "   <td>" + phrase + "</td>" +
+                                            "   <td>" + (val.search_engine_label || '—') + "</td>" +
+                                            "   <td>" + (val.top_label || '—') + "</td>" +
                                             "   <td>" + (val.region_name || getRegionName(val.region)) + "</td>" +
                                             "   <td>" + val.main_link + "</td>" +
                                             "   <td data-order='" + dataOrderPosition + "'>" + position + "</td>"
@@ -1336,11 +1342,11 @@
                                             "columnDefs": [
                                                 {
                                                     type: "num",
-                                                    targets: [6, 7, 8, 9, 10, 11]
+                                                    targets: [8, 9, 10, 11, 12, 13]
                                                 },
                                                 {
                                                     orderable: false,
-                                                    targets: [1, 2, 12]
+                                                    targets: [1, 2, 14]
                                                 },
                                             ],
                                             "oLanguage": {
@@ -1373,7 +1379,7 @@
                                                     });
                                                 });
 
-                                                $('#history_table tbody td:nth-child(4), #history_table tbody td:nth-child(6)').each(function () {
+                                                $('#history_table tbody td:nth-child(4), #history_table tbody td:nth-child(8)').each(function () {
                                                     let cell = $(this);
                                                     let clipboard = new ClipboardJS(cell[0], {
                                                         text: function () {
@@ -1482,6 +1488,8 @@
                                             '   <td data-target="' + key + '" class="col-1 ra-hist-list-expand"></td>' +
                                             '   <td data-order="' + createdAt + '" class="ra-hist-date-cell">' + dateHtml + '</td>' +
                                             '   <td>' + key + '</td>' +
+                                            '   <td>' + (value[0]['search_engine_label'] || '—') + '</td>' +
+                                            '   <td>' + (value[0]['top_label'] || '—') + '</td>' +
                                             '   <td>' + (value[0]['region_name'] || getRegionName(value[0]['region'])) + '</td>' +
                                             '   <td class="ra-hist-list-url" data-ra-tip="' + $('<div>').text(url).html() + '">' +
                                             (url ? ('<a href="' + url + '" target="_blank" rel="noopener">' + $('<div>').text(urlShort).html() + '</a>') : '—') +
@@ -1519,6 +1527,8 @@
                                                 },
                                                 {data: 'date'},
                                                 {data: 'phrase'},
+                                                {data: 'search_engine'},
+                                                {data: 'top'},
                                                 {data: 'region'},
                                                 {data: 'link'},
                                                 {data: 'position'},
@@ -2112,7 +2122,7 @@
 
                 $.fn.dataTable.ext.search.push(function (settings, data) {
                     let regionSearch = String($('#regionSearch' + prefix).val()).toLowerCase();
-                    let target = String(data[index + 2]).toLowerCase();
+                    let target = String(data[index + 4]).toLowerCase();
                     return isIncludes(target, regionSearch, settings, tableID)
                 });
                 $('#regionSearch' + prefix).keyup(function () {
@@ -2121,7 +2131,7 @@
 
                 $.fn.dataTable.ext.search.push(function (settings, data) {
                     let mainPageSearch = String($('#mainPageSearch' + prefix).val()).toLowerCase();
-                    let target = String(data[index + 3]).toLowerCase();
+                    let target = String(data[index + 5]).toLowerCase();
                     return isIncludes(target, mainPageSearch, settings, tableID)
                 });
                 $('#mainPageSearch' + prefix).keyup(function () {
@@ -2131,7 +2141,7 @@
                 $.fn.dataTable.ext.search.push(function (settings, data) {
                     let maxPosition = parseFloat($('#maxPosition' + prefix).val());
                     let minPosition = parseFloat($('#minPosition' + prefix).val());
-                    let target = parseFloat(data[index + 4]);
+                    let target = parseFloat(data[index + 6]);
                     return isValidate(minPosition, maxPosition, target, settings, tableID)
                 });
                 let pos = '#minPosition' + prefix + ', #maxPosition' + prefix
@@ -2142,7 +2152,7 @@
                 $.fn.dataTable.ext.search.push(function (settings, data) {
                     let maxPoints = parseFloat($('#maxPoints' + prefix).val());
                     let minPoints = parseFloat($('#minPoints' + prefix).val());
-                    let target = parseFloat(data[index + 5]);
+                    let target = parseFloat(data[index + 7]);
                     return isValidate(minPoints, maxPoints, target, settings, tableID)
                 });
                 let points = '#minPoints' + prefix + ', #maxPoints' + prefix
@@ -2153,7 +2163,7 @@
                 $.fn.dataTable.ext.search.push(function (settings, data) {
                     let maxCoverage = parseFloat($('#maxCoverage' + prefix).val());
                     let minCoverage = parseFloat($('#minCoverage' + prefix).val());
-                    let target = parseFloat(data[index + 6]);
+                    let target = parseFloat(data[index + 8]);
                     return isValidate(minCoverage, maxCoverage, target, settings, tableID)
                 });
                 let coverage = '#minCoverage' + prefix + ', #maxCoverage' + prefix
@@ -2164,7 +2174,7 @@
                 $.fn.dataTable.ext.search.push(function (settings, data) {
                     let maxCoverageTf = parseFloat($('#maxCoverageTf' + prefix).val());
                     let minCoverageTf = parseFloat($('#minCoverageTf' + prefix).val());
-                    let target = parseFloat(data[index + 7]);
+                    let target = parseFloat(data[index + 9]);
                     return isValidate(minCoverageTf, maxCoverageTf, target, settings, tableID)
                 });
                 let covTf = '#minCoverageTf' + prefix + ', #maxCoverageTf' + prefix
@@ -2175,7 +2185,7 @@
                 $.fn.dataTable.ext.search.push(function (settings, data) {
                     let maxWidth = parseFloat($('#maxWidth' + prefix).val());
                     let minWidth = parseFloat($('#minWidth' + prefix).val());
-                    let target = parseFloat(data[index + 8]);
+                    let target = parseFloat(data[index + 10]);
                     return isValidate(minWidth, maxWidth, target, settings, tableID)
                 });
                 let width = '#minWidth' + prefix + ', #maxWidth' + prefix
@@ -2186,10 +2196,9 @@
                 $.fn.dataTable.ext.search.push(function (settings, data) {
                     let maxDensity = parseFloat($('#maxDensity' + prefix).val());
                     let minDensity = parseFloat($('#minDensity' + prefix).val());
-                    let target = parseFloat(data[index + 9]);
+                    let target = parseFloat(data[index + 11]);
                     return isValidate(minDensity, maxDensity, target, settings, tableID)
-                });
-                let density = '#minDensity' + prefix + ', #maxDensity' + prefix
+                });                let density = '#minDensity' + prefix + ', #maxDensity' + prefix
                 $(density).keyup(function () {
                     table.draw();
                 });

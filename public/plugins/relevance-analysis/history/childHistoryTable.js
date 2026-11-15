@@ -274,6 +274,8 @@ function format(data) {
             '   </td>' +
             '   <td><input type="text" data-target="' + value['id'] + '" class="history-comment form-control form-control-sm" value="' + String(value['comment'] || '').replace(/"/g, '&quot;') + '"></td>' +
             '   <td style="width: 150px;">' + value['phrase'] + '</td>' +
+            '   <td>' + (value['search_engine_label'] || '—') + '</td>' +
+            '   <td>' + (value['top_label'] || '—') + '</td>' +
             '   <td style="width: 150px;">' + (value['region_name'] || getRegionName(value['region'])) + '</td>' +
             '   <td style="width: 150px;">' + value['main_link'] + '</td>' +
             '   <td>' + position + '</td>' +
@@ -329,6 +331,8 @@ function format(data) {
         '        <input class="w-100 form form-control search-input" type="text"' +
         '               name="phraseSearch' + tableId + '" id="phraseSearch' + tableId + '" placeholder="' + raPh('phrase', 'Фраза') + '">' +
         '    </th>' +
+        '    <th style="position: inherit" class="table-header"></th>' +
+        '    <th style="position: inherit" class="table-header"></th>' +
         '    <th style="position: inherit" class="table-header">' +
         '        <input class="w-100 form form-control search-input" type="text"' +
         '               name="regionSearch' + tableId + '" id="regionSearch' + tableId + '" placeholder="' + raPh('region', 'Регион') + '">' +
@@ -392,6 +396,8 @@ function format(data) {
         '         <th class="table-header ra-hist-actions-th">Действия</th>' +
         '         <th class="table-header" style="max-width: 150px">Комментарий</th>' +
         '         <th class="table-header">Фраза</th>' +
+        '         <th class="table-header">ПС</th>' +
+        '         <th class="table-header">Топ</th>' +
         '         <th class="table-header">Регион</th>' +
         '         <th class="table-header" style="max-width: 150px">URL</th>' +
         '         <th class="table-header">Поз.</th>' +
@@ -541,6 +547,8 @@ function checkAnalyseProgress(id) {
                     String(newObject.comment || '').replace(/"/g, '&quot;') + '"></td>'
                 )
                 $tr.append('<td>' + phrase + '</td>')
+                $tr.append('<td>' + (newObject.search_engine_label || '—') + '</td>')
+                $tr.append('<td>' + (newObject.top_label || '—') + '</td>')
                 $tr.append('<td>' + region + '</td>')
                 $tr.append('<td>' + (newObject.main_link || '') + '</td>')
                 $tr.append('<td data-order="' + (newObject.position != null ? newObject.position : '') + '">' + position + '</td>')
@@ -599,7 +607,7 @@ function customFilters(tableID, table, prefix = '', index = 0) {
 
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let regionSearch = String($('#regionSearch' + prefix).val()).toLowerCase();
-        let target = String(data[index + 3]).toLowerCase();
+        let target = String(data[index + 5]).toLowerCase();
         return isIncludes(target, regionSearch, settings, tableID)
     });
     $('#regionSearch' + prefix).keyup(function () {
@@ -608,7 +616,7 @@ function customFilters(tableID, table, prefix = '', index = 0) {
 
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let mainPageSearch = String($('#mainPageSearch' + prefix).val()).toLowerCase();
-        let target = String(data[index + 4]).toLowerCase();
+        let target = String(data[index + 6]).toLowerCase();
         return isIncludes(target, mainPageSearch, settings, tableID)
     });
     $('#mainPageSearch' + prefix).keyup(function () {
@@ -618,7 +626,7 @@ function customFilters(tableID, table, prefix = '', index = 0) {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxPosition = parseFloat($('#maxPosition' + prefix).val());
         let minPosition = parseFloat($('#minPosition' + prefix).val());
-        let target = parseFloat(data[index + 5]);
+        let target = parseFloat(data[index + 7]);
         return isValidate(minPosition, maxPosition, target, settings, tableID)
     });
     $('#minPosition' + prefix + ', #maxPosition' + prefix).keyup(function () {
@@ -628,7 +636,7 @@ function customFilters(tableID, table, prefix = '', index = 0) {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxPoints = parseFloat($('#maxPoints' + prefix).val());
         let minPoints = parseFloat($('#minPoints' + prefix).val());
-        let target = parseFloat(data[index + 6]);
+        let target = parseFloat(data[index + 8]);
         return isValidate(minPoints, maxPoints, target, settings, tableID)
     });
     $('#minPoints' + prefix + ', #maxPoints' + prefix).keyup(function () {
@@ -638,7 +646,7 @@ function customFilters(tableID, table, prefix = '', index = 0) {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxAVGPoints = parseFloat($('#maxAVGPoints' + prefix).val());
         let minAvgPoints = parseFloat($('#minAVGPoints' + prefix).val());
-        let target = parseFloat(data[index + 1 + 6]);
+        let target = parseFloat(data[index + 1 + 8]);
         return isValidate(minAvgPoints, maxAVGPoints, target, settings, tableID)
     });
     $('#minAVGPoints' + prefix + ', #maxAVGPoints' + prefix).keyup(function () {
@@ -648,7 +656,7 @@ function customFilters(tableID, table, prefix = '', index = 0) {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxCoverage = parseFloat($('#maxCoverage' + prefix).val());
         let minCoverage = parseFloat($('#minCoverage' + prefix).val());
-        let target = parseFloat(data[index + 7]);
+        let target = parseFloat(data[index + 9]);
         return isValidate(minCoverage, maxCoverage, target, settings, tableID)
     });
     $('#minCoverage' + prefix + ', #maxCoverage' + prefix).keyup(function () {
@@ -658,7 +666,7 @@ function customFilters(tableID, table, prefix = '', index = 0) {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxCoverageTf = parseFloat($('#maxCoverageTf' + prefix).val());
         let minCoverageTf = parseFloat($('#minCoverageTf' + prefix).val());
-        let target = parseFloat(data[index + 8]);
+        let target = parseFloat(data[index + 10]);
         return isValidate(minCoverageTf, maxCoverageTf, target, settings, tableID)
     });
     $('#minCoverageTf' + prefix + ', #maxCoverageTf' + prefix).keyup(function () {
@@ -668,7 +676,7 @@ function customFilters(tableID, table, prefix = '', index = 0) {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxWidth = parseFloat($('#maxWidth' + prefix).val());
         let minWidth = parseFloat($('#minWidth' + prefix).val());
-        let target = parseFloat(data[index + 9]);
+        let target = parseFloat(data[index + 11]);
         return isValidate(minWidth, maxWidth, target, settings, tableID)
     });
     $('#minWidth' + prefix + ', #maxWidth' + prefix).keyup(function () {
@@ -678,7 +686,7 @@ function customFilters(tableID, table, prefix = '', index = 0) {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxDensity = parseFloat($('#maxDensity' + prefix).val());
         let minDensity = parseFloat($('#minDensity' + prefix).val());
-        let target = parseFloat(data[index + 10]);
+        let target = parseFloat(data[index + 12]);
         return isValidate(minDensity, maxDensity, target, settings, tableID)
     });
     $('#minDensity' + prefix + ', #maxDensity' + prefix).keyup(function () {
@@ -687,7 +695,7 @@ function customFilters(tableID, table, prefix = '', index = 0) {
 }
 
 function customHistoryFilters(tableID, table, prefix = '') {
-    // Колонки: 0 дата, 1 действия, 2 комментарий, 3 фраза, …
+    // Колонки: 0 дата, 1 действия, 2 комментарий, 3 фраза, 4 ПС, 5 топ, 6 регион, 7 URL, 8 поз…
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let target = String(data[0]);
         return isDateValid(target, settings, tableID, prefix)
@@ -719,7 +727,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
 
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let regionSearch = String($('#regionSearch' + prefix).val()).toLowerCase();
-        let target = String(data[4]).toLowerCase();
+        let target = String(data[6]).toLowerCase();
         return isIncludes(target, regionSearch, settings, tableID)
     });
     $('#regionSearch' + prefix).keyup(function () {
@@ -728,7 +736,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
 
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let mainPageSearch = String($('#mainPageSearch' + prefix).val()).toLowerCase();
-        let target = String(data[5]).toLowerCase();
+        let target = String(data[7]).toLowerCase();
         return isIncludes(target, mainPageSearch, settings, tableID)
     });
     $('#mainPageSearch' + prefix).keyup(function () {
@@ -738,7 +746,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxPosition = parseFloat($('#maxPosition' + prefix).val());
         let minPosition = parseFloat($('#minPosition' + prefix).val());
-        let target = parseFloat(data[6]);
+        let target = parseFloat(data[8]);
         return isValidate(minPosition, maxPosition, target, settings, tableID)
     });
     $('#minPosition' + prefix + ', #maxPosition' + prefix).keyup(function () {
@@ -748,7 +756,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxPoints = parseFloat($('#maxPoints' + prefix).val());
         let minPoints = parseFloat($('#minPoints' + prefix).val());
-        let target = parseFloat(data[7]);
+        let target = parseFloat(data[9]);
         return isValidate(minPoints, maxPoints, target, settings, tableID)
     });
     $('#minPoints' + prefix + ', #maxPoints' + prefix).keyup(function () {
@@ -758,7 +766,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxCoverage = parseFloat($('#maxCoverage' + prefix).val());
         let minCoverage = parseFloat($('#minCoverage' + prefix).val());
-        let target = parseFloat(data[8]);
+        let target = parseFloat(data[10]);
         return isValidate(minCoverage, maxCoverage, target, settings, tableID)
     });
     $('#minCoverage' + prefix + ', #maxCoverage' + prefix).keyup(function () {
@@ -768,7 +776,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxCoverageTf = parseFloat($('#maxCoverageTf' + prefix).val());
         let minCoverageTf = parseFloat($('#minCoverageTf' + prefix).val());
-        let target = parseFloat(data[9]);
+        let target = parseFloat(data[11]);
         return isValidate(minCoverageTf, maxCoverageTf, target, settings, tableID)
     });
     $('#minCoverageTf' + prefix + ', #maxCoverageTf' + prefix).keyup(function () {
@@ -778,7 +786,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxWidth = parseFloat($('#maxWidth' + prefix).val());
         let minWidth = parseFloat($('#minWidth' + prefix).val());
-        let target = parseFloat(data[10]);
+        let target = parseFloat(data[12]);
         return isValidate(minWidth, maxWidth, target, settings, tableID)
     });
     $('#minWidth' + prefix + ', #maxWidth' + prefix).keyup(function () {
@@ -788,7 +796,7 @@ function customHistoryFilters(tableID, table, prefix = '') {
     $.fn.dataTable.ext.search.push(function (settings, data) {
         let maxDensity = parseFloat($('#maxDensity' + prefix).val());
         let minDensity = parseFloat($('#minDensity' + prefix).val());
-        let target = parseFloat(data[11]);
+        let target = parseFloat(data[13]);
         return isValidate(minDensity, maxDensity, target, settings, tableID)
     });
     $('#minDensity' + prefix + ', #maxDensity' + prefix).keyup(function () {

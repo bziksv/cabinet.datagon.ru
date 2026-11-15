@@ -15,6 +15,8 @@
         <input class="w-100 form form-control search-input" type="text"
                name="phraseSearch" id="phraseSearch" placeholder="{{ __('phrase') }}">
     </th>
+    <th></th>
+    <th></th>
     <th>
         <input class="w-100 form form-control search-input" type="text"
                name="regionSearch" id="regionSearch" placeholder="{{ __('region') }}">
@@ -81,6 +83,8 @@
     <th class="table-header ra-hist-actions-th">Действия</th>
     <th class="table-header">Комментарий</th>
     <th class="table-header">Фраза</th>
+    <th class="table-header">ПС</th>
+    <th class="table-header">Топ</th>
     <th class="table-header">Регион</th>
     <th class="table-header">URL</th>
     <th class="table-header">Поз.</th>

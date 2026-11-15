@@ -1097,6 +1097,8 @@
                                                     "      <input type='text' data-target='" + val.id + "' class='history-comment form-control form-control-sm' value='" + String(val.comment || '').replace(/'/g, '&#39;') + "'>" +
                                                     "   </td>" +
                                                     "   <td>" + phrase + "</td>" +
+                                                    "   <td>" + (val.search_engine_label || '—') + "</td>" +
+                                                    "   <td>" + (val.top_label || '—') + "</td>" +
                                                     "   <td>" + (val.region_name || getRegionName(val.region)) + "</td>" +
                                                     "   <td>" + val.main_link + "</td>" +
                                                     "   <td>" + position + "</td>" +
@@ -1126,6 +1128,8 @@
                                                     "      <input type='text' data-target='" + val.id + "' class='history-comment form-control form-control-sm' value='" + String(val.comment || '').replace(/'/g, '&#39;') + "'>" +
                                                     "   </td>" +
                                                     "   <td>" + phrase + "</td>" +
+                                                    "   <td>" + (val.search_engine_label || '—') + "</td>" +
+                                                    "   <td>" + (val.top_label || '—') + "</td>" +
                                                     "   <td>" + (val.region_name || getRegionName(val.region)) + "</td>" +
                                                     "   <td>" + val.main_link + "</td>" +
                                                     "   <td>" + position + "</td>" +

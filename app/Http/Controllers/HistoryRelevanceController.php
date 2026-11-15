@@ -201,6 +201,7 @@ class HistoryRelevanceController extends Controller
             'width', 'density', 'calculate',
             'id', 'project_relevance_history_id',
             'comment', 'user_id', 'state',
+            'request',
         ]);
 
         foreach ($results as $result) {
@@ -209,7 +210,12 @@ class HistoryRelevanceController extends Controller
                 $result['average_values'] = json_decode($averageValues, true);
             }
             $result['region_name'] = \App\Common::getRegionName((string) $result->region);
-            unset($result->results);
+            $serp = RelevanceHistory::serpMetaFromRequest($result->request);
+            $result['search_engine'] = $serp['search_engine'];
+            $result['search_engine_label'] = $serp['search_engine_label'];
+            $result['top'] = $serp['top'];
+            $result['top_label'] = $serp['top_label'];
+            unset($result->request, $result->results);
         }
 
         return $results;
@@ -567,6 +573,7 @@ class HistoryRelevanceController extends Controller
                 'phrase',
                 'state',
                 'comment',
+                'request',
             ]);
 
         if ($projects->isEmpty()) {
@@ -583,6 +590,12 @@ class HistoryRelevanceController extends Controller
             } else {
                 $project['average_values'] = null;
             }
+            $serp = RelevanceHistory::serpMetaFromRequest($project->request);
+            $project['search_engine'] = $serp['search_engine'];
+            $project['search_engine_label'] = $serp['search_engine_label'];
+            $project['top'] = $serp['top'];
+            $project['top_label'] = $serp['top_label'];
+            unset($project->request);
             $project->unsetRelation('results');
         }
 

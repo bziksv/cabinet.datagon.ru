@@ -56,7 +56,8 @@ class SeedMarketingSitePlan extends Migration
             }
         }
 
-        $file = (string) config('cabinet-marketing.content_plan_file');
+        // Не через config(): на проде migrate часто идёт при старом config:cache без cabinet-marketing.php.
+        $file = database_path('data/marketing/seo-glossary-plan.md');
         if (is_file($file)) {
             app(MarketingContentPlanImporter::class)->importFile($file);
         }

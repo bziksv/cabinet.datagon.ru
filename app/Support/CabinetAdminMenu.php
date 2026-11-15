@@ -150,6 +150,15 @@ class CabinetAdminMenu
             ];
         }
 
+        if (\Illuminate\Support\Facades\Route::has('admin.marketing.index')) {
+            $items[] = [
+                'id' => 0,
+                'title' => __('Site marketing'),
+                'link' => route('admin.marketing.index'),
+                'external' => false,
+            ];
+        }
+
         self::$itemsCache = self::appendGoogleDocumentation(
             self::pinNotificationsAfterSmtp(self::sortItemsByTitle($items))
         );

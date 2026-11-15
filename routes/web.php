@@ -205,6 +205,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/admin/ai-providers', 'AiProvidersAdminController@index')->name('admin.ai-providers.index');
     Route::put('/admin/ai-providers', 'AiProvidersAdminController@update')->name('admin.ai-providers.update');
 
+    // Маркетинг сайта (titlo.ru): план, задачи, контент-план с ТЗ — только Super Admin / admin (middleware в контроллере)
+    Route::get('/admin/marketing', 'MarketingAdminController@index')->name('admin.marketing.index');
+    Route::get('/admin/marketing/stages/create', 'MarketingAdminController@createStage')->name('admin.marketing.stages.create');
+    Route::post('/admin/marketing/stages', 'MarketingAdminController@storeStage')->name('admin.marketing.stages.store');
+    Route::get('/admin/marketing/stages/{id}/edit', 'MarketingAdminController@editStage')->where('id', '[0-9]+')->name('admin.marketing.stages.edit');
+    Route::put('/admin/marketing/stages/{id}', 'MarketingAdminController@updateStage')->where('id', '[0-9]+')->name('admin.marketing.stages.update');
+    Route::delete('/admin/marketing/stages/{id}', 'MarketingAdminController@destroyStage')->where('id', '[0-9]+')->name('admin.marketing.stages.destroy');
+    Route::get('/admin/marketing/tasks/create', 'MarketingAdminController@createTask')->name('admin.marketing.tasks.create');
+    Route::post('/admin/marketing/tasks', 'MarketingAdminController@storeTask')->name('admin.marketing.tasks.store');
+    Route::get('/admin/marketing/tasks/{id}/edit', 'MarketingAdminController@editTask')->where('id', '[0-9]+')->name('admin.marketing.tasks.edit');
+    Route::put('/admin/marketing/tasks/{id}', 'MarketingAdminController@updateTask')->where('id', '[0-9]+')->name('admin.marketing.tasks.update');
+    Route::patch('/admin/marketing/tasks/{id}/status', 'MarketingAdminController@updateTaskStatus')->where('id', '[0-9]+')->name('admin.marketing.tasks.status');
+    Route::delete('/admin/marketing/tasks/{id}', 'MarketingAdminController@destroyTask')->where('id', '[0-9]+')->name('admin.marketing.tasks.destroy');
+    Route::get('/admin/marketing/content', 'MarketingAdminController@content')->name('admin.marketing.content');
+    Route::get('/admin/marketing/content/create', 'MarketingAdminController@createContent')->name('admin.marketing.content.create');
+    Route::post('/admin/marketing/content', 'MarketingAdminController@storeContent')->name('admin.marketing.content.store');
+    Route::post('/admin/marketing/content/import', 'MarketingAdminController@importContent')->name('admin.marketing.content.import');
+    Route::get('/admin/marketing/content/{id}/edit', 'MarketingAdminController@editContent')->where('id', '[0-9]+')->name('admin.marketing.content.edit');
+    Route::put('/admin/marketing/content/{id}', 'MarketingAdminController@updateContent')->where('id', '[0-9]+')->name('admin.marketing.content.update');
+    Route::delete('/admin/marketing/content/{id}', 'MarketingAdminController@destroyContent')->where('id', '[0-9]+')->name('admin.marketing.content.destroy');
+
     Route::get('/admin/finance', 'FinanceAdminController@index')->name('admin.finance.index');
     Route::get('/admin/finance/users-search', 'FinanceAdminController@searchUsers')->name('admin.finance.users-search');
     Route::get('/admin/finance/companies', 'FinanceAdminController@companies')->name('admin.finance.companies');

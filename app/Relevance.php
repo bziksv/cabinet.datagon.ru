@@ -742,7 +742,7 @@ class Relevance
     public static function searchPassages($html): string
     {
         $passages = '';
-        preg_match_all('(<li.*?>(.*?)</li>)', $html, $li, PREG_SET_ORDER);
+        preg_match_all('/<li\b[^>]*>(.*?)<\/li>/isu', $html, $li, PREG_SET_ORDER);
 
         foreach ($li as $item) {
             $ul = str_replace('>', '> ', $item[1]);

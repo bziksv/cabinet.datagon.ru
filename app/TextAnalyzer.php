@@ -1004,14 +1004,11 @@ class TextAnalyzer extends Model
             return "";
 
         $linkText = '';
-        $html = str_replace("article", "div", $html);
-        $html = preg_replace('| +|', ' ', $html);
-        $html = str_replace("\n", " ", $html);
-        preg_match_all('(<a.*?href=["\']?(.*?)([\'"].*?>(.*?)</a>))', $html, $matches, PREG_SET_ORDER);
+        preg_match_all('/<a\b[^>]*>.*?<\/a>/isu', $html, $matches, PREG_SET_ORDER);
         foreach ($matches as $match) {
-            $match = strip_tags($match[3]);
-            if ($match !== "") {
-                $linkText .= $match . " ";
+            $anchor = trim(strip_tags($match[0]));
+            if ($anchor !== '') {
+                $linkText .= $anchor . ' ';
             }
         }
 
@@ -1040,11 +1037,11 @@ class TextAnalyzer extends Model
 
     public static function clearHTMLFromLinks($html): string
     {
-        $html = str_replace("article", "div", $html);
         $html = str_replace(["\n", "\r", "\t"], " ", $html);
         $html = preg_replace("| +|", ' ', $html);
 
-        preg_match_all('(<a.*?>.*?</a>)', $html, $matches, PREG_SET_ORDER);
+        // \b — чтобы не захватывать aside/audio/abbr/address/area/article.
+        preg_match_all('/<a\b[^>]*>.*?<\/a>/isu', $html, $matches, PREG_SET_ORDER);
         foreach ($matches as $items) {
             $html = str_replace($items[0], "", $html);
         }

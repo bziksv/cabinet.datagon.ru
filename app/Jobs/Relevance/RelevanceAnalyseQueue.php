@@ -44,7 +44,38 @@ class RelevanceAnalyseQueue implements ShouldQueue
      */
     public function retryUntil(): DateTime
     {
-        return now()->addMinutes(3);
+        // 3 минуты срывали задание ещё в очереди: воркер снимал его как просроченное,
+        // а integration_analyses оставался queued навсегда.
+        return now()->addHours(6);
+    }
+
+    /**
+     * @param \Throwable|null $exception
+     */
+    public function failed($exception = null): void
+    {
+        $hash = (string) ($this->request['hash'] ?? '');
+        if ($hash === '') {
+            return;
+        }
+
+        $message = 'queue_not_started';
+        if (is_object($exception) && method_exists($exception, 'getMessage')) {
+            $raw = trim((string) $exception->getMessage());
+            if ($raw !== '') {
+                $message = mb_substr($raw, 0, 500);
+            }
+        }
+
+        \App\IntegrationAnalysis::where('progress_hash', $hash)
+            ->whereIn('status', [
+                \App\IntegrationAnalysis::STATUS_QUEUED,
+                \App\IntegrationAnalysis::STATUS_RUNNING,
+            ])
+            ->update([
+                'status' => \App\IntegrationAnalysis::STATUS_FAILED,
+                'error' => $message,
+            ]);
     }
 
     public function handle()

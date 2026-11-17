@@ -90,6 +90,7 @@ class Kernel extends ConsoleKernel
         $schedule->command('site-audit:run-schedules')->hourly();
         $schedule->command('site-audit:prune-body-tmp')->everyFifteenMinutes();
         $schedule->command('site-audit:promote-waiting')->everyMinute();
+        $schedule->command('integration:requeue-stuck-analyses')->everyFiveMinutes();
         $schedule->command('site-audit:prune-expired-free')->dailyAt('03:40');
 
         // Delete relevance histories (see relevance_analysis_config.cleaning_interval)

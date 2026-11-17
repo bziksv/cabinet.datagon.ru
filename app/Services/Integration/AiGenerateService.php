@@ -19,6 +19,17 @@ class AiGenerateService
         $this->prompts = $prompts;
     }
 
+    protected function dispatchGeneration(AiGenerationHistory $record): void
+    {
+        try {
+            GenerationCategoryQueue::dispatch($record)->onQueue('ai_generation');
+        } catch (\Throwable $e) {
+            $record->status = AiGenerationHistory::FAILED;
+            $record->save();
+            throw $e;
+        }
+    }
+
     /**
      * @param array{type:string,url?:string,name?:string,items?:array,keywords?:array,stopwords?:array,note?:string,prompt?:string,source?:string} $input
      */
@@ -30,6 +41,13 @@ class AiGenerateService
         }
 
         $this->assertMonthlyBudget($user);
+
+        $waiting = AiGenerationHistory::where('user_id', $user->id)
+            ->where('status', AiGenerationHistory::PENDING)
+            ->count();
+        if ($waiting >= 20) {
+            throw new InvalidArgumentException('queue_busy');
+        }
 
         // Пачка фраз: один запрос к модели на N товаров (экономия токенов).
         if ($type === 'phrase' && !empty($input['items']) && is_array($input['items'])) {
@@ -128,7 +146,7 @@ class AiGenerateService
             'status' => AiGenerationHistory::PENDING,
         ]);
 
-        GenerationCategoryQueue::dispatch($record)->onQueue('ai_generation');
+        $this->dispatchGeneration($record);
 
         // Local: без setsid-воркера Bitrix висит на «Ожидание…» — поднимаем сами.
         AiGenerationLocalQueueGuard::ensureWorkers();
@@ -220,7 +238,7 @@ class AiGenerateService
             'status' => AiGenerationHistory::PENDING,
         ]);
 
-        GenerationCategoryQueue::dispatch($record)->onQueue('ai_generation');
+        $this->dispatchGeneration($record);
         AiGenerationLocalQueueGuard::ensureWorkers();
 
         return $record;

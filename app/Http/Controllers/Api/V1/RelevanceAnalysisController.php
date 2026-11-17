@@ -30,13 +30,32 @@ class RelevanceAnalysisController extends Controller
                 $request->all()
             );
         } catch (InvalidArgumentException $e) {
-            $code = $e->getMessage() === 'relevance_limit_exhausted' ? 429 : 422;
+            $msg = $e->getMessage();
+            if ($msg === 'queue_busy') {
+                return response()->json([
+                    'error' => 'queue_busy',
+                    'message' => 'Too many analyses are already waiting. Retry later.',
+                ], 429)->header('Retry-After', '30');
+            }
+            $code = $msg === 'relevance_limit_exhausted' ? 429 : 422;
             return response()->json([
-                'error' => $e->getMessage(),
-                'message' => $e->getMessage() === 'relevance_limit_exhausted'
+                'error' => $msg,
+                'message' => $msg === 'relevance_limit_exhausted'
                     ? 'Monthly relevance limit exhausted'
-                    : $e->getMessage(),
+                    : $msg,
             ], $code);
+        } catch (\Throwable $e) {
+            $requestId = (string) \Illuminate\Support\Str::uuid();
+            \Illuminate\Support\Facades\Log::error('relevance analysis start failed', [
+                'request_id' => $requestId,
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'server_error',
+                'message' => mb_substr($e->getMessage(), 0, 300),
+                'request_id' => $requestId,
+            ], 500);
         }
 
         return response()->json([

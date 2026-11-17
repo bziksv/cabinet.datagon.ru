@@ -26,6 +26,12 @@ class AiGenerateController extends Controller
             $record = $this->generator->start(Auth::user(), $request->all());
         } catch (InvalidArgumentException $e) {
             $msg = $e->getMessage();
+            if ($msg === 'queue_busy') {
+                return response()->json([
+                    'error' => 'queue_busy',
+                    'message' => 'Too many generations are already waiting. Retry later.',
+                ], 429)->header('Retry-After', '30');
+            }
             $code = $msg === 'ai_monthly_limit_exhausted' ? 429 : 422;
             return response()->json([
                 'error' => $msg === 'ai_monthly_limit_exhausted' ? 'ai_monthly_limit_exhausted' : 'validation_error',
@@ -33,6 +39,18 @@ class AiGenerateController extends Controller
                     ? 'Monthly AI generation limit exhausted'
                     : $msg,
             ], $code);
+        } catch (\Throwable $e) {
+            $requestId = (string) \Illuminate\Support\Str::uuid();
+            \Illuminate\Support\Facades\Log::error('ai generate start failed', [
+                'request_id' => $requestId,
+                'message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'error' => 'server_error',
+                'message' => mb_substr($e->getMessage(), 0, 300),
+                'request_id' => $requestId,
+            ], 500);
         }
 
         return response()->json([

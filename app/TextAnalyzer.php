@@ -17,10 +17,44 @@ class TextAnalyzer extends Model
 
     protected $table = 'text_analyser_count_checks';
 
+    /** @var string fetch_timeout | fetch_http_NNN | fetch_empty_html | fetch_curl */
+    public static $lastFetchError = '';
+
     public static function curlInitV2($link)
+    {
+        self::$lastFetchError = '';
+        $html = '';
+        for ($try = 1; $try <= 3; $try++) {
+            $html = self::curlFetchDocument($link);
+            if (is_string($html) && $html !== '') {
+                self::$lastFetchError = '';
+
+                return $html;
+            }
+            if ($try >= 3 || ! self::fetchErrorIsRetryable(self::$lastFetchError)) {
+                break;
+            }
+            usleep(400000);
+        }
+
+        return '';
+    }
+
+    protected static function fetchErrorIsRetryable(string $error): bool
+    {
+        if ($error === '' || $error === 'fetch_timeout' || $error === 'fetch_empty_html' || $error === 'fetch_curl') {
+            return true;
+        }
+
+        return (bool) preg_match('/^fetch_http_5\d\d$/', $error);
+    }
+
+    protected static function curlFetchDocument($link)
     {
         $url = trim((string) $link);
         if ($url === '' || !self::isSafePublicFetchUrl($url)) {
+            self::$lastFetchError = 'fetch_blocked';
+
             return '';
         }
 
@@ -53,18 +87,20 @@ class TextAnalyzer extends Model
             curl_setopt($curl, CURLOPT_FAILONERROR, false);
             curl_setopt($curl, CURLOPT_AUTOREFERER, true);
             curl_setopt($curl, CURLOPT_ENCODING, '');
-            curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 6);
-            curl_setopt($curl, CURLOPT_TIMEOUT, 12);
+            curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, 10);
+            curl_setopt($curl, CURLOPT_TIMEOUT, 20);
             curl_setopt($curl, CURLOPT_REFERER, $refers[array_rand($refers)]);
             curl_setopt($curl, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
             curl_setopt($curl, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
 
             $raw = curl_exec($curl);
             $status = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            $errno = (int) curl_errno($curl);
             $headerSize = (int) curl_getinfo($curl, CURLINFO_HEADER_SIZE);
             curl_close($curl);
 
             if (!is_string($raw) || $raw === '') {
+                self::$lastFetchError = $errno === 28 ? 'fetch_timeout' : 'fetch_curl';
                 $html = '';
                 break;
             }
@@ -87,17 +123,25 @@ class TextAnalyzer extends Model
             }
 
             if ($status >= 400) {
+                self::$lastFetchError = 'fetch_http_' . $status;
                 $html = '';
                 break;
             }
 
             $html = is_string($body) ? $body : '';
+            if ($html === '') {
+                self::$lastFetchError = 'fetch_empty_html';
+            }
             break;
         }
 
         @unlink($cookieFile);
 
         if (!is_string($html) || $html === '') {
+            if (self::$lastFetchError === '') {
+                self::$lastFetchError = 'fetch_empty_html';
+            }
+
             return '';
         }
 

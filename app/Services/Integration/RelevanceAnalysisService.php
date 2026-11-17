@@ -60,6 +60,30 @@ class RelevanceAnalysisService
             $top = 50;
         }
 
+        $existing = IntegrationAnalysis::where('user_id', $user->id)
+            ->where('url', $url)
+            ->where('phrase', $phrase)
+            ->whereIn('status', [IntegrationAnalysis::STATUS_QUEUED, IntegrationAnalysis::STATUS_RUNNING])
+            ->where('created_at', '>=', now()->subHours(12))
+            ->orderByDesc('id')
+            ->first();
+        if ($existing) {
+            $prev = is_array($existing->request_payload) ? $existing->request_payload : [];
+            $sameEngine = strtolower((string) ($prev['searchEngine'] ?? '')) === $engine;
+            $sameRegion = (string) ($prev['region'] ?? '') === $region;
+            $sameTop = (int) ($prev['count'] ?? 0) === $top;
+            if ($sameEngine && $sameRegion && $sameTop) {
+                return $existing;
+            }
+        }
+
+        $inflight = IntegrationAnalysis::where('user_id', $user->id)
+            ->whereIn('status', [IntegrationAnalysis::STATUS_QUEUED, IntegrationAnalysis::STATUS_RUNNING])
+            ->count();
+        if ($inflight >= 20) {
+            throw new InvalidArgumentException('queue_busy');
+        }
+
         Auth::setUser($user);
 
         $payload = [
@@ -107,9 +131,16 @@ class RelevanceAnalysisService
             'request_payload' => $payload,
         ]);
 
-        RelevanceAnalyseQueue::dispatch($payload, false, $user->id, 'full')
-            ->onQueue(RelevanceController::HIGH_QUEUE)
-            ->onConnection('database');
+        try {
+            RelevanceAnalyseQueue::dispatch($payload, false, $user->id, 'full')
+                ->onQueue(RelevanceController::HIGH_QUEUE)
+                ->onConnection('database');
+        } catch (\Throwable $e) {
+            $analysis->status = IntegrationAnalysis::STATUS_FAILED;
+            $analysis->error = mb_substr($e->getMessage(), 0, 300);
+            $analysis->save();
+            throw $e;
+        }
 
         \App\Support\RelevanceLocalQueueGuard::ensureWorkers();
 

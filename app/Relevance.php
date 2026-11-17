@@ -117,6 +117,10 @@ class Relevance
     public function getMainPageHtml()
     {
         $html = TextAnalyzer::removeStylesAndScripts(TextAnalyzer::curlInitV2($this->params['main_page_link']));
+        if (! is_string($html) || trim($html) === '') {
+            $why = TextAnalyzer::$lastFetchError !== '' ? TextAnalyzer::$lastFetchError : 'fetch_empty_html';
+            throw new \RuntimeException($why);
+        }
         $this->setMainPage($html);
     }
 
@@ -3056,6 +3060,9 @@ class Relevance
         $lower = mb_strtolower($msg);
         if ($msg === '') {
             return 'analysis_failed';
+        }
+        if (preg_match('/^fetch_(timeout|empty_html|curl|http_\d{3})$/', $msg)) {
+            return $msg;
         }
         if (strpos($lower, 'fetch') !== false
             || strpos($lower, 'curl') !== false

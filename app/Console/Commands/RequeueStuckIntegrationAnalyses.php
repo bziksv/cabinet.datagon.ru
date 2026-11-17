@@ -23,18 +23,28 @@ class RequeueStuckIntegrationAnalyses extends Command
         $limit = max(1, (int) $this->option('limit'));
         $cutoff = now()->subMinutes($minutes);
 
-        $rows = IntegrationAnalysis::query()
-            ->where('status', IntegrationAnalysis::STATUS_QUEUED)
-            ->where('created_at', '<', $cutoff)
-            ->orderBy('id')
-            ->limit($limit)
-            ->get();
-
         $requeued = 0;
         $failed = 0;
         $skipped = 0;
+        $lastId = 0;
+
+        while (($requeued + $failed) < $limit) {
+            $rows = IntegrationAnalysis::query()
+                ->where('status', IntegrationAnalysis::STATUS_QUEUED)
+                ->where('created_at', '<', $cutoff)
+                ->where('id', '>', $lastId)
+                ->orderBy('id')
+                ->limit(50)
+                ->get();
+            if ($rows->isEmpty()) {
+                break;
+            }
 
         foreach ($rows as $analysis) {
+            $lastId = (int) $analysis->id;
+            if (($requeued + $failed) >= $limit) {
+                break;
+            }
             $progress = RelevanceProgress::where('hash', $analysis->progress_hash)->first();
             if ($progress && (int) $progress->progress > 0 && ! $progress->error) {
                 $analysis->status = IntegrationAnalysis::STATUS_RUNNING;
@@ -79,6 +89,7 @@ class RequeueStuckIntegrationAnalyses extends Command
                 ->onQueue(RelevanceController::HIGH_QUEUE)
                 ->onConnection('database');
             $requeued++;
+        }
         }
 
         $this->info('requeued=' . $requeued . ' failed=' . $failed . ' skipped=' . $skipped);

@@ -493,6 +493,21 @@ class DomainRecordsService
     /**
      * @param array<string, array<int, array<string, mixed>>> $dns
      */
+    /**
+     * Запись относится к запрашиваемому имени: сам хост или его поддомен.
+     * Чужие имена (s3.prime-ltd.su из /etc/hosts, цель CNAME biz.mail.ru) отбрасываем.
+     */
+    private function recordHostInZone(string $zone, string $host): bool
+    {
+        $zone = strtolower(rtrim($zone, '.'));
+        $host = strtolower(rtrim($host, '.'));
+        if ($zone === '' || $host === '') {
+            return false;
+        }
+
+        return $host === $zone || substr($host, -strlen('.' . $zone)) === '.' . $zone;
+    }
+
     private function dnsIsEmpty(array $dns): bool
     {
         foreach ($dns as $rows) {
@@ -627,6 +642,7 @@ class DomainRecordsService
         $lookupHost = $this->toAscii($fqdn) ?: $fqdn;
         $out = [];
         $localOk = false;
+        $sawForeign = false;
 
         $const = $this->dnsTypeConstant($type);
         if ($const !== null) {
@@ -640,6 +656,10 @@ class DomainRecordsService
                     } else {
                         $row['host'] = DomainInformationDns::normalizeHost((string) $row['host']) ?: $fqdn;
                     }
+                    if (! $this->recordHostInZone($fqdn, (string) ($row['host'] ?? ''))) {
+                        $sawForeign = true;
+                        continue;
+                    }
                     if (($row['value'] ?? '') !== '') {
                         $out[] = $row;
                     }
@@ -647,9 +667,13 @@ class DomainRecordsService
             }
         }
 
-        if ($localOk) {
+        if ($out !== []) {
             return $out;
         }
+        if ($localOk && ! $sawForeign) {
+            return [];
+        }
+        $out = [];
 
         $typeCodes = ['A' => 1, 'AAAA' => 28, 'CNAME' => 5];
         $code = $typeCodes[$type] ?? null;
@@ -662,6 +686,9 @@ class DomainRecordsService
                 continue;
             }
             $row = $this->normalizeDohAnswer($type, $fqdn, $ans);
+            if (! $this->recordHostInZone($fqdn, (string) ($row['host'] ?? ''))) {
+                continue;
+            }
             if (($row['value'] ?? '') !== '') {
                 $out[] = $row;
             }
@@ -678,6 +705,7 @@ class DomainRecordsService
         $types = config('cabinet-domain-records.dns_types', ['A', 'AAAA', 'MX', 'NS', 'TXT', 'CNAME', 'SOA', 'SRV']);
         $lookupHost = $this->toAscii($domain) ?: $domain;
         $grouped = $this->emptyDnsGroups($types);
+        $poisoned = [];
 
         foreach ($types as $type) {
             $const = $this->dnsTypeConstant($type);
@@ -691,7 +719,40 @@ class DomainRecordsService
             }
 
             foreach ($records as $rec) {
-                $grouped[$type][] = $this->normalizeDnsRow($type, $rec);
+                $row = $this->normalizeDnsRow($type, $rec);
+                if (! $this->recordHostInZone($domain, (string) ($row['host'] ?? ''))) {
+                    $poisoned[$type] = true;
+                    continue;
+                }
+                $grouped[$type][] = $row;
+            }
+        }
+
+        // Локальный резолвер (systemd-resolved + /etc/hosts) может отдать
+        // чужой host с TTL 0 — например A uc-vrn.ru как s3.prime-ltd.su.
+        foreach ($types as $type) {
+            if (! empty($grouped[$type]) || empty($poisoned[$type])) {
+                continue;
+            }
+            $code = [
+                'A' => 1, 'NS' => 2, 'CNAME' => 5, 'SOA' => 6,
+                'MX' => 15, 'TXT' => 16, 'AAAA' => 28, 'SRV' => 33,
+            ][$type] ?? null;
+            if ($code === null) {
+                continue;
+            }
+            $payload = $this->dohQuery($lookupHost, $code);
+            foreach ($payload['Answer'] ?? [] as $ans) {
+                if (! is_array($ans) || (int) ($ans['type'] ?? 0) !== $code) {
+                    continue;
+                }
+                $row = $this->normalizeDohAnswer($type, $domain, $ans);
+                if (! $this->recordHostInZone($domain, (string) ($row['host'] ?? ''))) {
+                    continue;
+                }
+                if (($row['value'] ?? '') !== '') {
+                    $grouped[$type][] = $row;
+                }
             }
         }
 
@@ -795,9 +856,10 @@ class DomainRecordsService
     private function normalizeDohAnswer(string $type, string $host, array $ans): array
     {
         $data = trim((string) ($ans['data'] ?? ''));
+        $owner = DomainInformationDns::normalizeHost(rtrim((string) ($ans['name'] ?? $host), '.'));
         $row = [
             'type' => $type,
-            'host' => $host,
+            'host' => $owner !== '' ? $owner : $host,
             'ttl' => $ans['TTL'] ?? null,
             'value' => $data,
             'target' => null,

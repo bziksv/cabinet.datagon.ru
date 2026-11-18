@@ -804,37 +804,70 @@
         });
     }
 
+    function currentTaskRoleFilter() {
+        if (activeFilters.indexOf('mine') !== -1) return 'mine';
+        var roleFilters = activeFilters.filter(function (f) { return f.indexOf('role:') === 0; });
+        return roleFilters.length ? roleFilters[0] : '';
+    }
+
+    function syncTaskRoleSelect() {
+        var sel = root.querySelector('[data-sc-show-task-role]');
+        if (!sel) return;
+        var want = currentTaskRoleFilter();
+        if (sel.value !== want) sel.value = want;
+    }
+
+    function setTaskRoleFilter(val) {
+        val = String(val || '');
+        activeFilters = activeFilters.filter(function (f) {
+            return f !== 'mine' && f.indexOf('role:') !== 0;
+        });
+        if (val === 'mine' || val.indexOf('role:') === 0) {
+            activeFilters.push(val);
+        }
+        applyFilters();
+    }
+
     function applyFilters() {
         var filters = activeFilters.slice();
         var hasFacet = filters.length > 0;
+        var statusFacets = filters.filter(function (f) {
+            return f !== 'mine' && f.indexOf('role:') !== 0;
+        });
+        var hasStatusFacet = statusFacets.length > 0;
 
-        root.querySelectorAll('[data-sc-filter]').forEach(function (btn) {
-            var key = btn.getAttribute('data-sc-filter');
-            var on = key === 'all' ? !hasFacet : filters.indexOf(key) !== -1;
+        root.querySelectorAll('[data-sc-status-filter], [data-sc-filter]').forEach(function (btn) {
+            var key = btn.getAttribute('data-sc-status-filter') || btn.getAttribute('data-sc-filter');
+            if (!key || key.indexOf('role:') === 0 || key === 'mine') return;
+            var on = key === 'all' ? !hasStatusFacet : statusFacets.indexOf(key) !== -1;
             btn.classList.toggle('active', on);
             btn.setAttribute('aria-pressed', on ? 'true' : 'false');
         });
+        syncTaskRoleSelect();
 
         root.querySelectorAll('[data-sc-item]').forEach(function (item) {
             var status = item.getAttribute('data-status') || 'todo';
             var important = item.getAttribute('data-important') === '1';
             var role = item.getAttribute('data-role') || 'any';
-            var open = status === 'todo' || status === 'doing' || status === 'rework'
-                || status === 'blocked' || status === 'clarify' || status === 'review';
             var overdue = item.getAttribute('data-overdue') === '1';
             var dueSoon = item.getAttribute('data-due-soon') === '1';
             var show = true;
+            var isDone = status === 'done' || status === 'skip';
+            var isReview = status === 'review';
 
             if (hasFacet) {
                 var wantDone = filters.indexOf('done') !== -1;
                 var wantReview = filters.indexOf('review') !== -1;
                 var hideReview = filters.indexOf('no-review') !== -1;
-                var isDone = status === 'done' || status === 'skip';
-                var isReview = status === 'review';
 
-                if (filters.indexOf('open') !== -1 && !open) show = false;
-                if (show && wantDone && !isDone) show = false;
-                if (show && wantReview && !isReview) show = false;
+                if (wantDone) {
+                    if (!isDone) show = false;
+                } else if (wantReview) {
+                    if (!isReview) show = false;
+                } else if (hasStatusFacet && isDone) {
+                    // как на «Мои задачи»: без пресета «Выполненные» закрытые скрыты
+                    show = false;
+                }
                 if (show && !wantDone && !wantReview && hideReview && isReview) show = false;
                 if (show && filters.indexOf('unread-notes') !== -1) {
                     var unreadNotes = (parseInt(item.getAttribute('data-unread-notes-count') || '0', 10) || 0) > 0;
@@ -860,6 +893,9 @@
                     });
                     if (!roleOk) show = false;
                 }
+            } else if (isDone) {
+                // «Все» — без закрытых, как на /checklist/my-tasks
+                show = false;
             }
 
             if (show && currentSearch) {
@@ -885,8 +921,15 @@
     function toggleFilter(key) {
         key = String(key || '');
         if (!key || key === 'all') {
-            activeFilters = [];
+            // сбрасываем только статусные пресеты, роль в селекте оставляем
+            activeFilters = activeFilters.filter(function (f) {
+                return f === 'mine' || f.indexOf('role:') === 0;
+            });
             applyFilters();
+            return;
+        }
+        if (key === 'mine' || key.indexOf('role:') === 0) {
+            setTaskRoleFilter(activeFilters.indexOf(key) === -1 ? key : '');
             return;
         }
         var idx = activeFilters.indexOf(key);
@@ -909,15 +952,56 @@
         applyFilters();
     }
 
-    root.querySelectorAll('[data-sc-filter]').forEach(function (btn) {
+    root.querySelectorAll('[data-sc-status-filter], [data-sc-filter]').forEach(function (btn) {
         btn.setAttribute('aria-pressed', 'false');
         btn.addEventListener('click', function () {
-            toggleFilter(btn.getAttribute('data-sc-filter'));
+            toggleFilter(btn.getAttribute('data-sc-status-filter') || btn.getAttribute('data-sc-filter'));
         });
     });
 
-    var taskSearch = root.querySelector('[data-sc-task-search]');
-    var filtersRoot = root.querySelector('[data-sc-show-filters]');
+    var taskRoleSelect = root.querySelector('[data-sc-show-task-role]');
+    if (taskRoleSelect) {
+        taskRoleSelect.addEventListener('change', function () {
+            setTaskRoleFilter(taskRoleSelect.value || '');
+        });
+    }
+
+    var taskSearch = root.querySelector('[data-sc-search-input], [data-sc-task-search]');
+    var filtersRoot = root.querySelector('[data-sc-task-filters], [data-sc-show-filters]');
+    var searchToggle = root.querySelector('[data-sc-search-toggle], [data-sc-show-search-toggle]');
+    var searchPanel = root.querySelector('[data-sc-search-panel], [data-sc-show-search-panel]');
+
+    function setShowSearchOpen(open) {
+        if (!searchToggle || !taskSearch || !searchPanel) return;
+        searchPanel.hidden = !open;
+        searchToggle.classList.toggle('is-active', open);
+        searchToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (filtersRoot) {
+            filtersRoot.classList.toggle('is-search-open', open);
+            filtersRoot.classList.toggle('has-search-query', !!currentSearch);
+        }
+        if (open) {
+            try { taskSearch.focus(); taskSearch.select(); } catch (e) {}
+        } else if (!currentSearch) {
+            taskSearch.value = '';
+        }
+    }
+
+    if (searchToggle && taskSearch && searchPanel) {
+        searchToggle.addEventListener('click', function () {
+            var open = !!searchPanel.hidden;
+            if (!open && currentSearch) {
+                currentSearch = '';
+                taskSearch.value = '';
+                if (filtersRoot) filtersRoot.classList.remove('has-search-query');
+                setShowSearchOpen(false);
+                applyFilters();
+                return;
+            }
+            setShowSearchOpen(open);
+            if (!open) applyFilters();
+        });
+    }
 
     if (taskSearch) {
         taskSearch.addEventListener('input', function () {
@@ -930,6 +1014,16 @@
                 root.querySelectorAll('[data-sc-stage]:not(.is-empty-filter)').forEach(function (stage) {
                     stage.open = true;
                 });
+            }
+        });
+        taskSearch.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                currentSearch = '';
+                taskSearch.value = '';
+                if (filtersRoot) filtersRoot.classList.remove('has-search-query');
+                setShowSearchOpen(false);
+                applyFilters();
             }
         });
     }
@@ -965,7 +1059,9 @@
     });
 
     function jumpToNextOpenTask() {
-        activeFilters = ['open'];
+        activeFilters = activeFilters.filter(function (f) {
+            return f === 'mine' || f.indexOf('role:') === 0;
+        });
         applyFilters();
         var first = root.querySelector('[data-sc-item]:not(.is-hidden-filter)');
         if (!first) return;
@@ -989,13 +1085,16 @@
     if (prefs.search && taskSearch) {
         currentSearch = String(prefs.search);
         taskSearch.value = prefs.search;
+        if (searchToggle && searchPanel) setShowSearchOpen(true);
     }
     if (prefs.filters) {
-        activeFilters = normalizeFilters(prefs.filters);
-    } else if (prefs.filter) {
+        activeFilters = normalizeFilters(prefs.filters).filter(function (f) {
+            return f !== 'open'; // legacy: «Открытые» убраны, «Все» и так без закрытых
+        });
+    } else if (prefs.filter && prefs.filter !== 'open' && prefs.filter !== 'all') {
         activeFilters = normalizeFilters(prefs.filter);
     } else {
-        activeFilters = ['open'];
+        activeFilters = [];
     }
     applyFilters();
     filtersReady = true;
@@ -1022,11 +1121,7 @@
         activeFilters = [];
         currentSearch = '';
         if (taskSearch) taskSearch.value = '';
-        root.querySelectorAll('[data-sc-filter]').forEach(function (btn) {
-            var key = btn.getAttribute('data-sc-filter');
-            btn.classList.toggle('active', key === 'all');
-            btn.setAttribute('aria-pressed', key === 'all' ? 'true' : 'false');
-        });
+        if (searchToggle && searchPanel) setShowSearchOpen(false);
         applyFilters();
 
         var stage = target.closest('[data-sc-stage]');

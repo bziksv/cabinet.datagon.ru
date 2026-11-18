@@ -127,102 +127,18 @@
                 </div>
 
                 <div class="cabinet-sc-plan-workspace">
-                    <div class="cabinet-sc-plan-filters cabinet-sc-plan-filters--sticky" data-sc-plan-filters>
-                        <div class="cabinet-sc-plan-filters__bar">
-                            <label class="cabinet-sc-plan-filters__project">
-                                <span class="visually-hidden">{{ __('Filter by project') }}</span>
-                                <select class="form-select form-select-sm"
-                                        data-sc-plan-project
-                                        data-placeholder="{{ __('All projects') }}">
-                                    <option value=""></option>
-                                    @foreach($filterProjects as $fp)
-                                        @php
-                                            $fpDomain = trim((string) ($fp->domain ?? ''));
-                                            $fpTitle = trim((string) ($fp->title ?? ''));
-                                            $fpTitleUseful = $fpTitle !== ''
-                                                && strcasecmp($fpTitle, $fpDomain) !== 0
-                                                && ($fpDomain === '' || mb_stripos($fpTitle, $fpDomain) === false);
-                                        @endphp
-                                        <option value="{{ $fp->id }}">
-                                            {{ $fpDomain }}@if($fpTitleUseful) · {{ $fpTitle }}@endif
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </label>
-                            <label class="cabinet-sc-plan-filters__my-role">
-                                <span class="visually-hidden">{{ __('Filter by my role') }}</span>
-                                <select class="form-select form-select-sm" data-sc-plan-my-role>
-                                    <option value="">{{ __('All my roles') }}</option>
-                                    <option value="owner">{{ __('I am responsible') }}</option>
-                                    <option value="auditor">{{ __('I am auditor') }}</option>
-                                    <option value="pm">{{ __('I am PM') }}</option>
-                                    <option value="participant">{{ __('I am participant') }}</option>
-                                    <option value="account">{{ __('I created checklist') }}</option>
-                                </select>
-                            </label>
-                            <button type="button"
-                                    class="cabinet-sc-plan-search__toggle"
-                                    data-sc-plan-search-toggle
-                                    data-tip="{{ __('Search tasks and checklist items') }}"
-                                    aria-label="{{ __('Search tasks and checklist items') }}"
-                                    aria-expanded="false"
-                                    aria-controls="cabinetScPlanSearch">
-                                <i class="bi bi-search" aria-hidden="true"></i>
-                            </button>
-                            <div class="cabinet-sc-filters">
-                                <button type="button" class="btn btn-sm btn-outline-secondary active" data-sc-plan-preset="all" aria-pressed="true">{{ __('All') }}</button>
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-secondary"
-                                        data-sc-plan-preset="overdue"
-                                        data-tip="{{ __('Overdue filter hint') }}"
-                                        aria-pressed="false">{{ __('Overdue') }}</button>
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-secondary"
-                                        data-sc-plan-preset="due-soon"
-                                        data-tip="{{ __('Due soon filter hint') }}"
-                                        aria-pressed="false">{{ __('Due soon') }}</button>
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-secondary"
-                                        data-sc-plan-preset="no-review"
-                                        data-tip="{{ __('Without review filter hint') }}"
-                                        aria-pressed="false">{{ __('Without review') }}</button>
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-secondary"
-                                        data-sc-plan-preset="important"
-                                        data-tip="{{ __('Important filter hint') }}"
-                                        aria-pressed="false">{{ __('Important') }}</button>
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-secondary"
-                                        data-sc-plan-preset="unread-notes"
-                                        data-tip="{{ __('Unread notes filter hint') }}"
-                                        aria-pressed="false">{{ __('Unread notes') }}</button>
-                                @if(!empty($showReviewTab) && (int) ($reviewCount ?? 0) > 0)
-                                    <button type="button"
-                                            class="btn btn-sm btn-outline-secondary"
-                                            data-sc-plan-preset="review"
-                                            data-tip="{{ __('For review filter hint') }}"
-                                            aria-pressed="false">
-                                        {{ __('Status review') }}
-                                        <span class="cabinet-sc-filters__badge">{{ number_format((int) $reviewCount, 0, '', ' ') }}</span>
-                                    </button>
-                                @endif
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-secondary"
-                                        data-sc-plan-preset="done"
-                                        data-tip="{{ __('Completed tasks filter hint') }}"
-                                        aria-pressed="false">{{ __('Completed tasks') }}</button>
-                            </div>
-                        </div>
-                        <div class="cabinet-sc-plan-search-panel" data-sc-plan-search-panel hidden>
-                            <label class="visually-hidden" for="cabinetScPlanSearch">{{ __('Search tasks') }}</label>
-                            <input type="search"
-                                   id="cabinetScPlanSearch"
-                                   class="form-control form-control-sm cabinet-sc-plan-search__input"
-                                   data-sc-plan-search
-                                   placeholder="{{ __('Search tasks') }}…"
-                                   autocomplete="off">
-                        </div>
-                    </div>
+                    @component('pages.partials.seo-checklist-task-filters', [
+                        'context' => 'plan',
+                        'reviewCount' => (int) ($reviewCount ?? 0),
+                        'showReview' => !empty($showReviewTab) && (int) ($reviewCount ?? 0) > 0,
+                        'searchId' => 'cabinetScPlanSearch',
+                    ])
+                        @slot('leading')
+                            @include('pages.partials.seo-checklist-task-filters-leading-plan', [
+                                'filterProjects' => $filterProjects ?? [],
+                            ])
+                        @endslot
+                    @endcomponent
 
                     <div class="cabinet-sc-plan-filter-empty d-none"
                          data-sc-plan-filter-empty

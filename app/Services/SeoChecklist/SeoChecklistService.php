@@ -4686,39 +4686,31 @@ class SeoChecklistService
     }
 
     /**
-     * Сброс recurring-задач обратно в todo (месяц / каждые N дней).
+     * Цикл повторов:
+     * - done/skip → сброс в todo (как раньше);
+     * - review (зависла проверка) → создать новый экземпляр, с прежней снять repeat_rule.
+     * Иначе «на проверке» блокирует весь ряд повторов навсегда.
      *
-     * @return int сколько задач сброшено
+     * @return int сколько задач обработано (сброс + spawn)
      */
     public function resetRecurringDue(): int
     {
         $now = now();
         $monthStart = $now->copy()->startOfMonth();
-        $reset = 0;
+        $touched = 0;
         $rules = SeoChecklistDefaultTemplate::repeatRuleKeys();
+        $projectsToRecalc = [];
 
         SeoChecklistItem::query()
             ->whereNotNull('repeat_rule')
             ->whereIn('repeat_rule', $rules)
             ->whereIn('status', ['done', 'skip'])
             ->whereNotNull('done_at')
+            ->whereNull('parent_id')
             ->orderBy('id')
-            ->chunkById(200, function ($items) use ($now, $monthStart, &$reset) {
+            ->chunkById(200, function ($items) use ($now, $monthStart, &$touched, &$projectsToRecalc) {
                 foreach ($items as $item) {
-                    $doneAt = $item->done_at;
-                    if (!$doneAt) {
-                        continue;
-                    }
-                    $shouldReset = false;
-                    if ($item->repeat_rule === 'monthly') {
-                        $shouldReset = $doneAt->lt($monthStart);
-                    } else {
-                        $interval = SeoChecklistDefaultTemplate::repeatIntervalDays($item->repeat_rule);
-                        if ($interval) {
-                            $shouldReset = $doneAt->copy()->addDays($interval)->lte($now);
-                        }
-                    }
-                    if (!$shouldReset) {
+                    if (!$this->repeatCycleIsDue($item->repeat_rule, $item->done_at, $now, $monthStart)) {
                         continue;
                     }
 
@@ -4726,15 +4718,242 @@ class SeoChecklistService
                     $item->done_at = null;
                     $item->done_by = null;
                     $item->save();
-                    $reset++;
+                    $touched++;
+                    $projectsToRecalc[(int) $item->project_id] = true;
+                }
+            });
 
-                    if ($item->project) {
-                        $item->project->recalculateProgress();
+        SeoChecklistItem::query()
+            ->whereNotNull('repeat_rule')
+            ->whereIn('repeat_rule', $rules)
+            ->where('status', 'review')
+            ->whereNull('parent_id')
+            ->orderBy('id')
+            ->chunkById(200, function ($items) use ($now, $monthStart, &$touched, &$projectsToRecalc) {
+                foreach ($items as $item) {
+                    try {
+                        if ($this->findActiveRepeatSibling($item)) {
+                            // Цикл уже живёт в другой открытой задаче — с этой снимаем правило.
+                            $item->repeat_rule = null;
+                            $item->save();
+                            $touched++;
+                            continue;
+                        }
+
+                        $anchor = $this->repeatReviewAnchorAt($item);
+                        if (!$this->repeatCycleIsDue($item->repeat_rule, $anchor, $now, $monthStart)) {
+                            continue;
+                        }
+
+                        $spawned = $this->spawnRecurringAfterStuckReview($item);
+                        if (!$spawned) {
+                            continue;
+                        }
+                        $touched++;
+                        $projectsToRecalc[(int) $item->project_id] = true;
+                    } catch (Throwable $e) {
+                        report($e);
                     }
                 }
             });
 
-        return $reset;
+        foreach (array_keys($projectsToRecalc) as $projectId) {
+            $project = SeoChecklistProject::query()->find($projectId);
+            if ($project) {
+                $project->recalculateProgress();
+            }
+        }
+
+        return $touched;
+    }
+
+    /**
+     * @param  \Carbon\Carbon|\DateTimeInterface|string|null  $anchor
+     */
+    private function repeatCycleIsDue(?string $rule, $anchor, $now, $monthStart): bool
+    {
+        if ($rule === null || $rule === '' || !$anchor) {
+            return false;
+        }
+        $at = $anchor instanceof \Carbon\Carbon
+            ? $anchor
+            : \Carbon\Carbon::parse($anchor);
+
+        if ($rule === 'monthly') {
+            return $at->lt($monthStart);
+        }
+
+        $interval = SeoChecklistDefaultTemplate::repeatIntervalDays($rule);
+
+        return $interval ? $at->copy()->addDays($interval)->lte($now) : false;
+    }
+
+    private function repeatReviewAnchorAt(SeoChecklistItem $item): \Carbon\Carbon
+    {
+        if (SeoChecklistActivityLog::tableReady()) {
+            $reviewAt = SeoChecklistActivityLog::query()
+                ->where('item_id', (int) $item->id)
+                ->where('type', 'status_change')
+                ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(meta_json, '$.to')) = ?", ['review'])
+                ->orderByDesc('id')
+                ->value('created_at');
+            if ($reviewAt) {
+                return \Carbon\Carbon::parse($reviewAt);
+            }
+        }
+
+        if ($item->due_at) {
+            return $item->due_at->copy();
+        }
+
+        return $item->updated_at
+            ? $item->updated_at->copy()
+            : ($item->created_at ? $item->created_at->copy() : now());
+    }
+
+    private function findActiveRepeatSibling(SeoChecklistItem $item): ?SeoChecklistItem
+    {
+        // Уникальный (project_id, code): живой цикл уже занял канонический code,
+        // а эта review-задача лежит с суффиксом __rev_*.
+        $code = trim((string) ($item->code ?? ''));
+        $canonical = $code;
+        if (preg_match('/^(.*)__rev_\d+$/', $code, $m)) {
+            $canonical = $m[1];
+        }
+
+        $q = SeoChecklistItem::query()
+            ->where('project_id', (int) $item->project_id)
+            ->whereNull('parent_id')
+            ->where('id', '!=', (int) $item->id)
+            ->whereIn('status', SeoChecklistItem::ASSIGNEE_DUE_STATUSES)
+            ->whereNotNull('repeat_rule');
+
+        if ($canonical !== '') {
+            $q->where('code', $canonical);
+        } else {
+            $q->where('stage_key', (string) $item->stage_key)
+                ->where('title', (string) $item->title);
+        }
+
+        return $q->orderByDesc('id')->first();
+    }
+
+    private function archiveRepeatItemCode(SeoChecklistItem $item): string
+    {
+        $original = trim((string) ($item->code ?? ''));
+        if ($original === '') {
+            $original = 'item';
+        }
+        $suffix = '__rev_' . (int) $item->id;
+        $max = 96;
+        $baseMax = max(1, $max - strlen($suffix));
+        $base = substr($original, 0, $baseMax);
+        $candidate = $base . $suffix;
+
+        $n = 0;
+        while (
+            SeoChecklistItem::query()
+                ->where('project_id', (int) $item->project_id)
+                ->where('code', $candidate)
+                ->where('id', '!=', (int) $item->id)
+                ->exists()
+        ) {
+            $n++;
+            $extra = '_' . $n;
+            $baseMax = max(1, $max - strlen($suffix) - strlen($extra));
+            $candidate = substr($original, 0, $baseMax) . $suffix . $extra;
+            if ($n > 20) {
+                $candidate = 'rev_' . (int) $item->id . '_' . substr(md5($original . microtime(true)), 0, 12);
+                break;
+            }
+        }
+
+        return $candidate;
+    }
+
+    private function spawnRecurringAfterStuckReview(SeoChecklistItem $stuck): ?SeoChecklistItem
+    {
+        $rule = SeoChecklistDefaultTemplate::normalizeRepeatRule($stuck->repeat_rule);
+        if ($rule === null) {
+            return null;
+        }
+
+        $project = $stuck->project ?: SeoChecklistProject::query()->find($stuck->project_id);
+        if (!$project || $project->status === 'archived') {
+            return null;
+        }
+
+        $dueDays = $this->normalizeDueDays($stuck->due_days_from_start);
+        if ($dueDays === null) {
+            $dueDays = SeoChecklistDefaultTemplate::repeatIntervalDays($rule) ?: ($rule === 'monthly' ? 30 : 7);
+        }
+        $dueAt = now()->copy()->startOfDay()->addDays(max(1, (int) $dueDays));
+        if (!empty($project->skip_weekends)) {
+            while (in_array((int) $dueAt->dayOfWeekIso, [6, 7], true)) {
+                $dueAt->addDay();
+            }
+        }
+
+        $sort = (int) $project->items()
+            ->whereNull('parent_id')
+            ->where('stage_key', (string) $stuck->stage_key)
+            ->max('sort') + 10;
+
+        $originalCode = (string) $stuck->code;
+
+        return DB::transaction(function () use ($stuck, $project, $rule, $dueAt, $sort, $originalCode) {
+            // Освобождаем UNIQUE(project_id, code): старая review остаётся в очереди,
+            // канонический code переходит новому циклу.
+            $stuck->code = $this->archiveRepeatItemCode($stuck);
+            $stuck->repeat_rule = null;
+            $stuck->save();
+
+            $payload = [
+                'project_id' => (int) $project->id,
+                'parent_id' => null,
+                'code' => $originalCode,
+                'stage_key' => $stuck->stage_key,
+                'stage_sort' => (int) $stuck->stage_sort,
+                'sort' => $sort,
+                'title' => $stuck->title,
+                'help' => $stuck->help,
+                'role' => $stuck->role,
+                'is_important' => (bool) $stuck->is_important,
+                'include_in_report' => (bool) $stuck->include_in_report,
+                'allows_subtasks' => (bool) $stuck->allows_subtasks,
+                'repeat_rule' => $rule,
+                'due_days_from_start' => $stuck->due_days_from_start,
+                'due_at' => $dueAt,
+                'links_json' => is_array($stuck->links_json) ? $stuck->links_json : [],
+                'status' => 'todo',
+                'assignee_user_id' => $stuck->assignee_user_id,
+                'created_by' => $stuck->created_by,
+                'time_spent_seconds' => 0,
+            ];
+            if (Schema::hasColumn('seo_checklist_items', 'client_help')) {
+                $payload['client_help'] = $stuck->client_help;
+            }
+            $spawned = SeoChecklistItem::query()->create($payload);
+
+            $actorId = (int) ($stuck->created_by ?: $project->user_id ?: 0);
+            $this->logActivity((int) $project->id, (int) $spawned->id, $actorId, 'item_created', array_merge(
+                $this->itemActivitySnapshot($spawned),
+                [
+                    'source' => 'repeat_spawn_after_review',
+                    'from_item_id' => (int) $stuck->id,
+                    'repeat_rule' => $rule,
+                ]
+            ));
+            $this->logActivity((int) $project->id, (int) $stuck->id, $actorId, 'repeat_rule_cleared', [
+                'reason' => 'spawned_next_while_in_review',
+                'spawned_item_id' => (int) $spawned->id,
+                'repeat_rule' => $rule,
+                'archived_code' => (string) $stuck->code,
+                'canonical_code' => $originalCode,
+            ]);
+
+            return $spawned;
+        });
     }
 
     private function domainHasMetrika(int $userId, string $domain): bool

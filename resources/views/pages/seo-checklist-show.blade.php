@@ -311,75 +311,27 @@
             @endif
 
             <div class="cabinet-sc-plan-workspace">
-                <div class="cabinet-sc-plan-filters cabinet-sc-plan-filters--sticky cabinet-sc-show-toolbar" data-sc-show-filters>
-                    <div class="cabinet-sc-plan-filters__bar cabinet-sc-show-toolbar__bar" data-tip="{{ __('Filters can be combined') }}">
-                        <label class="cabinet-sc-show-search">
-                            <span class="visually-hidden">{{ __('Search tasks') }}</span>
-                            <i class="bi bi-search" aria-hidden="true"></i>
-                            <input type="search"
-                                   id="cabinetScShowSearch"
-                                   class="form-control form-control-sm"
-                                   data-sc-task-search
-                                   placeholder="{{ __('Search tasks') }}…"
-                                   autocomplete="off">
-                        </label>
-                        <div class="cabinet-sc-filters cabinet-sc-filters--status">
-                            <button type="button" class="btn btn-sm btn-outline-secondary active" data-sc-filter="all" aria-pressed="true">{{ __('All') }}</button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-filter="open" aria-pressed="false">{{ __('Open tasks') }}</button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-filter="overdue" data-tip="{{ __('Overdue filter hint') }}" aria-pressed="false">{{ __('Overdue') }}</button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-filter="due-soon" data-tip="{{ __('Due soon filter hint') }}" aria-pressed="false">{{ __('Due soon') }}</button>
-                            <button type="button"
-                                    class="btn btn-sm btn-outline-secondary"
-                                    data-sc-filter="no-review"
-                                    data-tip="{{ __('Without review filter hint') }}"
-                                    aria-pressed="false">{{ __('Without review') }}</button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-filter="important" aria-pressed="false">{{ __('Important') }}</button>
-                            <button type="button"
-                                    class="btn btn-sm btn-outline-secondary"
-                                    data-sc-filter="unread-notes"
-                                    data-tip="{{ __('Unread notes filter hint') }}"
-                                    aria-pressed="false">{{ __('Unread notes') }}</button>
-                            @if((int) ($projectReviewCount ?? 0) > 0)
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-secondary"
-                                        data-sc-filter="review"
-                                        data-tip="{{ __('For review filter hint') }}"
-                                        aria-pressed="false">
-                                    {{ __('Status review') }}
-                                    <span class="cabinet-sc-filters__badge">{{ number_format((int) $projectReviewCount, 0, '', ' ') }}</span>
-                                </button>
-                            @endif
-                            <button type="button"
-                                    class="btn btn-sm btn-outline-secondary"
-                                    data-sc-filter="done"
-                                    data-tip="{{ __('Completed tasks filter hint') }}"
-                                    aria-pressed="false">{{ __('Completed tasks') }}</button>
-                            @if(count($myRoles) > 0)
-                                <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-filter="mine" aria-pressed="false">{{ __('My tasks') }}</button>
-                            @endif
-                        </div>
-                    </div>
-                    <div class="cabinet-sc-show-toolbar__roles">
-                        <div class="cabinet-sc-filters cabinet-sc-filters--role">
-                            @foreach($roleLabels as $roleKey => $roleLabel)
-                                @php $rs = $roleStats[$roleKey] ?? ['done' => 0, 'total' => 0]; @endphp
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-secondary"
-                                        data-sc-filter="role:{{ $roleKey }}"
-                                        aria-pressed="false">
-                                    {{ $roleLabel }}
-                                    @if(($rs['total'] ?? 0) > 0)
-                                        <span class="cabinet-sc-filters__badge">{{ number_format((int) $rs['done'], 0, '', ' ') }}/{{ number_format((int) $rs['total'], 0, '', ' ') }}</span>
-                                    @endif
-                                </button>
-                            @endforeach
-                        </div>
-                        <div class="cabinet-sc-stage-controls">
-                            <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-stages-expand>{{ __('Expand all') }}</button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-stages-collapse>{{ __('Collapse all') }}</button>
-                        </div>
-                    </div>
-                </div>
+                @component('pages.partials.seo-checklist-task-filters', [
+                    'context' => 'show',
+                    'reviewCount' => (int) ($projectReviewCount ?? 0),
+                    'showReview' => (int) ($projectReviewCount ?? 0) > 0,
+                    'searchId' => 'cabinetScShowSearch',
+                    'rootExtraClass' => 'cabinet-sc-show-toolbar',
+                    'barExtraClass' => 'cabinet-sc-show-toolbar__bar',
+                    'barTip' => __('Filters can be combined'),
+                    'filtersExtraClass' => 'cabinet-sc-filters--status',
+                ])
+                    @slot('leading')
+                        @include('pages.partials.seo-checklist-task-filters-leading-show', [
+                            'myRoles' => $myRoles ?? [],
+                            'roleLabels' => $roleLabels ?? [],
+                            'roleStats' => $roleStats ?? [],
+                        ])
+                    @endslot
+                    @slot('trailing')
+                        @include('pages.partials.seo-checklist-task-filters-trailing-show')
+                    @endslot
+                @endcomponent
 
         @if($canManage)
             <div class="cabinet-sc-actions mb-3">

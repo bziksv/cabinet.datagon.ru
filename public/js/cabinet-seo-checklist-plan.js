@@ -1127,11 +1127,11 @@
         var myRoleSelect = root.querySelector('[data-sc-plan-my-role]');
         var myRolePresetBtns = Array.prototype.slice.call(root.querySelectorAll('[data-sc-plan-my-role-preset]'));
         var emptyEl = root.querySelector('[data-sc-plan-filter-empty]');
-        var presetBtns = Array.prototype.slice.call(root.querySelectorAll('[data-sc-plan-preset]'));
-        var searchToggle = root.querySelector('[data-sc-plan-search-toggle]');
-        var searchInput = root.querySelector('[data-sc-plan-search]');
-        var searchPanel = root.querySelector('[data-sc-plan-search-panel]');
-        var filtersRoot = root.querySelector('[data-sc-plan-filters]');
+        var presetBtns = Array.prototype.slice.call(root.querySelectorAll('[data-sc-status-filter], [data-sc-plan-preset]'));
+        var searchToggle = root.querySelector('[data-sc-search-toggle], [data-sc-plan-search-toggle]');
+        var searchInput = root.querySelector('[data-sc-search-input], [data-sc-plan-search]');
+        var searchPanel = root.querySelector('[data-sc-search-panel], [data-sc-plan-search-panel]');
+        var filtersRoot = root.querySelector('[data-sc-task-filters], [data-sc-plan-filters]');
         if (!projectSelect && !myRoleSelect && !presetBtns.length && !searchInput) return;
 
         var activePresets = [];
@@ -1277,10 +1277,14 @@
             } catch (e) {}
         }
 
+        function statusFilterKey(btn) {
+            return btn.getAttribute('data-sc-status-filter') || btn.getAttribute('data-sc-plan-preset') || '';
+        }
+
         function syncPresetButtons() {
             var hasFacet = activePresets.length > 0;
             presetBtns.forEach(function (btn) {
-                var key = btn.getAttribute('data-sc-plan-preset');
+                var key = statusFilterKey(btn);
                 var on = key === 'all' ? !hasFacet : activePresets.indexOf(key) !== -1;
                 btn.classList.toggle('active', on);
                 btn.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -1608,7 +1612,7 @@
         }
         presetBtns.forEach(function (btn) {
             btn.addEventListener('click', function () {
-                togglePreset(btn.getAttribute('data-sc-plan-preset'));
+                togglePreset(statusFilterKey(btn));
             });
         });
         root.querySelectorAll('[data-sc-plan-rail-chip]').forEach(function (btn) {

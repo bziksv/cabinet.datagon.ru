@@ -983,5 +983,6 @@
     "No plan tasks for this project": "No tasks for this project in the current plan",
     "Only completed tasks in plan for this project": "Only completed tasks are in the plan for this project — click “Show completed”",
     "All my roles": "All my roles",
-    "Filter by my role": "Filter by my role"
+    "Filter by my role": "Filter by my role",
+    "Filter by task role": "Filter by task role"
 }

@@ -77,13 +77,6 @@ class RelevanceAnalysisService
             }
         }
 
-        $inflight = IntegrationAnalysis::where('user_id', $user->id)
-            ->whereIn('status', [IntegrationAnalysis::STATUS_QUEUED, IntegrationAnalysis::STATUS_RUNNING])
-            ->count();
-        if ($inflight >= 20) {
-            throw new InvalidArgumentException('queue_busy');
-        }
-
         Auth::setUser($user);
 
         $payload = [

@@ -26,12 +26,6 @@ class AiGenerateController extends Controller
             $record = $this->generator->start(Auth::user(), $request->all());
         } catch (InvalidArgumentException $e) {
             $msg = $e->getMessage();
-            if ($msg === 'queue_busy') {
-                return response()->json([
-                    'error' => 'queue_busy',
-                    'message' => 'Too many generations are already waiting. Retry later.',
-                ], 429)->header('Retry-After', '30');
-            }
             $code = $msg === 'ai_monthly_limit_exhausted' ? 429 : 422;
             return response()->json([
                 'error' => $msg === 'ai_monthly_limit_exhausted' ? 'ai_monthly_limit_exhausted' : 'validation_error',

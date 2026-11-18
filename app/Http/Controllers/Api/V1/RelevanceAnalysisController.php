@@ -31,12 +31,6 @@ class RelevanceAnalysisController extends Controller
             );
         } catch (InvalidArgumentException $e) {
             $msg = $e->getMessage();
-            if ($msg === 'queue_busy') {
-                return response()->json([
-                    'error' => 'queue_busy',
-                    'message' => 'Too many analyses are already waiting. Retry later.',
-                ], 429)->header('Retry-After', '30');
-            }
             $code = $msg === 'relevance_limit_exhausted' ? 429 : 422;
             return response()->json([
                 'error' => $msg,

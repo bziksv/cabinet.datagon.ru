@@ -42,13 +42,6 @@ class AiGenerateService
 
         $this->assertMonthlyBudget($user);
 
-        $waiting = AiGenerationHistory::where('user_id', $user->id)
-            ->where('status', AiGenerationHistory::PENDING)
-            ->count();
-        if ($waiting >= 20) {
-            throw new InvalidArgumentException('queue_busy');
-        }
-
         // Пачка фраз: один запрос к модели на N товаров (экономия токенов).
         if ($type === 'phrase' && !empty($input['items']) && is_array($input['items'])) {
             return $this->startPhraseBatch($user, $input['items'], $input);

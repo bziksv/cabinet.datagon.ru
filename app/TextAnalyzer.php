@@ -535,6 +535,12 @@ class TextAnalyzer extends Model
 
     public static function removeNoindexText($html)
     {
+        // Яндекс: и тег <noindex>, и комментарий <!--noindex-->…<!--/noindex--> (так пишет Битрикс).
+        $html = preg_replace('/<!--\s*noindex\s*-->.*?<!--\s*\/\s*noindex\s*-->/isu', '', (string) $html);
+        if (! is_string($html)) {
+            $html = '';
+        }
+
         $document = new HtmlDocument();
         $document->load(mb_strtolower($html));
         $document->removeElements('noindex');

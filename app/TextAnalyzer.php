@@ -548,6 +548,57 @@ class TextAnalyzer extends Model
         return $document->outertext;
     }
 
+    /**
+     * Просмотр сохранённого HTML: блоки noindex остаются на месте и подписаны,
+     * участвуют ли они в подсчёте слов.
+     */
+    public static function annotateNoindexPreview(string $html, bool $excludedFromCount): string
+    {
+        $label = $excludedFromCount
+            ? 'noindex — в расчёте слов не участвует'
+            : 'noindex — текст участвует в расчёте';
+        $wrap = static function (string $inner) use ($label, $excludedFromCount): string {
+            return '<div class="titlo-noindex-mark" data-titlo-counted="' . ($excludedFromCount ? '0' : '1') . '">'
+                . '<div class="titlo-noindex-mark__label">' . htmlspecialchars($label, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</div>'
+                . $inner
+                . '</div>';
+        };
+
+        $html = preg_replace_callback(
+            '/<!--\s*noindex\s*-->(.*?)<!--\s*\/\s*noindex\s*-->/isu',
+            static function (array $m) use ($wrap): string {
+                return $wrap($m[1]);
+            },
+            $html
+        );
+        if (! is_string($html)) {
+            return '';
+        }
+
+        $html = preg_replace_callback(
+            '/<noindex\b[^>]*>(.*?)<\/noindex>/isu',
+            static function (array $m) use ($wrap): string {
+                return $wrap($m[1]);
+            },
+            $html
+        );
+        if (! is_string($html)) {
+            return '';
+        }
+
+        $css = '<style id="titlo-noindex-preview">'
+            . '.titlo-noindex-mark{outline:2px dashed #b45309;background:rgba(245,158,11,.16);margin:8px 0;padding:0 0 6px}'
+            . '.titlo-noindex-mark__label{display:block;background:#b45309;color:#fff;font:600 12px/1.4 Arial,sans-serif;padding:3px 8px}'
+            . '</style>';
+        if (preg_match('/<\/head>/i', $html)) {
+            $html = preg_replace('/<\/head>/i', $css . '</head>', $html, 1);
+        } else {
+            $html = $css . $html;
+        }
+
+        return is_string($html) ? $html : '';
+    }
+
     public static function removeConjunctionsPrepositionsPronouns($text)
     {
         $pronouns = [

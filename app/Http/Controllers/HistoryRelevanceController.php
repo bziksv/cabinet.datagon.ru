@@ -13,6 +13,7 @@ use App\RelevanceHistory;
 use App\RelevanceHistoryResult;
 use App\RelevanceSharing;
 use App\RelevanceTags;
+use App\TextAnalyzer;
 use App\User;
 use App\UsersJobs;
 use Illuminate\Database\Eloquent\Collection;
@@ -1086,9 +1087,28 @@ class HistoryRelevanceController extends Controller
     public function showDetail($url, $id, $search)
     {
         $history = RelevanceHistoryResult::where($search, $id)->latest('updated_at')->first();
+        if ($history === null) {
+            abort(404);
+        }
         $url = str_replace('splittedSlashe', '/', $url);
         $sites = Common::uncompressArray($history->sites);
+        if (! isset($sites[$url]['defaultHtml'])) {
+            abort(404);
+        }
+        $html = gzuncompress(base64_decode($sites[$url]['defaultHtml']));
+        if (! is_string($html) || $html === '') {
+            abort(404);
+        }
 
-        return gzuncompress(base64_decode($sites[$url]['defaultHtml']));
+        $request = [];
+        $row = RelevanceHistory::find($history->project_id);
+        if ($row !== null && $row->request) {
+            $decoded = json_decode($row->request, true);
+            $request = is_array($decoded) ? $decoded : [];
+        }
+        $strip = Relevance::shouldStripNoindex($request['noIndex'] ?? null);
+
+        return response(TextAnalyzer::annotateNoindexPreview($html, $strip))
+            ->header('Content-Type', 'text/html; charset=UTF-8');
     }
 }

@@ -307,9 +307,64 @@
         });
     }
 
+    var PROJECT_PREFS_KEY = 'seoChecklistProjectHubPrefs';
     var PROJECT_ROLE_FILTER_KEY = 'seoChecklistProjectRoleFilter';
     var PROJECT_VIEW_KEY = 'seoChecklistProjectView';
     var PROJECT_GROUP_BY_KEY = 'seoChecklistProjectGroupBy';
+    var PROJECT_SORT_KEY = 'seoChecklistProjectSort';
+    var PROJECT_SEARCH_KEY = 'seoChecklistProjectSearch';
+
+    function readProjectPrefs() {
+        var prefs = { role: '', sort: 'activity', view: 'grid', groupBy: 'owner', search: '' };
+        try {
+            var raw = localStorage.getItem(PROJECT_PREFS_KEY);
+            if (raw) {
+                var parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === 'object') {
+                    if (typeof parsed.role === 'string') prefs.role = parsed.role;
+                    if (typeof parsed.sort === 'string') prefs.sort = parsed.sort;
+                    if (typeof parsed.view === 'string') prefs.view = parsed.view;
+                    if (typeof parsed.groupBy === 'string') prefs.groupBy = parsed.groupBy;
+                    if (typeof parsed.search === 'string') prefs.search = parsed.search;
+                }
+            }
+            // legacy session keys → one-time migrate
+            if (!raw) {
+                prefs.role = sessionStorage.getItem(PROJECT_ROLE_FILTER_KEY) || prefs.role;
+                prefs.view = sessionStorage.getItem(PROJECT_VIEW_KEY) || prefs.view;
+                prefs.groupBy = sessionStorage.getItem(PROJECT_GROUP_BY_KEY) || prefs.groupBy;
+                prefs.sort = sessionStorage.getItem(PROJECT_SORT_KEY) || prefs.sort;
+                prefs.search = sessionStorage.getItem(PROJECT_SEARCH_KEY) || prefs.search;
+            }
+        } catch (e) { /* ignore */ }
+        if (prefs.view !== 'people') prefs.view = 'grid';
+        if (prefs.groupBy !== 'pm' && prefs.groupBy !== 'auditor') prefs.groupBy = 'owner';
+        if (prefs.sort !== 'progress' && prefs.sort !== 'domain') prefs.sort = 'activity';
+        return prefs;
+    }
+
+    function writeProjectPrefs(patch) {
+        var prefs = readProjectPrefs();
+        Object.keys(patch || {}).forEach(function (key) {
+            prefs[key] = patch[key];
+        });
+        try {
+            localStorage.setItem(PROJECT_PREFS_KEY, JSON.stringify(prefs));
+            sessionStorage.removeItem(PROJECT_ROLE_FILTER_KEY);
+            sessionStorage.removeItem(PROJECT_VIEW_KEY);
+            sessionStorage.removeItem(PROJECT_GROUP_BY_KEY);
+            sessionStorage.removeItem(PROJECT_SORT_KEY);
+            sessionStorage.removeItem(PROJECT_SEARCH_KEY);
+        } catch (e) { /* ignore */ }
+        return prefs;
+    }
+
+    function selectHasOption(selectEl, value) {
+        if (!selectEl) return false;
+        return Array.prototype.some.call(selectEl.options || [], function (opt) {
+            return opt.value === value;
+        });
+    }
 
     function projectViewI18n() {
         var el = document.getElementById('cabinet-sc-project-view-i18n');
@@ -360,10 +415,7 @@
         }
         syncProjectRolePresets(next);
         if (persist !== false) {
-            try {
-                if (next) sessionStorage.setItem(PROJECT_ROLE_FILTER_KEY, next);
-                else sessionStorage.removeItem(PROJECT_ROLE_FILTER_KEY);
-            } catch (e) { /* ignore */ }
+            writeProjectPrefs({ role: next });
         }
         applyProjectFilters();
     }
@@ -411,9 +463,7 @@
         var next = view === 'people' ? 'people' : 'grid';
         syncProjectViewControls(next);
         if (persist !== false) {
-            try {
-                sessionStorage.setItem(PROJECT_VIEW_KEY, next);
-            } catch (e) { /* ignore */ }
+            writeProjectPrefs({ view: next });
         }
         applyProjectFilters();
     }
@@ -567,32 +617,42 @@
     var roleFilterEl = document.querySelector('[data-sc-project-role-filter]');
     var sortEl = document.querySelector('[data-sc-project-sort]');
     var groupByEl = document.querySelector('[data-sc-project-group-by]');
-    if (searchEl) searchEl.addEventListener('input', applyProjectFilters);
+    var projectPrefs = readProjectPrefs();
+
+    if (searchEl) {
+        if (projectPrefs.search) searchEl.value = projectPrefs.search;
+        var searchPersistTimer = null;
+        searchEl.addEventListener('input', function () {
+            applyProjectFilters();
+            if (searchPersistTimer) clearTimeout(searchPersistTimer);
+            searchPersistTimer = setTimeout(function () {
+                writeProjectPrefs({ search: String(searchEl.value || '') });
+            }, 250);
+        });
+    }
     if (roleFilterEl) {
-        try {
-            var savedRole = sessionStorage.getItem(PROJECT_ROLE_FILTER_KEY) || '';
-            if (savedRole && Array.prototype.some.call(roleFilterEl.options, function (opt) {
-                return opt.value === savedRole;
-            })) {
-                roleFilterEl.value = savedRole;
-            }
-        } catch (e) { /* ignore */ }
+        if (projectPrefs.role && selectHasOption(roleFilterEl, projectPrefs.role)) {
+            roleFilterEl.value = projectPrefs.role;
+        }
         roleFilterEl.addEventListener('change', function () {
             setProjectRoleFilter(roleFilterEl.value, true);
         });
     }
-    if (sortEl) sortEl.addEventListener('change', applyProjectFilters);
+    if (sortEl) {
+        if (projectPrefs.sort && selectHasOption(sortEl, projectPrefs.sort)) {
+            sortEl.value = projectPrefs.sort;
+        }
+        sortEl.addEventListener('change', function () {
+            writeProjectPrefs({ sort: sortEl.value || 'activity' });
+            applyProjectFilters();
+        });
+    }
     if (groupByEl) {
-        try {
-            var savedGroup = sessionStorage.getItem(PROJECT_GROUP_BY_KEY) || '';
-            if (savedGroup === 'owner' || savedGroup === 'pm' || savedGroup === 'auditor') {
-                groupByEl.value = savedGroup;
-            }
-        } catch (e) { /* ignore */ }
+        if (projectPrefs.groupBy && selectHasOption(groupByEl, projectPrefs.groupBy)) {
+            groupByEl.value = projectPrefs.groupBy;
+        }
         groupByEl.addEventListener('change', function () {
-            try {
-                sessionStorage.setItem(PROJECT_GROUP_BY_KEY, currentGroupBy());
-            } catch (e) { /* ignore */ }
+            writeProjectPrefs({ groupBy: currentGroupBy() });
             applyProjectFilters();
         });
     }
@@ -607,11 +667,8 @@
         });
     });
     if (document.querySelector('[data-sc-project-board]')) {
-        var savedView = 'grid';
-        try {
-            savedView = sessionStorage.getItem(PROJECT_VIEW_KEY) || 'grid';
-        } catch (e) { /* ignore */ }
-        syncProjectViewControls(savedView === 'people' ? 'people' : 'grid');
+        syncProjectViewControls(projectPrefs.view === 'people' ? 'people' : 'grid');
+        syncProjectRolePresets(roleFilterEl ? roleFilterEl.value : '');
         applyProjectFilters();
     }
 

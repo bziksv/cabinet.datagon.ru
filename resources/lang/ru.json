@@ -6908,5 +6908,12 @@
     "Marketing summary articles": "Статьи блога",
     "Marketing title": "Название",
     "Marketing updated": "Обновлено",
-    "Marketing plan row": "Строка плана № :n"
+    "Marketing plan row": "Строка плана № :n",
+    "Checklist project filter structure": "Состояние",
+    "Checklist project filter my role": "Моя роль",
+    "I am responsible": "Я ответственный",
+    "I am auditor": "Я аудитор",
+    "I am PM": "Я PM",
+    "I am participant": "Я участник",
+    "I created checklist": "Я создал"
 }

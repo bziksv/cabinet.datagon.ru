@@ -5888,6 +5888,24 @@ html.cabinet-sc-lightbox-open {
     width: auto;
 }
 
+.cabinet-sc-filters--project-role {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.cabinet-sc-filters--project-role .btn-sm {
+    border-radius: 999px;
+    font-weight: 600;
+}
+
+.cabinet-sc-filters--project-role .btn-sm.active {
+    background: var(--sc-accent, #0d6efd);
+    border-color: var(--sc-accent, #0d6efd);
+    color: #fff;
+}
+
 .cabinet-sc-card.is-filtered-out {
     display: none !important;
 }

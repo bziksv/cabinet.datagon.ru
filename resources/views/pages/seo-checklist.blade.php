@@ -40,7 +40,7 @@
                 </button>
             </div>
         @else
-            <div class="cabinet-sc-toolbar mb-3">
+            <div class="cabinet-sc-toolbar mb-2">
                 <input type="search"
                        class="form-control form-control-sm cabinet-sc-search"
                        placeholder="{{ __('Search projects') }}…"
@@ -48,7 +48,17 @@
                        autocomplete="off">
                 <select class="form-select form-select-sm cabinet-sc-filter-select" data-sc-project-role-filter>
                     <option value="">{{ __('All roles') }}</option>
-                    <option value="no-pm">{{ __('Without PM') }}</option>
+                    <optgroup label="{{ __('Checklist project filter structure') }}">
+                        <option value="no-pm">{{ __('Without PM') }}</option>
+                        <option value="no-team">{{ __('No team') }}</option>
+                    </optgroup>
+                    <optgroup label="{{ __('Checklist project filter my role') }}">
+                        <option value="me:owner">{{ __('I am responsible') }}</option>
+                        <option value="me:auditor">{{ __('I am auditor') }}</option>
+                        <option value="me:pm">{{ __('I am PM') }}</option>
+                        <option value="me:participant">{{ __('I am participant') }}</option>
+                        <option value="me:account">{{ __('I created checklist') }}</option>
+                    </optgroup>
                 </select>
                 <select class="form-select form-select-sm cabinet-sc-filter-select" data-sc-project-sort>
                     <option value="activity">{{ __('Sort by activity') }}</option>
@@ -60,6 +70,33 @@
                         data-bs-toggle="modal"
                         data-bs-target="#cabinetScCreateModal">
                     {{ __('Create checklist') }}
+                </button>
+            </div>
+            <div class="cabinet-sc-filters cabinet-sc-filters--project-role mb-3" data-sc-project-role-presets>
+                <button type="button" class="btn btn-sm btn-outline-secondary active" data-sc-project-role-preset="" aria-pressed="true">
+                    {{ __('All roles') }}
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-project-role-preset="me:owner" aria-pressed="false">
+                    {{ __('I am responsible') }}
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-project-role-preset="me:auditor" aria-pressed="false">
+                    {{ __('I am auditor') }}
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-project-role-preset="me:pm" aria-pressed="false">
+                    {{ __('I am PM') }}
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-project-role-preset="me:participant" aria-pressed="false">
+                    {{ __('I am participant') }}
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-project-role-preset="me:account" aria-pressed="false">
+                    {{ __('I created checklist') }}
+                </button>
+                <span class="cabinet-sc-filters__sep" aria-hidden="true"></span>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-project-role-preset="no-pm" aria-pressed="false">
+                    {{ __('Without PM') }}
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-project-role-preset="no-team" aria-pressed="false">
+                    {{ __('No team') }}
                 </button>
             </div>
             <div class="cabinet-sc-grid" data-sc-project-grid>
@@ -105,6 +142,29 @@
                         if ($checklistTitle === '') {
                             $checklistTitle = $project->domain;
                         }
+                        $viewerId = (int) auth()->id();
+                        $myRoleKeys = [];
+                        if ((int) $project->user_id === $viewerId) {
+                            $myRoleKeys[] = 'account';
+                        }
+                        if ((int) ($project->owner_user_id ?? 0) === $viewerId) {
+                            $myRoleKeys[] = 'owner';
+                        }
+                        if ((int) ($project->pm_user_id ?? 0) === $viewerId) {
+                            $myRoleKeys[] = 'pm';
+                        }
+                        if ($team) {
+                            foreach ($team->members as $member) {
+                                if ((int) $member->user_id !== $viewerId) {
+                                    continue;
+                                }
+                                $memberRole = (string) ($member->role ?? '');
+                                if (in_array($memberRole, ['owner', 'auditor', 'pm', 'participant'], true)) {
+                                    $myRoleKeys[] = $memberRole;
+                                }
+                            }
+                        }
+                        $myRoleKeys = array_values(array_unique($myRoleKeys));
                         $searchBlob = strtolower(implode(' ', array_filter(array_merge([
                             $project->domain,
                             $checklistTitle,
@@ -122,6 +182,7 @@
                        data-search="{{ e($searchBlob) }}"
                        data-has-pm="{{ $pm ? '1' : '0' }}"
                        data-has-team="{{ $team ? '1' : '0' }}"
+                       data-my-roles="{{ e(implode(',', $myRoleKeys)) }}"
                        data-sort-activity="{{ $activityTs }}"
                        data-sort-progress="{{ $pct }}"
                        data-sort-domain="{{ e(mb_strtolower($project->domain . ' ' . $checklistTitle)) }}">

@@ -307,6 +307,55 @@
         });
     }
 
+    var PROJECT_ROLE_FILTER_KEY = 'seoChecklistProjectRoleFilter';
+
+    function cardMyRoles(card) {
+        return String(card.getAttribute('data-my-roles') || '')
+            .split(',')
+            .map(function (r) { return String(r || '').trim(); })
+            .filter(Boolean);
+    }
+
+    function projectRoleMatches(card, role) {
+        if (!role) return true;
+        if (role === 'no-pm') {
+            return card.getAttribute('data-has-pm') !== '1';
+        }
+        if (role === 'no-team') {
+            return card.getAttribute('data-has-team') !== '1';
+        }
+        if (role.indexOf('me:') === 0) {
+            var want = role.slice(3);
+            return cardMyRoles(card).indexOf(want) !== -1;
+        }
+        return true;
+    }
+
+    function syncProjectRolePresets(role) {
+        document.querySelectorAll('[data-sc-project-role-preset]').forEach(function (btn) {
+            var val = btn.getAttribute('data-sc-project-role-preset') || '';
+            var on = val === String(role || '');
+            btn.classList.toggle('active', on);
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+    }
+
+    function setProjectRoleFilter(role, persist) {
+        var roleEl = document.querySelector('[data-sc-project-role-filter]');
+        var next = String(role || '');
+        if (roleEl && roleEl.value !== next) {
+            roleEl.value = next;
+        }
+        syncProjectRolePresets(next);
+        if (persist !== false) {
+            try {
+                if (next) sessionStorage.setItem(PROJECT_ROLE_FILTER_KEY, next);
+                else sessionStorage.removeItem(PROJECT_ROLE_FILTER_KEY);
+            } catch (e) { /* ignore */ }
+        }
+        applyProjectFilters();
+    }
+
     function applyProjectFilters() {
         var qEl = document.querySelector('[data-sc-project-search]');
         var roleEl = document.querySelector('[data-sc-project-role-filter]');
@@ -339,23 +388,43 @@
 
         cards.forEach(function (card) {
             var hay = (card.getAttribute('data-search') || '').toLowerCase();
-            var hasPm = card.getAttribute('data-has-pm') === '1';
             var ok = true;
             if (q && hay.indexOf(q) === -1) ok = false;
-            if (ok && role === 'no-pm' && hasPm) ok = false;
+            if (ok && !projectRoleMatches(card, role)) ok = false;
             card.classList.toggle('is-filtered-out', !ok);
             if (ok) visible++;
         });
 
         if (emptyEl) emptyEl.classList.toggle('d-none', visible > 0);
+        syncProjectRolePresets(role);
     }
 
     var searchEl = document.querySelector('[data-sc-project-search]');
     var roleFilterEl = document.querySelector('[data-sc-project-role-filter]');
     var sortEl = document.querySelector('[data-sc-project-sort]');
     if (searchEl) searchEl.addEventListener('input', applyProjectFilters);
-    if (roleFilterEl) roleFilterEl.addEventListener('change', applyProjectFilters);
+    if (roleFilterEl) {
+        try {
+            var savedRole = sessionStorage.getItem(PROJECT_ROLE_FILTER_KEY) || '';
+            if (savedRole && Array.prototype.some.call(roleFilterEl.options, function (opt) {
+                return opt.value === savedRole;
+            })) {
+                roleFilterEl.value = savedRole;
+            }
+        } catch (e) { /* ignore */ }
+        roleFilterEl.addEventListener('change', function () {
+            setProjectRoleFilter(roleFilterEl.value, true);
+        });
+    }
     if (sortEl) sortEl.addEventListener('change', applyProjectFilters);
+    document.querySelectorAll('[data-sc-project-role-preset]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            setProjectRoleFilter(btn.getAttribute('data-sc-project-role-preset') || '', true);
+        });
+    });
+    if (document.querySelector('[data-sc-project-grid]')) {
+        applyProjectFilters();
+    }
 
     // —— Team hub: search + collapse/expand ——
     var TEAM_OPEN_KEY = 'seoChecklistTeamsOpen';

@@ -542,7 +542,7 @@
                                                    class="custom-control-input"
                                                    id="switchNoindex"
                                                    name="noIndex"
-                                                   @if($object['request']['noIndex'] == 'true') checked @endif>
+                                                   @if(!\App\Relevance::shouldStripNoindex($object['request']['noIndex'] ?? null)) checked @endif>
                                             <label class="custom-control-label" for="switchNoindex"></label>
                                         </div>
                                     </div>

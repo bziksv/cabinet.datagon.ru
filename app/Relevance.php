@@ -405,7 +405,7 @@ class Relevance
             return;
         }
 
-        if (isset($this->request['noIndex']) && $this->request['noIndex'] == 'false') {
+        if (self::shouldStripNoindex($this->request['noIndex'] ?? null)) {
             $this->sites[$mainKey]['html'] = TextAnalyzer::removeNoindexText($this->sites[$mainKey]['html']);
         }
 
@@ -683,6 +683,29 @@ class Relevance
     }
 
     /**
+     * Вырезать текст noindex только когда «Отслеживать текст в теге noindex» выключено.
+     * true == 'false' в PHP истинно, поэтому булев true из API раньше тоже вырезал текст.
+     *
+     * @param mixed $flag
+     */
+    public static function shouldStripNoindex($flag): bool
+    {
+        if ($flag === null || $flag === '') {
+            return false;
+        }
+        if (is_bool($flag)) {
+            return $flag === false;
+        }
+        if (is_int($flag) || is_float($flag)) {
+            return (int) $flag === 0;
+        }
+
+        $value = strtolower(trim((string) $flag));
+
+        return in_array($value, ['0', 'false', 'no', 'off'], true);
+    }
+
+    /**
      * Удалить текст, который помечен <noindex>
      * @return void
      */
@@ -690,7 +713,7 @@ class Relevance
     {
         RelevanceProgress::editProgress(20, $this->request);
 
-        if (isset($this->request['noIndex']) && $this->request['noIndex'] == 'false') {
+        if (self::shouldStripNoindex($this->request['noIndex'] ?? null)) {
             $this->mainPage['html'] = TextAnalyzer::removeNoindexText($this->mainPage['html']);
             foreach ($this->sites as $key => $page) {
                 $this->sites[$key]['html'] = TextAnalyzer::removeNoindexText($page['html']);
@@ -2659,7 +2682,7 @@ class Relevance
     {
         $html = $rawHtml;
 
-        if (($request['noIndex'] ?? '') === 'false') {
+        if (self::shouldStripNoindex($request['noIndex'] ?? null)) {
             $html = TextAnalyzer::removeNoindexText($html);
         }
 

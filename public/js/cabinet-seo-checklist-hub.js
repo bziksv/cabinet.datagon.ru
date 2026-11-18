@@ -308,6 +308,18 @@
     }
 
     var PROJECT_ROLE_FILTER_KEY = 'seoChecklistProjectRoleFilter';
+    var PROJECT_VIEW_KEY = 'seoChecklistProjectView';
+    var PROJECT_GROUP_BY_KEY = 'seoChecklistProjectGroupBy';
+
+    function projectViewI18n() {
+        var el = document.getElementById('cabinet-sc-project-view-i18n');
+        if (!el) return { unassigned: '—', projects: '' };
+        try {
+            return JSON.parse(el.textContent || '{}') || { unassigned: '—', projects: '' };
+        } catch (e) {
+            return { unassigned: '—', projects: '' };
+        }
+    }
 
     function cardMyRoles(card) {
         return String(card.getAttribute('data-my-roles') || '')
@@ -356,20 +368,57 @@
         applyProjectFilters();
     }
 
-    function applyProjectFilters() {
-        var qEl = document.querySelector('[data-sc-project-search]');
-        var roleEl = document.querySelector('[data-sc-project-role-filter]');
-        var sortEl = document.querySelector('[data-sc-project-sort]');
-        var emptyEl = document.querySelector('[data-sc-project-empty]');
+    function currentProjectView() {
+        var board = document.querySelector('[data-sc-project-board]');
+        return board && board.getAttribute('data-view') === 'people' ? 'people' : 'grid';
+    }
+
+    function currentGroupBy() {
+        var el = document.querySelector('[data-sc-project-group-by]');
+        var v = el ? String(el.value || 'owner') : 'owner';
+        return v === 'pm' || v === 'auditor' ? v : 'owner';
+    }
+
+    function syncProjectViewControls(view) {
+        var isPeople = view === 'people';
+        document.querySelectorAll('[data-sc-project-view]').forEach(function (btn) {
+            var on = (btn.getAttribute('data-sc-project-view') || '') === view;
+            btn.classList.toggle('active', on);
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        var groupByEl = document.querySelector('[data-sc-project-group-by]');
+        if (groupByEl) {
+            groupByEl.classList.toggle('d-none', !isPeople);
+            groupByEl.disabled = !isPeople;
+        }
+        var board = document.querySelector('[data-sc-project-board]');
         var grid = document.querySelector('[data-sc-project-grid]');
-        var cards = Array.prototype.slice.call(document.querySelectorAll('[data-sc-project-card]'));
-        if (!cards.length) return;
+        var people = document.querySelector('[data-sc-project-people]');
+        if (board) board.setAttribute('data-view', view);
+        if (grid) {
+            grid.classList.toggle('d-none', isPeople);
+            if (isPeople) grid.setAttribute('hidden', '');
+            else grid.removeAttribute('hidden');
+        }
+        if (people) {
+            people.classList.toggle('d-none', !isPeople);
+            if (isPeople) people.removeAttribute('hidden');
+            else people.setAttribute('hidden', '');
+        }
+    }
 
-        var q = (qEl && qEl.value ? qEl.value : '').toLowerCase().trim();
-        var role = roleEl ? roleEl.value : '';
-        var sort = sortEl ? sortEl.value : 'activity';
-        var visible = 0;
+    function setProjectView(view, persist) {
+        var next = view === 'people' ? 'people' : 'grid';
+        syncProjectViewControls(next);
+        if (persist !== false) {
+            try {
+                sessionStorage.setItem(PROJECT_VIEW_KEY, next);
+            } catch (e) { /* ignore */ }
+        }
+        applyProjectFilters();
+    }
 
+    function sortProjectCards(cards, sort) {
         cards.sort(function (a, b) {
             if (sort === 'progress') {
                 return (parseInt(a.getAttribute('data-sort-progress'), 10) || 0) - (parseInt(b.getAttribute('data-sort-progress'), 10) || 0);
@@ -379,29 +428,145 @@
             }
             return (parseInt(b.getAttribute('data-sort-activity'), 10) || 0) - (parseInt(a.getAttribute('data-sort-activity'), 10) || 0);
         });
+        return cards;
+    }
 
-        if (grid) {
-            cards.forEach(function (card) {
+    function renderPeopleBoard(visibleCards, hiddenCards) {
+        var people = document.querySelector('[data-sc-project-people]');
+        var park = document.querySelector('[data-sc-project-park]');
+        if (!people) return;
+
+        var groupBy = currentGroupBy();
+        var i18n = projectViewI18n();
+        var groups = {};
+        var order = [];
+
+        visibleCards.forEach(function (card) {
+            var id = String(card.getAttribute('data-person-' + groupBy + '-id') || '').trim();
+            var name = String(card.getAttribute('data-person-' + groupBy + '-name') || '').trim();
+            var initials = String(card.getAttribute('data-person-' + groupBy + '-initials') || '').trim();
+            var key = id !== '' ? 'id:' + id : 'none';
+            if (!groups[key]) {
+                groups[key] = {
+                    id: id,
+                    name: name || i18n.unassigned || '—',
+                    initials: initials || '?',
+                    unassigned: id === '',
+                    cards: [],
+                };
+                order.push(key);
+            }
+            groups[key].cards.push(card);
+        });
+
+        order.sort(function (a, b) {
+            var ga = groups[a];
+            var gb = groups[b];
+            if (ga.unassigned !== gb.unassigned) return ga.unassigned ? 1 : -1;
+            return String(ga.name).localeCompare(String(gb.name), 'ru');
+        });
+
+        people.innerHTML = '';
+        order.forEach(function (key) {
+            var g = groups[key];
+            var section = document.createElement('section');
+            section.className = 'cabinet-sc-person-group' + (g.unassigned ? ' is-unassigned' : '');
+            section.setAttribute('data-sc-person-group', g.id || '0');
+
+            var head = document.createElement('header');
+            head.className = 'cabinet-sc-person-group__head';
+
+            var avatar = document.createElement('span');
+            avatar.className = 'cabinet-sc-avatar cabinet-sc-person-group__avatar';
+            avatar.setAttribute('aria-hidden', 'true');
+            avatar.textContent = g.initials || '?';
+
+            var title = document.createElement('div');
+            title.className = 'cabinet-sc-person-group__title';
+            var nameEl = document.createElement('strong');
+            nameEl.textContent = g.name;
+            var meta = document.createElement('span');
+            meta.className = 'cabinet-sc-person-group__meta';
+            meta.textContent = String(g.cards.length);
+            title.appendChild(nameEl);
+            title.appendChild(meta);
+
+            head.appendChild(avatar);
+            head.appendChild(title);
+            section.appendChild(head);
+
+            var grid = document.createElement('div');
+            grid.className = 'cabinet-sc-grid cabinet-sc-person-group__grid';
+            g.cards.forEach(function (card) {
+                card.classList.remove('is-filtered-out');
                 grid.appendChild(card);
             });
-        }
+            section.appendChild(grid);
+            people.appendChild(section);
+        });
 
+        if (park) {
+            hiddenCards.forEach(function (card) {
+                card.classList.add('is-filtered-out');
+                park.appendChild(card);
+            });
+        }
+    }
+
+    function applyProjectFilters() {
+        var qEl = document.querySelector('[data-sc-project-search]');
+        var roleEl = document.querySelector('[data-sc-project-role-filter]');
+        var sortEl = document.querySelector('[data-sc-project-sort]');
+        var emptyEl = document.querySelector('[data-sc-project-empty]');
+        var grid = document.querySelector('[data-sc-project-grid]');
+        var park = document.querySelector('[data-sc-project-park]');
+        var cards = Array.prototype.slice.call(document.querySelectorAll('[data-sc-project-card]'));
+        if (!cards.length) return;
+
+        var q = (qEl && qEl.value ? qEl.value : '').toLowerCase().trim();
+        var role = roleEl ? roleEl.value : '';
+        var sort = sortEl ? sortEl.value : 'activity';
+        var view = currentProjectView();
+
+        sortProjectCards(cards, sort);
+
+        var visibleCards = [];
+        var hiddenCards = [];
         cards.forEach(function (card) {
             var hay = (card.getAttribute('data-search') || '').toLowerCase();
             var ok = true;
             if (q && hay.indexOf(q) === -1) ok = false;
             if (ok && !projectRoleMatches(card, role)) ok = false;
-            card.classList.toggle('is-filtered-out', !ok);
-            if (ok) visible++;
+            if (ok) visibleCards.push(card);
+            else hiddenCards.push(card);
         });
 
-        if (emptyEl) emptyEl.classList.toggle('d-none', visible > 0);
+        if (view === 'people') {
+            renderPeopleBoard(visibleCards, hiddenCards);
+        } else {
+            if (grid) {
+                visibleCards.forEach(function (card) {
+                    card.classList.remove('is-filtered-out');
+                    grid.appendChild(card);
+                });
+            }
+            (park || grid) && hiddenCards.forEach(function (card) {
+                card.classList.add('is-filtered-out');
+                if (park) park.appendChild(card);
+                else if (grid) grid.appendChild(card);
+            });
+            var people = document.querySelector('[data-sc-project-people]');
+            if (people) people.innerHTML = '';
+        }
+
+        if (emptyEl) emptyEl.classList.toggle('d-none', visibleCards.length > 0);
         syncProjectRolePresets(role);
     }
 
     var searchEl = document.querySelector('[data-sc-project-search]');
     var roleFilterEl = document.querySelector('[data-sc-project-role-filter]');
     var sortEl = document.querySelector('[data-sc-project-sort]');
+    var groupByEl = document.querySelector('[data-sc-project-group-by]');
     if (searchEl) searchEl.addEventListener('input', applyProjectFilters);
     if (roleFilterEl) {
         try {
@@ -417,12 +582,36 @@
         });
     }
     if (sortEl) sortEl.addEventListener('change', applyProjectFilters);
+    if (groupByEl) {
+        try {
+            var savedGroup = sessionStorage.getItem(PROJECT_GROUP_BY_KEY) || '';
+            if (savedGroup === 'owner' || savedGroup === 'pm' || savedGroup === 'auditor') {
+                groupByEl.value = savedGroup;
+            }
+        } catch (e) { /* ignore */ }
+        groupByEl.addEventListener('change', function () {
+            try {
+                sessionStorage.setItem(PROJECT_GROUP_BY_KEY, currentGroupBy());
+            } catch (e) { /* ignore */ }
+            applyProjectFilters();
+        });
+    }
     document.querySelectorAll('[data-sc-project-role-preset]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             setProjectRoleFilter(btn.getAttribute('data-sc-project-role-preset') || '', true);
         });
     });
-    if (document.querySelector('[data-sc-project-grid]')) {
+    document.querySelectorAll('[data-sc-project-view]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            setProjectView(btn.getAttribute('data-sc-project-view') || 'grid', true);
+        });
+    });
+    if (document.querySelector('[data-sc-project-board]')) {
+        var savedView = 'grid';
+        try {
+            savedView = sessionStorage.getItem(PROJECT_VIEW_KEY) || 'grid';
+        } catch (e) { /* ignore */ }
+        syncProjectViewControls(savedView === 'people' ? 'people' : 'grid');
         applyProjectFilters();
     }
 

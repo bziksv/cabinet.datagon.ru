@@ -5906,6 +5906,108 @@ html.cabinet-sc-lightbox-open {
     color: #fff;
 }
 
+.cabinet-sc-view-toggle {
+    display: inline-flex;
+    flex: 0 0 auto;
+    border: 1px solid var(--sc-border, #dee2e6);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: #fff;
+}
+
+.cabinet-sc-view-toggle .btn {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    font-weight: 600;
+    padding: 0.28rem 0.7rem;
+}
+
+.cabinet-sc-view-toggle .btn + .btn {
+    border-left: 1px solid var(--sc-border, #dee2e6);
+}
+
+.cabinet-sc-view-toggle .btn.active {
+    background: var(--sc-accent, #0d6efd);
+    color: #fff;
+}
+
+.cabinet-sc-project-board[data-view="people"] .cabinet-sc-grid[data-sc-project-grid] {
+    display: none;
+}
+
+.cabinet-sc-people-board {
+    display: flex;
+    flex-direction: column;
+    gap: 1.15rem;
+}
+
+.cabinet-sc-person-group {
+    border: 1px solid var(--sc-border, #e5e7eb);
+    border-radius: 0.85rem;
+    background: color-mix(in srgb, var(--bs-body-bg, #fff) 92%, #f8fafc);
+    padding: 0.75rem 0.85rem 0.9rem;
+}
+
+.cabinet-sc-person-group.is-unassigned {
+    background: color-mix(in srgb, #f59e0b 6%, #fff);
+    border-style: dashed;
+}
+
+.cabinet-sc-person-group__head {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    margin-bottom: 0.75rem;
+}
+
+.cabinet-sc-person-group__avatar {
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.85rem;
+}
+
+.cabinet-sc-person-group__title {
+    display: flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    min-width: 0;
+}
+
+.cabinet-sc-person-group__title strong {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.cabinet-sc-person-group__meta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.4rem;
+    height: 1.25rem;
+    padding: 0 0.4rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--sc-accent, #0d6efd) 12%, #fff);
+    color: var(--sc-accent, #0d6efd);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.cabinet-sc-person-group__grid {
+    margin: 0;
+}
+
+@media (max-width: 767.98px) {
+    .cabinet-sc-view-toggle {
+        width: 100%;
+    }
+
+    .cabinet-sc-view-toggle .btn {
+        flex: 1 1 0;
+    }
+}
+
 .cabinet-sc-card.is-filtered-out {
     display: none !important;
 }

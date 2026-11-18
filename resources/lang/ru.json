@@ -6915,5 +6915,10 @@
     "I am auditor": "Я аудитор",
     "I am PM": "Я PM",
     "I am participant": "Я участник",
-    "I created checklist": "Я создал"
+    "I created checklist": "Я создал",
+    "Checklist project view": "Вид проектов",
+    "Checklist projects grid": "Плитка",
+    "Checklist projects by specialist": "По специалистам",
+    "Group projects by role": "Группировать по роли",
+    "Checklist projects unassigned specialist": "Без специалиста"
 }

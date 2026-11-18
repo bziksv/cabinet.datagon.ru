@@ -65,6 +65,27 @@
                     <option value="progress">{{ __('Sort by progress') }}</option>
                     <option value="domain">{{ __('Sort by domain') }}</option>
                 </select>
+                <div class="cabinet-sc-view-toggle" data-sc-project-view-toggle role="group" aria-label="{{ __('Checklist project view') }}">
+                    <button type="button"
+                            class="btn btn-sm btn-outline-secondary active"
+                            data-sc-project-view="grid"
+                            aria-pressed="true">
+                        {{ __('Checklist projects grid') }}
+                    </button>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-secondary"
+                            data-sc-project-view="people"
+                            aria-pressed="false">
+                        {{ __('Checklist projects by specialist') }}
+                    </button>
+                </div>
+                <select class="form-select form-select-sm cabinet-sc-filter-select d-none"
+                        data-sc-project-group-by
+                        aria-label="{{ __('Group projects by role') }}">
+                    <option value="owner">{{ __('SEO role owner') }}</option>
+                    <option value="pm">{{ __('SEO role PM') }}</option>
+                    <option value="auditor">{{ __('SEO role auditor') }}</option>
+                </select>
                 <button type="button"
                         class="btn btn-primary btn-sm ms-auto"
                         data-bs-toggle="modal"
@@ -99,6 +120,7 @@
                     {{ __('No team') }}
                 </button>
             </div>
+            <div class="cabinet-sc-project-board" data-sc-project-board data-view="grid">
             <div class="cabinet-sc-grid" data-sc-project-grid>
                 @foreach($projects as $project)
                     @php
@@ -165,6 +187,38 @@
                             }
                         }
                         $myRoleKeys = array_values(array_unique($myRoleKeys));
+                        $personAttrs = [
+                            'owner' => ['id' => '', 'name' => '', 'initials' => ''],
+                            'pm' => ['id' => '', 'name' => '', 'initials' => ''],
+                            'auditor' => ['id' => '', 'name' => '', 'initials' => ''],
+                        ];
+                        $fillPerson = static function ($user) {
+                            if (!$user) {
+                                return ['id' => '', 'name' => '', 'initials' => ''];
+                            }
+                            $name = trim(($user->name ?? '') . ' ' . ($user->last_name ?? '')) ?: (string) ($user->email ?? '');
+                            $seed = trim((string) (($user->name ?? '') ?: ($user->email ?? '?')));
+
+                            return [
+                                'id' => (string) $user->id,
+                                'name' => $name,
+                                'initials' => mb_strtoupper(mb_substr($seed !== '' ? $seed : '?', 0, 1)),
+                            ];
+                        };
+                        if ($team) {
+                            foreach (['owner', 'pm', 'auditor'] as $roleKey) {
+                                $member = $team->members->firstWhere('role', $roleKey);
+                                if ($member && $member->user) {
+                                    $personAttrs[$roleKey] = $fillPerson($member->user);
+                                }
+                            }
+                        }
+                        if ($personAttrs['owner']['id'] === '' && $owner) {
+                            $personAttrs['owner'] = $fillPerson($owner);
+                        }
+                        if ($personAttrs['pm']['id'] === '' && $pm) {
+                            $personAttrs['pm'] = $fillPerson($pm);
+                        }
                         $searchBlob = strtolower(implode(' ', array_filter(array_merge([
                             $project->domain,
                             $checklistTitle,
@@ -174,6 +228,9 @@
                             $pm ? $pm->email : null,
                             $tpl ? $tpl->title : null,
                             $team ? $team->title : null,
+                            $personAttrs['owner']['name'] ?? null,
+                            $personAttrs['pm']['name'] ?? null,
+                            $personAttrs['auditor']['name'] ?? null,
                         ], $teamMemberNames))));
                     @endphp
                     <a href="{{ route('pages.seo-checklist.show', ['id' => $project->id]) }}"
@@ -183,6 +240,15 @@
                        data-has-pm="{{ $pm ? '1' : '0' }}"
                        data-has-team="{{ $team ? '1' : '0' }}"
                        data-my-roles="{{ e(implode(',', $myRoleKeys)) }}"
+                       data-person-owner-id="{{ e($personAttrs['owner']['id']) }}"
+                       data-person-owner-name="{{ e($personAttrs['owner']['name']) }}"
+                       data-person-owner-initials="{{ e($personAttrs['owner']['initials']) }}"
+                       data-person-pm-id="{{ e($personAttrs['pm']['id']) }}"
+                       data-person-pm-name="{{ e($personAttrs['pm']['name']) }}"
+                       data-person-pm-initials="{{ e($personAttrs['pm']['initials']) }}"
+                       data-person-auditor-id="{{ e($personAttrs['auditor']['id']) }}"
+                       data-person-auditor-name="{{ e($personAttrs['auditor']['name']) }}"
+                       data-person-auditor-initials="{{ e($personAttrs['auditor']['initials']) }}"
                        data-sort-activity="{{ $activityTs }}"
                        data-sort-progress="{{ $pct }}"
                        data-sort-domain="{{ e(mb_strtolower($project->domain . ' ' . $checklistTitle)) }}">
@@ -261,8 +327,16 @@
                     </a>
                 @endforeach
             </div>
+            <div class="cabinet-sc-people-board d-none" data-sc-project-people hidden></div>
+            <div class="d-none" data-sc-project-park hidden aria-hidden="true"></div>
+            </div>
             <p class="cabinet-sc-empty-filter small text-secondary d-none mb-0" data-sc-project-empty>{{ __('No projects match filters') }}</p>
         @endif
+
+        <script type="application/json" id="cabinet-sc-project-view-i18n">@json([
+            'unassigned' => __('Checklist projects unassigned specialist'),
+            'projects' => __('projects'),
+        ])</script>
 
         @if(isset($archived) && $archived->isNotEmpty())
             <details class="cabinet-sc-archive mt-4">

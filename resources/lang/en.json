@@ -973,5 +973,10 @@
     "I am auditor": "I am auditor",
     "I am PM": "I am PM",
     "I am participant": "I am participant",
-    "I created checklist": "I created"
+    "I created checklist": "I created",
+    "Checklist project view": "Project view",
+    "Checklist projects grid": "Grid",
+    "Checklist projects by specialist": "By specialist",
+    "Group projects by role": "Group by role",
+    "Checklist projects unassigned specialist": "Unassigned"
 }

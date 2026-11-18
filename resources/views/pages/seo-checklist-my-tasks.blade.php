@@ -17,6 +17,20 @@
         $hasAny = count($planSections) > 0;
         $statusLabels = $statusLabels ?? [];
         $filterProjects = $filterProjects ?? collect();
+        $planProjectIds = [];
+        foreach ($planSections as $section) {
+            foreach (($section['items'] ?? []) as $planItem) {
+                $pid = (int) ($planItem->project_id ?? 0);
+                if ($pid > 0) {
+                    $planProjectIds[$pid] = true;
+                }
+            }
+        }
+        if ($planProjectIds !== []) {
+            $filterProjects = $filterProjects->filter(function ($fp) use ($planProjectIds) {
+                return isset($planProjectIds[(int) $fp->id]);
+            })->values();
+        }
         $planCount = (int) ($plan['count'] ?? $myTasksCount ?? 0);
         $overdueCount = (int) ($plan['overdue'] ?? 0);
         $useStages = !empty($stages);
@@ -213,8 +227,18 @@
                         </div>
                     </div>
 
-                    <div class="cabinet-sc-plan-filter-empty d-none" data-sc-plan-filter-empty>
-                        <p class="small text-secondary mb-0">{{ __('No tasks match filters') }}</p>
+                    <div class="cabinet-sc-plan-filter-empty d-none"
+                         data-sc-plan-filter-empty
+                         data-i18n-empty-default="{{ e(__('No tasks match filters')) }}"
+                         data-i18n-empty-project="{{ e(__('No plan tasks for this project')) }}"
+                         data-i18n-empty-done="{{ e(__('Only completed tasks in plan for this project')) }}"
+                         hidden>
+                        <p class="small text-secondary mb-2" data-sc-plan-filter-empty-text>{{ __('No tasks match filters') }}</p>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary d-none"
+                                data-sc-plan-filter-empty-done>
+                            {{ __('Show completed') }}
+                        </button>
                     </div>
 
                     <div class="cabinet-sc-plan">

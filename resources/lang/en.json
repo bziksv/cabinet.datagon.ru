@@ -978,5 +978,8 @@
     "Checklist projects grid": "Grid",
     "Checklist projects by specialist": "By specialist",
     "Group projects by role": "Group by role",
-    "Checklist projects unassigned specialist": "Unassigned"
+    "Checklist projects unassigned specialist": "Unassigned",
+    "Show completed": "Show completed",
+    "No plan tasks for this project": "No tasks for this project in the current plan",
+    "Only completed tasks in plan for this project": "Only completed tasks are in the plan for this project — click “Show completed”"
 }

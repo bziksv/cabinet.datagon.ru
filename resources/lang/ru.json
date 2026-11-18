@@ -6920,5 +6920,8 @@
     "Checklist projects grid": "Плитка",
     "Checklist projects by specialist": "По специалистам",
     "Group projects by role": "Группировать по роли",
-    "Checklist projects unassigned specialist": "Без специалиста"
+    "Checklist projects unassigned specialist": "Без специалиста",
+    "Show completed": "Показать выполненные",
+    "No plan tasks for this project": "В этом проекте нет задач в текущем плане",
+    "Only completed tasks in plan for this project": "В этом проекте в плане только выполненные — нажмите «Показать выполненные»"
 }

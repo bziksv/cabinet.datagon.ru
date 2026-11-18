@@ -1220,7 +1220,7 @@
             try {
                 if (!window.history || !window.history.replaceState) return;
                 var params = new URLSearchParams(window.location.search);
-                var project = projectSelect ? String(projectSelect.value || '') : '';
+                var project = selectedProjectId();
                 if (project) params.set('project', project);
                 else params.delete('project');
                 if (activePresets.length) params.set('preset', activePresets.join(','));
@@ -1280,8 +1280,59 @@
             return true;
         }
 
+        function selectedProjectId() {
+            if (!projectSelect) return '';
+            if (window.jQuery) {
+                var jqVal = window.jQuery(projectSelect).val();
+                if (jqVal == null || jqVal === undefined) return '';
+                return String(jqVal);
+            }
+            return String(projectSelect.value || '');
+        }
+
+        function countHiddenDoneForProject(projectId) {
+            if (!projectId) return 0;
+            var n = 0;
+            root.querySelectorAll('[data-sc-plan-item]').forEach(function (item) {
+                if (String(item.getAttribute('data-project-id') || '') !== projectId) return;
+                var st = String(item.getAttribute('data-status') || '');
+                if (st === 'done' || st === 'skip') n += 1;
+            });
+            return n;
+        }
+
+        function updateFilterEmpty(visibleTotal, projectId) {
+            if (!emptyEl) return;
+            var show = visibleTotal === 0;
+            emptyEl.classList.toggle('d-none', !show);
+            emptyEl.classList.toggle('is-filter-hidden', !show);
+            emptyEl.hidden = !show;
+
+            var textEl = emptyEl.querySelector('[data-sc-plan-filter-empty-text]');
+            var doneBtn = emptyEl.querySelector('[data-sc-plan-filter-empty-done]');
+            var doneHidden = 0;
+            if (show && projectId && activePresets.indexOf('done') === -1) {
+                doneHidden = countHiddenDoneForProject(projectId);
+            }
+            if (textEl) {
+                if (doneHidden > 0) {
+                    textEl.textContent = emptyEl.getAttribute('data-i18n-empty-done')
+                        || 'В этом проекте в плане только выполненные задачи';
+                } else if (projectId) {
+                    textEl.textContent = emptyEl.getAttribute('data-i18n-empty-project')
+                        || 'В этом проекте нет задач в текущем плане';
+                } else {
+                    textEl.textContent = emptyEl.getAttribute('data-i18n-empty-default')
+                        || 'Нет задач по запросу';
+                }
+            }
+            if (doneBtn) {
+                doneBtn.classList.toggle('d-none', !(show && doneHidden > 0));
+            }
+        }
+
         function applyFilters() {
-            var projectId = projectSelect ? String(projectSelect.value || '') : '';
+            var projectId = selectedProjectId();
             var hasPreset = activePresets.length > 0;
             var search = currentSearch;
             var visibleTotal = 0;
@@ -1403,10 +1454,7 @@
                 }
             });
 
-            if (emptyEl) {
-                emptyEl.classList.toggle('is-filter-hidden', visibleTotal > 0);
-                emptyEl.hidden = visibleTotal > 0;
-            }
+            updateFilterEmpty(visibleTotal, projectId);
             writeQuery();
         }
 
@@ -1459,9 +1507,19 @@
         }
 
         readQuery();
+        if (emptyEl) {
+            var doneBtnInit = emptyEl.querySelector('[data-sc-plan-filter-empty-done]');
+            if (doneBtnInit) {
+                doneBtnInit.addEventListener('click', function () {
+                    activePresets = ['done'];
+                    activeRailChip = null;
+                    applyFilters();
+                });
+            }
+        }
         if (projectSelect) {
             if (window.jQuery) {
-                window.jQuery(projectSelect).on('change', applyFilters);
+                window.jQuery(projectSelect).on('change select2:select select2:clear', applyFilters);
             } else {
                 projectSelect.addEventListener('change', applyFilters);
             }

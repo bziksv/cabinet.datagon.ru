@@ -131,6 +131,7 @@ class SeoChecklistController extends Controller
                 ->where('status', 'active')
                 ->orderBy('domain')
                 ->get(['id', 'domain', 'title']),
+            'membershipRolesByProject' => $plan['membership_roles'] ?? [],
             'roleLabels' => $this->roleLabels(),
             'statusLabels' => $this->statusLabels(),
             'projectsCount' => $projectsCount,

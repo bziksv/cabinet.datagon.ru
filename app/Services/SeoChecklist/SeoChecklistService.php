@@ -585,6 +585,7 @@ class SeoChecklistService
             'doing' => 0,
             'groups' => $emptyGroups,
             'stages' => [],
+            'membership_roles' => [],
         ];
 
         if (!SeoChecklistProject::tableReady()) {
@@ -600,8 +601,11 @@ class SeoChecklistService
         }
 
         $rolesByProject = [];
+        $membershipRolesByProject = [];
         foreach ($projects as $project) {
-            $rolesByProject[(int) $project->id] = $this->myTaskRoles($project, $userId);
+            $pid = (int) $project->id;
+            $rolesByProject[$pid] = $this->myTaskRoles($project, $userId);
+            $membershipRolesByProject[$pid] = $this->membershipRoleKeys($project, $userId);
         }
 
         $projectIds = $projects->pluck('id')->all();
@@ -666,7 +670,9 @@ class SeoChecklistService
                 ->orderBy('id');
         }
 
-        $candidates = $query->limit(400)->get();
+        // Без жёсткого global limit(400): иначе «поздние» проекты (напр. test1.ru)
+        // вытесняются чужими due_at и пропадают и из плана, и из селекта проектов.
+        $candidates = $query->limit(5000)->get();
         $mine = $candidates->filter(function (SeoChecklistItem $item) use ($rolesByProject) {
             return $this->itemMatchesMyRoles(
                 (string) $item->role,
@@ -746,6 +752,7 @@ class SeoChecklistService
             'doing' => $doing,
             'groups' => $groups,
             'stages' => $stages,
+            'membership_roles' => $membershipRolesByProject,
         ];
     }
 
@@ -1232,6 +1239,47 @@ class SeoChecklistService
                 $roles[] = 'pm';
             } elseif (in_array($memberRole, ['auditor', 'participant'], true)) {
                 $roles[] = 'shared';
+            }
+        }
+
+        return array_values(array_unique($roles));
+    }
+
+    /**
+     * Фактические роли пользователя в проекте (без свёртки auditor/participant → shared).
+     * Для UI-фильтра «Я ответственный / аудитор / PM…».
+     *
+     * @return list<string> account|owner|pm|auditor|participant
+     */
+    public function membershipRoleKeys(SeoChecklistProject $project, int $userId): array
+    {
+        $roles = [];
+        if ((int) $project->user_id === $userId) {
+            $roles[] = 'account';
+        }
+        if ((int) $project->owner_user_id === $userId) {
+            $roles[] = 'owner';
+        }
+        if ((int) $project->pm_user_id === $userId) {
+            $roles[] = 'pm';
+        }
+
+        if ($project->team_id && SeoChecklistTeam::tableReady()) {
+            $memberRole = null;
+            if ($project->relationLoaded('team')
+                && $project->team
+                && $project->team->relationLoaded('members')) {
+                $member = $project->team->members->firstWhere('user_id', $userId);
+                $memberRole = $member ? (string) $member->role : null;
+            } else {
+                $memberRole = SeoChecklistTeamMember::query()
+                    ->where('team_id', (int) $project->team_id)
+                    ->where('user_id', $userId)
+                    ->value('role');
+                $memberRole = $memberRole !== null ? (string) $memberRole : null;
+            }
+            if (in_array($memberRole, SeoChecklistTeam::roleKeys(), true)) {
+                $roles[] = $memberRole;
             }
         }
 

@@ -66,12 +66,20 @@
         || $statusLabel
         || $repeatLabel;
 @endphp
+@php
+    $myRolesOnProject = $myRolesOnProject ?? [];
+    if (!is_array($myRolesOnProject)) {
+        $myRolesOnProject = [];
+    }
+@endphp
 <li class="cabinet-sc-plan__item @if($isOver) is-overdue @endif @if($item->status === 'doing') is-doing @endif @if($item->status === 'review') is-review @endif @if($item->is_important) is-important @endif @if($timerRunning) is-timing @endif"
     data-sc-plan-item
     data-id="{{ $item->id }}"
     data-project-id="{{ $item->project_id }}"
     data-domain="{{ $project ? $project->domain : '' }}"
     data-status="{{ $item->status }}"
+    data-task-role="{{ $item->role }}"
+    data-my-roles="{{ e(implode(',', $myRolesOnProject)) }}"
     data-stage-key="{{ $item->stage_key === 'connect' ? 'access' : $item->stage_key }}"
     data-important="{{ $item->is_important ? '1' : '0' }}"
     data-overdue="{{ $isOver ? '1' : '0' }}"

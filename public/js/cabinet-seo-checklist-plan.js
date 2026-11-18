@@ -1124,17 +1124,49 @@
 
     (function initPlanFilters() {
         var projectSelect = root.querySelector('[data-sc-plan-project]');
+        var myRoleSelect = root.querySelector('[data-sc-plan-my-role]');
+        var myRolePresetBtns = Array.prototype.slice.call(root.querySelectorAll('[data-sc-plan-my-role-preset]'));
         var emptyEl = root.querySelector('[data-sc-plan-filter-empty]');
         var presetBtns = Array.prototype.slice.call(root.querySelectorAll('[data-sc-plan-preset]'));
         var searchToggle = root.querySelector('[data-sc-plan-search-toggle]');
         var searchInput = root.querySelector('[data-sc-plan-search]');
         var searchPanel = root.querySelector('[data-sc-plan-search-panel]');
         var filtersRoot = root.querySelector('[data-sc-plan-filters]');
-        if (!projectSelect && !presetBtns.length && !searchInput) return;
+        if (!projectSelect && !myRoleSelect && !presetBtns.length && !searchInput) return;
 
         var activePresets = [];
+        var activeMyRole = '';
         var activeRailChip = null; // { stage: string, chip: string }
         var currentSearch = '';
+
+        function itemMyRoles(item) {
+            return String(item.getAttribute('data-my-roles') || '')
+                .split(',')
+                .map(function (r) { return String(r || '').trim(); })
+                .filter(Boolean);
+        }
+
+        function syncMyRoleControls() {
+            if (myRoleSelect && myRoleSelect.value !== String(activeMyRole || '')) {
+                myRoleSelect.value = activeMyRole || '';
+            }
+            myRolePresetBtns.forEach(function (btn) {
+                var val = btn.getAttribute('data-sc-plan-my-role-preset') || '';
+                var on = val === String(activeMyRole || '');
+                btn.classList.toggle('active', on);
+                btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+        }
+
+        function setMyRoleFilter(role) {
+            var next = String(role || '');
+            if (['owner', 'auditor', 'pm', 'participant', 'account'].indexOf(next) === -1) {
+                next = '';
+            }
+            activeMyRole = next;
+            syncMyRoleControls();
+            applyFilters();
+        }
 
         function normalizeSearch(value) {
             return String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -1181,12 +1213,16 @@
             try {
                 var params = new URLSearchParams(window.location.search);
                 var project = params.get('project') || '';
+                var myRole = params.get('my_role') || '';
                 var preset = params.get('preset') || '';
                 var chip = params.get('chip') || '';
                 var chipStage = params.get('chip_stage') || '';
                 var q = params.get('q') || '';
                 if (projectSelect && project) {
                     projectSelect.value = project;
+                }
+                if (myRole && ['owner', 'auditor', 'pm', 'participant', 'account'].indexOf(myRole) !== -1) {
+                    activeMyRole = myRole;
                 }
                 if (q && searchInput) {
                     currentSearch = normalizeSearch(q);
@@ -1223,6 +1259,8 @@
                 var project = selectedProjectId();
                 if (project) params.set('project', project);
                 else params.delete('project');
+                if (activeMyRole) params.set('my_role', activeMyRole);
+                else params.delete('my_role');
                 if (activePresets.length) params.set('preset', activePresets.join(','));
                 else params.delete('preset');
                 if (currentSearch) params.set('q', currentSearch);
@@ -1338,6 +1376,7 @@
             var visibleTotal = 0;
 
             syncPresetButtons();
+            syncMyRoleControls();
             syncRailChips();
 
             root.querySelectorAll('[data-sc-plan-group]').forEach(function (group) {
@@ -1346,6 +1385,9 @@
                 group.querySelectorAll('[data-sc-plan-item]').forEach(function (item) {
                     var show = true;
                     if (projectId && String(item.getAttribute('data-project-id') || '') !== projectId) {
+                        show = false;
+                    }
+                    if (show && activeMyRole && itemMyRoles(item).indexOf(activeMyRole) === -1) {
                         show = false;
                     }
                     if (show && activeRailChip) {
@@ -1524,6 +1566,16 @@
                 projectSelect.addEventListener('change', applyFilters);
             }
         }
+        if (myRoleSelect) {
+            myRoleSelect.addEventListener('change', function () {
+                setMyRoleFilter(myRoleSelect.value || '');
+            });
+        }
+        myRolePresetBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                setMyRoleFilter(btn.getAttribute('data-sc-plan-my-role-preset') || '');
+            });
+        });
         if (searchToggle && searchInput && searchPanel) {
             searchToggle.addEventListener('click', function () {
                 var open = !isSearchOpen();

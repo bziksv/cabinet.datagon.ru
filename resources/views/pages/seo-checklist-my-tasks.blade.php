@@ -17,20 +17,6 @@
         $hasAny = count($planSections) > 0;
         $statusLabels = $statusLabels ?? [];
         $filterProjects = $filterProjects ?? collect();
-        $planProjectIds = [];
-        foreach ($planSections as $section) {
-            foreach (($section['items'] ?? []) as $planItem) {
-                $pid = (int) ($planItem->project_id ?? 0);
-                if ($pid > 0) {
-                    $planProjectIds[$pid] = true;
-                }
-            }
-        }
-        if ($planProjectIds !== []) {
-            $filterProjects = $filterProjects->filter(function ($fp) use ($planProjectIds) {
-                return isset($planProjectIds[(int) $fp->id]);
-            })->values();
-        }
         $planCount = (int) ($plan['count'] ?? $myTasksCount ?? 0);
         $overdueCount = (int) ($plan['overdue'] ?? 0);
         $useStages = !empty($stages);
@@ -163,6 +149,17 @@
                                     @endforeach
                                 </select>
                             </label>
+                            <label class="cabinet-sc-plan-filters__my-role">
+                                <span class="visually-hidden">{{ __('Filter by my role') }}</span>
+                                <select class="form-select form-select-sm" data-sc-plan-my-role>
+                                    <option value="">{{ __('All my roles') }}</option>
+                                    <option value="owner">{{ __('I am responsible') }}</option>
+                                    <option value="auditor">{{ __('I am auditor') }}</option>
+                                    <option value="pm">{{ __('I am PM') }}</option>
+                                    <option value="participant">{{ __('I am participant') }}</option>
+                                    <option value="account">{{ __('I created checklist') }}</option>
+                                </select>
+                            </label>
                             <button type="button"
                                     class="cabinet-sc-plan-search__toggle"
                                     data-sc-plan-search-toggle
@@ -260,6 +257,7 @@
                                             'item' => $item,
                                             'roleLabels' => $roleLabels,
                                             'statusLabels' => $statusLabels,
+                                            'myRolesOnProject' => ($membershipRolesByProject ?? [])[(int) $item->project_id] ?? [],
                                             'canApprove' => $item->project
                                                 ? app(\App\Services\SeoChecklist\SeoChecklistService::class)
                                                     ->canApproveReview($item->project, (int) auth()->id())

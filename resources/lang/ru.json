@@ -6923,5 +6923,7 @@
     "Checklist projects unassigned specialist": "Без специалиста",
     "Show completed": "Показать выполненные",
     "No plan tasks for this project": "В этом проекте нет задач в текущем плане",
-    "Only completed tasks in plan for this project": "В этом проекте в плане только выполненные — нажмите «Показать выполненные»"
+    "Only completed tasks in plan for this project": "В этом проекте в плане только выполненные — нажмите «Показать выполненные»",
+    "All my roles": "Все мои роли",
+    "Filter by my role": "Фильтр по моей роли"
 }

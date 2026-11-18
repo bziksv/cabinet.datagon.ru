@@ -96,6 +96,34 @@ function raHistoryProcessingHtml() {
 window.raHistoryActionsHtml = raHistoryActionsHtml
 window.raHistoryProcessingHtml = raHistoryProcessingHtml
 
+function applyRepeatModalSearchEngine(history) {
+    var $modal = $('#staticBackdrop');
+    if (!$modal.length) {
+        return;
+    }
+    if (window.cabinetRelevanceSearchEngine && typeof window.cabinetRelevanceSearchEngine.applyValues === 'function') {
+        window.cabinetRelevanceSearchEngine.bind($modal);
+        window.cabinetRelevanceSearchEngine.applyValues($modal, {
+            searchEngine: history.searchEngine || 'yandex',
+            region: history.region,
+            regionName: history.regionName || history.regionText || '',
+            regionText: history.regionText || history.regionName || '',
+        });
+        return;
+    }
+    // fallback: старый селект без ПС
+    $modal.find('.form-select.rounded-0.region, .js-relevance-region').val(history.region).trigger('change');
+}
+
+$(function () {
+    $('#staticBackdrop').on('shown.bs.modal', function () {
+        var $modal = $(this);
+        if (window.cabinetRelevanceSearchEngine && typeof window.cabinetRelevanceSearchEngine.bind === 'function') {
+            window.cabinetRelevanceSearchEngine.bind($modal);
+        }
+    });
+});
+
 function getHistoryInfo() {
     $('.get-history-info').unbind("click").click(function () {
         let id = $(this).attr('data-order')
@@ -105,32 +133,33 @@ function getHistoryInfo() {
             url: "/get-history-info/" + id,
             success: function (response) {
                 $('.history').show()
-                let history = response.history
+                let history = response.history || {}
+                var $modal = $('#staticBackdrop')
                 if (history.type === 'list') {
-                    $('#key-phrase').hide()
-                    $('#site-list').show()
-                    $('#siteList').val(history.siteList)
+                    $modal.find('#key-phrase').hide()
+                    $modal.find('#site-list').show()
+                    $modal.find('#siteList').val(history.siteList)
                 } else {
-                    $('#key-phrase').show()
-                    $('#site-list').hide()
+                    $modal.find('#key-phrase').show()
+                    $modal.find('#site-list').hide()
                 }
 
-                $('.form-control.link').val(history.link)
-                $('.form-control.phrase').val(history.phrase)
+                $modal.find('.form-control.link').val(history.link)
+                $modal.find('.form-control.phrase').val(history.phrase)
                 $('#type').val(history.type)
                 $('#hiddenId').val(id)
-                $(".form-select#count").val(history.count).change();
-                $(".form-select.rounded-0.region").val(history.region).change();
-                $(".form-control.ignoredDomains").val(history.ignoredDomains);
-                $("#separator").val(history.separator);
+                $modal.find(".form-select#count, select.count").val(history.count).change();
+                applyRepeatModalSearchEngine(history);
+                $modal.find(".form-control.ignoredDomains").val(history.ignoredDomains);
+                $modal.find("#separator").val(history.separator);
 
-                changeSwitchState($('#switchNoindex'), history.noIndex)
+                changeSwitchState($modal.find('#switchNoindex'), history.noIndex)
 
-                changeSwitchState($('#switchAltAndTitle'), history.hiddenText)
+                changeSwitchState($modal.find('#switchAltAndTitle'), history.hiddenText)
 
-                changeSwitchState($('#switchConjunctionsPrepositionsPronouns'), history.conjunctionsPrepositionsPronouns)
+                changeSwitchState($modal.find('#switchConjunctionsPrepositionsPronouns'), history.conjunctionsPrepositionsPronouns)
 
-                changeSwitchState($('#switchMyListWords'), history.switchMyListWords, history.listWords, '.listWords')
+                changeSwitchState($modal.find('#switchMyListWords'), history.switchMyListWords, history.listWords, '.listWords')
             },
         });
     });
@@ -418,6 +447,8 @@ function format(data) {
 function repeatScan() {
     $('#relevance-repeat-scan').unbind("click").click(function () {
         let id = $('#hiddenId').val()
+        var $modal = $('#staticBackdrop')
+        var se = (window.cabinetRelevanceSearchEngine && window.cabinetRelevanceSearchEngine.payloadFields($modal)) || {}
         $.ajax({
             type: "POST",
             dataType: "json",
@@ -425,18 +456,19 @@ function repeatScan() {
             data: {
                 id: id,
                 type: $('#type').val(),
-                siteList: $('#siteList').val(),
-                link: $('.form-control.link').val(),
-                phrase: $('.form-control.phrase').val(),
-                count: $(".form-select#count").val(),
-                region: $(".form-select.rounded-0.region").val(),
-                ignoredDomains: $(".form-control.ignoredDomains").val(),
-                separator: $("#separator").val(),
-                noIndex: $('#switchNoindex').is(':checked'),
-                hiddenText: $('#switchAltAndTitle').is(':checked'),
-                conjunctionsPrepositionsPronouns: $('#switchConjunctionsPrepositionsPronouns').is(':checked'),
-                switchMyListWords: $('#switchMyListWords').is(':checked'),
-                listWords: $('.form-control.listWords').val(),
+                siteList: $modal.find('#siteList').val(),
+                link: $modal.find('.form-control.link').val(),
+                phrase: $modal.find('.form-control.phrase').val(),
+                count: $modal.find(".form-select#count, select.count").val(),
+                searchEngine: se.searchEngine || $modal.find('.js-relevance-search-engine').val() || 'yandex',
+                region: se.region || $modal.find('.js-relevance-region').val() || $modal.find(".form-select.rounded-0.region").val(),
+                ignoredDomains: $modal.find(".form-control.ignoredDomains").val(),
+                separator: $modal.find("#separator").val(),
+                noIndex: $modal.find('#switchNoindex').is(':checked'),
+                hiddenText: $modal.find('#switchAltAndTitle').is(':checked'),
+                conjunctionsPrepositionsPronouns: $modal.find('#switchConjunctionsPrepositionsPronouns').is(':checked'),
+                switchMyListWords: $modal.find('#switchMyListWords').is(':checked'),
+                listWords: $modal.find('.form-control.listWords').val(),
             },
             success: function (response) {
                 if (response.code === 415) {

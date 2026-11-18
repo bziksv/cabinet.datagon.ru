@@ -81,6 +81,17 @@
     $root.find('.js-relevance-limit-cost').text(String(total));
   }
 
+  function dropdownParentFor($select, $root) {
+    var $modal = $select.closest('.modal');
+    if ($modal.length) {
+      return $modal;
+    }
+    if ($root && $root.length && $root.hasClass('modal')) {
+      return $root;
+    }
+    return $(document.body);
+  }
+
   function initRegionSelect($select, $root) {
     if (!$select.length || typeof $.fn.select2 !== 'function') return;
 
@@ -97,7 +108,7 @@
       allowClear: false,
       minimumInputLength: 0,
       width: '100%',
-      dropdownParent: $(document.body),
+      dropdownParent: dropdownParentFor($select, $root),
       language: {
         inputTooShort: function () { return i18n.regionSearchMin || ''; },
         noResults: function () { return i18n.regionNotFound || ''; },
@@ -125,6 +136,15 @@
     });
   }
 
+  function bindEngineChange($root, $engine, $region) {
+    $engine.off('change.relevanceSe').on('change.relevanceSe', function () {
+      var engine = engineOf($root);
+      setRegion($region, defaultsFor(engine));
+      syncHint($root);
+      updateLimitCost($root);
+    });
+  }
+
   function bind($root) {
     $root = $root && $root.length ? $root : $(document);
     var $engine = $root.find('.js-relevance-search-engine');
@@ -134,13 +154,7 @@
     initRegionSelect($region, $root);
     syncHint($root);
     updateLimitCost($root);
-
-    $engine.off('change.relevanceSe').on('change.relevanceSe', function () {
-      var engine = engineOf($root);
-      setRegion($region, defaultsFor(engine));
-      syncHint($root);
-      updateLimitCost($root);
-    });
+    bindEngineChange($root, $engine, $region);
 
     $root
       .off('change.relevanceSeCost')
@@ -157,6 +171,50 @@
       });
   }
 
+  /**
+   * Prefill ПС + регион without resetting region to engine default.
+   * opts: { searchEngine, region, regionName, regionText }
+   * region may be id string/number or { id, name, text }.
+   */
+  function applyValues($root, opts) {
+    $root = $root && $root.length ? $root : $(document);
+    opts = opts || {};
+    var $engine = $root.find('.js-relevance-search-engine');
+    var $region = $root.find('.js-relevance-region');
+    if (!$engine.length || !$region.length) return;
+
+    var engine = String(opts.searchEngine || 'yandex').toLowerCase() === 'google' ? 'google' : 'yandex';
+    $engine.off('change.relevanceSe');
+    $engine.val(engine);
+
+    if (!$region.hasClass('select2-hidden-accessible')) {
+      initRegionSelect($region, $root);
+    }
+
+    var region = opts.region;
+    var regionObj = null;
+    if (region && typeof region === 'object' && region.id != null && String(region.id) !== '') {
+      regionObj = {
+        id: String(region.id),
+        name: region.name || region.text || String(region.id),
+        text: region.text || region.name || String(region.id),
+      };
+    } else if (region != null && String(region) !== '') {
+      var label = opts.regionText || opts.regionName || String(region);
+      regionObj = { id: String(region), name: label, text: label };
+    }
+
+    if (regionObj) {
+      setRegion($region, regionObj);
+    } else {
+      setRegion($region, defaultsFor(engine));
+    }
+
+    syncHint($root);
+    updateLimitCost($root);
+    bindEngineChange($root, $engine, $region);
+  }
+
   function payloadFields($root) {
     $root = $root && $root.length ? $root : $(document);
     return {
@@ -167,6 +225,7 @@
 
   window.cabinetRelevanceSearchEngine = {
     bind: bind,
+    applyValues: applyValues,
     payloadFields: payloadFields,
     serpRequestCost: function ($root) {
       return serpRequestCost($root && $root.length ? $root : $(document));

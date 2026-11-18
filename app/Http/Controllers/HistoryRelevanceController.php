@@ -549,8 +549,26 @@ class HistoryRelevanceController extends Controller
             ]);
         }
 
+        $history = json_decode((string) $object->request, true);
+        if (!is_array($history)) {
+            $history = [];
+        }
+
+        $engine = strtolower((string) ($history['searchEngine'] ?? 'yandex')) === 'google' ? 'google' : 'yandex';
+        $history['searchEngine'] = $engine;
+
+        $regionId = (string) ($history['region'] ?? $object->region ?? '');
+        if ($regionId !== '') {
+            $history['region'] = $regionId;
+            $meta = \App\Support\CompetitorSearchRegions::find($engine, $regionId);
+            if (is_array($meta)) {
+                $history['regionName'] = (string) ($meta['name'] ?? $meta['text'] ?? $regionId);
+                $history['regionText'] = (string) ($meta['text'] ?? $meta['name'] ?? $regionId);
+            }
+        }
+
         return response()->json([
-            'history' => json_decode($object->request)
+            'history' => $history,
         ]);
     }
 

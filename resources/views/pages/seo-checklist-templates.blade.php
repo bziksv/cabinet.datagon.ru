@@ -25,7 +25,7 @@
             <div class="alert alert-danger py-2 px-3 small">{{ session('error') }}</div>
         @endif
 
-        <form method="post" action="{{ route('pages.seo-checklist.templates.store') }}" class="cabinet-sc-create-tpl mb-3">
+        <form method="post" action="{{ route('pages.seo-checklist.templates.store') }}" class="cabinet-sc-create-tpl mb-3" data-ajax-form>
             @csrf
             <div class="cabinet-sc-create-tpl__head">
                 <div class="cabinet-sc-create-tpl__title">{{ __('Create template') }}</div>
@@ -100,7 +100,10 @@
                                 data-label-make-default="{{ __('Make default template') }}">
                             <span data-sc-default-label>{{ __('Make default template') }}</span>
                         </button>
-                        <form method="post" action="{{ route('pages.seo-checklist.templates.duplicate', ['templateId' => $tpl->id]) }}">
+                        <form method="post" action="{{ route('pages.seo-checklist.templates.duplicate', ['templateId' => $tpl->id]) }}"
+                              data-ajax-form
+                              data-ajax-no-redirect="1"
+                              data-ajax-refresh=".cabinet-sc-grid">
                             @csrf
                             <button type="submit" class="btn btn-sm btn-outline-secondary">{{ __('Duplicate') }}</button>
                         </form>
@@ -112,6 +115,7 @@
     </div>
 
     @slot('js')
+        <script src="{{ asset('js/cabinet-ajax-form.js') }}?v={{ @filemtime(public_path('js/cabinet-ajax-form.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-hub.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-hub.js')) ?: time() }}"></script>
     @endslot
 @endcomponent

@@ -17,6 +17,7 @@
 
 @php
     $teamCreateModalId = 'cabinet-team-create-modal';
+    $teamAjaxRefresh = '[data-sc-team-list]|[data-sc-assign-list]|[data-sc-team-count]';
 @endphp
 
 <div class="cabinet-sc-panel cabinet-sc-panel--create mb-3">
@@ -38,6 +39,7 @@
 @include('pages.partials.team-create-modal', [
     'modalId' => $teamCreateModalId,
     'returnTo' => $returnTo,
+    'ajaxRefresh' => $teamAjaxRefresh,
     'showManageLink' => false,
     'lead' => $teamsLead,
     'teamCandidates' => $teamCandidates ?? collect(),
@@ -59,7 +61,7 @@
 @elseif(isset($teams))
     <div class="cabinet-sc-section-label">
         <span>{{ __('Teams') }}</span>
-        <span class="cabinet-sc-section-label__count">{{ $teams->count() }}</span>
+        <span class="cabinet-sc-section-label__count" data-sc-team-count>{{ $teams->count() }}</span>
     </div>
     <div class="cabinet-sc-toolbar mb-3">
         <input type="search"
@@ -141,6 +143,7 @@
                         <form method="post"
                               action="{{ route('pages.seo-checklist.teams.delete', ['teamId' => $team->id]) }}"
                               class="cabinet-sc-team-card__summary-action"
+                              data-ajax-form data-ajax-refresh="{{ $teamAjaxRefresh }}"
                               data-sc-stop-toggle
                               data-cabinet-confirm="{{ __('Delete this team?') }}"
                               data-cabinet-confirm-title="Удалить команду"
@@ -159,7 +162,7 @@
                     @if($canManageTeam)
                         <div class="cabinet-sc-team-card__block">
                             <div class="cabinet-sc-team-card__block-title">{{ __('Team settings') }}</div>
-                            <form method="post" action="{{ route('pages.seo-checklist.teams.update', ['teamId' => $team->id]) }}" class="cabinet-sc-create__row">
+                            <form method="post" action="{{ route('pages.seo-checklist.teams.update', ['teamId' => $team->id]) }}" class="cabinet-sc-create__row" data-ajax-form data-ajax-refresh="{{ $teamAjaxRefresh }}">
                                 @csrf
                                 @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
                                 <input type="text" name="title" class="form-control form-control-sm" required value="{{ $team->title }}" placeholder="{{ __('Team name') }}">
@@ -199,16 +202,17 @@
                                                 </span>
                                                 @if($canManageTeam)
                                                     <span class="cabinet-sc-role-group__actions">
-                                                        <form method="post" action="{{ route('pages.seo-checklist.teams.members.update', ['teamId' => $team->id, 'memberId' => $member->id]) }}">
+                                                        <form method="post" action="{{ route('pages.seo-checklist.teams.members.update', ['teamId' => $team->id, 'memberId' => $member->id]) }}" data-ajax-form data-ajax-refresh="{{ $teamAjaxRefresh }}">
                                                             @csrf
                                                             @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
-                                                            <select name="role" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="{{ __('Role') }}">
+                                                            <select name="role" class="form-select form-select-sm" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()" aria-label="{{ __('Role') }}">
                                                                 @foreach(($teamRoleLabels ?? []) as $rk => $rl)
                                                                     <option value="{{ $rk }}" @if($member->role === $rk) selected @endif>{{ $rl }}</option>
                                                                 @endforeach
                                                             </select>
                                                         </form>
                                                         <form method="post" action="{{ route('pages.seo-checklist.teams.members.delete', ['teamId' => $team->id, 'memberId' => $member->id]) }}"
+                                                              data-ajax-form data-ajax-refresh="{{ $teamAjaxRefresh }}"
                                                               data-cabinet-confirm="{{ __('Remove member?') }}"
                                                               data-cabinet-confirm-title="Удалить участника"
                                                               data-cabinet-confirm-ok="Удалить"
@@ -232,7 +236,7 @@
                     @if($canManageTeam)
                         <div class="cabinet-sc-team-card__add">
                             <div class="cabinet-sc-team-card__block-title">{{ __('Add member') }}</div>
-                            <form method="post" action="{{ route('pages.seo-checklist.teams.members.store', ['teamId' => $team->id]) }}" class="cabinet-sc-create__row">
+                            <form method="post" action="{{ route('pages.seo-checklist.teams.members.store', ['teamId' => $team->id]) }}" class="cabinet-sc-create__row" data-ajax-form data-ajax-refresh="{{ $teamAjaxRefresh }}" data-ajax-reset="1">
                                 @csrf
                                 @if($returnTo)<input type="hidden" name="return_to" value="{{ $returnTo }}">@endif
                                 <select name="user_id" class="form-select form-select-sm">
@@ -287,6 +291,7 @@
                 <form method="post"
                       action="{{ route('pages.seo-checklist.assign-team', ['id' => $project->id]) }}"
                       class="cabinet-sc-assign-row cabinet-sc-assign-row--team"
+                      data-ajax-form data-ajax-refresh="{{ $teamAjaxRefresh }}"
                       data-sc-assign-row
                       data-search="{{ e($assignSearch) }}">
                     @csrf
@@ -320,4 +325,5 @@
 
 @once
     @include('partials.cabinet-confirm-modal')
+    <script src="{{ asset('js/cabinet-ajax-form.js') }}?v={{ @filemtime(public_path('js/cabinet-ajax-form.js')) ?: time() }}"></script>
 @endonce

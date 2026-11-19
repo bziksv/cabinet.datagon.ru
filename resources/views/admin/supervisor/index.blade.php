@@ -136,7 +136,7 @@
                                     @php
                                         $load = $cap['load'] ?? 'ok';
                                         $rowClass = $load === 'backlog' ? 'cabinet-supervisor-cap-row--danger' : ($load === 'idle' ? 'cabinet-supervisor-cap-row--muted' : ($load === 'busy' ? 'cabinet-supervisor-cap-row--ok' : ''));
-                                        $barClass = $load === 'backlog' ? 'bg-danger' : ($cap['utilization'] ?? 0) >= 75 ? 'bg-success' : 'bg-primary';
+                                        $barClass = $load === 'backlog' ? 'bg-danger' : ((($cap['utilization'] ?? 0) >= 75) ? 'bg-success' : 'bg-primary');
                                     @endphp
                                     <tr class="{{ $rowClass }}">
                                         <td class="font-monospace small">{{ $cap['program'] ?? '' }}</td>

@@ -7,11 +7,13 @@
     $teamRoleLabels = $teamRoleLabels ?? \App\SeoChecklist\SeoChecklistTeam::roleLabels();
     $teamCandidates = $teamCandidates ?? collect();
     $inviteRoles = collect($teamRoleLabels)->except(['owner']);
+    $ajaxRefresh = $ajaxRefresh ?? null;
 @endphp
 <div class="modal fade" id="{{ $modalId }}" tabindex="-1" aria-labelledby="{{ $modalId }}-title" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
-            <form method="post" action="{{ route('pages.seo-checklist.teams.store') }}" data-team-create-form>
+            <form method="post" action="{{ route('pages.seo-checklist.teams.store') }}" data-team-create-form
+                  @if($ajaxRefresh) data-ajax-form data-ajax-reset="1" data-ajax-refresh="{{ $ajaxRefresh }}" @endif>
                 @csrf
                 @if($returnTo)
                     <input type="hidden" name="return_to" value="{{ $returnTo }}">

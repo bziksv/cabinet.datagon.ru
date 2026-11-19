@@ -129,8 +129,9 @@ class SeoChecklistController extends Controller
             'plan' => $plan,
             'filterProjects' => $this->service->accessibleProjectsQuery($userId)
                 ->where('status', 'active')
+                ->with('template:id,title,code')
                 ->orderBy('domain')
-                ->get(['id', 'domain', 'title']),
+                ->get(['id', 'domain', 'title', 'template_id']),
             'membershipRolesByProject' => $plan['membership_roles'] ?? [],
             'roleLabels' => $this->roleLabels(),
             'statusLabels' => $this->statusLabels(),
@@ -599,7 +600,7 @@ class SeoChecklistController extends Controller
         ]);
     }
 
-    public function storeTeam(Request $request): RedirectResponse
+    public function storeTeam(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $userId = (int) Auth::id();
         $result = $this->service->createTeam(
@@ -653,6 +654,13 @@ class SeoChecklistController extends Controller
             }
         }
 
+        if ($memberErrors !== [] && $request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'message' => __('SEO checklist team created') . ' Часть участников не добавлена: ' . implode('; ', $memberErrors),
+            ]);
+        }
+
         if ($memberErrors !== []) {
             return $this->teamRedirect(
                 $request,
@@ -664,7 +672,7 @@ class SeoChecklistController extends Controller
         return $this->teamRedirect($request, 'success', __('SEO checklist team created'));
     }
 
-    public function updateTeamMeta(Request $request, int $teamId): RedirectResponse
+    public function updateTeamMeta(Request $request, int $teamId): \Symfony\Component\HttpFoundation\Response
     {
         $team = $this->service->findOwnedTeam((int) Auth::id(), $teamId);
         if (!$team) {
@@ -684,7 +692,7 @@ class SeoChecklistController extends Controller
         );
     }
 
-    public function destroyTeam(Request $request, int $teamId): RedirectResponse
+    public function destroyTeam(Request $request, int $teamId): \Symfony\Component\HttpFoundation\Response
     {
         $team = $this->service->findOwnedTeam((int) Auth::id(), $teamId);
         if (!$team) {
@@ -700,7 +708,7 @@ class SeoChecklistController extends Controller
         );
     }
 
-    public function storeTeamMember(Request $request, int $teamId): RedirectResponse
+    public function storeTeamMember(Request $request, int $teamId): \Symfony\Component\HttpFoundation\Response
     {
         $team = $this->service->findOwnedTeam((int) Auth::id(), $teamId);
         if (!$team) {
@@ -724,7 +732,7 @@ class SeoChecklistController extends Controller
         );
     }
 
-    public function updateTeamMember(Request $request, int $teamId, int $memberId): RedirectResponse
+    public function updateTeamMember(Request $request, int $teamId, int $memberId): \Symfony\Component\HttpFoundation\Response
     {
         $team = $this->service->findOwnedTeam((int) Auth::id(), $teamId);
         if (!$team) {
@@ -740,7 +748,7 @@ class SeoChecklistController extends Controller
         );
     }
 
-    public function destroyTeamMember(Request $request, int $teamId, int $memberId): RedirectResponse
+    public function destroyTeamMember(Request $request, int $teamId, int $memberId): \Symfony\Component\HttpFoundation\Response
     {
         $team = $this->service->findOwnedTeam((int) Auth::id(), $teamId);
         if (!$team) {
@@ -756,7 +764,7 @@ class SeoChecklistController extends Controller
         );
     }
 
-    public function assignProjectTeam(Request $request, int $id): RedirectResponse
+    public function assignProjectTeam(Request $request, int $id): \Symfony\Component\HttpFoundation\Response
     {
         $project = $this->findManageableProject($id);
         if (!$project) {
@@ -769,7 +777,7 @@ class SeoChecklistController extends Controller
         }
         $result = $this->service->assignTeamToProject($project, $teamId);
 
-        if ((string) $request->input('return_to') === 'show') {
+        if ((string) $request->input('return_to') === 'show' && !$request->expectsJson()) {
             return redirect()
                 ->route('pages.seo-checklist.show', ['id' => $project->id])
                 ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? __('SEO checklist team assigned') : ($result['message'] ?? __('Error')));
@@ -782,8 +790,31 @@ class SeoChecklistController extends Controller
         );
     }
 
-    private function teamRedirect(Request $request, string $flashKey, string $message): RedirectResponse
+    /**
+     * JSON для AJAX-форм (redirect — куда перейти, если действие уводит со страницы),
+     * иначе обычный redirect с flash.
+     */
+    private function flashResult(Request $request, string $url, bool $ok, string $message, bool $navigate = false): \Symfony\Component\HttpFoundation\Response
     {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => $ok,
+                'message' => $message,
+                'redirect' => $ok && $navigate ? $url : null,
+            ], $ok ? 200 : 422);
+        }
+
+        return redirect()->to($url)->with($ok ? 'success' : 'error', $message);
+    }
+
+    private function teamRedirect(Request $request, string $flashKey, string $message): \Symfony\Component\HttpFoundation\Response
+    {
+        if ($request->expectsJson()) {
+            $ok = $flashKey === 'success';
+
+            return response()->json(['ok' => $ok, 'message' => $message], $ok ? 200 : 422);
+        }
+
         $returnTo = (string) $request->input('return_to');
 
         if ($returnTo === 'profile') {
@@ -850,7 +881,7 @@ class SeoChecklistController extends Controller
         ]);
     }
 
-    public function storeTemplate(Request $request): RedirectResponse
+    public function storeTemplate(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $userId = (int) Auth::id();
         $title = (string) $request->input('title', '');
@@ -869,36 +900,50 @@ class SeoChecklistController extends Controller
         }
 
         if (empty($result['ok']) || empty($result['template'])) {
-            return redirect()
-                ->route('pages.seo-checklist.templates')
-                ->with('error', $result['message'] ?? __('Could not create template'));
+            return $this->flashResult(
+                $request,
+                route('pages.seo-checklist.templates'),
+                false,
+                $result['message'] ?? __('Could not create template')
+            );
         }
 
-        return redirect()
-            ->route('pages.seo-checklist.templates.edit', ['templateId' => $result['template']->id])
-            ->with('success', __('SEO checklist template created'));
+        return $this->flashResult(
+            $request,
+            route('pages.seo-checklist.templates.edit', ['templateId' => $result['template']->id]),
+            true,
+            __('SEO checklist template created'),
+            true
+        );
     }
 
-    public function duplicateTemplate(int $templateId): RedirectResponse
+    public function duplicateTemplate(Request $request, int $templateId): \Symfony\Component\HttpFoundation\Response
     {
         $userId = (int) Auth::id();
         $source = $this->findUsableTemplateModel($templateId);
         if (!$source) {
-            return redirect()->route('pages.seo-checklist.templates')->with('error', __('Template not found'));
+            return $this->flashResult($request, route('pages.seo-checklist.templates'), false, __('Template not found'));
         }
 
         $title = trim($source->title) . ' (' . __('Copy') . ')';
         $result = $this->service->cloneTemplate($userId, $title, (int) $source->id);
 
         if (empty($result['ok']) || empty($result['template'])) {
-            return redirect()
-                ->route('pages.seo-checklist.templates')
-                ->with('error', $result['message'] ?? __('Could not create template'));
+            return $this->flashResult(
+                $request,
+                route('pages.seo-checklist.templates'),
+                false,
+                $result['message'] ?? __('Could not create template')
+            );
         }
 
-        return redirect()
-            ->route('pages.seo-checklist.templates.edit', ['templateId' => $result['template']->id])
-            ->with('success', __('SEO checklist template created'));
+        return $this->flashResult(
+            $request,
+            route('pages.seo-checklist.templates.edit', ['templateId' => $result['template']->id]),
+            true,
+            __('SEO checklist template created'),
+            true
+        );
     }
 
     /**
@@ -977,7 +1022,7 @@ class SeoChecklistController extends Controller
         ]);
     }
 
-    public function updateTemplate(Request $request, int $templateId): RedirectResponse
+    public function updateTemplate(Request $request, int $templateId): \Symfony\Component\HttpFoundation\Response
     {
         $template = $this->findOwnedCustomTemplate($templateId);
         if (!$template) {
@@ -991,23 +1036,49 @@ class SeoChecklistController extends Controller
             $request->boolean('skip_weekends')
         );
 
-        return redirect()
-            ->route('pages.seo-checklist.templates.edit', ['templateId' => $template->id])
-            ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? __('Saved') : ($result['message'] ?? __('Error')));
+        return $this->templateEditResult($request, $template, $result, __('Saved'));
     }
 
-    public function destroyTemplate(int $templateId): RedirectResponse
+    /**
+     * @param  array{ok?: bool, message?: string}  $result
+     */
+    private function templateEditResult(
+        Request $request,
+        SeoChecklistTemplate $template,
+        array $result,
+        string $okMessage
+    ): \Symfony\Component\HttpFoundation\Response {
+        $ok = !empty($result['ok']);
+        $message = $ok ? $okMessage : ($result['message'] ?? __('Error'));
+
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => $ok, 'message' => $message], $ok ? 200 : 422);
+        }
+
+        return redirect()
+            ->route('pages.seo-checklist.templates.edit', ['templateId' => $template->id])
+            ->with($ok ? 'success' : 'error', $message);
+    }
+
+    public function destroyTemplate(Request $request, int $templateId): \Symfony\Component\HttpFoundation\Response
     {
         $template = $this->findOwnedCustomTemplate($templateId);
         if (!$template) {
-            return redirect()->route('pages.seo-checklist.templates')->with('error', __('Template not found'));
+            return $this->flashResult($request, route('pages.seo-checklist.templates'), false, __('Template not found'));
         }
 
         $result = $this->service->deleteTemplate($template);
+        $ok = !empty($result['ok']);
 
-        return redirect()
-            ->route('pages.seo-checklist.templates')
-            ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? __('SEO checklist template deleted') : ($result['message'] ?? __('Error')));
+        return $this->flashResult(
+            $request,
+            $ok
+                ? route('pages.seo-checklist.templates')
+                : route('pages.seo-checklist.templates.edit', ['templateId' => $template->id]),
+            $ok,
+            $ok ? __('SEO checklist template deleted') : ($result['message'] ?? __('Error')),
+            true
+        );
     }
 
     public function updateTemplateTask(Request $request, int $templateId, int $taskId)
@@ -1055,9 +1126,7 @@ class SeoChecklistController extends Controller
             'due_days_from_start' => $request->input('due_days_from_start'),
         ]);
 
-        return redirect()
-            ->route('pages.seo-checklist.templates.edit', ['templateId' => $template->id])
-            ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? __('Saved') : ($result['message'] ?? __('Error')));
+        return $this->templateEditResult($request, $template, $result, __('Saved'));
     }
 
     public function destroyTemplateTask(Request $request, int $templateId, int $taskId)
@@ -1244,7 +1313,7 @@ class SeoChecklistController extends Controller
             ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? __('Task added') : ($result['message'] ?? __('Error')));
     }
 
-    public function storeTemplateStage(Request $request, int $templateId): RedirectResponse
+    public function storeTemplateStage(Request $request, int $templateId): \Symfony\Component\HttpFoundation\Response
     {
         $template = $this->findOwnedCustomTemplate($templateId);
         if (!$template) {
@@ -1257,9 +1326,7 @@ class SeoChecklistController extends Controller
             $request->input('lead')
         );
 
-        return redirect()
-            ->route('pages.seo-checklist.templates.edit', ['templateId' => $template->id])
-            ->with($result['ok'] ? 'success' : 'error', $result['ok'] ? __('Stage added') : ($result['message'] ?? __('Error')));
+        return $this->templateEditResult($request, $template, $result, __('Stage added'));
     }
 
     public function applyTemplateSkeleton(int $templateId): RedirectResponse
@@ -2178,50 +2245,51 @@ class SeoChecklistController extends Controller
         ]);
     }
 
-    public function updateTitle(Request $request, int $id): RedirectResponse
+    public function updateTitle(Request $request, int $id): \Symfony\Component\HttpFoundation\Response
     {
         $project = $this->findManageableProject($id);
         if (!$project) {
-            return redirect()->route('pages.seo-checklist')->with('error', __('Project not found'));
+            return $this->flashResult($request, route('pages.seo-checklist'), false, __('Project not found'));
         }
 
         $result = $this->service->updateProjectTitle($project, (string) $request->input('title', ''));
-        if (empty($result['ok'])) {
-            return redirect()
-                ->route('pages.seo-checklist.show', ['id' => $project->id])
-                ->with('error', $result['message'] ?? __('Error'));
-        }
 
-        return redirect()
-            ->route('pages.seo-checklist.show', ['id' => $project->id])
-            ->with('success', __('Checklist renamed'));
+        return $this->flashResult(
+            $request,
+            route('pages.seo-checklist.show', ['id' => $project->id]),
+            !empty($result['ok']),
+            !empty($result['ok']) ? __('Checklist renamed') : ($result['message'] ?? __('Error'))
+        );
     }
 
-    public function archive(int $id): RedirectResponse
+    public function archive(Request $request, int $id): \Symfony\Component\HttpFoundation\Response
     {
         $project = $this->findManageableProject($id);
         if (!$project) {
-            return redirect()->route('pages.seo-checklist')->with('error', __('Project not found'));
+            return $this->flashResult($request, route('pages.seo-checklist'), false, __('Project not found'));
         }
 
         $project->status = 'archived';
         $project->save();
 
-        return redirect()->route('pages.seo-checklist')->with('success', __('SEO checklist archived'));
+        return $this->flashResult($request, route('pages.seo-checklist'), true, __('SEO checklist archived'), true);
     }
 
-    public function restore(int $id): RedirectResponse
+    public function restore(Request $request, int $id): \Symfony\Component\HttpFoundation\Response
     {
         $project = $this->findManageableProject($id);
         if (!$project) {
-            return redirect()->route('pages.seo-checklist')->with('error', __('Project not found'));
+            return $this->flashResult($request, route('pages.seo-checklist'), false, __('Project not found'));
         }
 
         $this->service->restoreProject($project);
 
-        return redirect()
-            ->route('pages.seo-checklist.show', ['id' => $project->id])
-            ->with('success', __('SEO checklist restored'));
+        return $this->flashResult(
+            $request,
+            route('pages.seo-checklist.show', ['id' => $project->id]),
+            true,
+            __('SEO checklist restored')
+        );
     }
 
     public function destroy(int $id): RedirectResponse

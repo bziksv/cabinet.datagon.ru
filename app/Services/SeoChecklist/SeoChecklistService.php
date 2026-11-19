@@ -539,7 +539,10 @@ class SeoChecklistService
             ->whereNotNull('due_at')
             ->whereIn('status', SeoChecklistItem::OPEN_STATUSES)
             ->where('due_at', '<=', $soonUntil)
-            ->with(['project:id,domain,title,user_id'])
+            ->with([
+                'project:id,domain,title,template_id,user_id',
+                'project.template:id,title,code',
+            ])
             ->orderBy('due_at')
             ->limit(40)
             ->get();
@@ -617,7 +620,8 @@ class SeoChecklistService
             ->whereNull('parent_id')
             ->whereIn('status', SeoChecklistItem::OPEN_STATUSES)
             ->with([
-                'project:id,domain,title,user_id,owner_user_id,pm_user_id,team_id,status',
+                'project:id,domain,title,template_id,user_id,owner_user_id,pm_user_id,team_id,status',
+                'project.template:id,title,code',
                 'createdByUser',
                 'doneByUser',
                 'notes' => function ($q) use ($userId) {
@@ -948,7 +952,8 @@ class SeoChecklistService
             ->whereNotNull('done_at')
             ->where('done_at', '>=', now()->subDays(120)->startOfDay())
             ->with([
-                'project:id,domain,title,user_id,owner_user_id,pm_user_id,team_id,status',
+                'project:id,domain,title,template_id,user_id,owner_user_id,pm_user_id,team_id,status',
+                'project.template:id,title,code',
                 'createdByUser',
                 'doneByUser',
                 'notes' => function ($q) use ($userId) {
@@ -3149,8 +3154,9 @@ class SeoChecklistService
         return SeoChecklistProject::query()
             ->whereIn('id', $counts->keys()->all())
             ->where('status', 'active')
+            ->with('template:id,title,code')
             ->orderBy('domain')
-            ->get(['id', 'domain', 'title'])
+            ->get(['id', 'domain', 'title', 'template_id'])
             ->map(function (SeoChecklistProject $project) use ($counts) {
                 $project->setAttribute('review_count', (int) ($counts[$project->id] ?? 0));
 
@@ -3189,7 +3195,8 @@ class SeoChecklistService
             ->whereNull('parent_id')
             ->where('status', 'review')
             ->with([
-                'project:id,domain,title,user_id,owner_user_id,pm_user_id,team_id,status',
+                'project:id,domain,title,template_id,user_id,owner_user_id,pm_user_id,team_id,status',
+                'project.template:id,title,code',
                 'createdByUser',
                 'doneByUser',
                 'notes' => function ($q) use ($userId) {

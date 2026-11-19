@@ -122,7 +122,9 @@
                                 </summary>
                                 <form method="post"
                                       action="{{ route('pages.seo-checklist.title', ['id' => $project->id]) }}"
-                                      class="cabinet-sc-project-rename__form">
+                                      class="cabinet-sc-project-rename__form"
+                                      data-ajax-form
+                                      data-ajax-refresh=".cabinet-sc-plan-topbar__title">
                                     @csrf
                                     <label class="cabinet-sc-project-rename__label" for="scProjectTitleInput">{{ __('Checklist name') }}</label>
                                     <input id="scProjectTitleInput"
@@ -150,6 +152,7 @@
                         @endif
                         · {{ number_format(count($stages), 0, '', ' ') }} {{ __('Stages') }}
                     </p>
+                    <div data-sc-show-team-info>
                     <p class="cabinet-sc-team-line small mb-0">
                         @if($project->team)
                             <span>{{ __('Team') }}: <strong>{{ $project->team->title }}</strong>
@@ -186,6 +189,7 @@
                             @endforeach
                         </div>
                     @endif
+                    </div>
                 </div>
                 <div class="cabinet-sc-plan-topbar__actions">
                     @if($project->status !== 'archived' && $project->progress_done < $project->progress_total)
@@ -202,7 +206,10 @@
                             </form>
                         @else
                             <form method="post" action="{{ route('pages.seo-checklist.archive', ['id' => $project->id]) }}"
-                                  onsubmit='return confirm(@json(__("Archive this SEO checklist?")));'>
+                                  data-ajax-form
+                                  data-cabinet-confirm="{{ __('Archive this SEO checklist?') }}"
+                                  data-cabinet-confirm-title="{{ __('To archive') }}"
+                                  data-cabinet-confirm-ok="{{ __('To archive') }}">
                                 @csrf
                                 <button type="submit" class="cabinet-sc-plan-chip-btn">{{ __('To archive') }}</button>
                             </form>
@@ -335,7 +342,7 @@
 
         @if($canManage)
             <div class="cabinet-sc-actions mb-3">
-                <details class="cabinet-sc-action cabinet-sc-action--team">
+                <details class="cabinet-sc-action cabinet-sc-action--team" id="sc-team-action">
                     <summary class="cabinet-sc-action__summary">
                         <span class="cabinet-sc-action__icon" aria-hidden="true"><i class="bi bi-people"></i></span>
                         <span class="cabinet-sc-action__text">
@@ -353,7 +360,9 @@
                         </span>
                     </summary>
                     <div class="cabinet-sc-action__body">
-                        <form method="post" action="{{ route('pages.seo-checklist.assign-team', ['id' => $project->id]) }}" class="cabinet-sc-team__form">
+                        <form method="post" action="{{ route('pages.seo-checklist.assign-team', ['id' => $project->id]) }}" class="cabinet-sc-team__form"
+                              data-ajax-form
+                              data-ajax-refresh="[data-sc-show-team-info]|#sc-team-action">
                             @csrf
                             <input type="hidden" name="return_to" value="show">
                             <div class="cabinet-sc-team__fields">
@@ -416,7 +425,10 @@
                             </span>
                         </summary>
                         <div class="cabinet-sc-action__body">
-                            <form method="post" action="{{ route('pages.seo-checklist.items.store', ['id' => $project->id]) }}" class="cabinet-sc-team__form">
+                            <form method="post" action="{{ route('pages.seo-checklist.items.store', ['id' => $project->id]) }}" class="cabinet-sc-team__form"
+                                  data-ajax-form
+                                  data-ajax-silent="1"
+                                  data-sc-add-item-form>
                                 @csrf
                                 <div class="cabinet-sc-team__fields">
                                     <label>
@@ -981,6 +993,7 @@
     @include('pages.partials.seo-checklist-status-modal')
 
     @slot('js')
+        <script src="{{ asset('js/cabinet-ajax-form.js') }}?v={{ @filemtime(public_path('js/cabinet-ajax-form.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-hub.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-hub.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-attach.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-attach.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-status-modal.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-status-modal.js')) ?: time() }}"></script>

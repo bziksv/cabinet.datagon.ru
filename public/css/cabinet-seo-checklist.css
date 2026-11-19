@@ -1508,8 +1508,17 @@
     overflow: visible;
 }
 
-.cabinet-sc-plan__domain {
+.cabinet-sc-plan__project {
     grid-area: domain;
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.45rem;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.cabinet-sc-plan__domain {
     font-size: 0.75rem;
     font-weight: 700;
     color: var(--sc-accent);
@@ -1519,6 +1528,13 @@
 
 .cabinet-sc-plan__domain:hover {
     text-decoration: underline;
+}
+
+.cabinet-sc-plan__tpl {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #64748b;
+    line-height: 1.2;
 }
 
 .cabinet-sc-plan__task {
@@ -7898,6 +7914,15 @@ html.cabinet-sc-lightbox-open {
     40% { background-color: color-mix(in srgb, #ea580c 8%, #fff); }
 }
 
+.cabinet-sc-plan__item.is-just-added {
+    animation: cabinet-sc-just-added 1.6s ease-out;
+}
+
+@keyframes cabinet-sc-just-added {
+    0%, 30% { background-color: color-mix(in srgb, var(--plan-accent, #2563eb) 14%, #fff); }
+    100% { background-color: transparent; }
+}
+
 @keyframes cabinet-sc-plan-sub-need {
     0%, 100% { transform: translateX(0); }
     30% { transform: translateX(-2px); }
@@ -7908,10 +7933,20 @@ html.cabinet-sc-lightbox-open {
     background: color-mix(in srgb, var(--plan-accent) 5%, #fff);
 }
 
+.cabinet-sc-plan-v2 .cabinet-sc-plan__project {
+    gap: 0.2rem 0.4rem;
+}
+
 .cabinet-sc-plan-v2 .cabinet-sc-plan__domain {
     font-size: 0.7rem;
     font-weight: 750;
     color: var(--plan-accent);
+}
+
+.cabinet-sc-plan-v2 .cabinet-sc-plan__tpl {
+    font-size: 0.66rem;
+    font-weight: 650;
+    color: #64748b;
 }
 
 .cabinet-sc-plan-v2 .cabinet-sc-plan__task {

@@ -275,28 +275,9 @@
         }
     })();
 
-    document.querySelectorAll('[data-sc-set-default-template]').forEach(function (btn) {
-        btn.addEventListener('click', function (e) {
-            e.preventDefault();
-            var id = btn.getAttribute('data-sc-set-default-template');
-            writeDefaultTemplateId(id);
-            document.querySelectorAll('[data-sc-set-default-template]').forEach(function (other) {
-                other.classList.toggle('is-default', other === btn);
-                var label = other.querySelector('[data-sc-default-label]');
-                if (label) {
-                    label.textContent = other === btn
-                        ? (other.getAttribute('data-label-default') || 'Default')
-                        : (other.getAttribute('data-label-make-default') || 'Make default');
-                }
-            });
-        });
-    });
-
-    // Mark current default on templates page
-    var savedId = readDefaultTemplateId();
-    if (savedId) {
+    function markDefaultTemplate(id) {
         document.querySelectorAll('[data-sc-set-default-template]').forEach(function (btn) {
-            var isDefault = btn.getAttribute('data-sc-set-default-template') === savedId;
+            var isDefault = !!id && btn.getAttribute('data-sc-set-default-template') === String(id);
             btn.classList.toggle('is-default', isDefault);
             var label = btn.querySelector('[data-sc-default-label]');
             if (label) {
@@ -306,6 +287,20 @@
             }
         });
     }
+
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-sc-set-default-template]');
+        if (!btn) return;
+        e.preventDefault();
+        var id = btn.getAttribute('data-sc-set-default-template');
+        writeDefaultTemplateId(id);
+        markDefaultTemplate(id);
+    });
+
+    markDefaultTemplate(readDefaultTemplateId());
+    document.addEventListener('cabinet:ajax-refreshed', function () {
+        markDefaultTemplate(readDefaultTemplateId());
+    });
 
     var PROJECT_PREFS_KEY = 'seoChecklistProjectHubPrefs';
     var PROJECT_ROLE_FILTER_KEY = 'seoChecklistProjectRoleFilter';
@@ -730,11 +725,15 @@
         if (emptyEl) emptyEl.classList.toggle('d-none', visible > 0);
     }
 
-    document.querySelectorAll('[data-sc-stop-toggle]').forEach(function (el) {
-        el.addEventListener('click', function (e) {
-            e.stopPropagation();
+    function bindStopToggle() {
+        document.querySelectorAll('[data-sc-stop-toggle]:not([data-sc-stop-bound])').forEach(function (el) {
+            el.setAttribute('data-sc-stop-bound', '1');
+            el.addEventListener('click', function (e) {
+                e.stopPropagation();
+            });
         });
-    });
+    }
+    bindStopToggle();
 
     var teamSearchEl = document.querySelector('[data-sc-team-search]');
     if (teamSearchEl) teamSearchEl.addEventListener('input', applyTeamFilters);
@@ -808,6 +807,13 @@
     }
     if (assignExpand) assignExpand.addEventListener('click', function () { setAssignCollapsed(false); });
     if (assignCollapse) assignCollapse.addEventListener('click', function () { setAssignCollapsed(true); });
+
+    document.addEventListener('cabinet:ajax-refreshed', function () {
+        bindStopToggle();
+        restoreTeamOpenState();
+        applyTeamFilters();
+        applyAssignFilters();
+    });
 
     // —— Template editor: smart search ——
     (function initTemplateSmartSearch() {
@@ -957,6 +963,10 @@
         }
 
         function showInlineFlash(message, isError) {
+            if (window.CabinetAjaxForm) {
+                window.CabinetAjaxForm.toast(message, isError);
+                return;
+            }
             var existing = page.querySelector('[data-sc-tpl-inline-flash]');
             if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
             var el = document.createElement('div');
@@ -1038,6 +1048,21 @@
                     form.classList.remove('is-busy');
                     showInlineFlash('Error', true);
                 });
+        });
+
+        page.addEventListener('cabinet:ajax-form:success', function (e) {
+            var form = e.target.closest('[data-sc-tpl-task-delete]');
+            if (!form) return;
+            var stage = form.closest('[data-sc-tpl-stage]');
+            window.setTimeout(function () {
+                if (!stage) return;
+                var ul = stage.querySelector('.cabinet-sc-tasks');
+                var count = ul ? ul.querySelectorAll(':scope > [data-sc-tpl-task]').length : 0;
+                refreshMoveButtons(stage);
+                refreshStageCounts(stage, count);
+                var delStage = stage.querySelector('[data-sc-tpl-stage-delete]');
+                if (delStage && count === 0) delStage.disabled = false;
+            }, 0);
         });
     })();
 

@@ -1173,10 +1173,15 @@
         }
 
         function itemTitleText(item) {
+            var project = item.querySelector('.cabinet-sc-plan__project');
             var domain = item.querySelector('.cabinet-sc-plan__domain');
             var title = item.querySelector('.cabinet-sc-plan__task, [data-sc-title]');
             var parts = [];
-            if (domain) parts.push(domain.textContent || '');
+            if (project) {
+                parts.push(project.textContent || '');
+            } else if (domain) {
+                parts.push(domain.textContent || '');
+            }
             if (title) parts.push(title.textContent || '');
             return normalizeSearch(parts.join(' '));
         }

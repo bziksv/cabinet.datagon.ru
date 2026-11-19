@@ -1805,6 +1805,52 @@
         bindRow(subEl, true);
     });
 
+    // Новая задача из «Добавить задачу»: берём готовую строку из свежего HTML страницы.
+    root.addEventListener('cabinet:ajax-form:success', function (e) {
+        var form = e.target.closest('[data-sc-add-item-form]');
+        if (!form || !window.CabinetAjaxForm) return;
+        var data = (e.detail && e.detail.data) || {};
+        var newId = data.item && data.item.id;
+        var titleInput = form.querySelector('input[name="title"]');
+        form.reset();
+        if (titleInput) titleInput.focus();
+        updateProgress(data.progress);
+        if (!newId) return;
+
+        window.CabinetAjaxForm.fetchPage().then(function (doc) {
+            var freshLi = doc.getElementById('sc-item-' + newId);
+            var freshStage = freshLi ? freshLi.closest('[data-sc-stage]') : null;
+            var stageKey = freshStage ? freshStage.getAttribute('data-sc-stage-key') : '';
+            var stage = stageKey ? root.querySelector('[data-sc-stage][data-sc-stage-key="' + stageKey + '"]') : null;
+            var list = stage ? stage.querySelector('.cabinet-sc-tasks') : null;
+            if (!freshLi || !list) {
+                window.location.reload();
+                return;
+            }
+            var li = document.importNode(freshLi, true);
+            var next = freshLi.nextElementSibling;
+            var anchor = null;
+            while (next && !anchor) {
+                anchor = next.id ? list.querySelector('#' + next.id) : null;
+                next = next.nextElementSibling;
+            }
+            if (anchor) list.insertBefore(li, anchor);
+            else list.appendChild(li);
+            bindRow(li, false);
+            li.querySelectorAll('[data-sc-subitem]').forEach(function (subEl) {
+                bindRow(subEl, true);
+            });
+            stage.open = true;
+            refreshStageCompletion();
+            applyFilters();
+            li.classList.add('is-just-added');
+            try { li.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (err) {}
+            window.CabinetAjaxForm.toast(data.message || (data.item.title ? '«' + data.item.title + '» добавлена' : 'Задача добавлена'), false);
+        }).catch(function () {
+            window.location.reload();
+        });
+    });
+
     window.setInterval(tickAllTimers, 1000);
 
     window.cabinetSeoChecklistOnTimerStopped = function (data) {

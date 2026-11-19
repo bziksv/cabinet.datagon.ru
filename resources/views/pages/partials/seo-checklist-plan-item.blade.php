@@ -71,12 +71,17 @@
     if (!is_array($myRolesOnProject)) {
         $myRolesOnProject = [];
     }
+    $planTplTitle = '';
+    if ($project && $project->relationLoaded('template') && $project->template) {
+        $planTplTitle = trim((string) ($project->template->title ?? ''));
+    }
 @endphp
 <li class="cabinet-sc-plan__item @if($isOver) is-overdue @endif @if($item->status === 'doing') is-doing @endif @if($item->status === 'review') is-review @endif @if($item->is_important) is-important @endif @if($timerRunning) is-timing @endif"
     data-sc-plan-item
     data-id="{{ $item->id }}"
     data-project-id="{{ $item->project_id }}"
     data-domain="{{ $project ? $project->domain : '' }}"
+    data-template="{{ $planTplTitle }}"
     data-status="{{ $item->status }}"
     data-task-role="{{ $item->role }}"
     data-my-roles="{{ e(implode(',', $myRolesOnProject)) }}"
@@ -97,7 +102,12 @@
         <div class="cabinet-sc-plan__body">
             <div class="cabinet-sc-plan__row">
                 @if($project)
-                    <a href="{{ $projectUrl }}" class="cabinet-sc-plan__domain">{{ $project->domain }}</a>
+                    <span class="cabinet-sc-plan__project">
+                        <a href="{{ $projectUrl }}" class="cabinet-sc-plan__domain">{{ $project->domain }}</a>
+                        @if($planTplTitle !== '')
+                            <span class="cabinet-sc-plan__tpl">{{ $planTplTitle }}</span>
+                        @endif
+                    </span>
                 @endif
                 <span class="cabinet-sc-plan__task {{ $item->status === 'review' ? 'is-review-text' : '' }}">{{ $item->title }}</span>
                 <div class="cabinet-sc-plan__meta">

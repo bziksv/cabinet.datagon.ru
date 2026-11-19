@@ -69,14 +69,22 @@
                                 @php
                                     $fpDomain = trim((string) ($fp->domain ?? ''));
                                     $fpTitle = trim((string) ($fp->title ?? ''));
+                                    $fpTpl = $fp->relationLoaded('template') && $fp->template
+                                        ? trim((string) ($fp->template->title ?? ''))
+                                        : '';
                                     $fpTitleUseful = $fpTitle !== ''
                                         && strcasecmp($fpTitle, $fpDomain) !== 0
-                                        && ($fpDomain === '' || mb_stripos($fpTitle, $fpDomain) === false);
+                                        && ($fpDomain === '' || mb_stripos($fpTitle, $fpDomain) === false)
+                                        && ($fpTpl === '' || strcasecmp($fpTitle, $fpTpl) !== 0);
                                     $fpCount = (int) ($fp->review_count ?? 0);
+                                    $fpLabel = implode(' · ', array_filter([
+                                        $fpDomain,
+                                        $fpTpl,
+                                        $fpTitleUseful ? $fpTitle : '',
+                                    ], 'strlen'));
                                 @endphp
                                 <option value="{{ $fp->id }}" @if((int) ($filterProjectId ?? 0) === (int) $fp->id) selected @endif>
-                                    {{ $fpDomain }}@if($fpTitleUseful) · {{ $fpTitle }}@endif
-                                    ({{ number_format($fpCount, 0, '', ' ') }})
+                                    {{ $fpLabel }} ({{ number_format($fpCount, 0, '', ' ') }})
                                 </option>
                             @endforeach
                         </select>

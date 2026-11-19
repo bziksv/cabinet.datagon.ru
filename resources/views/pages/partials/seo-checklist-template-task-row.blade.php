@@ -114,7 +114,9 @@
             </button>
         </div>
         <div class="cabinet-sc-tpl-task-body" data-sc-tpl-task-body>
-            <form method="post" action="{{ route('pages.seo-checklist.templates.task.update', ['templateId' => $template->id, 'taskId' => $task->id]) }}" class="cabinet-sc-tpl-task">
+            <form method="post" action="{{ route('pages.seo-checklist.templates.task.update', ['templateId' => $template->id, 'taskId' => $task->id]) }}" class="cabinet-sc-tpl-task"
+                  data-ajax-form
+                  data-ajax-refresh="#tpl-task-{{ $task->id }}">
                 @csrf
                 <label class="cabinet-sc-tpl-task__field">
                     <span class="cabinet-sc-tpl-task__label">{{ __('Task') }}</span>
@@ -230,7 +232,13 @@
                 </div>
                 <form method="post" action="{{ route('pages.seo-checklist.templates.task.delete', ['templateId' => $template->id, 'taskId' => $task->id]) }}"
                       class="cabinet-sc-tpl-task__delete"
-                      onsubmit='return confirm(@json(__("Delete this task?")));'>
+                      data-ajax-form
+                      data-ajax-remove="[data-sc-tpl-task]"
+                      data-sc-tpl-task-delete
+                      data-cabinet-confirm="{{ __('Delete this task?') }}"
+                      data-cabinet-confirm-title="{{ __('Delete task') }}"
+                      data-cabinet-confirm-ok="Удалить"
+                      data-cabinet-confirm-danger="1">
                     @csrf
                     <button type="submit" class="btn btn-sm btn-outline-danger">{{ __('Delete task') }}</button>
                 </form>

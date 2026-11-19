@@ -253,12 +253,26 @@
         pushDraft(root);
     });
 
+    // capture: черновик участника должен попасть в форму до AJAX-отправки (cabinet-ajax-form.js)
     document.addEventListener('submit', function (e) {
         var form = e.target && e.target.closest ? e.target.closest('[data-team-create-form]') : null;
         if (!form) {
             return;
         }
         pushDraft(formModal(form) || form, true);
+    }, true);
+
+    document.addEventListener('cabinet:ajax-form:success', function (e) {
+        var form = e.target && e.target.closest ? e.target.closest('[data-team-create-form]') : null;
+        var modal = form ? form.closest('.modal') : null;
+        if (!modal) {
+            return;
+        }
+        if (window.bootstrap && bootstrap.Modal) {
+            bootstrap.Modal.getOrCreateInstance(modal).hide();
+        } else if (window.jQuery && window.jQuery.fn.modal) {
+            window.jQuery(modal).modal('hide');
+        }
     });
 
     document.addEventListener('hidden.bs.modal', function (e) {

@@ -58,7 +58,7 @@
                     </p>
                 </div>
                 <div class="cabinet-sc-tpl-topbar__actions">
-                    <form method="post" action="{{ route('pages.seo-checklist.templates.duplicate', ['templateId' => $template->id]) }}">
+                    <form method="post" action="{{ route('pages.seo-checklist.templates.duplicate', ['templateId' => $template->id]) }}" data-ajax-form>
                         @csrf
                         <button type="submit" class="cabinet-sc-tpl-chip-btn">{{ __('Duplicate') }}</button>
                     </form>
@@ -67,7 +67,11 @@
                             <button type="button" class="cabinet-sc-tpl-chip-btn is-disabled" disabled>{{ __('Delete') }}</button>
                         @else
                             <form method="post" action="{{ route('pages.seo-checklist.templates.delete', ['templateId' => $template->id]) }}"
-                                  onsubmit='return confirm(@json(__("Delete this template?")));'>
+                                  data-ajax-form
+                                  data-cabinet-confirm="{{ __('Delete this template?') }}"
+                                  data-cabinet-confirm-title="{{ __('Delete') }}"
+                                  data-cabinet-confirm-ok="Удалить"
+                                  data-cabinet-confirm-danger="1">
                                 @csrf
                                 <button type="submit" class="cabinet-sc-tpl-chip-btn cabinet-sc-tpl-chip-btn--danger">{{ __('Delete') }}</button>
                             </form>
@@ -91,7 +95,9 @@
                     <span class="cabinet-sc-tpl-settings__summary-meta">{{ $template->title }}</span>
                     <span class="cabinet-sc-tpl-settings__summary-action">{{ __('Edit') }}</span>
                 </summary>
-                <form method="post" action="{{ route('pages.seo-checklist.templates.update', ['templateId' => $template->id]) }}" class="cabinet-sc-tpl-settings__form">
+                <form method="post" action="{{ route('pages.seo-checklist.templates.update', ['templateId' => $template->id]) }}" class="cabinet-sc-tpl-settings__form"
+                      data-ajax-form
+                      data-ajax-refresh=".cabinet-sc-tpl-topbar__title|.cabinet-sc-tpl-settings__summary-meta">
                     @csrf
                     <div class="cabinet-sc-tpl-settings__grid">
                         <label class="cabinet-sc-tpl-settings__field">
@@ -290,7 +296,9 @@
             @if(!$readOnly)
                 <form method="post"
                       action="{{ route('pages.seo-checklist.templates.stage.store', ['templateId' => $template->id]) }}"
-                      class="cabinet-sc-add-stage">
+                      class="cabinet-sc-add-stage"
+                      data-ajax-form
+                      data-ajax-refresh="[data-sc-tpl-stages]|.cabinet-sc-tpl-rail__list">
                     @csrf
                     <div class="cabinet-sc-add-stage__title">{{ __('Add stage') }}</div>
                     <div class="cabinet-sc-add-stage__row">
@@ -306,7 +314,10 @@
 
     </div>
 
+    @include('partials.cabinet-confirm-modal')
+
     @slot('js')
+        <script src="{{ asset('js/cabinet-ajax-form.js') }}?v={{ @filemtime(public_path('js/cabinet-ajax-form.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-hub.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-hub.js')) ?: time() }}"></script>
         <script>
             (function () {

@@ -8,13 +8,20 @@
             @php
                 $fpDomain = trim((string) ($fp->domain ?? ''));
                 $fpTitle = trim((string) ($fp->title ?? ''));
+                $fpTpl = $fp->relationLoaded('template') && $fp->template
+                    ? trim((string) ($fp->template->title ?? ''))
+                    : '';
                 $fpTitleUseful = $fpTitle !== ''
                     && strcasecmp($fpTitle, $fpDomain) !== 0
-                    && ($fpDomain === '' || mb_stripos($fpTitle, $fpDomain) === false);
+                    && ($fpDomain === '' || mb_stripos($fpTitle, $fpDomain) === false)
+                    && ($fpTpl === '' || strcasecmp($fpTitle, $fpTpl) !== 0);
+                $fpLabel = implode(' · ', array_filter([
+                    $fpDomain,
+                    $fpTpl,
+                    $fpTitleUseful ? $fpTitle : '',
+                ], 'strlen'));
             @endphp
-            <option value="{{ $fp->id }}">
-                {{ $fpDomain }}@if($fpTitleUseful) · {{ $fpTitle }}@endif
-            </option>
+            <option value="{{ $fp->id }}">{{ $fpLabel }}</option>
         @endforeach
     </select>
 </label>

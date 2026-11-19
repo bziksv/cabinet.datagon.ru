@@ -50,6 +50,7 @@
                     <option value="">{{ __('All roles') }}</option>
                     <optgroup label="{{ __('Checklist project filter structure') }}">
                         <option value="no-pm">{{ __('Without PM') }}</option>
+                        <option value="no-auditor">{{ __('Without auditor') }}</option>
                         <option value="no-team">{{ __('No team') }}</option>
                     </optgroup>
                     <optgroup label="{{ __('Checklist project filter my role') }}">
@@ -115,6 +116,9 @@
                 <span class="cabinet-sc-filters__sep" aria-hidden="true"></span>
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-project-role-preset="no-pm" aria-pressed="false">
                     {{ __('Without PM') }}
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-project-role-preset="no-auditor" aria-pressed="false">
+                    {{ __('Without auditor') }}
                 </button>
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-sc-project-role-preset="no-team" aria-pressed="false">
                     {{ __('No team') }}
@@ -238,6 +242,7 @@
                        data-sc-project-card
                        data-search="{{ e($searchBlob) }}"
                        data-has-pm="{{ $pm ? '1' : '0' }}"
+                       data-has-auditor="{{ ($personAttrs['auditor']['id'] ?? '') !== '' ? '1' : '0' }}"
                        data-has-team="{{ $team ? '1' : '0' }}"
                        data-my-roles="{{ e(implode(',', $myRoleKeys)) }}"
                        data-person-owner-id="{{ e($personAttrs['owner']['id']) }}"

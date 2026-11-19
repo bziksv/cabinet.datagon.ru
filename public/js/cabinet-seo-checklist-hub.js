@@ -388,6 +388,9 @@
         if (role === 'no-pm') {
             return card.getAttribute('data-has-pm') !== '1';
         }
+        if (role === 'no-auditor') {
+            return card.getAttribute('data-has-auditor') !== '1';
+        }
         if (role === 'no-team') {
             return card.getAttribute('data-has-team') !== '1';
         }

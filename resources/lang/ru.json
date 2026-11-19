@@ -6926,5 +6926,6 @@
     "Only completed tasks in plan for this project": "В этом проекте в плане только выполненные — нажмите «Показать выполненные»",
     "All my roles": "Все мои роли",
     "Filter by my role": "Фильтр по моей роли",
-    "Filter by task role": "Фильтр по роли задачи"
+    "Filter by task role": "Фильтр по роли задачи",
+    "Without auditor": "Без аудитора"
 }

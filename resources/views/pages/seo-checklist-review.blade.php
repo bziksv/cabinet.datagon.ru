@@ -61,7 +61,7 @@
                 <section class="cabinet-sc-plan__group cabinet-sc-plan__group--review" data-sc-plan-group="review">
                     <header class="cabinet-sc-plan__group-head">
                         <h3 class="cabinet-sc-plan__group-title">{{ __('Status review') }}</h3>
-                        <span class="cabinet-sc-plan__group-count" data-sc-plan-count>{{ $items->count() }}</span>
+                        <span class="cabinet-sc-plan__group-count" data-sc-plan-count>{{ number_format($items->count(), 0, '', ' ') }}</span>
                     </header>
                     <ul class="cabinet-sc-plan__list">
                         @foreach($items as $item)

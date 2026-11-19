@@ -736,7 +736,12 @@ class SeoChecklistService
 
         $count = 0;
         foreach ($groups as $key => $group) {
-            $groups[$key]['items'] = $group['items']->take($limit)->values();
+            // «На проверку» / просрочка без скрытого потолка: иначе счётчик и список расходятся,
+            // а пагинации на плане нет.
+            $cap = in_array($key, ['review', 'overdue'], true)
+                ? max($limit, 5000)
+                : $limit;
+            $groups[$key]['items'] = $group['items']->take($cap)->values();
             if (in_array($key, ['overdue', 'today', 'tomorrow', 'week'], true)) {
                 $count += $groups[$key]['items']->count();
             }
@@ -3101,10 +3106,11 @@ class SeoChecklistService
 
     /**
      * Очередь «На проверку» для PM/аудиторов.
+     * Без лимита по умолчанию — на странице нет пагинации, обрезать нельзя.
      *
      * @return \Illuminate\Support\Collection<int, SeoChecklistItem>
      */
-    public function reviewQueueForUser(int $userId, int $limit = 100)
+    public function reviewQueueForUser(int $userId, ?int $limit = null)
     {
         $projects = $this->accessibleProjectsQuery($userId)
             ->where('status', 'active')
@@ -3120,7 +3126,7 @@ class SeoChecklistService
             return collect();
         }
 
-        $items = SeoChecklistItem::query()
+        $query = SeoChecklistItem::query()
             ->whereIn('project_id', $allowedIds)
             ->whereNull('parent_id')
             ->where('status', 'review')
@@ -3157,9 +3163,13 @@ class SeoChecklistService
                 },
             ])
             ->orderBy('due_at')
-            ->orderBy('id')
-            ->limit($limit)
-            ->get();
+            ->orderBy('id');
+
+        if ($limit !== null && $limit > 0) {
+            $query->limit($limit);
+        }
+
+        $items = $query->get();
 
         $this->attachStatusAuditLabels($items);
 

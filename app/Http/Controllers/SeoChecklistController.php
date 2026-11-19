@@ -99,7 +99,7 @@ class SeoChecklistController extends Controller
             'templates' => $templates,
             'teamCount' => $this->service->teamsForUser($userId)->count(),
             'myTasksCount' => (int) ($workPlan['count'] ?? 0),
-            'reviewCount' => $this->service->reviewQueueForUser($userId)->count(),
+            'reviewCount' => $this->service->reviewQueueCountForUser($userId),
             'showReviewTab' => $this->service->canSeeReviewQueue($userId),
             'unreadNotesCount' => (int) ($chronicle['unread_count'] ?? 0),
             'accessKinds' => $accessKinds,
@@ -138,7 +138,7 @@ class SeoChecklistController extends Controller
             'teamCount' => $this->service->teamsForUser($userId)->count(),
             'templatesCount' => $this->service->templatesForUser($userId)->count(),
             'myTasksCount' => (int) ($plan['count'] ?? 0),
-            'reviewCount' => $this->service->reviewQueueForUser($userId)->count(),
+            'reviewCount' => $this->service->reviewQueueCountForUser($userId),
             'showReviewTab' => $this->service->canSeeReviewQueue($userId),
             'unreadNotesCount' => (int) ($chronicle['unread_count'] ?? 0),
         ]);
@@ -163,6 +163,7 @@ class SeoChecklistController extends Controller
         $items = $this->service->reviewQueueForUser($userId);
         $plan = $this->service->workPlanForUser($userId);
         $chronicle = $this->service->chronicleForUser($userId, null, null, true, 1);
+        $reviewCount = $this->service->reviewQueueCountForUser($userId);
 
         return view('pages.seo-checklist-review', [
             'items' => $items,
@@ -172,7 +173,7 @@ class SeoChecklistController extends Controller
             'teamCount' => $this->service->teamsForUser($userId)->count(),
             'templatesCount' => $this->service->templatesForUser($userId)->count(),
             'myTasksCount' => (int) ($plan['count'] ?? 0),
-            'reviewCount' => $items->count(),
+            'reviewCount' => $reviewCount,
             'showReviewTab' => true,
             'unreadNotesCount' => (int) ($chronicle['unread_count'] ?? 0),
         ]);
@@ -227,7 +228,7 @@ class SeoChecklistController extends Controller
             'teamCount' => $this->service->teamsForUser($userId)->count(),
             'templatesCount' => $this->service->templatesForUser($userId)->count(),
             'myTasksCount' => (int) ($plan['count'] ?? 0),
-            'reviewCount' => $this->service->reviewQueueForUser($userId)->count(),
+            'reviewCount' => $this->service->reviewQueueCountForUser($userId),
             'showReviewTab' => $this->service->canSeeReviewQueue($userId),
             'unreadNotesCount' => (int) ($data['unread_count'] ?? 0),
             'unreadPrefs' => $data['unread_prefs'] ?? \App\SeoChecklist\SeoChecklistUserPreference::chronicleUnreadPrefsFor($userId),
@@ -450,7 +451,7 @@ class SeoChecklistController extends Controller
             'teamCount' => $this->service->teamsForUser($userId)->count(),
             'templatesCount' => $this->service->templatesForUser($userId)->count(),
             'myTasksCount' => (int) ($plan['count'] ?? 0),
-            'reviewCount' => $this->service->reviewQueueForUser($userId)->count(),
+            'reviewCount' => $this->service->reviewQueueCountForUser($userId),
             'showReviewTab' => $this->service->canSeeReviewQueue($userId),
             'unreadNotesCount' => (int) ($chronicle['unread_count'] ?? 0),
         ]);
@@ -576,7 +577,7 @@ class SeoChecklistController extends Controller
             'projectsCount' => $projectsCount,
             'templatesCount' => $this->service->templatesForUser($userId)->count(),
             'myTasksCount' => (int) ($this->service->dueAlertsForUser($userId)['count'] ?? 0),
-            'reviewCount' => $this->service->reviewQueueForUser($userId)->count(),
+            'reviewCount' => $this->service->reviewQueueCountForUser($userId),
             'showReviewTab' => $this->service->canSeeReviewQueue($userId),
             'unreadNotesCount' => (int) ($this->service->chronicleForUser($userId, null, null, true, 1)['unread_count'] ?? 0),
             'teamRoleLabels' => \App\SeoChecklist\SeoChecklistTeam::roleLabels(),
@@ -829,7 +830,7 @@ class SeoChecklistController extends Controller
             'projectsCount' => $projectsCount,
             'teamCount' => $this->service->teamsForUser($userId)->count(),
             'myTasksCount' => (int) ($this->service->dueAlertsForUser($userId)['count'] ?? 0),
-            'reviewCount' => $this->service->reviewQueueForUser($userId)->count(),
+            'reviewCount' => $this->service->reviewQueueCountForUser($userId),
             'showReviewTab' => $this->service->canSeeReviewQueue($userId),
             'unreadNotesCount' => (int) ($this->service->chronicleForUser($userId, null, null, true, 1)['unread_count'] ?? 0),
         ]);
@@ -954,7 +955,7 @@ class SeoChecklistController extends Controller
             'teamCount' => $this->service->teamsForUser($userId)->count(),
             'templatesCount' => $this->service->templatesForUser($userId)->count(),
             'myTasksCount' => (int) ($this->service->dueAlertsForUser($userId)['count'] ?? 0),
-            'reviewCount' => $this->service->reviewQueueForUser($userId)->count(),
+            'reviewCount' => $this->service->reviewQueueCountForUser($userId),
             'showReviewTab' => $this->service->canSeeReviewQueue($userId),
             'unreadNotesCount' => (int) ($this->service->chronicleForUser($userId, null, null, true, 1)['unread_count'] ?? 0),
             'usageCount' => SeoChecklistProject::query()->where('template_id', $template->id)->count(),
@@ -1462,7 +1463,7 @@ class SeoChecklistController extends Controller
             'teamCount' => $this->service->teamsForUser($authId)->count(),
             'templatesCount' => $this->service->templatesForUser($authId)->count(),
             'myTasksCount' => (int) ($plan['count'] ?? 0),
-            'reviewCount' => $this->service->reviewQueueForUser($authId)->count(),
+            'reviewCount' => $this->service->reviewQueueCountForUser($authId),
             'projectReviewCount' => $projectReviewCount,
             'showReviewTab' => $this->service->canSeeReviewQueue($authId),
             'unreadNotesCount' => (int) ($chronicle['unread_count'] ?? 0),

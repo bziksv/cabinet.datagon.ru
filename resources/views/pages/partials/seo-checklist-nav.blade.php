@@ -34,7 +34,7 @@
                @if($scTab === 'review') aria-current="page" @endif>
                 {{ __('For review') }}
                 @if(isset($scReviewCount))
-                    <span class="cabinet-sc-tabs__count @if((int) $scReviewCount > 0) is-hot @endif">{{ $scReviewCount }}</span>
+                    <span class="cabinet-sc-tabs__count @if((int) $scReviewCount > 0) is-hot @endif">{{ number_format((int) $scReviewCount, 0, '', ' ') }}</span>
                 @endif
             </a>
         @endif

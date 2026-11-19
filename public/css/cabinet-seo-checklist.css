@@ -7807,6 +7807,17 @@ html.cabinet-sc-lightbox-open {
     font-size: 0.7rem;
     font-weight: 750;
     text-align: center;
+    white-space: nowrap;
+}
+
+.cabinet-sc-plan-pager {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.cabinet-sc-plan-pager .pagination {
+    margin-bottom: 0;
 }
 
 .cabinet-sc-plan-v2 .cabinet-sc-plan__item {

@@ -149,7 +149,7 @@ class SeoChecklistController extends Controller
      *
      * @return View|RedirectResponse
      */
-    public function reviewQueue()
+    public function reviewQueue(Request $request)
     {
         $userId = (int) Auth::id();
         $this->service->ensureSystemTemplate();
@@ -160,13 +160,26 @@ class SeoChecklistController extends Controller
                 ->with('error', __('Only PM or auditor can approve'));
         }
 
-        $items = $this->service->reviewQueueForUser($userId);
+        $perPage = (int) $request->input('per_page', 40);
+        $filterProjects = $this->service->reviewQueueFilterProjects($userId);
+        $projectId = (int) $request->input('project', 0);
+        if ($projectId > 0 && !$filterProjects->contains('id', $projectId)) {
+            $projectId = 0;
+        }
+        $projectId = $projectId > 0 ? $projectId : null;
+
+        $items = $this->service->reviewQueueForUser($userId, $perPage, $projectId);
         $plan = $this->service->workPlanForUser($userId);
         $chronicle = $this->service->chronicleForUser($userId, null, null, true, 1);
         $reviewCount = $this->service->reviewQueueCountForUser($userId);
+        $filteredReviewCount = $projectId
+            ? $this->service->reviewQueueCountForUser($userId, $projectId)
+            : $reviewCount;
 
         return view('pages.seo-checklist-review', [
             'items' => $items,
+            'filterProjects' => $filterProjects,
+            'filterProjectId' => $projectId,
             'roleLabels' => $this->roleLabels(),
             'statusLabels' => $this->statusLabels(),
             'projectsCount' => $this->service->accessibleProjectsQuery($userId)->where('status', 'active')->count(),
@@ -174,6 +187,7 @@ class SeoChecklistController extends Controller
             'templatesCount' => $this->service->templatesForUser($userId)->count(),
             'myTasksCount' => (int) ($plan['count'] ?? 0),
             'reviewCount' => $reviewCount,
+            'filteredReviewCount' => $filteredReviewCount,
             'showReviewTab' => true,
             'unreadNotesCount' => (int) ($chronicle['unread_count'] ?? 0),
         ]);

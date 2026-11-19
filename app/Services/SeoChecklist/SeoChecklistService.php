@@ -3079,9 +3079,11 @@ class SeoChecklistService
     }
 
     /**
-     * Число задач «На проверку» для шапки / бейджа (без загрузки самих задач).
+     * Проекты, где пользователь может закрывать «На проверку».
+     *
+     * @return list<int>
      */
-    public function reviewQueueCountForUser(int $userId): int
+    private function reviewQueueProjectIds(int $userId): array
     {
         $projects = $this->accessibleProjectsQuery($userId)
             ->where('status', 'active')
@@ -3093,8 +3095,24 @@ class SeoChecklistService
                 $allowedIds[] = (int) $project->id;
             }
         }
+
+        return $allowedIds;
+    }
+
+    /**
+     * Число задач «На проверку» для шапки / бейджа (без загрузки самих задач).
+     */
+    public function reviewQueueCountForUser(int $userId, ?int $projectId = null): int
+    {
+        $allowedIds = $this->reviewQueueProjectIds($userId);
         if ($allowedIds === []) {
             return 0;
+        }
+        if ($projectId !== null && $projectId > 0) {
+            if (!in_array($projectId, $allowedIds, true)) {
+                return 0;
+            }
+            $allowedIds = [$projectId];
         }
 
         return (int) SeoChecklistItem::query()
@@ -3105,28 +3123,68 @@ class SeoChecklistService
     }
 
     /**
-     * Очередь «На проверку» для PM/аудиторов.
-     * Без лимита по умолчанию — на странице нет пагинации, обрезать нельзя.
+     * Проекты с задачами «На проверку» (для фильтра на /checklist/review).
      *
-     * @return \Illuminate\Support\Collection<int, SeoChecklistItem>
+     * @return \Illuminate\Support\Collection<int, SeoChecklistProject>
      */
-    public function reviewQueueForUser(int $userId, ?int $limit = null)
+    public function reviewQueueFilterProjects(int $userId)
     {
-        $projects = $this->accessibleProjectsQuery($userId)
-            ->where('status', 'active')
-            ->get(['id', 'user_id', 'owner_user_id', 'pm_user_id', 'team_id']);
-
-        $allowedIds = [];
-        foreach ($projects as $project) {
-            if ($this->canApproveReview($project, $userId)) {
-                $allowedIds[] = (int) $project->id;
-            }
-        }
+        $allowedIds = $this->reviewQueueProjectIds($userId);
         if ($allowedIds === []) {
             return collect();
         }
 
-        $query = SeoChecklistItem::query()
+        $counts = SeoChecklistItem::query()
+            ->selectRaw('project_id, COUNT(*) as review_count')
+            ->whereIn('project_id', $allowedIds)
+            ->whereNull('parent_id')
+            ->where('status', 'review')
+            ->groupBy('project_id')
+            ->pluck('review_count', 'project_id');
+
+        if ($counts->isEmpty()) {
+            return collect();
+        }
+
+        return SeoChecklistProject::query()
+            ->whereIn('id', $counts->keys()->all())
+            ->where('status', 'active')
+            ->orderBy('domain')
+            ->get(['id', 'domain', 'title'])
+            ->map(function (SeoChecklistProject $project) use ($counts) {
+                $project->setAttribute('review_count', (int) ($counts[$project->id] ?? 0));
+
+                return $project;
+            })
+            ->values();
+    }
+
+    /**
+     * Очередь «На проверку» для PM/аудиторов (постранично — страница тяжёлая).
+     *
+     * @return \Illuminate\Contracts\Pagination\LengthAwarePaginator
+     */
+    public function reviewQueueForUser(int $userId, int $perPage = 40, ?int $projectId = null)
+    {
+        $perPage = max(10, min(100, $perPage));
+        $allowedIds = $this->reviewQueueProjectIds($userId);
+        if ($projectId !== null && $projectId > 0) {
+            $allowedIds = in_array($projectId, $allowedIds, true) ? [$projectId] : [];
+        }
+        if ($allowedIds === []) {
+            return new \Illuminate\Pagination\LengthAwarePaginator(
+                collect(),
+                0,
+                $perPage,
+                max(1, (int) request()->input('page', 1)),
+                [
+                    'path' => request()->url(),
+                    'query' => request()->query(),
+                ]
+            );
+        }
+
+        $items = SeoChecklistItem::query()
             ->whereIn('project_id', $allowedIds)
             ->whereNull('parent_id')
             ->where('status', 'review')
@@ -3163,15 +3221,11 @@ class SeoChecklistService
                 },
             ])
             ->orderBy('due_at')
-            ->orderBy('id');
+            ->orderBy('id')
+            ->paginate($perPage)
+            ->appends(request()->query());
 
-        if ($limit !== null && $limit > 0) {
-            $query->limit($limit);
-        }
-
-        $items = $query->get();
-
-        $this->attachStatusAuditLabels($items);
+        $this->attachStatusAuditLabels($items->getCollection());
 
         return $items;
     }

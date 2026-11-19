@@ -3,6 +3,8 @@
     'documentTitle' => cabinet_sc_document_title(__('For review')),
 ])
     @slot('css')
+        <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
+        <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('css/cabinet-seo-checklist.css') }}?v={{ @filemtime(public_path('css/cabinet-seo-checklist.css')) ?: time() }}">
     @endslot
 
@@ -50,6 +52,39 @@
             </div>
         </div>
 
+        @if(($filterProjects ?? collect())->isNotEmpty())
+            <form method="get"
+                  action="{{ route('pages.seo-checklist.review') }}"
+                  class="cabinet-sc-plan-filters cabinet-sc-plan-filters--sticky mb-3"
+                  data-sc-review-filters>
+                <div class="cabinet-sc-plan-filters__bar">
+                    <label class="cabinet-sc-plan-filters__project">
+                        <span class="visually-hidden">{{ __('Filter by project') }}</span>
+                        <select class="form-select form-select-sm"
+                                name="project"
+                                data-sc-review-project
+                                data-placeholder="{{ __('All projects') }}">
+                            <option value=""></option>
+                            @foreach($filterProjects as $fp)
+                                @php
+                                    $fpDomain = trim((string) ($fp->domain ?? ''));
+                                    $fpTitle = trim((string) ($fp->title ?? ''));
+                                    $fpTitleUseful = $fpTitle !== ''
+                                        && strcasecmp($fpTitle, $fpDomain) !== 0
+                                        && ($fpDomain === '' || mb_stripos($fpTitle, $fpDomain) === false);
+                                    $fpCount = (int) ($fp->review_count ?? 0);
+                                @endphp
+                                <option value="{{ $fp->id }}" @if((int) ($filterProjectId ?? 0) === (int) $fp->id) selected @endif>
+                                    {{ $fpDomain }}@if($fpTitleUseful) · {{ $fpTitle }}@endif
+                                    ({{ number_format($fpCount, 0, '', ' ') }})
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+                </div>
+            </form>
+        @endif
+
         @if($items->isEmpty())
             <div class="cabinet-sc-empty">
                 <i class="bi bi-clipboard2-check display-6 d-block mb-2 opacity-50"></i>
@@ -57,11 +92,20 @@
                 <p class="small text-secondary mb-0">{{ __('No tasks for review hint') }}</p>
             </div>
         @else
+            @php
+                $reviewTotal = (int) ($filteredReviewCount ?? $items->total());
+                $reviewFrom = (int) $items->firstItem();
+                $reviewTo = (int) $items->lastItem();
+            @endphp
             <div class="cabinet-sc-plan">
                 <section class="cabinet-sc-plan__group cabinet-sc-plan__group--review" data-sc-plan-group="review">
                     <header class="cabinet-sc-plan__group-head">
                         <h3 class="cabinet-sc-plan__group-title">{{ __('Status review') }}</h3>
-                        <span class="cabinet-sc-plan__group-count" data-sc-plan-count>{{ number_format($items->count(), 0, '', ' ') }}</span>
+                        <span class="cabinet-sc-plan__group-count" data-sc-plan-count>
+                            {{ number_format($reviewFrom, 0, '', ' ') }}–{{ number_format($reviewTo, 0, '', ' ') }}
+                            /
+                            {{ number_format($reviewTotal, 0, '', ' ') }}
+                        </span>
                     </header>
                     <ul class="cabinet-sc-plan__list">
                         @foreach($items as $item)
@@ -79,6 +123,11 @@
                     </ul>
                 </section>
             </div>
+            @if($items->hasPages())
+                <nav class="cabinet-sc-plan-pager mt-3" aria-label="{{ __('For review') }}">
+                    {{ $items->onEachSide(1)->links('pagination::bootstrap-4') }}
+                </nav>
+            @endif
         @endif
     </div>
 
@@ -86,9 +135,32 @@
     @include('pages.partials.seo-checklist-status-modal')
 
     @slot('js')
+        <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
+        <script src="{{ asset('js/cabinet-select2-defaults.js') }}?v={{ @filemtime(public_path('js/cabinet-select2-defaults.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-attach.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-attach.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-status-modal.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-status-modal.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-notes.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-notes.js')) ?: time() }}"></script>
         <script src="{{ asset('js/cabinet-seo-checklist-plan.js') }}?v={{ @filemtime(public_path('js/cabinet-seo-checklist-plan.js')) ?: time() }}"></script>
+        <script>
+            (function () {
+                if (!window.jQuery || !jQuery.fn.select2) return;
+                var form = document.querySelector('[data-sc-review-filters]');
+                var $el = jQuery('[data-sc-review-project]');
+                if (!$el.length) return;
+                $el.select2({
+                    theme: 'bootstrap4',
+                    width: '100%',
+                    placeholder: $el.data('placeholder') || '',
+                    allowClear: true,
+                    language: {
+                        noResults: function () { return @json(__('Nothing found')); },
+                        searching: function () { return @json(__('Searching')); }
+                    }
+                });
+                $el.on('change select2:select select2:clear', function () {
+                    if (form) form.submit();
+                });
+            })();
+        </script>
     @endslot
 @endcomponent

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\WordstatPhrasesExport;
 use App\Jobs\Wordstat\StartWordstatRun;
 use App\Services\Wordstat\WordstatCollector;
 use App\Services\Wordstat\WordstatEstimator;
@@ -9,6 +10,7 @@ use App\Services\Wordstat\WordstatInputParser;
 use App\Services\Wordstat\WordstatSettings;
 use App\Support\YandexLrRegions;
 use App\Wordstat\WordstatGroup;
+use App\Wordstat\WordstatPhrase;
 use App\Wordstat\WordstatPreset;
 use App\Wordstat\WordstatProject;
 use App\Wordstat\WordstatRequestLog;
@@ -16,6 +18,7 @@ use App\Wordstat\WordstatRun;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Maatwebsite\Excel\Facades\Excel;
 
 class WordstatKeywordsController extends Controller
 {
@@ -147,6 +150,135 @@ class WordstatKeywordsController extends Controller
         $collector->cancelRun($run);
 
         return response()->json(['ok' => true, 'message' => __('Сбор остановлен'), 'run' => $this->runPayload($run->fresh())]);
+    }
+
+    public function phrases(Request $request, int $id): JsonResponse
+    {
+        $project = $this->project($id);
+        $status = in_array($request->query('status'), ['active', 'minus'], true) ? $request->query('status') : 'active';
+        $query = WordstatPhrase::query()->where('project_id', $project->id)->where('status', $status);
+        if ($request->filled('group_id')) {
+            $query->where('group_id', (int) $request->query('group_id'));
+        }
+        $rows = $query->orderByDesc('freq')->limit(20000)
+            ->get(['id', 'phrase', 'freq', 'source', 'depth', 'group_id', 'status']);
+
+        return response()->json(['ok' => true, 'phrases' => $rows]);
+    }
+
+    public function bulkPhrases(Request $request, int $id): JsonResponse
+    {
+        $project = $this->project($id);
+        $data = $request->validate([
+            'ids' => 'required|array|max:20000',
+            'ids.*' => 'integer',
+            'action' => 'required|in:move,minus,restore,delete',
+            'group_id' => 'nullable|integer',
+        ]);
+        $query = WordstatPhrase::query()->where('project_id', $project->id)->whereIn('id', $data['ids']);
+
+        switch ($data['action']) {
+            case 'move':
+                $group = WordstatGroup::query()->where('project_id', $project->id)->findOrFail((int) ($data['group_id'] ?? 0));
+                $affected = $query->update(['group_id' => $group->id]);
+                break;
+            case 'minus':
+                $affected = $query->update(['status' => WordstatPhrase::STATUS_MINUS]);
+                break;
+            case 'restore':
+                $affected = $query->update(['status' => WordstatPhrase::STATUS_ACTIVE]);
+                break;
+            default:
+                $affected = $query->delete();
+        }
+
+        return response()->json(['ok' => true, 'affected' => (int) $affected]);
+    }
+
+    public function updateGroup(Request $request, int $id, int $groupId): JsonResponse
+    {
+        $project = $this->project($id);
+        $group = WordstatGroup::query()->where('project_id', $project->id)->findOrFail($groupId);
+        $name = mb_substr(trim(preg_replace('/\s+/u', ' ', (string) $request->input('name', ''))), 0, 255);
+        if ($name === '') {
+            return response()->json(['ok' => false, 'message' => __('Введите название группы')], 422);
+        }
+        $taken = WordstatGroup::query()->where('project_id', $project->id)->where('name', $name)->where('id', '!=', $group->id)->exists();
+        if ($taken) {
+            return response()->json(['ok' => false, 'message' => __('Группа с таким названием уже есть')], 422);
+        }
+        $group->update(['name' => $name]);
+
+        return response()->json(['ok' => true, 'group' => ['id' => $group->id, 'name' => $group->name]]);
+    }
+
+    public function mergeGroup(Request $request, int $id, int $groupId): JsonResponse
+    {
+        $project = $this->project($id);
+        $source = WordstatGroup::query()->where('project_id', $project->id)->findOrFail($groupId);
+        $target = WordstatGroup::query()->where('project_id', $project->id)->findOrFail((int) $request->input('target_id'));
+        abort_if($source->id === $target->id, 422);
+        WordstatPhrase::query()->where('group_id', $source->id)->update(['group_id' => $target->id]);
+        $source->delete();
+
+        return response()->json(['ok' => true, 'message' => __('Группы объединены')]);
+    }
+
+    public function destroyGroup(int $id, int $groupId): JsonResponse
+    {
+        $project = $this->project($id);
+        $group = WordstatGroup::query()->where('project_id', $project->id)->findOrFail($groupId);
+        WordstatPhrase::query()->where('group_id', $group->id)->delete();
+        $group->delete();
+
+        return response()->json(['ok' => true, 'message' => __('Группа удалена')]);
+    }
+
+    public function export(Request $request, int $id)
+    {
+        $project = $this->project($id);
+        $groupId = $request->filled('group_id') ? (int) $request->query('group_id') : null;
+        $name = 'wordstat-' . preg_replace('/[^a-z0-9.-]+/i', '-', $project->domain) . '-' . now()->format('Y-m-d') . '.xlsx';
+
+        return Excel::download(new WordstatPhrasesExport($project->id, $groupId), $name);
+    }
+
+    public function storePreset(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'title' => 'required|string|max:255',
+            'settings' => 'nullable|array',
+            'team_id' => 'nullable|integer',
+            'preset_id' => 'nullable|integer',
+        ]);
+        $userId = (int) Auth::id();
+        $teamId = (int) ($data['team_id'] ?? 0);
+        if ($teamId && ! in_array($teamId, WordstatProject::teamIdsForMember($userId), true)) {
+            $teamId = 0;
+        }
+        $attrs = [
+            'title' => trim($data['title']),
+            'settings' => WordstatSettings::normalize((array) ($data['settings'] ?? [])),
+            'team_id' => $teamId ?: null,
+        ];
+        if (! empty($data['preset_id'])) {
+            $preset = WordstatPreset::query()->where('user_id', $userId)->findOrFail((int) $data['preset_id']);
+            $preset->update($attrs);
+        } else {
+            $preset = WordstatPreset::query()->create($attrs + ['user_id' => $userId]);
+        }
+
+        return response()->json(['ok' => true, 'message' => __('Пресет сохранён'), 'preset' => [
+            'id' => $preset->id, 'title' => $preset->title, 'settings' => $preset->settings, 'team_id' => $preset->team_id, 'mine' => true,
+        ]]);
+    }
+
+    public function destroyPreset(int $presetId): JsonResponse
+    {
+        $preset = WordstatPreset::query()->where('user_id', (int) Auth::id())->findOrFail($presetId);
+        $preset->delete();
+
+        return response()->json(['ok' => true, 'message' => __('Пресет удалён')]);
     }
 
     private function project(int $id): WordstatProject

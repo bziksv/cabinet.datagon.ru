@@ -217,7 +217,9 @@ class WordstatKeywordsController extends Controller
         $project = $this->project($id);
         $source = WordstatGroup::query()->where('project_id', $project->id)->findOrFail($groupId);
         $target = WordstatGroup::query()->where('project_id', $project->id)->findOrFail((int) $request->input('target_id'));
-        abort_if($source->id === $target->id, 422);
+        if ($source->id === $target->id) {
+            return response()->json(['ok' => false, 'message' => __('Выберите другую группу для объединения')], 422);
+        }
         WordstatPhrase::query()->where('group_id', $source->id)->update(['group_id' => $target->id]);
         $source->delete();
 

@@ -51,7 +51,7 @@ class AddWordstatKeywordsMenuAndPermission extends Migration
         $newId = DB::table('main_projects')->insertGetId([
             'access' => $parent->access,
             'controller' => "WordstatKeywordsController@index\r\n",
-            'color' => '#6d28d9',
+            'color' => $this->freeColor(),
             'title' => 'Wordstat keywords',
             'description' => 'Сбор ключевых слов из Wordstat по группам.',
             'link' => 'https://lk.redbox.su/wordstat-keywords',
@@ -64,6 +64,19 @@ class AddWordstatKeywordsMenuAndPermission extends Migration
         ]);
 
         $this->insertAfterProjectIdInUserMenus((int) $parent->id, (int) $newId);
+    }
+
+    /** Цвета в main_projects уникальны */
+    private function freeColor(): string
+    {
+        $taken = DB::table('main_projects')->pluck('color')->map(fn ($c) => mb_strtolower((string) $c))->all();
+        foreach (['#6d28d9', '#5b21b6', '#4c1d95', '#7e22ce', '#6b21a8', '#9333ea'] as $color) {
+            if (! in_array($color, $taken, true)) {
+                return $color;
+            }
+        }
+
+        return sprintf('#%06x', random_int(0, 0xffffff));
     }
 
     private function removeMenuItem(): void

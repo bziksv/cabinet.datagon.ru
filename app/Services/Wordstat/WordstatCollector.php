@@ -156,20 +156,27 @@ class WordstatCollector
         if ($seed->depth >= $settings['depth'] || $phrases === []) {
             return;
         }
-        $already = WordstatRunSeed::query()->where('run_id', $run->id)->where('depth', '>', 0)->count();
-        $room = $settings['depth_max_seeds'] - $already;
-        if ($room <= 0) {
-            return;
+        $childIds = DB::transaction(function () use ($run, $seed, $settings, $phrases) {
+            WordstatRun::query()->lockForUpdate()->findOrFail($run->id);
+            $already = WordstatRunSeed::query()->where('run_id', $run->id)->where('depth', '>', 0)->count();
+            $room = $settings['depth_max_seeds'] - $already;
+            if ($room <= 0) {
+                return [];
+            }
+            $ids = [];
+            foreach (array_slice($phrases, 0, $room) as $phrase) {
+                $ids[] = WordstatRunSeed::query()->create([
+                    'run_id' => $run->id, 'group_id' => $seed->group_id, 'phrase' => $phrase, 'depth' => $seed->depth + 1,
+                ])->id;
+            }
+            WordstatRun::query()->where('id', $run->id)->increment('seeds_total', count($ids));
+
+            return $ids;
+        });
+
+        foreach ($childIds as $childId) {
+            CollectWordstatSeed::dispatch($childId)->onQueue(config('cabinet-wordstat-keywords.queue'));
         }
-        $created = 0;
-        foreach (array_slice($phrases, 0, $room) as $phrase) {
-            $child = WordstatRunSeed::query()->create([
-                'run_id' => $run->id, 'group_id' => $seed->group_id, 'phrase' => $phrase, 'depth' => $seed->depth + 1,
-            ]);
-            $created++;
-            CollectWordstatSeed::dispatch($child->id)->onQueue(config('cabinet-wordstat-keywords.queue'));
-        }
-        WordstatRun::query()->where('id', $run->id)->increment('seeds_total', $created);
     }
 
     private function bumpRun(int $runId, int $requests, int $added): void

@@ -60,23 +60,11 @@ class AdminController extends Controller
     {
         $rows = collect([]);
         $queues = new RelevanceQueues();
-        $jobs = $queues->all();
+        $jobs = $queues->summaries();
 
-        $userIds = [];
-        $historyIds = [];
-        $projectIds = [];
-
-        foreach ($jobs as $job) {
-            if (property_exists($job, 'userId') && $job->userId) {
-                $userIds[] = (int) $job->userId;
-            }
-            if (property_exists($job, 'historyId') && $job->historyId) {
-                $historyIds[] = (int) $job->historyId;
-            }
-            if (property_exists($job, 'mainId') && $job->mainId) {
-                $projectIds[] = (int) $job->mainId;
-            }
-        }
+        $userIds = $jobs->pluck('userId')->filter()->all();
+        $historyIds = $jobs->pluck('historyId')->filter()->all();
+        $projectIds = $jobs->pluck('mainId')->filter()->all();
 
         $users = User::query()
             ->whereIn('id', array_values(array_unique($userIds)))
@@ -95,14 +83,10 @@ class AdminController extends Controller
             ->keyBy('id');
 
         foreach ($jobs as $job) {
-            $request = (property_exists($job, 'request') && is_array($job->request))
-                ? $job->request
-                : [];
-
-            $phrase = (string) ($request['phrase'] ?? '');
-            $link = (string) ($request['link'] ?? $request['main_link'] ?? '');
+            $phrase = $job->phrase;
+            $link = $job->link;
             $project = '';
-            $historyId = property_exists($job, 'historyId') ? (int) $job->historyId : 0;
+            $historyId = $job->historyId;
 
             if ($historyId > 0 && isset($histories[$historyId])) {
                 $history = $histories[$historyId];
@@ -115,8 +99,8 @@ class AdminController extends Controller
                 $project = (string) optional($history->mainHistory)->name;
             }
 
-            if ($project === '' && property_exists($job, 'mainId') && isset($projects[(int) $job->mainId])) {
-                $project = (string) $projects[(int) $job->mainId]->name;
+            if ($project === '' && isset($projects[$job->mainId])) {
+                $project = (string) $projects[$job->mainId]->name;
             }
 
             if ($project === '' && $link !== '') {
@@ -124,10 +108,9 @@ class AdminController extends Controller
                 $project = is_string($host) ? $host : '';
             }
 
-            $jobClass = class_basename($job);
-            $jobType = property_exists($job, 'type') ? (string) $job->type : '';
-            $jobLabel = $this->relevanceJobLabel($jobClass, $jobType);
-            $queue = (string) ($job->queue ?? '');
+            $jobClass = $job->job;
+            $jobLabel = $this->relevanceJobLabel($jobClass, $job->type);
+            $queue = $job->queue;
 
             $row = [
                 'user' => 'System',
@@ -141,8 +124,8 @@ class AdminController extends Controller
                 'job_label' => $jobLabel,
             ];
 
-            if (property_exists($job, 'userId') && isset($users[(int) $job->userId])) {
-                $user = $users[(int) $job->userId];
+            if (isset($users[$job->userId])) {
+                $user = $users[$job->userId];
                 $row['user'] = $user->fullName;
                 $row['email'] = (string) $user->email;
             }

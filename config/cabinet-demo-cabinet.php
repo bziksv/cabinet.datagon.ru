@@ -72,6 +72,7 @@ return [
         '/text-analyzer',
         '/cluster',
         '/site-audit',
+        '/checklist',
     ],
 
     /** URL регистрации с маркетинга */

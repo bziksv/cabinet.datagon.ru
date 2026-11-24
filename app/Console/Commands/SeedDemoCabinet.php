@@ -151,7 +151,7 @@ class SeedDemoCabinet extends Command
         }
 
         // На всякий случай — явные права модулей витрины
-        foreach (['Search suggestions', 'Domain records', 'Site types', 'Phrase commerce'] as $permName) {
+        foreach (['Search suggestions', 'Domain records', 'Site types', 'Phrase commerce', 'SEO Checklist'] as $permName) {
             try {
                 $perm = Permission::query()->where('name', $permName)->first();
                 if ($perm && ! $user->hasPermissionTo($permName)) {

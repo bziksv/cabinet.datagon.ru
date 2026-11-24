@@ -10,12 +10,12 @@ use Maatwebsite\Excel\Concerns\WithHeadings;
 class WordstatPhrasesExport implements FromArray, WithHeadings
 {
     private int $projectId;
-    private ?int $groupId;
+    private array $groupIds;
 
-    public function __construct(int $projectId, ?int $groupId = null)
+    public function __construct(int $projectId, array $groupIds = [])
     {
         $this->projectId = $projectId;
-        $this->groupId = $groupId;
+        $this->groupIds = $groupIds;
     }
 
     public function headings(): array
@@ -28,8 +28,8 @@ class WordstatPhrasesExport implements FromArray, WithHeadings
         $groups = WordstatGroup::query()->where('project_id', $this->projectId)->pluck('name', 'id');
         $sources = ['left' => 'Левая колонка', 'right' => 'Правая колонка', 'manual' => 'Своя фраза'];
         $query = WordstatPhrase::query()->where('project_id', $this->projectId)->where('status', WordstatPhrase::STATUS_ACTIVE);
-        if ($this->groupId) {
-            $query->where('group_id', $this->groupId);
+        if ($this->groupIds !== []) {
+            $query->whereIn('group_id', $this->groupIds);
         }
 
         return $query->orderBy('group_id')->orderByDesc('freq')->get()->map(fn (WordstatPhrase $p) => [

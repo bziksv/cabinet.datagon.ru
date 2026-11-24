@@ -67,6 +67,26 @@ class WordstatEditingTest extends TestCase
             ->assertOk()->assertJson(['group' => ['name' => 'Окна']]);
     }
 
+    public function testCreateGroupAndViewSeveralGroups(): void
+    {
+        $user = $this->user();
+        [$project, $a, $b, $p1] = $this->seedProject($user);
+
+        $this->actingAs($user)->postJson(route('pages.wordstat-keywords.groups.store', $project->id), ['name' => 'А'])->assertStatus(422);
+        $created = $this->actingAs($user)->postJson(route('pages.wordstat-keywords.groups.store', $project->id), ['name' => '  Новая   группа '])
+            ->assertOk()->assertJson(['group' => ['name' => 'Новая группа', 'count' => 0]]);
+        $c = (int) $created->json('group.id');
+
+        $this->actingAs($user)->postJson(route('pages.wordstat-keywords.phrases.bulk', $project->id), ['ids' => [$p1->id], 'action' => 'move', 'group_id' => $c])->assertOk();
+        WordstatPhrase::query()->create(['project_id' => $project->id, 'group_id' => $b->id, 'phrase' => 'двери', 'phrase_key' => 'двери', 'freq' => 50, 'source' => 'manual']);
+
+        $list = $this->actingAs($user)->getJson(route('pages.wordstat-keywords.phrases', $project->id) . '?group_ids=' . $c . ',' . $b->id);
+        $list->assertOk();
+        $phrases = array_column($list->json('phrases'), 'phrase');
+        sort($phrases);
+        $this->assertSame(['двери', 'окна'], $phrases);
+    }
+
     public function testPresetCrudAndOwnership(): void
     {
         $user = $this->user();

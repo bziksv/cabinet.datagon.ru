@@ -162,6 +162,8 @@
 
     var phrases = [];
     var currentGroupId = state.groups.length ? state.groups[0].id : null;
+    var viewIds = currentGroupId ? [currentGroupId] : [];
+    var NEW_GROUP = 'new';
     var status = 'active';
     var sort = { key: 'freq', dir: -1 };
     var pollTimer = null;
@@ -402,19 +404,50 @@
         request(ds.groupsUrl)
             .then(function (j) {
                 state.groups = j.groups || [];
-                if (!groupById(currentGroupId)) {
-                    currentGroupId = state.groups.length ? state.groups[0].id : null;
-                }
+                syncSelection();
                 renderGroups();
                 loadPhrases();
             })
             .catch(function () { /* следующий опрос обновит */ });
     }
 
+    function isViewed(id) {
+        return viewIds.some(function (v) { return String(v) === String(id); });
+    }
+
+    function syncSelection() {
+        viewIds = viewIds.filter(function (id) { return !!groupById(id); });
+        if (!groupById(currentGroupId)) {
+            currentGroupId = viewIds.length ? viewIds[0] : (state.groups.length ? state.groups[0].id : null);
+        }
+        if (!viewIds.length && currentGroupId) {
+            viewIds = [currentGroupId];
+        }
+    }
+
+    function openGroups(ids, current) {
+        viewIds = ids;
+        if (current) {
+            currentGroupId = current;
+        }
+        syncSelection();
+        $('[data-wsk-check-all]').prop('checked', false);
+        renderGroups();
+        loadPhrases();
+    }
+
     function renderGroups() {
         var canMerge = state.groups.length > 1;
-        var html = state.groups.map(function (g) {
-            return '<div class="cabinet-wsk-group' + (String(g.id) === String(currentGroupId) ? ' is-active' : '') + '" data-group-id="' + g.id + '">' +
+        var all = state.groups.length > 1 && viewIds.length === state.groups.length;
+        var total = state.groups.reduce(function (sum, g) { return sum + (g.count || 0); }, 0);
+        var head = state.groups.length > 1
+            ? '<div class="cabinet-wsk-group cabinet-wsk-group--all' + (all ? ' is-active' : '') + '">' +
+                '<button type="button" class="cabinet-wsk-group__name" data-wsk-group-all>Все группы</button>' +
+                '<span class="cabinet-wsk-group__count">' + fmt(total) + '</span></div>'
+            : '';
+        var html = head + state.groups.map(function (g) {
+            return '<div class="cabinet-wsk-group' + (isViewed(g.id) ? ' is-active' : '') + '" data-group-id="' + g.id + '">' +
+                (state.groups.length > 1 ? '<input type="checkbox" class="form-check-input mt-0" data-wsk-group-check aria-label="Показать вместе с другими"' + (isViewed(g.id) ? ' checked' : '') + '>' : '') +
                 '<button type="button" class="cabinet-wsk-group__name" data-wsk-group-open>' + esc(g.name) + '</button>' +
                 '<span class="cabinet-wsk-group__count">' + fmt(g.count) + '</span>' +
                 '<span class="cabinet-wsk-group__actions">' +
@@ -427,17 +460,19 @@
 
         var $bg = $('[data-wsk-bulk-group]');
         var selected = $bg.val();
-        $bg.empty();
+        $bg.empty().append(new Option('', ''));
+        $bg.append(new Option('+ Новая группа…', NEW_GROUP, false, selected === NEW_GROUP));
         state.groups.forEach(function (g) {
-            if (String(g.id) !== String(currentGroupId)) {
+            if (!(viewIds.length === 1 && isViewed(g.id))) {
                 $bg.append(new Option(g.name, g.id, false, String(g.id) === String(selected)));
             }
         });
         $bg.trigger('change.select2');
 
         var $exp = $('[data-wsk-export-group]');
-        if (currentGroupId) {
-            $exp.attr('href', ds.exportUrl + '?group_id=' + encodeURIComponent(currentGroupId)).prop('hidden', false);
+        if (viewIds.length) {
+            $exp.attr('href', ds.exportUrl + '?group_ids=' + encodeURIComponent(viewIds.join(','))).prop('hidden', false);
+            $exp.find('[data-wsk-export-label]').text(viewIds.length > 1 ? 'Excel: выбранные группы (' + fmt(viewIds.length) + ')' : 'Excel: только эта группа');
         } else {
             $exp.prop('hidden', true);
         }
@@ -445,10 +480,38 @@
     }
 
     $(document).on('click', '[data-wsk-group-open]', function () {
-        currentGroupId = parseInt($(this).closest('[data-group-id]').attr('data-group-id'), 10);
-        $('[data-wsk-check-all]').prop('checked', false);
-        renderGroups();
-        loadPhrases();
+        var id = parseInt($(this).closest('[data-group-id]').attr('data-group-id'), 10);
+        openGroups([id], id);
+    });
+
+    $(document).on('change', '[data-wsk-group-check]', function () {
+        var id = parseInt($(this).closest('[data-group-id]').attr('data-group-id'), 10);
+        var ids = viewIds.filter(function (v) { return String(v) !== String(id); });
+        if (this.checked) {
+            ids.push(id);
+        } else if (!ids.length) {
+            this.checked = true;
+            return;
+        }
+        openGroups(ids, this.checked ? id : (String(currentGroupId) === String(id) ? ids[0] : currentGroupId));
+    });
+
+    $(document).on('click', '[data-wsk-group-all]', function () {
+        openGroups(state.groups.map(function (g) { return g.id; }), currentGroupId);
+    });
+
+    function createGroup(cb) {
+        askName('Новая группа', 'Название группы', '', function (name) {
+            request(ds.groupsUrl, 'POST', { name: name }).then(function (j) {
+                state.groups.push(j.group);
+                toast(j.message);
+                cb(j.group);
+            }).catch(function (e) { toast(e.message, true); });
+        });
+    }
+
+    $(document).on('click', '[data-wsk-group-create]', function () {
+        createGroup(function (g) { openGroups([g.id], g.id); });
     });
 
     $(document).on('click', '[data-wsk-group-rename]', function () {
@@ -524,6 +587,9 @@
             if (String(currentGroupId) === String(sourceId)) {
                 currentGroupId = targetId;
             }
+            if (isViewed(sourceId) && !isViewed(targetId)) {
+                viewIds.push(targetId);
+            }
             toast(j.message);
             reloadGroups();
         }).catch(function (err) { toast(err.message, true); });
@@ -545,12 +611,12 @@
     /* ---------- таблица фраз ---------- */
     function loadPhrases() {
         var seq = ++loadSeq;
-        if (!currentGroupId) {
+        if (!viewIds.length) {
             phrases = [];
             renderRows();
             return;
         }
-        request(ds.phrasesUrl + '?group_id=' + encodeURIComponent(currentGroupId) + '&status=' + status).then(function (j) {
+        request(ds.phrasesUrl + '?group_ids=' + encodeURIComponent(viewIds.join(',')) + '&status=' + status).then(function (j) {
             if (seq !== loadSeq) {
                 return;
             }
@@ -566,26 +632,37 @@
             if (sort.key === 'phrase') {
                 return sort.dir * String(a.phrase).localeCompare(String(b.phrase), 'ru');
             }
+            if (sort.key === 'group') {
+                return sort.dir * groupName(a.group_id).localeCompare(groupName(b.group_id), 'ru') || ((b.freq || 0) - (a.freq || 0));
+            }
             return sort.dir * ((a.freq || 0) - (b.freq || 0));
         });
         return rows;
     }
 
+    function groupName(id) {
+        var g = groupById(id);
+        return g ? g.name : '';
+    }
+
     function renderRows() {
         var rows = visibleRows();
         var shown = rows.slice(0, ROWS_LIMIT);
+        var multi = viewIds.length > 1;
+        $('[data-wsk-group-col]').prop('hidden', !multi);
         $('[data-wsk-rows]').html(shown.map(function (p) {
             return '<tr><td class="cabinet-wsk-check"><input type="checkbox" class="form-check-input" data-wsk-check value="' + p.id + '" aria-label="Выбрать фразу"></td>' +
                 '<td>' + esc(p.phrase) + '</td>' +
+                (multi ? '<td class="text-muted small">' + esc(groupName(p.group_id)) + '</td>' : '') +
                 '<td class="text-end cabinet-wsk-num">' + fmt(p.freq) + '</td>' +
                 '<td class="text-muted small">' + esc(SOURCES[p.source] || p.source) + (p.depth ? ' · из расширения, круг ' + fmt(p.depth) : '') + '</td></tr>';
         }).join(''));
 
         var $empty = $('[data-wsk-empty]');
-        if (!currentGroupId) {
+        if (!viewIds.length) {
             $empty.text('Выберите группу слева, чтобы увидеть её фразы.').prop('hidden', false);
         } else if (!phrases.length) {
-            $empty.text(status === 'minus' ? 'В исключённых пока ничего нет.' : 'В группе пока нет фраз.').prop('hidden', false);
+            $empty.text(status === 'minus' ? 'В исключённых пока ничего нет.' : (multi ? 'В выбранных группах пока нет фраз.' : 'В группе пока нет фраз. Перенесите сюда фразы из другой группы: отметьте их и выберите «Перенести в группу».')).prop('hidden', false);
         } else if (!rows.length) {
             $empty.text('Ничего не найдено.').prop('hidden', false);
         } else if (rows.length > ROWS_LIMIT) {
@@ -646,19 +723,25 @@
             toast('Отметьте фразы в таблице', true);
             return;
         }
-        var groupId = parseInt($('[data-wsk-bulk-group]').val(), 10) || null;
-        if (action === 'move' && !groupId) {
+        var rawGroup = $('[data-wsk-bulk-group]').val();
+        var groupId = parseInt(rawGroup, 10) || null;
+        if (action === 'move' && !groupId && rawGroup !== NEW_GROUP) {
             toast('Выберите группу, куда перенести фразы', true);
             return;
         }
-        var run = function () {
-            request(ds.bulkUrl, 'POST', { ids: ids, action: action, group_id: groupId }).then(function (j) {
+        var run = function (targetId) {
+            request(ds.bulkUrl, 'POST', { ids: ids, action: action, group_id: targetId || groupId }).then(function (j) {
                 toast('Готово: ' + fmt(j.affected));
                 reloadGroups();
             }).catch(function (e) { toast(e.message, true); });
         };
-        if (action === 'delete') {
-            confirmAction({ title: 'Удалить фразы', text: 'Удалить выбранные фразы (' + fmt(ids.length) + ')?', okLabel: 'Удалить', danger: true }, run);
+        if (action === 'move' && rawGroup === NEW_GROUP) {
+            createGroup(function (g) {
+                $('[data-wsk-bulk-group]').val('');
+                run(g.id);
+            });
+        } else if (action === 'delete') {
+            confirmAction({ title: 'Удалить фразы', text: 'Удалить выбранные фразы (' + fmt(ids.length) + ')?', okLabel: 'Удалить', danger: true }, function () { run(); });
         } else {
             run();
         }
@@ -667,7 +750,7 @@
     /* ---------- запуск ---------- */
     $('[data-wsk-region-select]').each(function () { regionSelect($(this)); });
     plainSelect2($('[data-wsk-preset]'), { placeholder: 'Не выбран', allowClear: true });
-    plainSelect2($('[data-wsk-bulk-group]'), { placeholder: 'Группа' });
+    plainSelect2($('[data-wsk-bulk-group]'), { placeholder: 'Куда перенести' });
     applySettings(state.defaults);
     renderPresets(null);
     renderGroups();

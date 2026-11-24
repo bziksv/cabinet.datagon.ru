@@ -178,8 +178,9 @@ class WordstatKeywordsController extends Controller
         $project = $this->project($id);
         $status = in_array($request->query('status'), ['active', 'minus'], true) ? $request->query('status') : 'active';
         $query = WordstatPhrase::query()->where('project_id', $project->id)->where('status', $status);
-        if ($request->filled('group_id')) {
-            $query->where('group_id', (int) $request->query('group_id'));
+        $groupIds = $this->requestedGroupIds($request);
+        if ($groupIds !== []) {
+            $query->whereIn('group_id', $groupIds);
         }
         $rows = $query->orderByDesc('freq')->limit(20000)
             ->get(['id', 'phrase', 'freq', 'source', 'depth', 'group_id', 'status']);
@@ -215,6 +216,25 @@ class WordstatKeywordsController extends Controller
         }
 
         return response()->json(['ok' => true, 'affected' => (int) $affected]);
+    }
+
+    public function storeGroup(Request $request, int $id): JsonResponse
+    {
+        $project = $this->project($id);
+        $name = mb_substr(trim(preg_replace('/\s+/u', ' ', (string) $request->input('name', ''))), 0, 255);
+        if ($name === '') {
+            return response()->json(['ok' => false, 'message' => __('Введите название группы')], 422);
+        }
+        if (WordstatGroup::query()->where('project_id', $project->id)->where('name', $name)->exists()) {
+            return response()->json(['ok' => false, 'message' => __('Группа с таким названием уже есть')], 422);
+        }
+        $group = WordstatGroup::query()->create([
+            'project_id' => $project->id,
+            'name' => $name,
+            'position' => (int) WordstatGroup::query()->where('project_id', $project->id)->max('position') + 1,
+        ]);
+
+        return response()->json(['ok' => true, 'message' => __('Группа создана'), 'group' => ['id' => (int) $group->id, 'name' => $group->name, 'count' => 0]]);
     }
 
     public function updateGroup(Request $request, int $id, int $groupId): JsonResponse
@@ -268,10 +288,10 @@ class WordstatKeywordsController extends Controller
     public function export(Request $request, int $id)
     {
         $project = $this->project($id);
-        $groupId = $request->filled('group_id') ? (int) $request->query('group_id') : null;
+        $groupIds = $this->requestedGroupIds($request);
         $name = 'wordstat-' . preg_replace('/[^a-z0-9.-]+/i', '-', $project->domain) . '-' . now()->format('Y-m-d') . '.xlsx';
 
-        return Excel::download(new WordstatPhrasesExport($project->id, $groupId), $name);
+        return Excel::download(new WordstatPhrasesExport($project->id, $groupIds), $name);
     }
 
     public function storePreset(Request $request): JsonResponse
@@ -377,6 +397,14 @@ class WordstatKeywordsController extends Controller
         }
 
         return __('Сбор частотности временно недоступен, попробуйте позже');
+    }
+
+    private function requestedGroupIds(Request $request): array
+    {
+        $raw = (string) ($request->query('group_ids') ?? $request->query('group_id') ?? '');
+        $ids = array_filter(array_map('intval', explode(',', $raw)), fn (int $v) => $v > 0);
+
+        return array_values(array_unique(array_slice($ids, 0, 500)));
     }
 
     private function groupsWithCounts(int $projectId)

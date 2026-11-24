@@ -246,7 +246,8 @@
                         <button type="button" class="btn btn-outline-secondary" data-wsk-status="minus">{{ __('Исключённые') }}</button>
                     </div>
                 </div>
-                <div class="form-text mb-2">{{ __('Нажмите группу, чтобы увидеть её фразы. Новые фразы без группы пойдут в выбранную здесь группу.') }}</div>
+                <button type="button" class="btn btn-sm btn-outline-primary w-100 mb-2" data-wsk-group-create><i class="bi bi-plus-lg"></i> {{ __('Создать группу') }}</button>
+                <div class="form-text mb-2">{{ __('Нажмите на группу — откроются её фразы. Галочками отметьте несколько групп, чтобы смотреть их вместе. Фразы без группы из блока 1 пойдут в последнюю открытую группу.') }}</div>
                 <div data-wsk-groups></div>
             </aside>
             <section class="cabinet-wsk-table">
@@ -264,7 +265,7 @@
                     </div>
                     <button type="button" class="btn btn-sm btn-outline-primary" data-wsk-bulk-apply>{{ __('Применить') }}</button>
                     <span class="small text-muted ms-auto" data-wsk-counter></span>
-                    <a class="btn btn-sm btn-outline-secondary" href="#" data-wsk-export-group hidden><i class="bi bi-file-earmark-excel"></i> {{ __('Excel: только эта группа') }}</a>
+                    <a class="btn btn-sm btn-outline-secondary" href="#" data-wsk-export-group hidden><i class="bi bi-file-earmark-excel"></i> <span data-wsk-export-label>{{ __('Excel: только эта группа') }}</span></a>
                 </div>
                 <div class="table-responsive cabinet-wsk-table__scroll">
                     <table class="table table-sm table-hover mb-0">
@@ -272,6 +273,7 @@
                         <tr>
                             <th class="cabinet-wsk-check"><input type="checkbox" class="form-check-input" data-wsk-check-all aria-label="{{ __('Выбрать все') }}"></th>
                             <th class="cabinet-wsk-sortable" data-wsk-sort="phrase">{{ __('Фраза') }} <span class="cabinet-wsk-sort-mark"></span></th>
+                            <th class="cabinet-wsk-sortable" data-wsk-sort="group" data-wsk-group-col hidden>{{ __('Группа') }} <span class="cabinet-wsk-sort-mark"></span></th>
                             <th class="cabinet-wsk-sortable text-end" data-wsk-sort="freq">{{ __('Частота в Wordstat') }} <span class="cabinet-wsk-sort-mark"></span></th>
                             <th>{{ __('Откуда') }}</th>
                         </tr>

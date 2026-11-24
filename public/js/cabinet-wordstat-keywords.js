@@ -744,11 +744,52 @@
             loadPhrases(next);
         }
     });
+    function syncRowSelection() {
+        $('[data-wsk-rows] tr').each(function () {
+            var checked = $(this).find('[data-wsk-check]').prop('checked');
+            $(this).toggleClass('is-selected', !!checked);
+        });
+    }
+
+    var lastCheckedIndex = null;
     $(document).on('change', '[data-wsk-check-all]', function () {
         $('[data-wsk-check]').prop('checked', this.checked);
+        lastCheckedIndex = null;
+        syncRowSelection();
         updateCounter();
     });
-    $(document).on('change', '[data-wsk-check]', updateCounter);
+    $(document).on('change', '[data-wsk-check]', function () {
+        var $checks = $('[data-wsk-check]');
+        lastCheckedIndex = $checks.index(this);
+        syncRowSelection();
+        updateCounter();
+    });
+    $(document).on('click', '[data-wsk-rows] tr', function (e) {
+        if ($(e.target).closest('input, a, button, label').length) {
+            return;
+        }
+        var sel = window.getSelection ? String(window.getSelection()) : '';
+        if (sel.length > 0) {
+            return;
+        }
+        var $cb = $(this).find('[data-wsk-check]');
+        if (!$cb.length) {
+            return;
+        }
+        var $checks = $('[data-wsk-check]');
+        var idx = $checks.index($cb[0]);
+        var nextState = !$cb.prop('checked');
+        if (e.shiftKey && lastCheckedIndex !== null && lastCheckedIndex !== idx) {
+            var from = Math.min(lastCheckedIndex, idx);
+            var to = Math.max(lastCheckedIndex, idx);
+            $checks.slice(from, to + 1).prop('checked', nextState);
+        } else {
+            $cb.prop('checked', nextState);
+        }
+        lastCheckedIndex = idx;
+        syncRowSelection();
+        updateCounter();
+    });
     $(document).on('change', '[data-wsk-bulk-action]', function () {
         $('[data-wsk-bulk-group-wrap]').prop('hidden', this.value !== 'move');
     });

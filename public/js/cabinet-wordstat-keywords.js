@@ -13,7 +13,7 @@
 
     var ds = page.dataset;
     var ROWS_LIMIT = 5000;
-    var SOURCES = { left: 'Левая колонка', right: 'Правая колонка', manual: 'Своя фраза' };
+    var SOURCES = { left: 'Запрос с вашей фразой', right: 'Похожий запрос', manual: 'Ваша фраза' };
     var REASONS = { too_long: 'длиннее 400 символов', too_many_words: 'больше 7 слов' };
 
     function fmt(n) {
@@ -247,7 +247,7 @@
         $p.empty().append(new Option('', ''));
         state.presets.slice().sort(function (a, b) { return String(a.title).localeCompare(String(b.title), 'ru'); })
             .forEach(function (p) {
-                var label = p.title + (p.team_id ? ' · команда' : '');
+                var label = p.title + (p.team_id ? ' · для команды' : '');
                 $p.append(new Option(label, p.id, false, String(p.id) === String(selectedId)));
             });
         $p.trigger('change.select2');
@@ -265,7 +265,7 @@
     $(document).on('click', '[data-wsk-preset-save]', function () {
         var current = selectedPreset();
         var mine = current && current.mine ? current : null;
-        askName('Сохранить пресет', 'Название пресета', mine ? mine.title : '', function (title) {
+        askName('Сохранить настройки как шаблон', 'Название шаблона', mine ? mine.title : '', function (title) {
             var body = { title: title, settings: readSettings(), preset_id: mine && mine.title === title ? mine.id : null };
             if (mine && mine.title === title && mine.team_id) {
                 body.team_id = mine.team_id;
@@ -283,7 +283,7 @@
         if (!preset || !preset.mine) {
             return;
         }
-        confirmAction({ title: 'Удалить пресет', text: 'Удалить пресет «' + preset.title + '»?', okLabel: 'Удалить', danger: true }, function () {
+        confirmAction({ title: 'Удалить шаблон', text: 'Удалить шаблон «' + preset.title + '»? Сами фразы и группы он не трогает.', okLabel: 'Удалить', danger: true }, function () {
             request(ds.presetDeleteUrl + '/' + preset.id + '/delete', 'POST').then(function (j) {
                 state.presets = state.presets.filter(function (p) { return p.id !== preset.id; });
                 renderPresets(null);
@@ -300,7 +300,7 @@
 
     function renderDefaultGroupHint() {
         var name = currentGroupName() || state.defaultGroup;
-        $('[data-wsk-default-group-hint]').text('Фразы без указания группы попадут в группу «' + name + '».');
+        $('[data-wsk-default-group-hint]').text('Фразы без группы (без «Группа:» и без «# Группа») пойдут в группу «' + name + '».');
     }
 
     function payload() {
@@ -310,18 +310,18 @@
     $(document).on('click', '[data-wsk-preview-btn]', function () {
         var $btn = $(this).prop('disabled', true);
         request(ds.previewUrl, 'POST', payload()).then(function (j) {
-            var html = '<div>Групп: <strong>' + fmt(j.groups.length) + '</strong> · фраз: <strong>' + fmt(j.seeds.length) +
-                '</strong> · запросов к Wordstat примерно: <strong>' + fmt(j.estimate.total) + '</strong>';
+            var html = '<div>Фраз пойдёт в сбор: <strong>' + fmt(j.seeds.length) + '</strong>, групп: <strong>' + fmt(j.groups.length) +
+                '</strong>. Запросов к Wordstat примерно: <strong>' + fmt(j.estimate.total) + '</strong>';
             if (j.estimate.depth) {
-                html += ' <span class="text-muted">(из них на досбор до ' + fmt(j.estimate.depth) + ')</span>';
+                html += ' <span class="text-muted">(из них на расширение списка до ' + fmt(j.estimate.depth) + ')</span>';
             }
-            html += '</div>';
+            html += '.</div>';
             if (j.groups.length) {
                 html += '<div class="small text-muted mt-1">' + j.groups.map(esc).join(', ') + '</div>';
             }
             if (j.rejected.length) {
-                html += '<div class="text-danger small mt-1">Пропущено: ' + j.rejected.map(function (r) {
-                    return esc(r.line) + ' (' + (REASONS[r.reason] || r.reason) + ')';
+                html += '<div class="text-danger small mt-1">Не попадут в сбор, потому что ' + j.rejected.length + ' ' + (j.rejected.length === 1 ? 'строка' : 'строк') + ': ' + j.rejected.map(function (r) {
+                    return '«' + esc(r.line) + '» — ' + (REASONS[r.reason] || r.reason);
                 }).join('; ') + '</div>';
             }
             $('[data-wsk-preview]').html(html).prop('hidden', false);
@@ -344,7 +344,7 @@
         if (!run) {
             return;
         }
-        confirmAction({ title: 'Остановить сбор', text: 'Остановить сбор? Уже собранные фразы останутся в группах.', okLabel: 'Остановить', danger: true }, function () {
+        confirmAction({ title: 'Остановить сбор', text: 'Остановить сбор? Фразы, которые уже собраны, останутся в группах.', okLabel: 'Остановить', danger: true }, function () {
             request(ds.runStatusUrl + '/' + run.id + '/cancel', 'POST').then(function (j) {
                 showRun(j.run);
                 toast(j.message);
@@ -363,8 +363,8 @@
             .toggleClass('progress-bar-striped progress-bar-animated', !!run.active)
             .toggleClass('bg-danger', run.status === 'failed')
             .toggleClass('bg-secondary', run.status === 'cancelled');
-        var text = 'Обработано фраз: ' + fmt(run.seeds_done) + ' из ' + fmt(run.seeds_total) +
-            ' · новых фраз: ' + fmt(run.phrases_added) + ' · запросов: ' + fmt(run.requests_used);
+        var text = 'Проверено фраз: ' + fmt(run.seeds_done) + ' из ' + fmt(run.seeds_total) +
+            ' · новых фраз: ' + fmt(run.phrases_added) + ' · запросов к Wordstat: ' + fmt(run.requests_used);
         if (run.status === 'queued') { text = 'В очереди. ' + text; }
         if (run.status === 'done') { text = 'Готово. ' + text; }
         if (run.status === 'cancelled') { text = 'Остановлено. ' + text; }
@@ -423,7 +423,7 @@
                 '<button type="button" class="btn btn-link btn-sm p-0 text-danger" data-wsk-group-delete aria-label="Удалить группу"><i class="bi bi-trash"></i></button>' +
                 '</span></div>';
         }).join('');
-        $('[data-wsk-groups]').html(html || '<div class="text-muted small">Групп пока нет — вставьте фразы и нажмите «Собрать».</div>');
+        $('[data-wsk-groups]').html(html || '<div class="text-muted small">Групп пока нет. Вставьте фразы в блок 1 и нажмите «Запустить сбор».</div>');
 
         var $bg = $('[data-wsk-bulk-group]');
         var selected = $bg.val();
@@ -578,18 +578,18 @@
             return '<tr><td class="cabinet-wsk-check"><input type="checkbox" class="form-check-input" data-wsk-check value="' + p.id + '" aria-label="Выбрать фразу"></td>' +
                 '<td>' + esc(p.phrase) + '</td>' +
                 '<td class="text-end cabinet-wsk-num">' + fmt(p.freq) + '</td>' +
-                '<td class="text-muted small">' + esc(SOURCES[p.source] || p.source) + (p.depth ? ' · досбор ' + fmt(p.depth) : '') + '</td></tr>';
+                '<td class="text-muted small">' + esc(SOURCES[p.source] || p.source) + (p.depth ? ' · из расширения, круг ' + fmt(p.depth) : '') + '</td></tr>';
         }).join(''));
 
         var $empty = $('[data-wsk-empty]');
         if (!currentGroupId) {
-            $empty.text('Выберите группу слева.').prop('hidden', false);
+            $empty.text('Выберите группу слева, чтобы увидеть её фразы.').prop('hidden', false);
         } else if (!phrases.length) {
-            $empty.text(status === 'minus' ? 'В минусе пока ничего нет.' : 'В группе пока нет фраз.').prop('hidden', false);
+            $empty.text(status === 'minus' ? 'В исключённых пока ничего нет.' : 'В группе пока нет фраз.').prop('hidden', false);
         } else if (!rows.length) {
             $empty.text('Ничего не найдено.').prop('hidden', false);
         } else if (rows.length > ROWS_LIMIT) {
-            $empty.text('Показаны первые ' + fmt(ROWS_LIMIT) + ' фраз — уточните поиск или выгрузите XLSX.').prop('hidden', false);
+            $empty.text('Показаны первые ' + fmt(ROWS_LIMIT) + ' фраз. Уточните поиск или скачайте Excel.').prop('hidden', false);
         } else {
             $empty.prop('hidden', true);
         }
@@ -666,7 +666,7 @@
 
     /* ---------- запуск ---------- */
     $('[data-wsk-region-select]').each(function () { regionSelect($(this)); });
-    plainSelect2($('[data-wsk-preset]'), { placeholder: 'Без пресета', allowClear: true });
+    plainSelect2($('[data-wsk-preset]'), { placeholder: 'Не выбран', allowClear: true });
     plainSelect2($('[data-wsk-bulk-group]'), { placeholder: 'Группа' });
     applySettings(state.defaults);
     renderPresets(null);

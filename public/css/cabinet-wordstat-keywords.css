@@ -51,3 +51,10 @@
     .cabinet-wsk-page .cabinet-wsk-groups { border-right: 0; padding-right: 0; max-height: 40vh; }
     .cabinet-wsk-page .cabinet-wsk-group__actions { opacity: 1; }
 }
+
+/* Форма сбора: шаги и подсказки видны сразу */
+.cabinet-wsk-page .cabinet-wsk-step { font-weight: 600; font-size: 14px; margin: 0 0 10px; color: #111827; }
+.cabinet-wsk-page .cabinet-wsk-option { margin-bottom: 14px; }
+.cabinet-wsk-page .cabinet-wsk-option:last-child { margin-bottom: 0; }
+.cabinet-wsk-page .cabinet-wsk-option .form-text { margin-top: 2px; }
+.cabinet-wsk-page .cabinet-wsk-advanced > summary { cursor: pointer; font-weight: 600; color: #374151; font-size: 14px; }

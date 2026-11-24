@@ -59,104 +59,143 @@
                 <div class="text-muted small">{{ __('Запросов к Wordstat в этом месяце') }}: <strong>{{ number_format((int) $monthRequests, 0, '', ' ') }}</strong></div>
             </div>
             <a class="btn btn-outline-secondary btn-sm" href="{{ route('pages.wordstat-keywords.export', $project->id) }}">
-                <i class="bi bi-file-earmark-excel"></i> {{ __('Выгрузить XLSX') }}
+                <i class="bi bi-file-earmark-excel"></i> {{ __('Скачать все фразы (Excel)') }}
             </a>
         </div>
 
         <section class="cabinet-wsk-collect card card-body mb-3">
-            <div class="row g-3">
-                <div class="col-lg-7">
-                    <label class="form-label" for="wskText">
-                        {{ __('Фразы') }}
-                        @include('pages.partials.site-audit-tip', ['tip' => __('Одна строка — одна фраза. Группа: «Группа: фраза», строка «# Группа» для блока фраз ниже, или две колонки из Excel (группа, фраза). Фраза — не длиннее 400 символов и не больше 7 слов.')])
-                    </label>
-                    <textarea class="form-control cabinet-wsk-text" id="wskText" rows="10" data-wsk-text placeholder="Окна: пластиковые окна&#10;# Потолки&#10;натяжные потолки"></textarea>
-                    <div class="small text-muted mt-1" data-wsk-default-group-hint></div>
+            <div class="row g-4">
+
+                {{-- Шаг 1: фразы --}}
+                <div class="col-lg-6">
+                    <h6 class="cabinet-wsk-step">{{ __('1. Какие фразы собрать') }}</h6>
+                    <label class="visually-hidden" for="wskText">{{ __('Фразы') }}</label>
+                    <textarea class="form-control cabinet-wsk-text" id="wskText" rows="9" data-wsk-text
+                              placeholder="{{ __('пластиковые окна') }}&#10;{{ __('Окна: пластиковые окна') }}&#10;# {{ __('Потолки') }}&#10;{{ __('натяжные потолки') }}"></textarea>
+                    <div class="form-text">
+                        {{ __('Каждая строка — одна фраза, которую будем искать в Wordstat.') }}
+                        {{ __('Чтобы разложить фразы по группам, напишите название группы и двоеточие: «Окна: пластиковые окна».') }}
+                        {{ __('Или поставьте строку «# Потолки» — все фразы под ней пойдут в группу «Потолки», пока не встретится следующая такая строка.') }}
+                    </div>
+                    <div class="form-text">
+                        {{ __('Из Excel можно вставить два столбца: в первом название группы, во втором фраза.') }}
+                        {{ __('Фразы длиннее 400 символов или с больше чем 7 словами пропустим — список пропущенных покажем при подсчёте.') }}
+                    </div>
+                    <div class="small mt-2" data-wsk-default-group-hint></div>
                 </div>
-                <div class="col-lg-5">
-                    <label class="form-label">
-                        {{ __('Пресет') }}
-                        @include('pages.partials.site-audit-tip', ['tip' => __('Пресет — сохранённый набор настроек сбора. Пресеты команды доступны всем её участникам, удалить можно только свои.')])
-                    </label>
-                    <div class="cabinet-wsk-preset-row mb-2">
-                        <div class="flex-grow-1"><select class="form-select" data-wsk-preset><option value=""></option></select></div>
-                        <button type="button" class="btn btn-outline-danger btn-sm" data-wsk-preset-delete aria-label="{{ __('Удалить пресет') }}" disabled><i class="bi bi-trash"></i></button>
+
+                {{-- Шаг 2: что брать из Wordstat --}}
+                <div class="col-lg-6">
+                    <h6 class="cabinet-wsk-step">{{ __('2. Что брать из Wordstat') }}</h6>
+
+                    <div class="cabinet-wsk-option">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="wskColLeft" value="left" data-wsk-column>
+                            <label class="form-check-label" for="wskColLeft">{{ __('Запросы, где есть ваша фраза') }}</label>
+                        </div>
+                        <div class="form-text">{{ __('Для фразы «окна» — например, «пластиковые окна цена», «окна на заказ».') }}</div>
                     </div>
-                    <label class="form-label">{{ __('Регионы') }}</label>
-                    <div class="mb-2"><select class="form-select" data-wsk-region-select data-wsk-setting="region_ids" multiple></select></div>
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <label class="form-label" for="wskDevice">{{ __('Устройства') }}</label>
-                            <select class="form-select form-select-sm" id="wskDevice" data-wsk-setting="device">
-                                <option value="all">{{ __('Все') }}</option>
-                                <option value="desktop">{{ __('Компьютеры') }}</option>
-                                <option value="phone">{{ __('Телефоны') }}</option>
-                                <option value="tablet">{{ __('Планшеты') }}</option>
-                            </select>
+
+                    <div class="cabinet-wsk-option">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="wskColRight" value="right" data-wsk-column>
+                            <label class="form-check-label" for="wskColRight">{{ __('Похожие запросы') }}</label>
                         </div>
-                        <div class="col-6">
-                            <label class="form-label" for="wskLeftLimit">
-                                {{ __('Фраз из левой колонки') }}
-                                @include('pages.partials.site-audit-tip', ['tip' => __('Сколько фраз брать из левой колонки Wordstat на каждую вашу фразу: от 1 до 2 000.')])
-                            </label>
-                            <input type="text" inputmode="numeric" id="wskLeftLimit" class="form-control form-control-sm sa-num-space" data-wsk-setting="left_limit">
-                        </div>
-                        <div class="col-12">
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="wskColLeft" value="left" data-wsk-column>
-                                <label class="form-check-label" for="wskColLeft">{{ __('Левая колонка') }}</label>
-                            </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="checkbox" id="wskColRight" value="right" data-wsk-column>
-                                <label class="form-check-label" for="wskColRight">{{ __('Правая колонка') }}</label>
-                            </div>
-                            @include('pages.partials.site-audit-tip', ['tip' => __('Левая колонка — запросы, содержащие вашу фразу. Правая — похожие запросы.')])
-                        </div>
-                        <div class="col-4">
-                            <label class="form-label" for="wskDepth">
-                                {{ __('Глубина') }}
-                                @include('pages.partials.site-audit-tip', ['tip' => __('0 — только ваши фразы. 1–2 — дособрать по найденным фразам.')])
-                            </label>
-                            <select class="form-select form-select-sm" id="wskDepth" data-wsk-setting="depth">
-                                <option value="0">0</option>
-                                <option value="1">1</option>
-                                <option value="2">2</option>
-                            </select>
-                        </div>
-                        <div class="col-4">
-                            <label class="form-label" for="wskDepthLeft">
-                                {{ __('Фраз при досборе') }}
-                                @include('pages.partials.site-audit-tip', ['tip' => __('Сколько фраз брать на каждую найденную фразу при досборе: от 1 до 200.')])
-                            </label>
-                            <input type="text" inputmode="numeric" id="wskDepthLeft" class="form-control form-control-sm sa-num-space" data-wsk-setting="depth_left_limit">
-                        </div>
-                        <div class="col-4">
-                            <label class="form-label" for="wskDepthMax">
-                                {{ __('Лимит досбора') }}
-                                @include('pages.partials.site-audit-tip', ['tip' => __('Сколько найденных фраз максимум дособрать за запуск. Ограничивает расход запросов.')])
-                            </label>
-                            <input type="text" inputmode="numeric" id="wskDepthMax" class="form-control form-control-sm sa-num-space" data-wsk-setting="depth_max_seeds">
-                        </div>
+                        <div class="form-text">{{ __('Другие запросы на ту же тему — например, для «окна» это «балконные двери», «остекление».') }}</div>
                     </div>
-                    <label class="form-label mt-2" for="wskMinus">
-                        {{ __('Минус-слова') }}
-                        @include('pages.partials.site-audit-tip', ['tip' => __('Найденные фразы с этими словами не попадут в группы. Через запятую или с новой строки.')])
-                    </label>
-                    <textarea class="form-control form-control-sm" id="wskMinus" rows="2" data-wsk-setting="minus_words" placeholder="бесплатно, своими руками"></textarea>
-                    <label class="form-label mt-2" for="wskStop">
-                        {{ __('Стоп-слова') }}
-                        @include('pages.partials.site-audit-tip', ['tip' => __('Слова вырезаются из ваших фраз перед запросом, например «купить».')])
-                    </label>
-                    <textarea class="form-control form-control-sm" id="wskStop" rows="1" data-wsk-setting="stop_words"></textarea>
+
+                    <div class="cabinet-wsk-option">
+                        <label class="form-label mb-1" for="wskLeftLimit">{{ __('Сколько фраз брать на каждую вашу фразу') }}</label>
+                        <input type="text" inputmode="numeric" id="wskLeftLimit" class="form-control form-control-sm sa-num-space" data-wsk-setting="left_limit" style="max-width: 180px">
+                        <div class="form-text">{{ __('От 1 до 2 000. Чем больше, тем больше фраз и запросов.') }}</div>
+                    </div>
+                </div>
+
+                {{-- Шаг 3: регион, устройство, шаблон --}}
+                <div class="col-lg-6">
+                    <h6 class="cabinet-wsk-step">{{ __('3. Где и с каких устройств считать') }}</h6>
+                    <div class="cabinet-wsk-option">
+                        <label class="form-label mb-1">{{ __('Регион') }}</label>
+                        <select class="form-select" data-wsk-region-select data-wsk-setting="region_ids" multiple></select>
+                        <div class="form-text">{{ __('Частоту считаем по выбранным регионам. По умолчанию — Россия.') }}</div>
+                    </div>
+                    <div class="cabinet-wsk-option">
+                        <label class="form-label mb-1" for="wskDevice">{{ __('Устройство') }}</label>
+                        <select class="form-select" id="wskDevice" data-wsk-setting="device">
+                            <option value="all">{{ __('Все устройства') }}</option>
+                            <option value="desktop">{{ __('Компьютеры') }}</option>
+                            <option value="phone">{{ __('Телефоны') }}</option>
+                            <option value="tablet">{{ __('Планшеты') }}</option>
+                        </select>
+                        <div class="form-text">{{ __('Если сайт нужен всем пользователям — оставьте «Все устройства».') }}</div>
+                    </div>
+                </div>
+
+                {{-- Шаг 4: шаблон настроек --}}
+                <div class="col-lg-6">
+                    <h6 class="cabinet-wsk-step">{{ __('4. Шаблон настроек (необязательно)') }}</h6>
+                    <div class="cabinet-wsk-option">
+                        <label class="form-label mb-1" for="wskPreset">{{ __('Сохранённые настройки') }}</label>
+                        <div class="cabinet-wsk-preset-row">
+                            <div class="flex-grow-1"><select class="form-select" id="wskPreset" data-wsk-preset><option value=""></option></select></div>
+                            <button type="button" class="btn btn-outline-danger" data-wsk-preset-delete aria-label="{{ __('Удалить шаблон') }}" disabled><i class="bi bi-trash"></i></button>
+                        </div>
+                        <div class="form-text">{{ __('Выберите шаблон — его настройки подставятся в форму. Шаблон можно сохранить из текущих настроек (кнопка внизу). Шаблоны команды видят все её участники; удалить можно только свои.') }}</div>
+                    </div>
+                </div>
+
+                {{-- Дополнительно --}}
+                <div class="col-12">
+                    <details class="cabinet-wsk-advanced">
+                        <summary>{{ __('Дополнительно: расширение списка и исключения') }}</summary>
+                        <div class="row g-4 mt-0 pt-3">
+                            <div class="col-md-6">
+                                <div class="cabinet-wsk-option">
+                                    <label class="form-label mb-1" for="wskDepth">{{ __('Расширить список') }}</label>
+                                    <select class="form-select" id="wskDepth" data-wsk-setting="depth">
+                                        <option value="0">{{ __('Не расширять') }}</option>
+                                        <option value="1">{{ __('Один круг') }}</option>
+                                        <option value="2">{{ __('Два круга') }}</option>
+                                    </select>
+                                    <div class="form-text">{{ __('Каждую найденную фразу проверим в Wordstat ещё раз и возьмём из неё новые фразы. Фраз станет больше, запросов тоже.') }}</div>
+                                </div>
+                                <div class="cabinet-wsk-option">
+                                    <label class="form-label mb-1" for="wskDepthLeft">{{ __('Фраз на каждую найденную') }}</label>
+                                    <input type="text" inputmode="numeric" id="wskDepthLeft" class="form-control form-control-sm sa-num-space" data-wsk-setting="depth_left_limit" style="max-width: 180px">
+                                    <div class="form-text">{{ __('От 1 до 200.') }}</div>
+                                </div>
+                                <div class="cabinet-wsk-option">
+                                    <label class="form-label mb-1" for="wskDepthMax">{{ __('Сколько найденных фраз расширять всего') }}</label>
+                                    <input type="text" inputmode="numeric" id="wskDepthMax" class="form-control form-control-sm sa-num-space" data-wsk-setting="depth_max_seeds" style="max-width: 180px">
+                                    <div class="form-text">{{ __('Ограничивает расход запросов. От 0 до 1 000.') }}</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="cabinet-wsk-option">
+                                    <label class="form-label mb-1" for="wskMinus">{{ __('Исключить фразы со словами') }}</label>
+                                    <textarea class="form-control form-control-sm" id="wskMinus" rows="2" data-wsk-setting="minus_words" placeholder="{{ __('бесплатно, своими руками') }}"></textarea>
+                                    <div class="form-text">{{ __('Фразы с этими словами не попадут в список. Через запятую или с новой строки.') }}</div>
+                                </div>
+                                <div class="cabinet-wsk-option">
+                                    <label class="form-label mb-1" for="wskStop">{{ __('Не отправлять в Wordstat эти слова') }}</label>
+                                    <textarea class="form-control form-control-sm" id="wskStop" rows="2" data-wsk-setting="stop_words" placeholder="{{ __('купить') }}"></textarea>
+                                    <div class="form-text">{{ __('Эти слова уберём из вашей фразы перед запросом. Сама фраза в список попадёт целиком.') }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
                 </div>
             </div>
 
-            <div class="cabinet-wsk-preview mt-3" data-wsk-preview hidden></div>
+            <div class="cabinet-wsk-preview mt-4" data-wsk-preview hidden></div>
 
-            <div class="cabinet-wsk-actions mt-3">
-                <button type="button" class="btn btn-outline-primary" data-wsk-preview-btn>{{ __('Проверить') }}</button>
-                <button type="button" class="btn btn-primary" data-wsk-run-btn>{{ __('Собрать') }}</button>
-                <button type="button" class="btn btn-outline-secondary" data-wsk-preset-save>{{ __('Сохранить как пресет') }}</button>
+            <div class="cabinet-wsk-actions mt-4">
+                <button type="button" class="btn btn-primary" data-wsk-run-btn>{{ __('Запустить сбор') }}</button>
+                <button type="button" class="btn btn-outline-primary" data-wsk-preview-btn>{{ __('Посчитать без сбора') }}</button>
+                <button type="button" class="btn btn-outline-secondary" data-wsk-preset-save>{{ __('Сохранить настройки как шаблон') }}</button>
+            </div>
+            <div class="form-text mt-2">
+                {{ __('«Посчитать» ничего не собирает: покажет, сколько фраз попадёт в сбор и сколько запросов к Wordstat это займёт. Сбор идёт в фоне — можно закрыть страницу.') }}
             </div>
 
             <div class="cabinet-wsk-progress mt-3" data-wsk-progress hidden>
@@ -201,28 +240,29 @@
                 <div class="cabinet-wsk-groups__head">
                     <span>{{ __('Группы') }}</span>
                     <div class="btn-group btn-group-sm" role="group" aria-label="{{ __('Какие фразы показать') }}">
-                        <button type="button" class="btn btn-outline-secondary active" data-wsk-status="active">{{ __('Рабочие') }}</button>
-                        <button type="button" class="btn btn-outline-secondary" data-wsk-status="minus">{{ __('Минус') }}</button>
+                        <button type="button" class="btn btn-outline-secondary active" data-wsk-status="active">{{ __('Список') }}</button>
+                        <button type="button" class="btn btn-outline-secondary" data-wsk-status="minus">{{ __('Исключённые') }}</button>
                     </div>
                 </div>
+                <div class="form-text mb-2">{{ __('Нажмите группу, чтобы увидеть её фразы. Новые фразы без группы пойдут в выбранную здесь группу.') }}</div>
                 <div data-wsk-groups></div>
             </aside>
             <section class="cabinet-wsk-table">
                 <div class="cabinet-wsk-toolbar">
                     <input type="search" class="form-control form-control-sm cabinet-wsk-toolbar__search" placeholder="{{ __('Поиск по фразам') }}" data-wsk-search>
                     <select class="form-select form-select-sm w-auto" data-wsk-bulk-action>
-                        <option value="">{{ __('С выбранными…') }}</option>
+                        <option value="">{{ __('Действие с отмеченными…') }}</option>
                         <option value="move">{{ __('Перенести в группу') }}</option>
-                        <option value="minus" data-wsk-for-status="active">{{ __('В минус') }}</option>
-                        <option value="restore" data-wsk-for-status="minus" hidden>{{ __('Вернуть в работу') }}</option>
-                        <option value="delete">{{ __('Удалить') }}</option>
+                        <option value="minus" data-wsk-for-status="active">{{ __('Исключить из списка') }}</option>
+                        <option value="restore" data-wsk-for-status="minus" hidden>{{ __('Вернуть в список') }}</option>
+                        <option value="delete">{{ __('Удалить навсегда') }}</option>
                     </select>
                     <div class="cabinet-wsk-toolbar__group" data-wsk-bulk-group-wrap hidden>
                         <select class="form-select form-select-sm" data-wsk-bulk-group></select>
                     </div>
                     <button type="button" class="btn btn-sm btn-outline-primary" data-wsk-bulk-apply>{{ __('Применить') }}</button>
                     <span class="small text-muted ms-auto" data-wsk-counter></span>
-                    <a class="btn btn-sm btn-outline-secondary" href="#" data-wsk-export-group hidden><i class="bi bi-file-earmark-excel"></i> {{ __('XLSX группы') }}</a>
+                    <a class="btn btn-sm btn-outline-secondary" href="#" data-wsk-export-group hidden><i class="bi bi-file-earmark-excel"></i> {{ __('Excel: только эта группа') }}</a>
                 </div>
                 <div class="table-responsive cabinet-wsk-table__scroll">
                     <table class="table table-sm table-hover mb-0">
@@ -230,8 +270,8 @@
                         <tr>
                             <th class="cabinet-wsk-check"><input type="checkbox" class="form-check-input" data-wsk-check-all aria-label="{{ __('Выбрать все') }}"></th>
                             <th class="cabinet-wsk-sortable" data-wsk-sort="phrase">{{ __('Фраза') }} <span class="cabinet-wsk-sort-mark"></span></th>
-                            <th class="cabinet-wsk-sortable text-end" data-wsk-sort="freq">{{ __('Частотность') }} <span class="cabinet-wsk-sort-mark"></span></th>
-                            <th>{{ __('Источник') }}</th>
+                            <th class="cabinet-wsk-sortable text-end" data-wsk-sort="freq">{{ __('Частота в Wordstat') }} <span class="cabinet-wsk-sort-mark"></span></th>
+                            <th>{{ __('Откуда') }}</th>
                         </tr>
                         </thead>
                         <tbody data-wsk-rows></tbody>

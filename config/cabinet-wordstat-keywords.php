@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => '1.0.0',
+    'version' => '1.0.1',
     'endpoint' => env('WORDSTAT_ENDPOINT', 'https://xmlstock.com/wordstat/json/'),
     'http_timeout' => (int) env('WORDSTAT_HTTP_TIMEOUT', 30),
     'rps_default' => 5,

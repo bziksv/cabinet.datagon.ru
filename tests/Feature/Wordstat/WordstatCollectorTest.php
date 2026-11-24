@@ -51,7 +51,7 @@ class WordstatCollectorTest extends TestCase
         $run = $collector->createRun($project, 999001, [
             ['group' => 'Окна', 'phrase' => 'окна'],
             ['group' => 'Двери', 'phrase' => 'двери'],
-        ], ['minus_words' => ['бесплатно']]);
+        ], ['minus_words' => ['бесплатно'], 'columns' => ['left', 'right']]);
 
         $this->assertSame(2, (int) $run->requests_estimated);
 

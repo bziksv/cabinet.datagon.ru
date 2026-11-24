@@ -11,7 +11,7 @@ class WordstatSettings
         return [
             'region_ids' => [213],
             'device' => 'all',
-            'columns' => ['left', 'right'],
+            'columns' => ['left'],
             'left_limit' => 200,
             'depth' => 0,
             'depth_left_limit' => 50,

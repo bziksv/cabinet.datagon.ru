@@ -11,7 +11,7 @@ class WordstatSettingsTest extends TestCase
         $s = WordstatSettings::normalize([]);
         $this->assertSame([213], $s['region_ids']);
         $this->assertSame('all', $s['device']);
-        $this->assertSame(['left', 'right'], $s['columns']);
+        $this->assertSame(['left'], $s['columns']);
         $this->assertSame(200, $s['left_limit']);
         $this->assertSame(0, $s['depth']);
         $this->assertSame(50, $s['depth_left_limit']);
@@ -48,7 +48,7 @@ class WordstatSettingsTest extends TestCase
 
     public function testEmptyColumnsFallBackToBoth(): void
     {
-        $this->assertSame(['left', 'right'], WordstatSettings::normalize(['columns' => []])['columns']);
+        $this->assertSame(['left'], WordstatSettings::normalize(['columns' => []])['columns']);
     }
 
     public function testIgnoresNonScalarInputAndFoldsYo(): void

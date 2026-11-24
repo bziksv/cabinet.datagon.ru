@@ -33,7 +33,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        //
+        $this->app->bind(\App\Services\Wordstat\WordstatCollector::class, function () {
+            return new \App\Services\Wordstat\WordstatCollector(\App\Services\Wordstat\WordstatClient::fromConfig());
+        });
     }
 
     /**

@@ -13,6 +13,7 @@ class CabinetModuleBeta
         'checklist',
         'seo-reports',
         'reports',
+        'wordstat-keywords',
     ];
 
     public static function isBetaLink(?string $link): bool

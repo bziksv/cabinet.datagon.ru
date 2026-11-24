@@ -464,6 +464,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('search-suggestions/export', 'SearchSuggestionsController@exportCsv')->name('pages.search-suggestions.export')->middleware('permission:Search suggestions');
     Route::get('search-suggestions/history/{id}', 'SearchSuggestionsController@historyShow')->name('pages.search-suggestions.history.show')->middleware('permission:Search suggestions');
     Route::delete('search-suggestions/history/{id}', 'SearchSuggestionsController@historyDestroy')->name('pages.search-suggestions.history.destroy')->middleware('permission:Search suggestions');
+    Route::get('wordstat-keywords', 'WordstatKeywordsController@index')->name('pages.wordstat-keywords')->middleware('permission:Wordstat keywords');
+    Route::post('wordstat-keywords', 'WordstatKeywordsController@store')->name('pages.wordstat-keywords.store')->middleware('permission:Wordstat keywords');
+    Route::post('wordstat-keywords/presets', 'WordstatKeywordsController@storePreset')->name('pages.wordstat-keywords.presets.store')->middleware('permission:Wordstat keywords');
+    Route::post('wordstat-keywords/presets/{presetId}/delete', 'WordstatKeywordsController@destroyPreset')->name('pages.wordstat-keywords.presets.destroy')->middleware('permission:Wordstat keywords')->where('presetId', '[0-9]+');
+    Route::get('wordstat-keywords/{id}', 'WordstatKeywordsController@show')->name('pages.wordstat-keywords.show')->middleware('permission:Wordstat keywords')->where('id', '[0-9]+');
+    Route::post('wordstat-keywords/{id}/delete', 'WordstatKeywordsController@destroy')->name('pages.wordstat-keywords.destroy')->middleware('permission:Wordstat keywords')->where('id', '[0-9]+');
+    Route::post('wordstat-keywords/{id}/preview', 'WordstatKeywordsController@preview')->name('pages.wordstat-keywords.preview')->middleware('permission:Wordstat keywords')->where('id', '[0-9]+');
+    Route::post('wordstat-keywords/{id}/runs', 'WordstatKeywordsController@startRun')->name('pages.wordstat-keywords.runs.store')->middleware('permission:Wordstat keywords')->where('id', '[0-9]+');
+    Route::get('wordstat-keywords/{id}/runs/{runId}', 'WordstatKeywordsController@runStatus')->name('pages.wordstat-keywords.runs.show')->middleware('permission:Wordstat keywords')->where(['id' => '[0-9]+', 'runId' => '[0-9]+']);
+    Route::post('wordstat-keywords/{id}/runs/{runId}/cancel', 'WordstatKeywordsController@cancelRun')->name('pages.wordstat-keywords.runs.cancel')->middleware('permission:Wordstat keywords')->where(['id' => '[0-9]+', 'runId' => '[0-9]+']);
+    Route::get('wordstat-keywords/{id}/phrases', 'WordstatKeywordsController@phrases')->name('pages.wordstat-keywords.phrases')->middleware('permission:Wordstat keywords')->where('id', '[0-9]+');
+    Route::post('wordstat-keywords/{id}/phrases/bulk', 'WordstatKeywordsController@bulkPhrases')->name('pages.wordstat-keywords.phrases.bulk')->middleware('permission:Wordstat keywords')->where('id', '[0-9]+');
+    Route::get('wordstat-keywords/{id}/groups', 'WordstatKeywordsController@groups')->name('pages.wordstat-keywords.groups')->middleware('permission:Wordstat keywords')->where(['id' => '[0-9]+']);
+    Route::post('wordstat-keywords/{id}/groups/{groupId}', 'WordstatKeywordsController@updateGroup')->name('pages.wordstat-keywords.groups.update')->middleware('permission:Wordstat keywords')->where(['id' => '[0-9]+', 'groupId' => '[0-9]+']);
+    Route::post('wordstat-keywords/{id}/groups/{groupId}/merge', 'WordstatKeywordsController@mergeGroup')->name('pages.wordstat-keywords.groups.merge')->middleware('permission:Wordstat keywords')->where(['id' => '[0-9]+', 'groupId' => '[0-9]+']);
+    Route::post('wordstat-keywords/{id}/groups/{groupId}/delete', 'WordstatKeywordsController@destroyGroup')->name('pages.wordstat-keywords.groups.destroy')->middleware('permission:Wordstat keywords')->where(['id' => '[0-9]+', 'groupId' => '[0-9]+']);
+    Route::get('wordstat-keywords/{id}/export', 'WordstatKeywordsController@export')->name('pages.wordstat-keywords.export')->middleware('permission:Wordstat keywords')->where('id', '[0-9]+');
 
     Route::get('domain-records', 'DomainRecordsController@index')->name('pages.domain-records')->middleware('permission:Domain records');
     Route::post('domain-records/lookup', 'DomainRecordsController@lookup')->name('pages.domain-records.lookup')->middleware('permission:Domain records');

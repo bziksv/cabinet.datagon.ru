@@ -293,6 +293,18 @@
                     <div class="modal-body">
                         <label class="form-label" for="cabinetWskPromptInput" data-wsk-prompt-label></label>
                         <input type="text" class="form-control" id="cabinetWskPromptInput" maxlength="255" data-wsk-prompt-input required>
+                        @if ($teams->isNotEmpty())
+                            <div class="mt-3" data-wsk-prompt-team-wrap hidden>
+                                <label class="form-label" for="cabinetWskPromptTeam">{{ __('Кто видит шаблон') }}</label>
+                                <select class="form-select" id="cabinetWskPromptTeam" data-wsk-prompt-team>
+                                    <option value="">{{ __('Только я') }}</option>
+                                    @foreach ($teams as $team)
+                                        <option value="{{ $team->id }}">{{ __('Вся команда «:team»', ['team' => $team->title]) }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="form-text">{{ __('Шаблон команды видят и могут применять все её участники. Изменять его можете только вы.') }}</div>
+                            </div>
+                        @endif
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('Отмена') }}</button>

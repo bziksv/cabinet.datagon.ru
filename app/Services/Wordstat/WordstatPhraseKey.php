@@ -11,6 +11,11 @@ class WordstatPhraseKey
         $s = preg_replace('/[!+"\[\]()|]/u', ' ', $s);
         $s = trim(preg_replace('/\s+/u', ' ', $s));
 
-        return mb_substr($s, 0, 191);
+        return mb_substr($s, 0, 400);
+    }
+
+    public static function hash(string $key): string
+    {
+        return sha1($key);
     }
 }

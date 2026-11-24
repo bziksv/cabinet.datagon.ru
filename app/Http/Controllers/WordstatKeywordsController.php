@@ -15,6 +15,7 @@ use App\Wordstat\WordstatPreset;
 use App\Wordstat\WordstatProject;
 use App\Wordstat\WordstatRequestLog;
 use App\Wordstat\WordstatRun;
+use App\Wordstat\WordstatRunSeed;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -72,15 +73,14 @@ class WordstatKeywordsController extends Controller
     {
         $project = $this->project($id);
         $userId = (int) Auth::id();
-        $groups = WordstatGroup::query()->where('project_id', $project->id)->orderBy('position')->orderBy('id')
-            ->withCount(['phrases' => fn ($q) => $q->where('status', 'active')])
-            ->get();
+        $groups = $this->groupsWithCounts($project->id);
         $activeRun = WordstatRun::query()->where('project_id', $project->id)->whereIn('status', ['queued', 'running'])->latest('id')->first();
 
         return view('wordstat-keywords.show', [
             'project' => $project,
             'groups' => $groups,
             'presets' => WordstatPreset::query()->visibleTo($userId)->orderBy('title')->get(),
+            'teams' => app(\App\Services\SeoChecklist\SeoChecklistService::class)->teamsForUser($userId),
             'regions' => YandexLrRegions::resolveMany(array_map('strval', (array) $project->region_ids), 100),
             'activeRun' => $activeRun ? $this->runPayload($activeRun) : null,
             'lastRuns' => WordstatRun::query()->where('project_id', $project->id)->latest('id')->limit(5)->get(),
@@ -162,6 +162,15 @@ class WordstatKeywordsController extends Controller
         $collector->cancelRun($run);
 
         return response()->json(['ok' => true, 'message' => __('Сбор остановлен'), 'run' => $this->runPayload($run->fresh())]);
+    }
+
+    public function groups(int $id): JsonResponse
+    {
+        $project = $this->project($id);
+        $groups = $this->groupsWithCounts($project->id)
+            ->map(fn ($g) => ['id' => (int) $g->id, 'name' => $g->name, 'count' => (int) $g->phrases_count])->values();
+
+        return response()->json(['ok' => true, 'groups' => $groups]);
     }
 
     public function phrases(Request $request, int $id): JsonResponse
@@ -348,9 +357,33 @@ class WordstatKeywordsController extends Controller
             'requests_estimated' => (int) $run->requests_estimated,
             'requests_used' => (int) $run->requests_used,
             'phrases_added' => (int) $run->phrases_added,
-            'error' => $run->error ? __('Сбор частотности временно недоступен, попробуйте позже') : null,
+            'seeds_failed' => WordstatRunSeed::query()->where('run_id', $run->id)->where('status', WordstatRunSeed::STATUS_FAILED)->count(),
+            'error' => $this->runErrorText($run),
             'active' => $run->isActive(),
         ];
+    }
+
+    private function runErrorText(WordstatRun $run): ?string
+    {
+        if (! $run->error) {
+            return null;
+        }
+        $error = mb_strtolower((string) $run->error);
+        if (preg_match('/баланс|средств|оплат/u', $error)) {
+            return __('Закончился оплаченный лимит проверок частотности. Напишите в поддержку — после пополнения сбор можно повторить');
+        }
+        if (preg_match('/ключ|id пользователя|заблокир|доступ/u', $error)) {
+            return __('Проверка частотности сейчас не настроена. Напишите в поддержку');
+        }
+
+        return __('Сбор частотности временно недоступен, попробуйте позже');
+    }
+
+    private function groupsWithCounts(int $projectId)
+    {
+        return WordstatGroup::query()->where('project_id', $projectId)->orderBy('position')->orderBy('id')
+            ->withCount(['phrases' => fn ($q) => $q->where('status', WordstatPhrase::STATUS_ACTIVE)])
+            ->get();
     }
 
     private function monthRequests(int $userId): int

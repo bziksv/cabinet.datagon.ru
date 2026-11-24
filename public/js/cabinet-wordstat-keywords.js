@@ -204,11 +204,13 @@
     var promptEl = document.getElementById('cabinetWskPromptModal');
     var promptCallback = null;
 
-    function askName(title, label, value, cb) {
+    function askName(title, label, value, cb, teamId) {
         promptCallback = cb;
         $(promptEl).find('[data-wsk-prompt-title]').text(title);
         $(promptEl).find('[data-wsk-prompt-label]').text(label);
         $(promptEl).find('[data-wsk-prompt-input]').val(value || '');
+        $(promptEl).find('[data-wsk-prompt-team-wrap]').prop('hidden', teamId === undefined);
+        $(promptEl).find('[data-wsk-prompt-team]').val(teamId ? String(teamId) : '');
         modal(promptEl).show();
     }
 
@@ -225,9 +227,11 @@
             return;
         }
         var cb = promptCallback;
+        var $team = $(promptEl).find('[data-wsk-prompt-team-wrap]:not([hidden]) [data-wsk-prompt-team]');
+        var teamId = $team.length ? ($team.val() || null) : null;
         modal(promptEl).hide();
         if (cb) {
-            cb(value);
+            cb(value, teamId);
         }
     });
 
@@ -265,17 +269,14 @@
     $(document).on('click', '[data-wsk-preset-save]', function () {
         var current = selectedPreset();
         var mine = current && current.mine ? current : null;
-        askName('Сохранить настройки как шаблон', 'Название шаблона', mine ? mine.title : '', function (title) {
-            var body = { title: title, settings: readSettings(), preset_id: mine && mine.title === title ? mine.id : null };
-            if (mine && mine.title === title && mine.team_id) {
-                body.team_id = mine.team_id;
-            }
+        askName('Сохранить настройки как шаблон', 'Название шаблона', mine ? mine.title : '', function (title, teamId) {
+            var body = { title: title, settings: readSettings(), preset_id: mine && mine.title === title ? mine.id : null, team_id: teamId };
             request(ds.presetStoreUrl, 'POST', body).then(function (j) {
                 state.presets = state.presets.filter(function (p) { return p.id !== j.preset.id; }).concat([j.preset]);
                 renderPresets(j.preset.id);
                 toast(j.message);
             }).catch(function (e) { toast(e.message, true); });
-        });
+        }, mine ? (mine.team_id || '') : '');
     });
 
     $(document).on('click', '[data-wsk-preset-delete]', function () {
@@ -368,6 +369,7 @@
         if (run.status === 'queued') { text = 'В очереди. ' + text; }
         if (run.status === 'done') { text = 'Готово. ' + text; }
         if (run.status === 'cancelled') { text = 'Остановлено. ' + text; }
+        if (run.seeds_failed > 0) { text += ' · не удалось проверить: ' + fmt(run.seeds_failed); }
         if (run.status === 'failed') { text = (run.error || 'Сбор не удался') + '. ' + text; }
         $box.find('[data-wsk-progress-text]').text(text);
         $box.find('[data-wsk-cancel]').prop('hidden', !run.active);
@@ -393,15 +395,9 @@
 
     /* ---------- группы ---------- */
     function reloadGroups() {
-        fetch(window.location.href, { credentials: 'same-origin', headers: { 'Accept': 'text/html' }, cache: 'no-store' })
-            .then(function (r) { return r.text(); })
-            .then(function (html) {
-                var doc = new DOMParser().parseFromString(html, 'text/html');
-                var fresh = doc.getElementById('cabinetWskData');
-                if (!fresh) {
-                    return;
-                }
-                state.groups = JSON.parse(fresh.textContent).groups || [];
+        request(ds.groupsUrl)
+            .then(function (j) {
+                state.groups = j.groups || [];
                 if (!groupById(currentGroupId)) {
                     currentGroupId = state.groups.length ? state.groups[0].id : null;
                 }

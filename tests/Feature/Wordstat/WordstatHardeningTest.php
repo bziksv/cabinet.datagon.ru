@@ -71,4 +71,44 @@ class WordstatHardeningTest extends TestCase
 
         $this->assertSame(0, $calls, 'Уже обработанная затравка не должна снова ходить в API');
     }
+
+    public function testLongPhrasesWithSamePrefixStaySeparate(): void
+    {
+        [$project, $seed] = $this->runningSeed();
+        $prefix = str_repeat('окна пвх недорого ', 12);
+        $client = new WordstatClient('https://api.test/', 'u', 'k', function () use ($prefix) {
+            return json_encode([
+                'totalCount' => '10',
+                'results' => [['phrase' => $prefix . 'москва', 'count' => '5'], ['phrase' => $prefix . 'казань', 'count' => '4']],
+                'associations' => [],
+            ]);
+        });
+        (new WordstatCollector($client, false))->collectSeed($seed);
+
+        $this->assertSame(3, WordstatPhrase::query()->where('project_id', $project->id)->count());
+    }
+
+    public function testRequestsAreCountedPerApiCall(): void
+    {
+        [, $seed] = $this->runningSeed();
+        $client = new WordstatClient('https://api.test/', 'u', 'k', function () {
+            return json_encode(['totalCount' => '1', 'results' => [], 'associations' => []]);
+        });
+        (new WordstatCollector($client, false))->collectSeed($seed);
+
+        $this->assertSame(1, (int) $seed->fresh()->requests_used);
+        $this->assertSame(1, (int) WordstatRun::query()->find($seed->run_id)->requests_used);
+    }
+
+    private function runningSeed(): array
+    {
+        $project = WordstatProject::query()->create(['user_id' => 999001, 'domain' => 'example.ru', 'region_ids' => [213]]);
+        $group = WordstatGroup::query()->create(['project_id' => $project->id, 'name' => 'Окна']);
+        $run = WordstatRun::query()->create([
+            'project_id' => $project->id, 'user_id' => 999001, 'settings' => [], 'status' => WordstatRun::STATUS_RUNNING,
+            'seeds_total' => 1, 'seeds_done' => 0,
+        ]);
+
+        return [$project, WordstatRunSeed::query()->create(['run_id' => $run->id, 'group_id' => $group->id, 'phrase' => 'окна', 'depth' => 0])];
+    }
 }

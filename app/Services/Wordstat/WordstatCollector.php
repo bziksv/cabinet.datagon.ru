@@ -93,6 +93,9 @@ class WordstatCollector
         WordstatRequestLog::query()->create([
             'user_id' => $run->user_id, 'project_id' => $run->project_id, 'run_id' => $run->id, 'kind' => 'words', 'created_at' => now(),
         ]);
+        // Считаем сразу после запроса: повтор задачи после сбоя — это ещё один оплаченный запрос
+        WordstatRunSeed::query()->whereKey($seed->id)->increment('requests_used');
+        WordstatRun::query()->whereKey($run->id)->increment('requests_used');
 
         $added = 0;
         $newLeft = [];
@@ -126,8 +129,8 @@ class WordstatCollector
         });
 
         $this->queueChildren($run, $seed, $settings, $newLeft);
-        $seed->update(['status' => WordstatRunSeed::STATUS_DONE, 'requests_used' => 1]);
-        $this->bumpRun($run->id, 1, $added);
+        $seed->update(['status' => WordstatRunSeed::STATUS_DONE]);
+        $this->bumpRun($run->id, 0, $added);
     }
 
     private function upsertPhrase(WordstatRun $run, WordstatRunSeed $seed, string $phrase, int $freq, string $source, ?int $seedPhraseId, int &$added): ?WordstatPhrase
@@ -136,7 +139,7 @@ class WordstatCollector
         if ($key === '') {
             return null;
         }
-        $existing = WordstatPhrase::query()->where('project_id', $run->project_id)->where('phrase_key', $key)->first();
+        $existing = WordstatPhrase::query()->where('project_id', $run->project_id)->where('phrase_hash', WordstatPhraseKey::hash($key))->first();
         if ($existing) {
             if ((int) $existing->group_id === (int) $seed->group_id) {
                 $existing->update(['freq' => $freq]);
@@ -162,7 +165,7 @@ class WordstatCollector
                 throw $e;
             }
             // Параллельная затравка уже добавила эту фразу — используем её
-            return WordstatPhrase::query()->where('project_id', $run->project_id)->where('phrase_key', $key)->first();
+            return WordstatPhrase::query()->where('project_id', $run->project_id)->where('phrase_hash', WordstatPhraseKey::hash($key))->first();
         }
         $added++;
 

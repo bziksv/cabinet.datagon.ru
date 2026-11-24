@@ -66,4 +66,22 @@ class WordstatControllerTest extends TestCase
         $this->actingAs($user)->postJson(route('pages.wordstat-keywords.runs.store', $project->id), ['text' => "  \n "])
             ->assertStatus(422)->assertJson(['ok' => false]);
     }
+
+    public function testGroupsEndpointAndRunErrorText(): void
+    {
+        $user = $this->user();
+        $project = WordstatProject::query()->create(['user_id' => $user->id, 'domain' => 'example.ru', 'region_ids' => [213]]);
+        $group = \App\Wordstat\WordstatGroup::query()->create(['project_id' => $project->id, 'name' => 'Окна']);
+        $this->actingAs($user)->getJson(route('pages.wordstat-keywords.groups', $project->id))
+            ->assertOk()->assertJson(['ok' => true, 'groups' => [['id' => $group->id, 'name' => 'Окна', 'count' => 0]]]);
+
+        $run = \App\Wordstat\WordstatRun::query()->create([
+            'project_id' => $project->id, 'user_id' => $user->id, 'settings' => [], 'status' => 'failed',
+            'error' => 'Недостаточно средств на балансе',
+        ]);
+        $this->actingAs($user)->getJson(route('pages.wordstat-keywords.runs.show', [$project->id, $run->id]))
+            ->assertOk()->assertJson(['run' => ['seeds_failed' => 0]]);
+        $this->assertStringContainsString('лимит', $this->actingAs($user)
+            ->getJson(route('pages.wordstat-keywords.runs.show', [$project->id, $run->id]))->json('run.error'));
+    }
 }

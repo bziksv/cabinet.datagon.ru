@@ -35,7 +35,8 @@ class WordstatKeywordsController extends Controller
         return view('wordstat-keywords.index', [
             'projects' => $projects,
             'teams' => app(\App\Services\SeoChecklist\SeoChecklistService::class)->teamsForUser($userId),
-            'monthRequests' => $this->monthRequests($userId),
+            'monthRequests' => WordstatKeywordsLimits::usedForUserId($userId),
+            'monthLimit' => WordstatKeywordsLimits::limitForUser(Auth::user()),
         ]);
     }
 

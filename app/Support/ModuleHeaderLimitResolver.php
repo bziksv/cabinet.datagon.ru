@@ -55,6 +55,7 @@ class ModuleHeaderLimitResolver
         ['prefix' => 'site-types', 'code' => 'SiteTypes'],
         ['prefix' => 'phrase-commerce', 'code' => 'PhraseCommerce'],
         ['prefix' => 'text-uniqueness', 'code' => 'TextUniqueness'],
+        ['prefix' => 'wordstat-keywords', 'code' => 'WordstatKeywords'],
     ];
 
     /** @var list<array{prefix: string, code: string}> */
@@ -90,6 +91,7 @@ class ModuleHeaderLimitResolver
         ['prefix' => 'pages.site-types', 'code' => 'SiteTypes'],
         ['prefix' => 'pages.phrase-commerce', 'code' => 'PhraseCommerce'],
         ['prefix' => 'pages.text-uniqueness', 'code' => 'TextUniqueness'],
+        ['prefix' => 'pages.wordstat-keywords', 'code' => 'WordstatKeywords'],
     ];
 
     public static function resolve(?Request $request = null): ?string

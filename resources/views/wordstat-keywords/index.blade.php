@@ -15,6 +15,10 @@
         <div class="cabinet-wsk-head">
             <div class="text-muted small">
                 {{ __('Запросов к Wordstat в этом месяце') }}: <strong>{{ number_format((int) $monthRequests, 0, '', ' ') }}</strong>
+                @if ($monthLimit !== null)
+                    {{ __('из') }} <strong>{{ number_format((int) $monthLimit, 0, '', ' ') }}</strong>
+                    ({{ __('осталось') }} {{ number_format(max(0, (int) $monthLimit - (int) $monthRequests), 0, '', ' ') }})
+                @endif
             </div>
             <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#cabinetWskCreateModal">
                 <i class="bi bi-plus-lg"></i> {{ __('Новый проект') }}

@@ -73,6 +73,7 @@ return [
         '/cluster',
         '/site-audit',
         '/checklist',
+        '/reports',
     ],
 
     /** URL регистрации с маркетинга */

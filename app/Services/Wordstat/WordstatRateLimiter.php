@@ -57,5 +57,8 @@ class WordstatRateLimiter
             }
             usleep(100000);
         }
+
+        // Не отправляем запрос сверх лимита: вернём задачу в очередь на повтор
+        throw WordstatException::retryable('rate limit wait');
     }
 }

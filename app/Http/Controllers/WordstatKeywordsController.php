@@ -18,6 +18,7 @@ use App\Wordstat\WordstatRun;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 
 class WordstatKeywordsController extends Controller
@@ -87,10 +88,13 @@ class WordstatKeywordsController extends Controller
         ]);
     }
 
-    public function destroy(Request $request, int $id)
+    public function destroy(Request $request, int $id, WordstatCollector $collector)
     {
         $project = $this->project($id);
         abort_unless((int) $project->user_id === (int) Auth::id(), 403);
+        // Сначала останавливаем сбор, иначе фоновые задачи продолжат тратить запросы
+        WordstatRun::query()->where('project_id', $project->id)->whereIn('status', ['queued', 'running'])->get()
+            ->each(fn (WordstatRun $run) => $collector->cancelRun($run));
         $project->delete();
         $url = route('pages.wordstat-keywords');
 
@@ -117,9 +121,6 @@ class WordstatKeywordsController extends Controller
     public function startRun(Request $request, int $id, WordstatCollector $collector): JsonResponse
     {
         $project = $this->project($id);
-        if (WordstatRun::query()->where('project_id', $project->id)->whereIn('status', ['queued', 'running'])->exists()) {
-            return response()->json(['ok' => false, 'message' => __('Сбор по проекту уже идёт — дождитесь окончания или остановите его')], 422);
-        }
         [$parsed, $settings] = $this->parseRequest($request, $project);
         $max = (int) config('cabinet-wordstat-keywords.max_seeds_per_run', 500);
         if (count($parsed['seeds']) === 0) {
@@ -129,7 +130,18 @@ class WordstatKeywordsController extends Controller
             return response()->json(['ok' => false, 'message' => __('Слишком много фраз за один запуск. Максимум: :max', ['max' => number_format($max, 0, '', ' ')])], 422);
         }
 
-        $run = $collector->createRun($project, (int) Auth::id(), $parsed['seeds'], $settings);
+        // Проверка и создание запуска под блокировкой проекта: два участника не запустят сбор одновременно
+        $run = DB::transaction(function () use ($project, $parsed, $settings, $collector) {
+            WordstatProject::query()->whereKey($project->id)->lockForUpdate()->first();
+            if ($this->hasActiveRun($project->id)) {
+                return null;
+            }
+
+            return $collector->createRun($project, (int) Auth::id(), $parsed['seeds'], $settings);
+        });
+        if ($run === null) {
+            return response()->json(['ok' => false, 'message' => __('Сбор по проекту уже идёт — дождитесь окончания или остановите его')], 422);
+        }
         StartWordstatRun::dispatch($run->id)->onQueue(config('cabinet-wordstat-keywords.queue'));
 
         return response()->json(['ok' => true, 'message' => __('Сбор запущен'), 'run' => $this->runPayload($run->fresh())]);
@@ -189,7 +201,8 @@ class WordstatKeywordsController extends Controller
                 $affected = $query->update(['status' => WordstatPhrase::STATUS_ACTIVE]);
                 break;
             default:
-                $affected = $query->delete();
+                // Мягкое удаление: ключ фразы остаётся занятым, и сбор её не вернёт
+                $affected = $query->update(['status' => WordstatPhrase::STATUS_DELETED]);
         }
 
         return response()->json(['ok' => true, 'affected' => (int) $affected]);
@@ -215,6 +228,9 @@ class WordstatKeywordsController extends Controller
     public function mergeGroup(Request $request, int $id, int $groupId): JsonResponse
     {
         $project = $this->project($id);
+        if ($this->hasActiveRun($project->id)) {
+            return $this->groupsLockedResponse();
+        }
         $source = WordstatGroup::query()->where('project_id', $project->id)->findOrFail($groupId);
         $target = WordstatGroup::query()->where('project_id', $project->id)->findOrFail((int) $request->input('target_id'));
         if ($source->id === $target->id) {
@@ -229,8 +245,12 @@ class WordstatKeywordsController extends Controller
     public function destroyGroup(int $id, int $groupId): JsonResponse
     {
         $project = $this->project($id);
+        if ($this->hasActiveRun($project->id)) {
+            return $this->groupsLockedResponse();
+        }
         $group = WordstatGroup::query()->where('project_id', $project->id)->findOrFail($groupId);
-        WordstatPhrase::query()->where('group_id', $group->id)->delete();
+        // Фразы помечаем удалёнными, а не стираем: иначе следующий сбор вернёт их обратно
+        WordstatPhrase::query()->where('group_id', $group->id)->update(['status' => WordstatPhrase::STATUS_DELETED]);
         $group->delete();
 
         return response()->json(['ok' => true, 'message' => __('Группа удалена')]);
@@ -283,6 +303,16 @@ class WordstatKeywordsController extends Controller
         return response()->json(['ok' => true, 'message' => __('Пресет удалён')]);
     }
 
+    private function hasActiveRun(int $projectId): bool
+    {
+        return WordstatRun::query()->where('project_id', $projectId)->whereIn('status', ['queued', 'running'])->exists();
+    }
+
+    private function groupsLockedResponse(): JsonResponse
+    {
+        return response()->json(['ok' => false, 'message' => __('Дождитесь окончания сбора или остановите его: во время сбора группы менять нельзя')], 422);
+    }
+
     private function project(int $id): WordstatProject
     {
         $project = WordstatProject::query()->findOrFail($id);
@@ -299,8 +329,8 @@ class WordstatKeywordsController extends Controller
         }
         $settings = WordstatSettings::normalize($settings);
         $parsed = WordstatInputParser::parse(
-            (string) $request->input('text', ''),
-            (string) $request->input('group', WordstatGroup::DEFAULT_NAME) ?: WordstatGroup::DEFAULT_NAME,
+            is_string($request->input('text')) ? $request->input('text') : '',
+            is_string($request->input('group')) && trim($request->input('group')) !== '' ? trim($request->input('group')) : WordstatGroup::DEFAULT_NAME,
             (int) config('cabinet-wordstat-keywords.max_phrase_length', 400),
             (int) config('cabinet-wordstat-keywords.max_phrase_words', 7)
         );

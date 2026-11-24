@@ -257,7 +257,7 @@
                         <option value="move">{{ __('Перенести в группу') }}</option>
                         <option value="minus" data-wsk-for-status="active">{{ __('Исключить из списка') }}</option>
                         <option value="restore" data-wsk-for-status="minus" hidden>{{ __('Вернуть в список') }}</option>
-                        <option value="delete">{{ __('Удалить навсегда') }}</option>
+                        <option value="delete">{{ __('Удалить') }}</option>
                     </select>
                     <div class="cabinet-wsk-toolbar__group" data-wsk-bulk-group-wrap hidden>
                         <select class="form-select form-select-sm" data-wsk-bulk-group></select>

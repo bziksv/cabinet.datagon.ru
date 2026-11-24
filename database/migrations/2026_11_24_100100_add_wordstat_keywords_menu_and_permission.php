@@ -13,12 +13,20 @@ class AddWordstatKeywordsMenuAndPermission extends Migration
     {
         $this->seedMenuItem();
         $this->seedPermission();
+        $this->forgetPermissionCache();
     }
 
     public function down(): void
     {
         $this->removeMenuItem();
         $this->removePermission();
+        $this->forgetPermissionCache();
+    }
+
+    /** Права кэшируются spatie на 24 часа — без сброса новое право не применится сразу */
+    private function forgetPermissionCache(): void
+    {
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
     private function seedMenuItem(): void

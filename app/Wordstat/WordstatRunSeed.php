@@ -9,6 +9,7 @@ class WordstatRunSeed extends Model
     public const STATUS_QUEUED = 'queued';
     public const STATUS_DONE = 'done';
     public const STATUS_FAILED = 'failed';
+    public const STATUS_RUNNING = 'running';
     public const STATUS_SKIPPED = 'skipped';
 
     protected $table = 'wordstat_run_seeds';

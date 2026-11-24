@@ -8,6 +8,7 @@ use App\Wordstat\WordstatProject;
 use App\Wordstat\WordstatRequestLog;
 use App\Wordstat\WordstatRun;
 use App\Wordstat\WordstatRunSeed;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 class WordstatCollector
@@ -66,9 +67,17 @@ class WordstatCollector
     public function collectSeed(WordstatRunSeed $seed): void
     {
         $run = WordstatRun::query()->findOrFail($seed->run_id);
-        if (! $run->isActive() || $seed->status !== WordstatRunSeed::STATUS_QUEUED) {
+        if (! $run->isActive()) {
             return;
         }
+        // Атомарный захват: повторная доставка джобы не соберёт затравку дважды
+        $claimed = WordstatRunSeed::query()->where('id', $seed->id)
+            ->where('status', WordstatRunSeed::STATUS_QUEUED)
+            ->update(['status' => WordstatRunSeed::STATUS_RUNNING]);
+        if ($claimed !== 1) {
+            return;
+        }
+        $seed->status = WordstatRunSeed::STATUS_RUNNING;
         if ($run->status === WordstatRun::STATUS_QUEUED) {
             $run->update(['status' => WordstatRun::STATUS_RUNNING, 'started_at' => now()]);
         }
@@ -135,20 +144,29 @@ class WordstatCollector
 
             return $existing;
         }
+        try {
+            $created = WordstatPhrase::query()->create([
+                'project_id' => $run->project_id,
+                'group_id' => $seed->group_id,
+                'phrase' => $phrase,
+                'phrase_key' => $key,
+                'freq' => $freq,
+                'source' => $source,
+                'seed_phrase_id' => $seedPhraseId,
+                'depth' => $seed->depth,
+                'status' => WordstatPhrase::STATUS_ACTIVE,
+                'run_id' => $run->id,
+            ]);
+        } catch (QueryException $e) {
+            if ((int) ($e->errorInfo[1] ?? 0) !== 1062) {
+                throw $e;
+            }
+            // Параллельная затравка уже добавила эту фразу — используем её
+            return WordstatPhrase::query()->where('project_id', $run->project_id)->where('phrase_key', $key)->first();
+        }
         $added++;
 
-        return WordstatPhrase::query()->create([
-            'project_id' => $run->project_id,
-            'group_id' => $seed->group_id,
-            'phrase' => $phrase,
-            'phrase_key' => $key,
-            'freq' => $freq,
-            'source' => $source,
-            'seed_phrase_id' => $seedPhraseId,
-            'depth' => $seed->depth,
-            'status' => WordstatPhrase::STATUS_ACTIVE,
-            'run_id' => $run->id,
-        ]);
+        return $created;
     }
 
     private function queueChildren(WordstatRun $run, WordstatRunSeed $seed, array $settings, array $phrases): void
@@ -196,8 +214,21 @@ class WordstatCollector
 
     public function failSeed(WordstatRunSeed $seed, string $error): void
     {
-        $seed->update(['status' => WordstatRunSeed::STATUS_FAILED, 'error' => mb_substr($error, 0, 1000)]);
-        $this->bumpRun((int) $seed->run_id, 0, 0);
+        // Повторный вызов (например, из failed()) не должен учитывать затравку дважды
+        $changed = WordstatRunSeed::query()->where('id', $seed->id)
+            ->whereIn('status', [WordstatRunSeed::STATUS_QUEUED, WordstatRunSeed::STATUS_RUNNING])
+            ->update(['status' => WordstatRunSeed::STATUS_FAILED, 'error' => mb_substr($error, 0, 1000)]);
+        if ($changed === 1) {
+            $this->bumpRun((int) $seed->run_id, 0, 0);
+        }
+    }
+
+    /** Вернуть захваченную затравку в очередь перед повтором */
+    public function resetSeed(WordstatRunSeed $seed): void
+    {
+        WordstatRunSeed::query()->where('id', $seed->id)
+            ->where('status', WordstatRunSeed::STATUS_RUNNING)
+            ->update(['status' => WordstatRunSeed::STATUS_QUEUED]);
     }
 
     public function failRun(WordstatRun $run, string $error): void

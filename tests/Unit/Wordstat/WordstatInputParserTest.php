@@ -54,4 +54,15 @@ class WordstatInputParserTest extends TestCase
         $this->assertSame('купить елку', WordstatPhraseKey::make('  "!Купить  +ёлку" '));
         $this->assertSame('окна пвх', WordstatPhraseKey::make('окна [пвх] -дешево'));
     }
+
+    public function testEmptyHeaderIsReported(): void
+    {
+        $r = WordstatInputParser::parse("офтальмоскоп\n#кератометр", 'Без группы');
+        $this->assertSame([['group' => 'Без группы', 'phrase' => 'офтальмоскоп']], $r['seeds']);
+        $this->assertSame([['line' => '#кератометр', 'reason' => 'empty_group']], $r['rejected']);
+
+        $r = WordstatInputParser::parse("# Окна\nокна пвх\n# Двери\nВходные: двери входные", 'Без группы');
+        $this->assertCount(2, $r['seeds']);
+        $this->assertSame('# Двери', $r['rejected'][0]['line']);
+    }
 }

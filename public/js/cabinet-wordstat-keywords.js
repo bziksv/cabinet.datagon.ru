@@ -14,7 +14,11 @@
     var ds = page.dataset;
     var ROWS_LIMIT = 5000;
     var SOURCES = { left: 'Запрос с вашей фразой', right: 'Похожий запрос', manual: 'Ваша фраза' };
-    var REASONS = { too_long: 'длиннее 400 символов', too_many_words: 'больше 7 слов' };
+    var REASONS = {
+        too_long: 'длиннее 400 символов',
+        too_many_words: 'больше 7 слов',
+        empty_group: 'это название группы, а под ним нет ни одной фразы. Фразы группы пишите строками ниже'
+    };
 
     function fmt(n) {
         if (n === null || n === undefined || n === '') {
@@ -321,9 +325,9 @@
                 html += '<div class="small text-muted mt-1">' + j.groups.map(esc).join(', ') + '</div>';
             }
             if (j.rejected.length) {
-                html += '<div class="text-danger small mt-1">Не попадут в сбор, потому что ' + j.rejected.length + ' ' + (j.rejected.length === 1 ? 'строка' : 'строк') + ': ' + j.rejected.map(function (r) {
-                    return '«' + esc(r.line) + '» — ' + (REASONS[r.reason] || r.reason);
-                }).join('; ') + '</div>';
+                html += '<div class="text-danger small mt-1">Пропущено строк: ' + j.rejected.length + '<ul class="mb-0 ps-3">' + j.rejected.map(function (r) {
+                    return '<li>«' + esc(r.line) + '» — ' + (REASONS[r.reason] || r.reason) + '</li>';
+                }).join('') + '</ul></div>';
             }
             $('[data-wsk-preview]').html(html).prop('hidden', false);
         }).catch(function (e) { toast(e.message, true); }).finally(function () { $btn.prop('disabled', false); });

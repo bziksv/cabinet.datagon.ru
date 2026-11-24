@@ -56,12 +56,38 @@ SUPERVISOR_GROUPS=(
   cabinet-titlo-wordstat
 )
 
+# Рестарт в фоне, отвязанно от SSH: relevance ждёт текущие задачи до 11 минут (stopwaitsecs=660),
+# а SSH-сессию сервер закрывает через 10 минут — синхронный restart обрывался и оставлял группу остановленной.
+RESTARTED=()
 for group in "${SUPERVISOR_GROUPS[@]}"; do
-  if supervisorctl status "${group}:" 2>/dev/null | grep -q RUNNING; then
-    echo "supervisorctl restart ${group}:*"
-    supervisorctl restart "${group}:"*
+  if supervisorctl status "${group}:" 2>/dev/null | grep -qE 'RUNNING|STARTING'; then
+    echo "restart ${group} (в фоне)"
+    setsid nohup bash -c "supervisorctl restart '${group}:*'; sleep 5; supervisorctl start '${group}:*'" \
+      > "/tmp/deploy-restart-${group}.log" 2>&1 < /dev/null &
+    RESTARTED+=("$group")
   fi
 done
+
+not_running() {
+  local group
+  for group in "${RESTARTED[@]}"; do
+    supervisorctl status "${group}:" 2>/dev/null | grep -v RUNNING || true
+  done
+}
+
+sleep 15
+DEADLINE=$((SECONDS + 420))
+while [ -n "$(not_running)" ] && [ "$SECONDS" -lt "$DEADLINE" ]; do
+  sleep 10
+done
+
+PENDING="$(not_running)"
+if [ -n "$PENDING" ]; then
+  echo "ВНИМАНИЕ: ещё не поднялись (рестарт продолжается в фоне, проверьте supervisorctl status через несколько минут):"
+  echo "$PENDING"
+else
+  echo "Все группы воркеров RUNNING: ${#RESTARTED[@]}"
+fi
 
 curl -sI https://cabinet.titlo.ru/login | head -3
 echo "Deploy OK"

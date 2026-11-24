@@ -107,9 +107,9 @@
                     </div>
 
                     <div class="cabinet-wsk-option">
-                        <label class="form-label mb-1" for="wskLeftLimit">{{ __('Сколько фраз брать на каждую вашу фразу') }}</label>
+                        <label class="form-label mb-1" for="wskLeftLimit">{{ __('Сколько запросов сохранить по каждой вашей фразе') }}</label>
                         <input type="text" inputmode="numeric" id="wskLeftLimit" class="form-control form-control-sm sa-num-space" data-wsk-setting="left_limit" style="max-width: 180px">
-                        <div class="form-text">{{ __('От 1 до 2 000. Чем больше, тем больше фраз и запросов.') }}</div>
+                        <div class="form-text">{{ __('Например, для «окна пвх» и числа 200 сохраним до 200 самых частых запросов с этими словами: «окна пвх цена», «окна пвх москва» и т. д. Редкие хвосты отбрасываются. От 1 до 2 000. Расход запросов не меняется — одна фраза = один запрос.') }}</div>
                     </div>
                 </div>
 
@@ -162,9 +162,9 @@
                                     <div class="form-text">{{ __('Каждую найденную фразу проверим в Wordstat ещё раз и возьмём из неё новые фразы. Фраз станет больше, запросов тоже.') }}</div>
                                 </div>
                                 <div class="cabinet-wsk-option">
-                                    <label class="form-label mb-1" for="wskDepthLeft">{{ __('Фраз на каждую найденную') }}</label>
+                                    <label class="form-label mb-1" for="wskDepthLeft">{{ __('Сколько запросов сохранить по каждой найденной фразе') }}</label>
                                     <input type="text" inputmode="numeric" id="wskDepthLeft" class="form-control form-control-sm sa-num-space" data-wsk-setting="depth_left_limit" style="max-width: 180px">
-                                    <div class="form-text">{{ __('От 1 до 200.') }}</div>
+                                    <div class="form-text">{{ __('То же самое, но для фраз, найденных при расширении. От 1 до 200.') }}</div>
                                 </div>
                                 <div class="cabinet-wsk-option">
                                     <label class="form-label mb-1" for="wskDepthMax">{{ __('Сколько найденных фраз расширять всего') }}</label>

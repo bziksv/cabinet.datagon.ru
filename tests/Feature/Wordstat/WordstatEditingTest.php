@@ -85,6 +85,12 @@ class WordstatEditingTest extends TestCase
         $phrases = array_column($list->json('phrases'), 'phrase');
         sort($phrases);
         $this->assertSame(['двери', 'окна'], $phrases);
+
+        $this->actingAs($user)->postJson(route('pages.wordstat-keywords.phrases.bulk', $project->id), ['ids' => [$p1->id], 'action' => 'delete'])->assertOk();
+        $this->assertNull(WordstatPhrase::query()->find($p1->id));
+
+        $this->actingAs($user)->postJson(route('pages.wordstat-keywords.groups.destroy', [$project->id, $b->id]))->assertOk();
+        $this->assertSame(0, WordstatPhrase::query()->where('group_id', $b->id)->count());
     }
 
     public function testPresetCrudAndOwnership(): void

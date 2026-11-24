@@ -211,8 +211,8 @@ class WordstatKeywordsController extends Controller
                 $affected = $query->update(['status' => WordstatPhrase::STATUS_ACTIVE]);
                 break;
             default:
-                // Мягкое удаление: ключ фразы остаётся занятым, и сбор её не вернёт
-                $affected = $query->update(['status' => WordstatPhrase::STATUS_DELETED]);
+                // Удаляем полностью, чтобы можно было очистить и пересобрать; для «не возвращать» есть «Исключить из списка» (minus)
+                $affected = $query->delete();
         }
 
         return response()->json(['ok' => true, 'affected' => (int) $affected]);
@@ -278,8 +278,8 @@ class WordstatKeywordsController extends Controller
             return $this->groupsLockedResponse();
         }
         $group = WordstatGroup::query()->where('project_id', $project->id)->findOrFail($groupId);
-        // Фразы помечаем удалёнными, а не стираем: иначе следующий сбор вернёт их обратно
-        WordstatPhrase::query()->where('group_id', $group->id)->update(['status' => WordstatPhrase::STATUS_DELETED]);
+        // Удаляем фразы группы полностью, чтобы после удаления неудачной группы её можно было собрать заново
+        WordstatPhrase::query()->where('group_id', $group->id)->delete();
         $group->delete();
 
         return response()->json(['ok' => true, 'message' => __('Группа удалена')]);

@@ -23,7 +23,7 @@ class WordstatHardeningTest extends TestCase
         $this->assertSame('окна пвх', WordstatPhrasesExport::safe('окна пвх'));
     }
 
-    public function testDeletedPhraseIsNotCollectedAgain(): void
+    public function testMinusPhraseIsNotCollectedAgain(): void
     {
         $project = WordstatProject::query()->create(['user_id' => 999001, 'domain' => 'example.ru', 'region_ids' => [213]]);
         $group = WordstatGroup::query()->create(['project_id' => $project->id, 'name' => 'Окна']);
@@ -34,7 +34,7 @@ class WordstatHardeningTest extends TestCase
         $seed = WordstatRunSeed::query()->create(['run_id' => $run->id, 'group_id' => $group->id, 'phrase' => 'окна', 'depth' => 0]);
         WordstatPhrase::query()->create([
             'project_id' => $project->id, 'group_id' => $group->id, 'phrase' => 'окна бесплатно', 'phrase_key' => 'окна бесплатно',
-            'source' => 'left', 'status' => WordstatPhrase::STATUS_DELETED,
+            'source' => 'left', 'status' => WordstatPhrase::STATUS_MINUS,
         ]);
 
         $client = new WordstatClient('https://api.test/', 'u', 'k', function () {
@@ -48,7 +48,7 @@ class WordstatHardeningTest extends TestCase
 
         $rows = WordstatPhrase::query()->where('project_id', $project->id)->where('phrase_key', 'окна бесплатно')->get();
         $this->assertCount(1, $rows);
-        $this->assertSame(WordstatPhrase::STATUS_DELETED, $rows->first()->status);
+        $this->assertSame(WordstatPhrase::STATUS_MINUS, $rows->first()->status);
     }
 
     public function testSeedIsClaimedOnlyOnce(): void

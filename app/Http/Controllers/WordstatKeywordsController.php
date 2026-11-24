@@ -177,15 +177,59 @@ class WordstatKeywordsController extends Controller
     {
         $project = $this->project($id);
         $status = in_array($request->query('status'), ['active', 'minus'], true) ? $request->query('status') : 'active';
-        $query = WordstatPhrase::query()->where('project_id', $project->id)->where('status', $status);
+        $query = WordstatPhrase::query()
+            ->where('wordstat_phrases.project_id', $project->id)
+            ->where('wordstat_phrases.status', $status);
+
         $groupIds = $this->requestedGroupIds($request);
         if ($groupIds !== []) {
-            $query->whereIn('group_id', $groupIds);
+            $query->whereIn('wordstat_phrases.group_id', $groupIds);
         }
-        $rows = $query->orderByDesc('freq')->limit(20000)
-            ->get(['id', 'phrase', 'freq', 'source', 'depth', 'group_id', 'status']);
 
-        return response()->json(['ok' => true, 'phrases' => $rows]);
+        $search = trim((string) $request->query('q', ''));
+        if ($search !== '') {
+            $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
+            $query->where('wordstat_phrases.phrase', 'like', '%' . $escaped . '%');
+        }
+
+        $total = (clone $query)->count();
+        $perPage = max(1, min(500, (int) $request->query('per_page', 200)));
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        $page = max(1, min($lastPage, (int) $request->query('page', 1)));
+
+        $sortKey = in_array($request->query('sort'), ['freq', 'phrase', 'group'], true) ? $request->query('sort') : 'freq';
+        $dir = $request->query('dir') === 'asc' ? 'asc' : 'desc';
+
+        if ($sortKey === 'phrase') {
+            $query->orderBy('wordstat_phrases.phrase', $dir)->orderBy('wordstat_phrases.id');
+        } elseif ($sortKey === 'group') {
+            $query->leftJoin('wordstat_groups', 'wordstat_groups.id', '=', 'wordstat_phrases.group_id')
+                ->orderBy('wordstat_groups.name', $dir)
+                ->orderByDesc('wordstat_phrases.freq')
+                ->orderBy('wordstat_phrases.id');
+        } else {
+            $query->orderBy('wordstat_phrases.freq', $dir)->orderBy('wordstat_phrases.id');
+        }
+
+        $rows = $query->forPage($page, $perPage)
+            ->get([
+                'wordstat_phrases.id',
+                'wordstat_phrases.phrase',
+                'wordstat_phrases.freq',
+                'wordstat_phrases.source',
+                'wordstat_phrases.depth',
+                'wordstat_phrases.group_id',
+                'wordstat_phrases.status',
+            ]);
+
+        return response()->json([
+            'ok' => true,
+            'phrases' => $rows,
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+            'last_page' => $lastPage,
+        ]);
     }
 
     public function bulkPhrases(Request $request, int $id): JsonResponse

@@ -114,4 +114,29 @@ class WordstatEditingTest extends TestCase
         $res->assertOk();
         $this->assertStringContainsString('spreadsheetml', (string) $res->headers->get('content-type'));
     }
+
+    public function testPhrasesPaginationAndSearchAcrossAllPages(): void
+    {
+        $user = $this->user();
+        [$project, $a, $b] = $this->seedProject($user);
+        WordstatPhrase::query()->create(['project_id' => $project->id, 'group_id' => $b->id, 'phrase' => 'редкая фраза хвост', 'phrase_key' => 'редкая фраза хвост', 'freq' => 10, 'source' => 'left']);
+
+        $url = route('pages.wordstat-keywords.phrases', $project->id) . '?group_ids=' . $a->id . ',' . $b->id;
+        $p1 = $this->actingAs($user)->getJson($url . '&per_page=2&page=1')->assertOk();
+        $p1->assertJson(['total' => 3, 'page' => 1, 'per_page' => 2, 'last_page' => 2]);
+        $this->assertCount(2, $p1->json('phrases'));
+
+        $p2 = $this->actingAs($user)->getJson($url . '&per_page=2&page=2')->assertOk();
+        $p2->assertJson(['total' => 3, 'page' => 2, 'last_page' => 2]);
+        $this->assertSame(['редкая фраза хвост'], array_column($p2->json('phrases'), 'phrase'));
+
+        // Поиск находит фразу со второй страницы на странице 1
+        $found = $this->actingAs($user)->getJson($url . '&per_page=2&page=1&q=' . urlencode('хвост'))->assertOk();
+        $found->assertJson(['total' => 1, 'page' => 1, 'last_page' => 1]);
+        $this->assertSame(['редкая фраза хвост'], array_column($found->json('phrases'), 'phrase'));
+
+        // Сортировка по группе работает на сервере
+        $byGroup = $this->actingAs($user)->getJson($url . '&sort=group&dir=desc')->assertOk();
+        $this->assertSame('редкая фраза хвост', $byGroup->json('phrases.0.phrase'));
+    }
 }

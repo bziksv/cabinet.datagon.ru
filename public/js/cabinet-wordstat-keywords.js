@@ -12,7 +12,7 @@
     }
 
     var ds = page.dataset;
-    var ROWS_LIMIT = 5000;
+    var PER_PAGE = 200;
     var SOURCES = { left: 'Запрос с вашей фразой', right: 'Похожий запрос', manual: 'Ваша фраза' };
     var REASONS = {
         too_long: 'длиннее 400 символов',
@@ -161,6 +161,9 @@
     (state.regions || []).forEach(function (r) { regionNames[String(r.id)] = r.text; });
 
     var phrases = [];
+    var page = 1;
+    var total = 0;
+    var lastPage = 1;
     var currentGroupId = state.groups.length ? state.groups[0].id : null;
     var viewIds = currentGroupId ? [currentGroupId] : [];
     var NEW_GROUP = 'new';
@@ -388,25 +391,30 @@
                     var wasDone = j.run.seeds_done !== run.seeds_done;
                     showRun(j.run);
                     if (wasDone && j.run.active) {
-                        reloadGroups();
+                        reloadGroups(false);
                     }
                 }).catch(function () {
                     pollTimer = setTimeout(function () { showRun(run); }, 5000);
                 });
             }, 3000);
         } else {
-            reloadGroups();
+            reloadGroups(true);
         }
     }
 
     /* ---------- группы ---------- */
-    function reloadGroups() {
+    function reloadGroups(refreshTable) {
+        if (refreshTable === undefined) {
+            refreshTable = true;
+        }
         request(ds.groupsUrl)
             .then(function (j) {
                 state.groups = j.groups || [];
                 syncSelection();
                 renderGroups();
-                loadPhrases();
+                if (refreshTable || total === 0) {
+                    loadPhrases();
+                }
             })
             .catch(function () { /* следующий опрос обновит */ });
     }
@@ -431,9 +439,10 @@
             currentGroupId = current;
         }
         syncSelection();
+        page = 1;
         $('[data-wsk-check-all]').prop('checked', false);
         renderGroups();
-        loadPhrases();
+        loadPhrases(1);
     }
 
     function renderGroups() {
@@ -605,39 +614,51 @@
         });
         $('[data-wsk-bulk-action]').val('').trigger('change');
         $('[data-wsk-check-all]').prop('checked', false);
-        loadPhrases();
+        loadPhrases(1);
     });
 
     /* ---------- таблица фраз ---------- */
-    function loadPhrases() {
+    function loadPhrases(targetPage) {
+        if (targetPage !== undefined) {
+            page = Math.max(1, parseInt(targetPage, 10) || 1);
+        }
         var seq = ++loadSeq;
         if (!viewIds.length) {
             phrases = [];
+            total = 0;
+            lastPage = 1;
+            page = 1;
             renderRows();
             return;
         }
-        request(ds.phrasesUrl + '?group_ids=' + encodeURIComponent(viewIds.join(',')) + '&status=' + status).then(function (j) {
+        var q = String($('[data-wsk-search]').val() || '').trim();
+        var params = [
+            'group_ids=' + encodeURIComponent(viewIds.join(',')),
+            'status=' + encodeURIComponent(status),
+            'page=' + encodeURIComponent(page),
+            'per_page=' + encodeURIComponent(PER_PAGE),
+            'sort=' + encodeURIComponent(sort.key),
+            'dir=' + (sort.dir > 0 ? 'asc' : 'desc')
+        ];
+        if (q) {
+            params.push('q=' + encodeURIComponent(q));
+        }
+        request(ds.phrasesUrl + '?' + params.join('&')).then(function (j) {
             if (seq !== loadSeq) {
                 return;
             }
             phrases = j.phrases || [];
+            total = typeof j.total === 'number' ? j.total : phrases.length;
+            page = typeof j.page === 'number' ? j.page : 1;
+            lastPage = typeof j.last_page === 'number' ? j.last_page : 1;
             renderRows();
+            if (targetPage !== undefined) {
+                var $scroll = $('.cabinet-wsk-table__scroll');
+                if ($scroll.length) {
+                    $scroll[0].scrollTop = 0;
+                }
+            }
         }).catch(function (e) { toast(e.message, true); });
-    }
-
-    function visibleRows() {
-        var q = String($('[data-wsk-search]').val() || '').toLowerCase().trim();
-        var rows = phrases.filter(function (p) { return !q || String(p.phrase).toLowerCase().indexOf(q) !== -1; });
-        rows.sort(function (a, b) {
-            if (sort.key === 'phrase') {
-                return sort.dir * String(a.phrase).localeCompare(String(b.phrase), 'ru');
-            }
-            if (sort.key === 'group') {
-                return sort.dir * groupName(a.group_id).localeCompare(groupName(b.group_id), 'ru') || ((b.freq || 0) - (a.freq || 0));
-            }
-            return sort.dir * ((a.freq || 0) - (b.freq || 0));
-        });
-        return rows;
     }
 
     function groupName(id) {
@@ -646,11 +667,10 @@
     }
 
     function renderRows() {
-        var rows = visibleRows();
-        var shown = rows.slice(0, ROWS_LIMIT);
         var multi = viewIds.length > 1;
+        var q = String($('[data-wsk-search]').val() || '').trim();
         $('[data-wsk-group-col]').prop('hidden', !multi);
-        $('[data-wsk-rows]').html(shown.map(function (p) {
+        $('[data-wsk-rows]').html(phrases.map(function (p) {
             return '<tr><td class="cabinet-wsk-check"><input type="checkbox" class="form-check-input" data-wsk-check value="' + p.id + '" aria-label="Выбрать фразу"></td>' +
                 '<td>' + esc(p.phrase) + '</td>' +
                 (multi ? '<td class="text-muted small">' + esc(groupName(p.group_id)) + '</td>' : '') +
@@ -661,12 +681,10 @@
         var $empty = $('[data-wsk-empty]');
         if (!viewIds.length) {
             $empty.text('Выберите группу слева, чтобы увидеть её фразы.').prop('hidden', false);
-        } else if (!phrases.length) {
+        } else if (!total && q) {
+            $empty.text('По запросу «' + q + '» ничего не найдено.').prop('hidden', false);
+        } else if (!total) {
             $empty.text(status === 'minus' ? 'В исключённых пока ничего нет.' : (multi ? 'В выбранных группах пока нет фраз.' : 'В группе пока нет фраз. Перенесите сюда фразы из другой группы: отметьте их и выберите «Перенести в группу».')).prop('hidden', false);
-        } else if (!rows.length) {
-            $empty.text('Ничего не найдено.').prop('hidden', false);
-        } else if (rows.length > ROWS_LIMIT) {
-            $empty.text('Показаны первые ' + fmt(ROWS_LIMIT) + ' фраз. Уточните поиск или скачайте Excel.').prop('hidden', false);
         } else {
             $empty.prop('hidden', true);
         }
@@ -676,17 +694,29 @@
             $(this).find('.cabinet-wsk-sort-mark').text(key === sort.key ? (sort.dir > 0 ? '↑' : '↓') : '');
         });
         $('[data-wsk-check-all]').prop('checked', false);
+        renderPager();
         updateCounter();
     }
 
-    function updateCounter() {
-        var total = phrases.length;
-        var visible = $('[data-wsk-check]').length;
-        var checked = $('[data-wsk-check]:checked').length;
-        var text = total ? ('Фраз: ' + fmt(total)) : '';
-        if (total && visible !== total) {
-            text += ' · показано ' + fmt(visible);
+    function renderPager() {
+        var $pager = $('[data-wsk-pager]');
+        if (!total || lastPage <= 1) {
+            $pager.prop('hidden', true);
+            return;
         }
+        var from = (page - 1) * PER_PAGE + 1;
+        var to = Math.min(total, from + phrases.length - 1);
+        $pager.prop('hidden', false);
+        $('[data-wsk-pager-info]').text('Показано ' + fmt(from) + '–' + fmt(to) + ' из ' + fmt(total));
+        $('[data-wsk-pager-num]').text('Стр. ' + fmt(page) + ' из ' + fmt(lastPage));
+        $('[data-wsk-page="first"], [data-wsk-page="prev"]').prop('disabled', page <= 1);
+        $('[data-wsk-page="next"], [data-wsk-page="last"]').prop('disabled', page >= lastPage);
+    }
+
+    function updateCounter() {
+        var q = String($('[data-wsk-search]').val() || '').trim();
+        var checked = $('[data-wsk-check]:checked').length;
+        var text = total ? ((q ? 'Найдено: ' : 'Фраз: ') + fmt(total)) : '';
         if (checked) {
             text += ' · выбрано ' + fmt(checked);
         }
@@ -696,12 +726,23 @@
     var searchTimer = null;
     $(document).on('input', '[data-wsk-search]', function () {
         clearTimeout(searchTimer);
-        searchTimer = setTimeout(renderRows, 150);
+        searchTimer = setTimeout(function () { loadPhrases(1); }, 250);
     });
     $(document).on('click', '[data-wsk-sort]', function () {
         var key = $(this).attr('data-wsk-sort');
-        sort = { key: key, dir: sort.key === key ? -sort.dir : (key === 'phrase' ? 1 : -1) };
-        renderRows();
+        sort = { key: key, dir: sort.key === key ? -sort.dir : (key === 'phrase' || key === 'group' ? 1 : -1) };
+        loadPhrases(1);
+    });
+    $(document).on('click', '[data-wsk-page]', function () {
+        var kind = $(this).attr('data-wsk-page');
+        var next = page;
+        if (kind === 'first') { next = 1; }
+        else if (kind === 'prev') { next = Math.max(1, page - 1); }
+        else if (kind === 'next') { next = Math.min(lastPage, page + 1); }
+        else if (kind === 'last') { next = lastPage; }
+        if (next !== page) {
+            loadPhrases(next);
+        }
     });
     $(document).on('change', '[data-wsk-check-all]', function () {
         $('[data-wsk-check]').prop('checked', this.checked);

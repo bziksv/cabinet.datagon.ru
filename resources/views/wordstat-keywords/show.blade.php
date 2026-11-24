@@ -282,6 +282,16 @@
                     </table>
                 </div>
                 <div class="cabinet-wsk-table__empty text-muted small" data-wsk-empty hidden></div>
+                <div class="cabinet-wsk-pager" data-wsk-pager hidden>
+                    <span class="small text-muted" data-wsk-pager-info></span>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="{{ __('Страницы списка фраз') }}">
+                        <button type="button" class="btn btn-outline-secondary" data-wsk-page="first" aria-label="{{ __('Первая страница') }}">&laquo;</button>
+                        <button type="button" class="btn btn-outline-secondary" data-wsk-page="prev">{{ __('Назад') }}</button>
+                        <span class="btn btn-outline-secondary disabled" data-wsk-pager-num></span>
+                        <button type="button" class="btn btn-outline-secondary" data-wsk-page="next">{{ __('Вперёд') }}</button>
+                        <button type="button" class="btn btn-outline-secondary" data-wsk-page="last" aria-label="{{ __('Последняя страница') }}">&raquo;</button>
+                    </div>
+                </div>
             </section>
         </div>
 

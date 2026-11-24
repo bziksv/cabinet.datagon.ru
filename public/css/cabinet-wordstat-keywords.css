@@ -60,3 +60,5 @@
 .cabinet-wsk-page .cabinet-wsk-advanced > summary { cursor: pointer; font-weight: 600; color: #374151; font-size: 14px; }
 .cabinet-wsk-page .cabinet-wsk-group--all { border-bottom: 1px solid #e5e7eb; border-radius: 6px 6px 0 0; margin-bottom: 4px; }
 .cabinet-wsk-page .cabinet-wsk-group .form-check-input { flex: 0 0 auto; cursor: pointer; }
+.cabinet-wsk-page .cabinet-wsk-pager { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid #e5e7eb; margin-top: 8px; }
+.cabinet-wsk-page .cabinet-wsk-pager .btn.disabled { opacity: 1; color: #374151; background: #f9fafb; font-variant-numeric: tabular-nums; }

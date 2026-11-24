@@ -29,6 +29,7 @@
 
     <div class="cabinet-competitor-analysis-page">
         @include('competitors.partials.module-nav', ['active' => 'analyzer', 'admin' => $admin ?? false])
+        @include('partials.cabinet-yandex-night-window-notice', ['context' => 'serp'])
         @include('competitors.partials.limit-banner')
 
         <div class="row g-3 cabinet-ca-form-row">

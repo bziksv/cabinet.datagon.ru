@@ -1,7 +1,7 @@
 {{--
   Временное уведомление: Яндекс только 00:00–06:00 МСК.
   Снять partial с страниц, когда ограничение снимут и выйдет новость.
-  @var string|null $context — relevance|monitoring|both (по умолчанию both)
+  @var string|null $context — relevance|monitoring|serp|both (по умолчанию both)
   @var string|null $extraClass
 --}}
 @php
@@ -19,6 +19,8 @@
             Для анализа релевантности рекомендуем использовать <strong>Google</strong>.
         @elseif($context === 'monitoring')
             Мониторинг позиций — переведите съём на <strong>ночное время</strong>.
+        @elseif($context === 'serp')
+            Если можно выбрать поисковую систему — соберите выдачу через <strong>Google</strong>. Яндекс запускайте только в это ночное окно.
         @else
             Анализ релевантности — лучше через <strong>Google</strong>; мониторинг позиций — на <strong>ночное снятие</strong>.
         @endif

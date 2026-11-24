@@ -13,6 +13,7 @@
 
     <div class="cabinet-cluster-page">
         @include('cluster.partials.module-nav', ['active' => 'analyzer', 'admin' => $admin])
+        @include('partials.cabinet-yandex-night-window-notice', ['context' => 'serp'])
 
     <div id="toast-container" class="toast-top-right success-message">
         <div class="toast toast-success" aria-live="polite" style="display:none;">

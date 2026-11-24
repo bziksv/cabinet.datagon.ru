@@ -12,6 +12,7 @@
         <p class="text-secondary small cabinet-ta-intro mb-3">
             {{ __('Word statistics, Zipf distribution, phrase analysis, uniqueness check and word clouds for page text or URL.') }}
         </p>
+        @include('partials.cabinet-yandex-night-window-notice', ['context' => 'serp'])
 
         @include('text-analyse.partials.form', [
             'request' => $request ?? [],

@@ -7,6 +7,7 @@
     @endslot
 
     <div class="cabinet-ic-page">
+        @include('partials.cabinet-yandex-night-window-notice', ['context' => 'serp', 'extraClass' => 'mx-4 mt-3 mb-0'])
         <div class="cabinet-ic-lead px-4 py-3 mb-3">
             <div class="d-flex gap-3 align-items-start">
                 <span class="cabinet-ic-lead__icon" aria-hidden="true">

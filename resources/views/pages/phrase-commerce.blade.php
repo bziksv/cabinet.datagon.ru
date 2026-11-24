@@ -30,6 +30,8 @@
          data-tip-loc="{{ e(__('Phrase commerce tip loc')) }}"
          data-tip-com-avg="{{ e(__('Phrase commerce tip com avg')) }}">
 
+        @include('partials.cabinet-yandex-night-window-notice', ['context' => 'serp', 'extraClass' => 'mx-4 mt-3 mb-0'])
+
         <div class="cabinet-pc-lead px-4 py-3 mb-3">
             <div class="d-flex gap-3 align-items-center justify-content-between flex-wrap">
                 <div class="d-flex gap-3 align-items-center">

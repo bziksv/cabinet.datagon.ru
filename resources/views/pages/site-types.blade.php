@@ -46,6 +46,7 @@
                  'hint' => $c['hint'] ?? '',
              ];
          })->values()->all(), JSON_UNESCAPED_UNICODE)) }}">
+        @include('partials.cabinet-yandex-night-window-notice', ['context' => 'serp', 'extraClass' => 'mx-4 mt-3 mb-0'])
         <script type="application/json" id="cabinetStCatalogPresetsJson">@json($catalogPresets)</script>
 
         <div class="cabinet-st-lead px-4 py-3 mb-3">

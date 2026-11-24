@@ -109,5 +109,15 @@ return [
             'engines' => [],
             'usage' => 'XMLRiver Wordstat JSON (OccurrenceQueue)',
         ],
+        [
+            'key' => 'wordstat-keywords',
+            'title' => 'Подбор слов Wordstat',
+            'route' => 'pages.wordstat-keywords',
+            'class' => 'App\\Services\\Wordstat\\WordstatClient',
+            'facade' => 'WordstatClient',
+            'providers' => ['xmlstock'],
+            'engines' => ['yandex'],
+            'usage' => 'Wordstat API: wordstat/json, pagetype=words (левая и правая колонки)',
+        ],
     ],
 ];

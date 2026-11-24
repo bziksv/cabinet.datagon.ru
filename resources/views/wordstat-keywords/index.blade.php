@@ -11,6 +11,7 @@
     @endslot
 
     <div class="cabinet-wsk-page" id="cabinetWskPage" data-regions-url="{{ route('cluster.regions') }}">
+        @include('pages.partials.module-beta-banner', ['moduleName' => __('Wordstat keywords')])
         <div class="cabinet-wsk-head">
             <div class="text-muted small">
                 {{ __('Запросов к Wordstat в этом месяце') }}: <strong>{{ number_format((int) $monthRequests, 0, '', ' ') }}</strong>

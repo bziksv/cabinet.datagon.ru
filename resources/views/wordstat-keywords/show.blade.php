@@ -47,6 +47,8 @@
          data-regions-url="{{ route('cluster.regions') }}"
          data-csrf="{{ csrf_token() }}">
 
+        @include('pages.partials.module-beta-banner', ['moduleName' => __('Wordstat keywords')])
+
         <script type="application/json" id="cabinetWskData">{!! json_encode($wskData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) !!}</script>
 
         <div class="cabinet-wsk-head">

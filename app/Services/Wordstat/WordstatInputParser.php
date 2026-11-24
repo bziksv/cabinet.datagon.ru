@@ -18,13 +18,21 @@ class WordstatInputParser
                 continue;
             }
 
+            $inline = false;
             if (mb_substr($line, 0, 1) === '#') {
-                self::rejectEmptyHeader($header, $headerUsed, $rejected);
-                $name = trim(mb_substr($line, 1));
-                $current = $name !== '' ? self::cleanGroup($name) : $defaultGroup;
-                $header = $name !== '' ? $line : null;
-                $headerUsed = false;
-                continue;
+                // «#Группа: фраза» — та же строка «группа: фраза», просто с решёткой (удобно для выгрузки из Excel)
+                if (preg_match('/^#\s*[^:\/]{1,120}:\s*(?!\/\/)\S/u', $line)) {
+                    $inline = true;
+                    $line = trim(mb_substr($line, 1));
+                    $rawLine = $line;
+                } else {
+                    self::rejectEmptyHeader($header, $headerUsed, $rejected);
+                    $name = trim(mb_substr($line, 1));
+                    $current = $name !== '' ? self::cleanGroup($name) : $defaultGroup;
+                    $header = $name !== '' ? $line : null;
+                    $headerUsed = false;
+                    continue;
+                }
             }
 
             $group = $current;
@@ -40,7 +48,7 @@ class WordstatInputParser
                 $group = self::cleanGroup($m[1]);
                 $phrase = trim($m[2]);
             }
-            if ($group === $current) {
+            if (! $inline && $group === $current) {
                 $headerUsed = true;
             }
 

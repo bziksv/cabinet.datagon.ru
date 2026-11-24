@@ -65,4 +65,21 @@ class WordstatInputParserTest extends TestCase
         $this->assertCount(2, $r['seeds']);
         $this->assertSame('# Двери', $r['rejected'][0]['line']);
     }
+
+    public function testHashWithColonIsGroupAndPhrase(): void
+    {
+        $r = WordstatInputParser::parse("#кератометр:кератометр\n#Окна: окна пвх", 'Без группы');
+        $this->assertSame([
+            ['group' => 'кератометр', 'phrase' => 'кератометр'],
+            ['group' => 'Окна', 'phrase' => 'окна пвх'],
+        ], $r['seeds']);
+        $this->assertSame([], $r['rejected']);
+    }
+
+    public function testHashWithColonDoesNotChangeCurrentHeader(): void
+    {
+        $r = WordstatInputParser::parse("# Двери\nдвери входные\n#Окна: окна пвх\nдвери межкомнатные", 'Без группы');
+        $this->assertSame(['Двери', 'Окна', 'Двери'], array_column($r['seeds'], 'group'));
+        $this->assertSame([], $r['rejected']);
+    }
 }

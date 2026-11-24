@@ -211,6 +211,12 @@ class TariffLimitRegistry
                 'enforcement' => self::ENFORCEMENT_STRICT,
             ],
             [
+                'code' => 'WordstatKeywords',
+                'module' => __('Wordstat keywords'),
+                'hint' => __('Monthly Wordstat requests (1 checked phrase = 1 request).'),
+                'enforcement' => self::ENFORCEMENT_STRICT,
+            ],
+            [
                 'code' => 'DomainRecords',
                 'module' => __('Domain records'),
                 'hint' => __('Monthly WHOIS + DNS lookups: 1 domain check = 1 unit.'),

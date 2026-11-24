@@ -82,6 +82,14 @@ class WordstatCollector
             $run->update(['status' => WordstatRun::STATUS_RUNNING, 'started_at' => now()]);
         }
 
+        // Страховка тарифного лимита в воркере (на случай параллельных запусков или повторов)
+        $runUser = \App\User::query()->find($run->user_id);
+        if ($runUser && ! \App\Support\WordstatKeywordsLimits::canSpend(1, $runUser)) {
+            $this->failRun($run, \App\Support\WordstatKeywordsLimits::limitMessage($runUser));
+
+            return;
+        }
+
         $settings = WordstatSettings::normalize((array) $run->settings);
         $query = WordstatPhraseFilter::stripStopWords($seed->phrase, $settings['stop_words']);
         $limit = $seed->depth === 0 ? $settings['left_limit'] : $settings['depth_left_limit'];

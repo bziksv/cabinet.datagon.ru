@@ -84,4 +84,22 @@ class WordstatControllerTest extends TestCase
         $this->assertStringContainsString('лимит', $this->actingAs($user)
             ->getJson(route('pages.wordstat-keywords.runs.show', [$project->id, $run->id]))->json('run.error'));
     }
+
+    public function testTariffLimitsConfiguredInDatabase(): void
+    {
+        $setting = \Illuminate\Support\Facades\DB::table('tariff_settings')->where('code', 'WordstatKeywords')->first();
+        $this->assertNotNull($setting);
+        $values = \Illuminate\Support\Facades\DB::table('tariff_setting_values')
+            ->where('tariff_setting_id', $setting->id)
+            ->pluck('value', 'tariff')
+            ->map(fn ($v) => (int) $v)
+            ->all();
+
+        $this->assertSame([
+            'Free' => 50,
+            'Optimal' => 5000,
+            'Ultimate' => 12000,
+            'Maximum' => 30000,
+        ], $values);
+    }
 }

@@ -58,7 +58,14 @@
                     <strong>{{ $project->domain }}</strong>
                     @if ($project->title)<span class="text-muted"> · {{ $project->title }}</span>@endif
                 </div>
-                <div class="text-muted small">{{ __('Запросов к Wordstat в этом месяце') }}: <strong>{{ number_format((int) $monthRequests, 0, '', ' ') }}</strong></div>
+                <div class="text-muted small">
+                    {{ __('Запросов к Wordstat в этом месяце') }}:
+                    <strong>{{ number_format((int) $monthRequests, 0, '', ' ') }}</strong>
+                    @if ($monthLimit !== null)
+                        {{ __('из') }} <strong>{{ number_format((int) $monthLimit, 0, '', ' ') }}</strong>
+                        ({{ __('осталось') }} {{ number_format(max(0, (int) $monthLimit - (int) $monthRequests), 0, '', ' ') }})
+                    @endif
+                </div>
             </div>
             <a class="btn btn-outline-secondary btn-sm" href="{{ route('pages.wordstat-keywords.export', $project->id) }}">
                 <i class="bi bi-file-earmark-excel"></i> {{ __('Скачать все фразы (Excel)') }}

@@ -294,6 +294,12 @@ class LimitsComposer
                     'position' => 5,
                 ];
 
+            case 'WordstatKeywords':
+                return [
+                    'count' => \App\Support\WordstatKeywordsLimits::usedForUser($user),
+                    'position' => 4,
+                ];
+
             case 'DomainRecords':
                 return [
                     'count' => \App\Support\DomainRecordsLimits::usedForUser($user),
@@ -429,6 +435,9 @@ class LimitsComposer
 
             case 'SearchSuggestionsHistory':
                 return 5;
+
+            case 'WordstatKeywords':
+                return 4;
 
             case 'DomainRecords':
                 return 4;

@@ -8,6 +8,7 @@ use App\Services\Wordstat\WordstatCollector;
 use App\Services\Wordstat\WordstatEstimator;
 use App\Services\Wordstat\WordstatInputParser;
 use App\Services\Wordstat\WordstatSettings;
+use App\Support\WordstatKeywordsLimits;
 use App\Support\YandexLrRegions;
 use App\Wordstat\WordstatGroup;
 use App\Wordstat\WordstatPhrase;
@@ -84,7 +85,8 @@ class WordstatKeywordsController extends Controller
             'regions' => YandexLrRegions::resolveMany(array_map('strval', (array) $project->region_ids), 100),
             'activeRun' => $activeRun ? $this->runPayload($activeRun) : null,
             'lastRuns' => WordstatRun::query()->where('project_id', $project->id)->latest('id')->limit(5)->get(),
-            'monthRequests' => $this->monthRequests($userId),
+            'monthRequests' => WordstatKeywordsLimits::usedForUserId($userId),
+            'monthLimit' => WordstatKeywordsLimits::limitForUser(Auth::user()),
         ]);
     }
 
@@ -128,6 +130,26 @@ class WordstatKeywordsController extends Controller
         }
         if (count($parsed['seeds']) > $max) {
             return response()->json(['ok' => false, 'message' => __('Слишком много фраз за один запуск. Максимум: :max', ['max' => number_format($max, 0, '', ' ')])], 422);
+        }
+
+        $user = Auth::user();
+        $monthLimit = WordstatKeywordsLimits::limitForUser($user);
+        if ($monthLimit !== null) {
+            $remaining = WordstatKeywordsLimits::remainingForUser($user);
+            $estimate = WordstatEstimator::estimate(count($parsed['seeds']), $settings)['total'];
+            if ($remaining <= 0) {
+                return response()->json(['ok' => false, 'message' => WordstatKeywordsLimits::limitMessage($user)], 422);
+            }
+            if ($estimate > $remaining) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => __('Недостаточно лимита на этот запуск: нужно до :need запросов, осталось :left из :limit в этом месяце. Уменьшите число фраз или расширение, либо повысьте тариф.', [
+                        'need' => number_format($estimate, 0, '', ' '),
+                        'left' => number_format($remaining, 0, '', ' '),
+                        'limit' => number_format($monthLimit, 0, '', ' '),
+                    ]),
+                ], 422);
+            }
         }
 
         // Проверка и создание запуска под блокировкой проекта: два участника не запустят сбор одновременно
@@ -433,6 +455,9 @@ class WordstatKeywordsController extends Controller
             return null;
         }
         $error = mb_strtolower((string) $run->error);
+        if (preg_match('/лимит запросов wordstat/u', $error)) {
+            return (string) $run->error;
+        }
         if (preg_match('/баланс|средств|оплат/u', $error)) {
             return __('Закончился оплаченный лимит проверок частотности. Напишите в поддержку — после пополнения сбор можно повторить');
         }

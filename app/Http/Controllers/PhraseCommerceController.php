@@ -287,6 +287,14 @@ class PhraseCommerceController extends Controller
             return response()->json(['error' => 'not_found'], 404);
         }
 
+        $params = is_array($row->params) ? $row->params : [];
+        $yandexRegion = ! empty($params['yandex_lr'])
+            ? CompetitorSearchRegions::find('yandex', (string) $params['yandex_lr'])
+            : null;
+        $googleRegion = ! empty($params['google_lr'])
+            ? CompetitorSearchRegions::find('google', (string) $params['google_lr'])
+            : null;
+
         return response()->json([
             'ok' => true,
             'item' => [
@@ -298,6 +306,8 @@ class PhraseCommerceController extends Controller
                 'results_count' => $row->results_count,
                 'cost' => $row->cost,
                 'regions_label' => $row->regionsLabel(),
+                'yandex_region' => $yandexRegion,
+                'google_region' => $googleRegion,
                 'created_at' => optional($row->created_at)->format('d.m.Y H:i'),
             ],
         ]);

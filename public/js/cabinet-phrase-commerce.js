@@ -1073,6 +1073,27 @@
         phrasesEl.addEventListener('input', updateCostPreview);
     }
 
+    function applyRegionSelectValue(selectEl, regionId, regionObj) {
+        if (!selectEl || !regionId) {
+            return;
+        }
+        var id = String(regionId);
+        var text =
+            (regionObj && (regionObj.text || regionObj.name)) ||
+            id;
+        var opt = selectEl.querySelector('option[value="' + id.replace(/"/g, '\\"') + '"]');
+        if (!opt) {
+            opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = text;
+            selectEl.appendChild(opt);
+        }
+        selectEl.value = id;
+        if (window.jQuery && window.jQuery(selectEl).data('select2')) {
+            window.jQuery(selectEl).val(id).trigger('change');
+        }
+    }
+
     var historyBody = document.getElementById('cabinetPcHistoryBody');
     var activeHistoryEl = document.getElementById('cabinetPcActiveHistory');
     var activeHistoryId = null;
@@ -1164,6 +1185,25 @@
                         if (phrasesEl && item.params && Array.isArray(item.params.phrases)) {
                             phrasesEl.value = item.params.phrases.join('\n');
                         }
+                        if (item.params && Array.isArray(item.params.engines) && item.params.engines.length) {
+                            if (engineYandex) {
+                                engineYandex.checked = item.params.engines.indexOf('yandex') !== -1;
+                            }
+                            if (engineGoogle) {
+                                engineGoogle.checked = item.params.engines.indexOf('google') !== -1;
+                            }
+                        }
+                        applyRegionSelectValue(
+                            document.getElementById('cabinetPcYandexLr'),
+                            item.params && item.params.yandex_lr,
+                            item.yandex_region
+                        );
+                        applyRegionSelectValue(
+                            document.getElementById('cabinetPcGoogleLr'),
+                            item.params && item.params.google_lr,
+                            item.google_region
+                        );
+                        syncEngineRegions();
                         setActiveHistory(item);
                         setStatus('Открыто из истории #' + id);
                         updateCostPreview();

@@ -419,3 +419,17 @@
     color: #64748b;
     font-size: 0.72rem;
 }
+
+.cabinet-pc-engine__top {
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.cabinet-pc-engine__top--ok {
+    color: #0f766e;
+}
+
+.cabinet-pc-engine__top--warn {
+    color: #b45309;
+}

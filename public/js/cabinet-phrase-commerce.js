@@ -557,27 +557,28 @@
             shared.className = 'cabinet-pc-engine__shared';
             var base = geo.base_count != null ? geo.base_count : null;
             var hosts = (geo.shared_hosts || []).slice(0, 3).join(', ');
-            var topBadge =
-                row.serp_count && row.serp_contrast_count && row.serp_count === row.serp_contrast_count
-                    ? ' (ТОП-' + String(row.serp_count) + ')'
-                    : '';
             shared.textContent =
                 'общих доменов: ' +
                 String(geo.shared || 0) +
                 (base != null ? ' из ' + base : '') +
-                topBadge +
                 (hosts ? ' · ' + hosts + ((geo.shared_hosts || []).length > 3 ? '…' : '') : '');
             td.appendChild(shared);
         }
-        if (geo.incomplete || (row.serp_count != null && row.serp_contrast_count != null && row.serp_count !== row.serp_contrast_count)) {
-            var warn = document.createElement('div');
-            warn.className = 'cabinet-pc-engine__warn';
-            warn.textContent =
-                'неполная выдача: ' +
-                String(row.serp_count || 0) +
-                ' vs ' +
-                String(row.serp_contrast_count || 0);
-            td.appendChild(warn);
+
+        // Что реально собрано в ТОП-20: число URL в основном и контрольном регионе.
+        if (row.serp_count != null || row.serp_contrast_count != null) {
+            var topDepth = 20;
+            var primaryN = Number(row.serp_count || 0);
+            var contrastN = Number(row.serp_contrast_count || 0);
+            var topLine = document.createElement('div');
+            var full = primaryN >= topDepth && contrastN >= topDepth;
+            topLine.className = full
+                ? 'cabinet-pc-engine__top cabinet-pc-engine__top--ok'
+                : 'cabinet-pc-engine__top cabinet-pc-engine__top--warn';
+            topLine.textContent = full
+                ? 'ТОП-' + topDepth + ': собрано ' + primaryN + ' и ' + contrastN + ' сайтов'
+                : 'ТОП-' + topDepth + ': собрано ' + primaryN + ' и ' + contrastN + ' из ' + topDepth + ' (неполная выдача)';
+            td.appendChild(topLine);
         }
         return td;
     }

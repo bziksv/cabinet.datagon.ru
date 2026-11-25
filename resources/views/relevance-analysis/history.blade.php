@@ -1161,6 +1161,13 @@
                         hideTableHistory()
 
                         let storyId = $(this).attr('data-order')
+                        if (typeof window.raHistoryV2 !== 'undefined' && typeof window.raHistoryV2.loadProject === 'function') {
+                            window.raHistoryV2.loadProject(storyId, {
+                                triggerEl: thisElem,
+                                triggerClass: thisElementClass
+                            })
+                            return
+                        }
                         $.ajax({
                             type: "POST",
                             dataType: "json",
@@ -1377,6 +1384,16 @@
                         let thisElementClass = $(this).attr('class')
                         hideListHistory()
                         hideTableHistory()
+
+                        let storyId = $(this).attr('data-order')
+                        if (typeof window.raHistoryV2 !== 'undefined' && typeof window.raHistoryV2.openList === 'function') {
+                            window.raHistoryV2.openList(storyId, {
+                                triggerEl: thisElem,
+                                triggerClass: thisElementClass,
+                                eyeTip: @json(__('Relevance open details tip'))
+                            })
+                            return
+                        }
 
                         $.ajax({
                             type: "POST",

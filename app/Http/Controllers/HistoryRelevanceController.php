@@ -167,15 +167,7 @@ class HistoryRelevanceController extends Controller
     public function getStories(Request $request): JsonResponse
     {
         $history = ProjectRelevanceHistory::where('id', '=', $request->history_id)->first();
-        $admin = User::isUserAdmin();
-        $userId = Auth::id();
-
-        $share = RelevanceSharing::where('user_id', '=', $userId)
-            ->where('owner_id', '=', $history->user_id)
-            ->where('access', '=', 2)
-            ->first();
-
-        if ($history->user_id != $userId && !isset($share) && !$admin) {
+        if (! $this->canAccessProjectHistory($history)) {
             return response()->json([
                 'success' => false,
                 'message' => __("You don't have access to this object"),
@@ -183,9 +175,194 @@ class HistoryRelevanceController extends Controller
             ]);
         }
 
+        if ($request->boolean('paged')) {
+            return response()->json($this->loadProjectStoriesPaged($history, $request));
+        }
+
         return response()->json([
             'stories' => $this->loadProjectStories($history),
         ]);
+    }
+
+    private function canAccessProjectHistory(?ProjectRelevanceHistory $history): bool
+    {
+        if (! $history) {
+            return false;
+        }
+        $admin = User::isUserAdmin();
+        $userId = Auth::id();
+        if ((int) $history->user_id === (int) $userId || $admin) {
+            return true;
+        }
+
+        return RelevanceSharing::where('user_id', '=', $userId)
+            ->where('owner_id', '=', $history->user_id)
+            ->where('access', '=', 2)
+            ->exists();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function findRegionIdsBySearch(string $needle): array
+    {
+        $needle = mb_strtolower(trim($needle));
+        if ($needle === '') {
+            return [];
+        }
+
+        static $knownIds = [
+            '1', '2', '4', '5', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16',
+            '20', '21', '22', '23', '24', '25', '28', '30', '33', '35', '36', '37', '38', '39',
+            '41', '42', '43', '45', '47', '48', '49', '50', '51', '53', '54', '55', '56',
+            '62', '63', '64', '65', '66', '67', '75', '76', '77', '172', '191', '192', '193',
+            '195', '197', '213', '239', '973', '1092', '1106',
+        ];
+
+        $matched = [];
+        foreach ($knownIds as $id) {
+            $name = mb_strtolower((string) Common::getRegionName($id));
+            if ($name !== '' && mb_strpos($name, $needle) !== false) {
+                $matched[] = $id;
+            }
+        }
+
+        return $matched;
+    }
+
+    private function hydrateStoryRow(RelevanceHistory $result): RelevanceHistory
+    {
+        $averageValues = $result->results->average_values ?? null;
+        if ($averageValues !== null && $averageValues !== '') {
+            $result['average_values'] = json_decode($averageValues, true);
+        } else {
+            $result['average_values'] = null;
+        }
+        $result['region_name'] = Common::getRegionName((string) $result->region);
+        $serp = RelevanceHistory::serpMetaFromRequest($result->request);
+        $result['search_engine'] = $serp['search_engine'];
+        $result['search_engine_label'] = $serp['search_engine_label'];
+        $result['top'] = $serp['top'];
+        $result['top_label'] = $serp['top_label'];
+        unset($result->request);
+        $result->unsetRelation('results');
+
+        return $result;
+    }
+
+    /**
+     * Серверная пагинация и поиск по всем проверкам проекта (для #ra-hist-v2).
+     *
+     * @return array{stories: \Illuminate\Support\Collection<int, RelevanceHistory>, pagination: array<string, int>}
+     */
+    private function loadProjectStoriesPaged(ProjectRelevanceHistory $history, Request $request): array
+    {
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = max(10, min(100, (int) $request->input('per_page', 25)));
+
+        $baseQuery = RelevanceHistory::query()
+            ->where('project_relevance_history_id', $history->id);
+
+        $totalAll = (clone $baseQuery)->count();
+
+        $query = clone $baseQuery;
+
+        $q = trim((string) $request->input('q', ''));
+        if ($q !== '') {
+            $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q) . '%';
+            $regionIds = $this->findRegionIdsBySearch($q);
+            $qLower = mb_strtolower($q);
+
+            $query->where(function ($sub) use ($like, $regionIds, $qLower) {
+                $sub->where('phrase', 'like', $like)
+                    ->orWhere('comment', 'like', $like)
+                    ->orWhere('main_link', 'like', $like)
+                    ->orWhere('region', 'like', $like);
+
+                if ($regionIds !== []) {
+                    $sub->orWhereIn('region', $regionIds);
+                }
+                if (mb_strpos($qLower, 'яндекс') !== false || mb_strpos($qLower, 'yandex') !== false) {
+                    $sub->orWhere('request', 'like', '%"searchPass":"yandex"%')
+                        ->orWhere('request', 'like', '%"searchEngine":"yandex"%');
+                }
+                if (mb_strpos($qLower, 'гугл') !== false || mb_strpos($qLower, 'google') !== false) {
+                    $sub->orWhere('request', 'like', '%"searchPass":"google"%')
+                        ->orWhere('request', 'like', '%"searchEngine":"google"%');
+                }
+                if (preg_match('/^(?:топ[\s\-]*)?(10|20|30|50|100)$/u', $qLower, $m)) {
+                    $topVal = $m[1];
+                    $sub->orWhere('request', 'like', '%"count":"' . $topVal . '"%')
+                        ->orWhere('request', 'like', '%"count":' . $topVal . '%');
+                }
+            });
+        }
+
+        $urlQ = trim((string) $request->input('url', ''));
+        if ($urlQ !== '') {
+            $urlLike = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $urlQ) . '%';
+            $query->where('main_link', 'like', $urlLike);
+        }
+
+        $dateMin = trim((string) $request->input('date_min', ''));
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateMin)) {
+            $query->where('last_check', '>=', $dateMin . ' 00:00:00');
+        }
+
+        $dateMax = trim((string) $request->input('date_max', ''));
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateMax)) {
+            $query->where('last_check', '<=', $dateMax . ' 23:59:59');
+        }
+
+        $pointsMin = $request->input('points_min');
+        if ($pointsMin !== null && $pointsMin !== '' && is_numeric($pointsMin)) {
+            $query->where('points', '>=', (float) $pointsMin);
+        }
+
+        $pointsMax = $request->input('points_max');
+        if ($pointsMax !== null && $pointsMax !== '' && is_numeric($pointsMax)) {
+            $query->where('points', '<=', (float) $pointsMax);
+        }
+
+        $total = (clone $query)->count();
+        $lastPage = max(1, (int) ceil($total / $perPage));
+        if ($page > $lastPage) {
+            $page = $lastPage;
+        }
+        $offset = ($page - 1) * $perPage;
+
+        $rows = $query
+            ->with(['results:id,project_id,average_values'])
+            ->orderByDesc('last_check')
+            ->orderByDesc('id')
+            ->offset($offset)
+            ->limit($perPage)
+            ->get([
+                'phrase', 'main_link', 'region',
+                'last_check', 'points', 'position',
+                'coverage', 'coverage_tf', 'density',
+                'width', 'calculate',
+                'id', 'project_relevance_history_id',
+                'comment', 'user_id', 'state',
+                'request',
+            ]);
+
+        foreach ($rows as $row) {
+            $this->hydrateStoryRow($row);
+        }
+
+        return [
+            'stories' => $rows,
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_all' => $totalAll,
+                'last_page' => $lastPage,
+                'from' => $total > 0 ? $offset + 1 : 0,
+                'to' => min($offset + $perPage, $total),
+            ],
+        ];
     }
 
     /**
@@ -199,24 +376,14 @@ class HistoryRelevanceController extends Controller
             'phrase', 'main_link', 'region',
             'last_check', 'points', 'position',
             'coverage', 'coverage_tf', 'density',
-            'width', 'density', 'calculate',
+            'width', 'calculate',
             'id', 'project_relevance_history_id',
             'comment', 'user_id', 'state',
             'request',
         ]);
 
         foreach ($results as $result) {
-            $averageValues = $result->results->average_values ?? null;
-            if ($averageValues !== null && $averageValues !== '') {
-                $result['average_values'] = json_decode($averageValues, true);
-            }
-            $result['region_name'] = \App\Common::getRegionName((string) $result->region);
-            $serp = RelevanceHistory::serpMetaFromRequest($result->request);
-            $result['search_engine'] = $serp['search_engine'];
-            $result['search_engine_label'] = $serp['search_engine_label'];
-            $result['top'] = $serp['top'];
-            $result['top_label'] = $serp['top_label'];
-            unset($result->request, $result->results);
+            $this->hydrateStoryRow($result);
         }
 
         return $results;
@@ -574,6 +741,10 @@ class HistoryRelevanceController extends Controller
 
     public function getHistoryInfoV2(Request $request): JsonResponse
     {
+        if ($request->boolean('server_side')) {
+            return $this->getHistoryInfoV2ServerSide($request);
+        }
+
         $projects = RelevanceHistory::where('project_relevance_history_id', $request->historyId)
             ->with(['results:id,project_id,average_values'])
             ->latest('id')
@@ -642,6 +813,240 @@ class HistoryRelevanceController extends Controller
 
         return response()->json([
             'object' => $responseObject
+        ]);
+    }
+
+    /**
+     * Серверная пагинация, сортировка и поиск для списка по ключевым фразам (#list-history).
+     */
+    private function getHistoryInfoV2ServerSide(Request $request): JsonResponse
+    {
+        $historyId = (int) $request->input('historyId', 0);
+        $history = ProjectRelevanceHistory::where('id', '=', $historyId)->first();
+        if (! $this->canAccessProjectHistory($history)) {
+            return response()->json([
+                'draw' => (int) $request->input('draw', 1),
+                'recordsTotal' => 0,
+                'recordsFiltered' => 0,
+                'data' => [],
+                'code' => 415,
+                'message' => __("You don't have access to this object"),
+            ]);
+        }
+
+        $model = new RelevanceHistory();
+        $table = $model->getTable();
+        $conn = $model->getConnection();
+
+        $latestSub = $conn->table($table)
+            ->selectRaw('MAX(id) as max_id')
+            ->where('project_relevance_history_id', $historyId)
+            ->groupBy('phrase');
+
+        $baseQuery = RelevanceHistory::query()
+            ->joinSub($latestSub, 'latest_phrase', function ($join) use ($table) {
+                $join->on($table . '.id', '=', 'latest_phrase.max_id');
+            });
+
+        $recordsTotal = (clone $baseQuery)->count();
+
+        $query = clone $baseQuery;
+
+        $globalSearch = trim((string) data_get($request->input('search'), 'value', ''));
+        if ($globalSearch !== '') {
+            $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $globalSearch) . '%';
+            $regionIds = $this->findRegionIdsBySearch($globalSearch);
+            $query->where(function ($sub) use ($table, $like, $regionIds) {
+                $sub->where($table . '.phrase', 'like', $like)
+                    ->orWhere($table . '.main_link', 'like', $like)
+                    ->orWhere($table . '.comment', 'like', $like)
+                    ->orWhere($table . '.region', 'like', $like);
+                if ($regionIds !== []) {
+                    $sub->orWhereIn($table . '.region', $regionIds);
+                }
+            });
+        }
+
+        $dateMin = trim((string) $request->input('date_min', ''));
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateMin)) {
+            $query->where($table . '.created_at', '>=', $dateMin . ' 00:00:00');
+        }
+
+        $dateMax = trim((string) $request->input('date_max', ''));
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateMax)) {
+            $query->where($table . '.created_at', '<=', $dateMax . ' 23:59:59');
+        }
+
+        $phraseQ = trim((string) $request->input('phrase', ''));
+        if ($phraseQ !== '') {
+            $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $phraseQ) . '%';
+            $query->where($table . '.phrase', 'like', $like);
+        }
+
+        $regionQ = trim((string) $request->input('region', ''));
+        if ($regionQ !== '') {
+            $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $regionQ) . '%';
+            $regionIds = $this->findRegionIdsBySearch($regionQ);
+            $query->where(function ($sub) use ($table, $like, $regionIds) {
+                $sub->where($table . '.region', 'like', $like);
+                if ($regionIds !== []) {
+                    $sub->orWhereIn($table . '.region', $regionIds);
+                }
+            });
+        }
+
+        $mainPageQ = trim((string) $request->input('main_page', ''));
+        if ($mainPageQ !== '') {
+            $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $mainPageQ) . '%';
+            $query->where($table . '.main_link', 'like', $like);
+        }
+
+        $numericRanges = [
+            'position' => ['min_position', 'max_position'],
+            'points' => ['min_points', 'max_points'],
+            'coverage' => ['min_coverage', 'max_coverage'],
+            'coverage_tf' => ['min_coverage_tf', 'max_coverage_tf'],
+            'width' => ['min_width', 'max_width'],
+            'density' => ['min_density', 'max_density'],
+        ];
+        foreach ($numericRanges as $col => [$minKey, $maxKey]) {
+            $minVal = $request->input($minKey);
+            if ($minVal !== null && $minVal !== '' && is_numeric($minVal)) {
+                $query->where($table . '.' . $col, '>=', (float) $minVal);
+            }
+            $maxVal = $request->input($maxKey);
+            if ($maxVal !== null && $maxVal !== '' && is_numeric($maxVal)) {
+                $query->where($table . '.' . $col, '<=', (float) $maxVal);
+            }
+        }
+
+        $recordsFiltered = (clone $query)->count();
+
+        $orderColIdx = (int) data_get($request->input('order'), '0.column', 1);
+        $orderDir = strtolower((string) data_get($request->input('order'), '0.dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $orderMap = [
+            1 => $table . '.created_at',
+            2 => $table . '.phrase',
+            3 => $table . '.region',
+            4 => $table . '.main_link',
+            5 => $table . '.position',
+            6 => $table . '.points',
+            7 => $table . '.coverage',
+            8 => $table . '.coverage_tf',
+            9 => $table . '.width',
+            10 => $table . '.density',
+        ];
+        $orderCol = $orderMap[$orderColIdx] ?? ($table . '.created_at');
+
+        $start = max(0, (int) $request->input('start', 0));
+        $length = (int) $request->input('length', 25);
+        if ($length <= 0 || $length > 200) {
+            $length = 25;
+        }
+
+        $rows = $query
+            ->orderBy($orderCol, $orderDir)
+            ->orderByDesc($table . '.id')
+            ->offset($start)
+            ->limit($length)
+            ->get([
+                $table . '.id',
+                $table . '.created_at',
+                $table . '.region',
+                $table . '.main_link',
+                $table . '.points',
+                $table . '.position',
+                $table . '.coverage',
+                $table . '.coverage_tf',
+                $table . '.width',
+                $table . '.density',
+                $table . '.phrase',
+                $table . '.state',
+            ]);
+
+        $data = [];
+        foreach ($rows as $row) {
+            $pos = $row->position;
+            if ((int) $pos === 0) {
+                $pos = 'вне ТОП-100';
+            }
+            $data[] = [
+                'id' => $row->id,
+                'date' => (string) $row->created_at,
+                'phrase' => $row->phrase !== null ? (string) $row->phrase : '',
+                'region' => Common::getRegionName((string) $row->region),
+                'link' => (string) ($row->main_link ?? ''),
+                'position' => $pos,
+                'points' => $row->points,
+                'coverage' => $row->coverage,
+                'coverage_tf' => $row->coverage_tf,
+                'width' => $row->width,
+                'density' => $row->density,
+            ];
+        }
+
+        return response()->json([
+            'draw' => (int) $request->input('draw', 1),
+            'recordsTotal' => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'data' => $data,
+        ]);
+    }
+
+    /**
+     * История проверок по одной фразе проекта (для раскрытия строки в #list-history).
+     */
+    public function getPhraseStoriesV2(Request $request): JsonResponse
+    {
+        $historyId = (int) $request->input('historyId', 0);
+        $history = ProjectRelevanceHistory::where('id', '=', $historyId)->first();
+        if (! $this->canAccessProjectHistory($history)) {
+            return response()->json([
+                'success' => false,
+                'message' => __("You don't have access to this object"),
+                'code' => 415,
+            ]);
+        }
+
+        $phrase = $request->input('phrase');
+        $query = RelevanceHistory::where('project_relevance_history_id', $historyId)
+            ->with(['results:id,project_id,average_values'])
+            ->latest('id')
+            ->limit(200);
+
+        if ($phrase === null || $phrase === '') {
+            $query->where(function ($sub) {
+                $sub->whereNull('phrase')->orWhere('phrase', '');
+            });
+        } else {
+            $query->where('phrase', (string) $phrase);
+        }
+
+        $rows = $query->get([
+            'id',
+            'created_at',
+            'region',
+            'main_link',
+            'points',
+            'position',
+            'user_id',
+            'coverage',
+            'coverage_tf',
+            'width',
+            'density',
+            'phrase',
+            'state',
+            'comment',
+            'calculate',
+            'request',
+        ]);
+
+        foreach ($rows as $row) {
+            $this->hydrateStoryRow($row);
+        }
+
+        return response()->json([
+            'rows' => $rows,
         ]);
     }
 

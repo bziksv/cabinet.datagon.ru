@@ -8,13 +8,21 @@
     var state = {
         stories: [],
         storyId: null,
+        serverMode: false,
         page: 1,
+        pagination: null,
         q: '',
         urlQ: '',
         dateMin: '',
         dateMax: '',
         pointsMin: '',
-        pointsMax: ''
+        pointsMax: '',
+        xhr: null,
+        debounceTimer: null,
+        listStoryId: null,
+        listTable: null,
+        listDebounceTimer: null,
+        childSeq: 0
     };
 
     function esc(s) {
@@ -312,7 +320,163 @@
         }
     }
 
+    function renderPager($pager, currentPage, totalPages) {
+        $pager.empty();
+        if (totalPages <= 1) {
+            return;
+        }
+        var addBtn = function (label, page, active, disabled) {
+            $pager.append(
+                '<button type="button" class="ra-hist-v2__page' + (active ? ' is-active' : '') + '"' +
+                (disabled ? ' disabled' : ' data-page="' + page + '"') + '>' + label + '</button>'
+            );
+        };
+        var addDots = function () {
+            $pager.append('<span class="ra-hist-v2__ellipsis">…</span>');
+        };
+
+        addBtn('«', Math.max(1, currentPage - 1), false, currentPage <= 1);
+
+        var start = Math.max(1, currentPage - 2);
+        var end = Math.min(totalPages, currentPage + 2);
+        if (start > 1) {
+            addBtn('1', 1, currentPage === 1, false);
+            if (start > 2) {
+                addDots();
+            }
+        }
+        for (var i = start; i <= end; i++) {
+            addBtn(fmtNum(i), i, i === currentPage, false);
+        }
+        if (end < totalPages) {
+            if (end < totalPages - 1) {
+                addDots();
+            }
+            addBtn(fmtNum(totalPages), totalPages, currentPage === totalPages, false);
+        }
+
+        addBtn('»', Math.min(totalPages, currentPage + 1), false, currentPage >= totalPages);
+    }
+
+    function renderRowsAndMeta(slice, meta) {
+        var $host = $('#ra-hist-v2-list');
+        if (!$host.length) {
+            return;
+        }
+        if (!slice.length) {
+            $host.html('<div class="ra-hist-v2__empty">Нет проверок по текущему фильтру</div>');
+        } else {
+            $host.html(tableWrapHtml(slice.map(rowHtml).join('')));
+            bindRowEvents($host);
+            if (typeof checkAnalyseProgress === 'function') {
+                for (var k = 0; k < slice.length; k++) {
+                    if (slice[k] && slice[k].state === 0) {
+                        checkAnalyseProgress(slice[k].id);
+                    }
+                }
+            }
+        }
+
+        var total = meta.total || 0;
+        var totalAll = meta.total_all != null ? meta.total_all : total;
+        var from = meta.from || 0;
+        var to = meta.to || 0;
+        var infoText = total
+            ? ('Показано ' + fmtNum(from) + '–' + fmtNum(to) + ' из ' + fmtNum(total) +
+                (totalAll > total ? (' (всего в проекте: ' + fmtNum(totalAll) + ')') : ''))
+            : (totalAll > 0 ? ('Нет записей по фильтру (всего в проекте: ' + fmtNum(totalAll) + ')') : 'Нет записей');
+        $('#ra-hist-v2-info').text(infoText);
+
+        renderPager($('#ra-hist-v2-pager'), meta.page || 1, meta.last_page || 1);
+    }
+
+    function fetchServerPage(opts) {
+        opts = opts || {};
+        if (!state.storyId) {
+            return;
+        }
+        if (state.xhr && state.xhr.readyState !== 4) {
+            try { state.xhr.abort(); } catch (e) { /* ignore */ }
+        }
+
+        var $host = $('#ra-hist-v2-list');
+        if ($host.length) {
+            $host.html('<div class="ra-hist-v2__loading"><i class="fa fa-spinner fa-spin mr-1" aria-hidden="true"></i> Загрузка…</div>');
+        }
+
+        state.xhr = $.ajax({
+            type: 'POST',
+            dataType: 'json',
+            url: '/get-stories',
+            data: {
+                history_id: state.storyId,
+                paged: 1,
+                page: state.page,
+                per_page: PAGE_SIZE,
+                q: state.q || '',
+                url: state.urlQ || '',
+                date_min: state.dateMin || '',
+                date_max: state.dateMax || '',
+                points_min: state.pointsMin !== '' && state.pointsMin != null ? state.pointsMin : '',
+                points_max: state.pointsMax !== '' && state.pointsMax != null ? state.pointsMax : ''
+            },
+            success: function (response) {
+                if (opts.onDone) {
+                    opts.onDone();
+                }
+                if (response && response.code === 415) {
+                    if (typeof getErrorMessage === 'function') {
+                        getErrorMessage(response.message);
+                    }
+                    return;
+                }
+                var rows = (response && Array.isArray(response.stories)) ? response.stories : [];
+                var pag = (response && response.pagination) ? response.pagination : {
+                    page: 1,
+                    per_page: PAGE_SIZE,
+                    total: rows.length,
+                    total_all: rows.length,
+                    last_page: 1,
+                    from: rows.length ? 1 : 0,
+                    to: rows.length
+                };
+                state.stories = rows;
+                state.pagination = pag;
+                state.page = pag.page || 1;
+                renderRowsAndMeta(rows, pag);
+                applyView();
+                if (opts.scrollAfter && typeof scrollTo === 'function') {
+                    scrollTo('#tab_1 > div.history > h3');
+                }
+            },
+            error: function (xhr, status) {
+                if (opts.onDone) {
+                    opts.onDone();
+                }
+                if (status === 'abort') {
+                    return;
+                }
+                if ($host.length) {
+                    $host.html('<div class="ra-hist-v2__empty">Не удалось загрузить историю проверок</div>');
+                }
+            }
+        });
+    }
+
+    function scheduleServerFetch() {
+        if (state.debounceTimer) {
+            clearTimeout(state.debounceTimer);
+        }
+        state.debounceTimer = setTimeout(function () {
+            fetchServerPage();
+        }, 300);
+    }
+
     function renderList() {
+        if (state.serverMode) {
+            fetchServerPage();
+            return;
+        }
         var $host = $('#ra-hist-v2-list');
         if (!$host.length) {
             return;
@@ -326,31 +490,15 @@
         var start = (state.page - 1) * PAGE_SIZE;
         var slice = filtered.slice(start, start + PAGE_SIZE);
 
-        if (!slice.length) {
-            $host.html('<div class="ra-hist-v2__empty">Нет проверок по текущему фильтру</div>');
-        } else {
-            $host.html(tableWrapHtml(slice.map(rowHtml).join('')));
-            bindRowEvents($host);
-        }
-
-        var from = total ? start + 1 : 0;
-        var to = Math.min(start + PAGE_SIZE, total);
-        $('#ra-hist-v2-info').text(
-            total
-                ? ('Показано ' + fmtNum(from) + '–' + fmtNum(to) + ' из ' + fmtNum(total))
-                : 'Нет записей'
-        );
-
-        var $pager = $('#ra-hist-v2-pager');
-        $pager.empty();
-        if (pages > 1) {
-            for (var i = 1; i <= pages; i++) {
-                $pager.append(
-                    '<button type="button" class="ra-hist-v2__page' + (i === state.page ? ' is-active' : '') +
-                    '" data-page="' + i + '">' + i + '</button>'
-                );
-            }
-        }
+        renderRowsAndMeta(slice, {
+            page: state.page,
+            per_page: PAGE_SIZE,
+            total: total,
+            total_all: state.stories.length,
+            last_page: pages,
+            from: total ? start + 1 : 0,
+            to: Math.min(start + PAGE_SIZE, total)
+        });
     }
 
     function ensureShell(storyId) {
@@ -475,13 +623,21 @@
             $history.on('input', '#ra-hist-v2-search', function () {
                 state.q = $(this).val();
                 state.page = 1;
-                renderList();
+                if (state.serverMode) {
+                    scheduleServerFetch();
+                } else {
+                    renderList();
+                }
             });
 
             $history.on('input', '#ra-hist-v2-url', function () {
                 state.urlQ = $(this).val();
                 state.page = 1;
-                renderList();
+                if (state.serverMode) {
+                    scheduleServerFetch();
+                } else {
+                    renderList();
+                }
             });
 
             $history.on('change', '#ra-hist-v2-date-min, #ra-hist-v2-date-max', function () {
@@ -495,7 +651,11 @@
                 state.pointsMin = $('#ra-hist-v2-points-min').val();
                 state.pointsMax = $('#ra-hist-v2-points-max').val();
                 state.page = 1;
-                renderList();
+                if (state.serverMode) {
+                    scheduleServerFetch();
+                } else {
+                    renderList();
+                }
             });
 
             $history.on('click', '#ra-hist-v2-pager [data-page]', function () {
@@ -506,11 +666,288 @@
     }
 
     /**
+     * Серверная загрузка истории проверок проекта по страницам (быстро для проектов с тысячами сканов).
+     *
+     * @param {string|number} storyId
+     * @param {{triggerEl?: jQuery, triggerClass?: string}} opts
+     */
+    function loadProject(storyId, opts) {
+        opts = opts || {};
+        state.serverMode = true;
+        state.storyId = storyId;
+        state.stories = [];
+        state.pagination = null;
+        state.page = 1;
+        state.q = '';
+        state.urlQ = '';
+        state.pointsMin = '';
+        state.pointsMax = '';
+
+        $('#changeAllState').prop('checked', false);
+        $('#changeAllStateList').prop('checked', false);
+        $('.search-input').val('');
+        $('.history').show();
+
+        ensureShell(storyId);
+        bindShell();
+
+        $('#ra-hist-v2-search').val('');
+        $('#ra-hist-v2-url').val('');
+        $('#ra-hist-v2-points-min').val('');
+        $('#ra-hist-v2-points-max').val('');
+        state.dateMin = $('#ra-hist-v2-date-min').val() || '';
+        state.dateMax = $('#ra-hist-v2-date-max').val() || '';
+
+        applyView();
+
+        var restoreTrigger = function () {
+            if (opts.triggerEl && opts.triggerClass != null) {
+                opts.triggerEl.attr('class', opts.triggerClass);
+            }
+        };
+        if (opts.triggerEl) {
+            opts.triggerEl.attr('class', 'fa fa-clock');
+        }
+
+        fetchServerPage({
+            scrollAfter: true,
+            onDone: restoreTrigger
+        });
+    }
+
+    /**
+     * Серверный список результатов по ключевым фразам (#list-history) с поиском по всем страницам
+     * и ленивой подгрузкой истории выбранной фразы.
+     *
+     * @param {string|number} storyId
+     * @param {{triggerEl?: jQuery, triggerClass?: string, eyeTip?: string}} opts
+     */
+    function openList(storyId, opts) {
+        opts = opts || {};
+        state.listStoryId = storyId;
+
+        $('#history-list-subject').show();
+        $('#list-history').show();
+        $('#ra-hist-list-bar').show().removeAttr('hidden');
+        $('#list-history .search-input').val('');
+
+        if ($.fn.DataTable && $.fn.DataTable.isDataTable('#list-history')) {
+            $('#list-history').DataTable().destroy();
+        }
+        $('#list-history-body').empty();
+
+        var eyeTip = opts.eyeTip || 'Открыть подробнее';
+        var dtLang = window.raDtRu || {};
+        var wordsObj = window.words || {};
+        var listTable = $('#list-history').DataTable({
+            processing: true,
+            serverSide: true,
+            pageLength: 25,
+            order: [[1, 'desc']],
+            destroy: true,
+            ajax: {
+                url: '/get-stories-v2',
+                type: 'POST',
+                data: function (d) {
+                    d.server_side = 1;
+                    d.historyId = storyId;
+                    d.date_min = $('#dateMinList').val() || '';
+                    d.date_max = $('#dateMaxList').val() || '';
+                    d.phrase = $('#phraseSearchList').val() || '';
+                    d.region = $('#regionSearchList').val() || '';
+                    d.main_page = $('#mainPageSearchList').val() || '';
+                    d.min_position = $('#minPositionList').val() || '';
+                    d.max_position = $('#maxPositionList').val() || '';
+                    d.min_points = $('#minPointsList').val() || '';
+                    d.max_points = $('#maxPointsList').val() || '';
+                    d.min_coverage = $('#minCoverageList').val() || '';
+                    d.max_coverage = $('#maxCoverageList').val() || '';
+                    d.min_coverage_tf = $('#minCoverageTfList').val() || '';
+                    d.max_coverage_tf = $('#maxCoverageTfList').val() || '';
+                    d.min_width = $('#minWidthList').val() || '';
+                    d.max_width = $('#maxWidthList').val() || '';
+                    d.min_density = $('#minDensityList').val() || '';
+                    d.max_density = $('#maxDensityList').val() || '';
+                },
+                dataSrc: function (json) {
+                    if (json && json.code === 415 && typeof getErrorMessage === 'function') {
+                        getErrorMessage(json.message);
+                        return [];
+                    }
+                    return (json && Array.isArray(json.data)) ? json.data : [];
+                }
+            },
+            columns: [
+                {
+                    className: 'dt-control col-1',
+                    orderable: false,
+                    searchable: false,
+                    data: null,
+                    defaultContent: '<i class="fa fa-eye" data-ra-tip="' + esc(eyeTip) + '"></i>',
+                    createdCell: function (td, cellData, rowData) {
+                        $(td)
+                            .css({ textAlign: 'center', verticalAlign: 'inherit', width: '50px' })
+                            .attr('data-target', rowData.phrase != null ? rowData.phrase : '');
+                    }
+                },
+                { data: 'date' },
+                { data: 'phrase' },
+                { data: 'region' },
+                { data: 'link' },
+                { data: 'position' },
+                { data: 'points' },
+                { data: 'coverage' },
+                { data: 'coverage_tf' },
+                { data: 'width' },
+                { data: 'density' }
+            ],
+            language: {
+                processing: 'Загрузка…',
+                paginate: {
+                    first: '«',
+                    last: '»',
+                    next: '»',
+                    previous: '«'
+                }
+            },
+            oLanguage: {
+                sSearch: (wordsObj.search || 'Поиск') + ':',
+                sLengthMenu: (wordsObj.show || 'Показать') + ' _MENU_ ' + (wordsObj.records || 'записей'),
+                sEmptyTable: wordsObj.noRecords || 'Нет записей',
+                sInfo: dtLang.info || 'Показано от _START_ до _END_ из _TOTAL_ записей',
+                sInfoEmpty: dtLang.infoEmpty || 'Показано от 0 до 0 из 0 записей',
+                sInfoFiltered: dtLang.infoFiltered || '(отфильтровано из _MAX_ записей)'
+            },
+            drawCallback: function () {
+                if (typeof window.initRelevanceActionTips === 'function') {
+                    window.initRelevanceActionTips(document.getElementById('list-history_wrapper') || document);
+                }
+                if (typeof repeatScan === 'function') {
+                    repeatScan();
+                }
+            }
+        });
+
+        state.listTable = listTable;
+
+        $('.dataTables_wrapper.no-footer').css({ width: '100%' });
+        if (!$('#list-history').parent().hasClass('list-history-table-scroll')) {
+            $('#list-history').wrap('<div class="list-history-table-scroll"></div>');
+        }
+        applyView();
+        if (typeof scrollTo === 'function') {
+            scrollTo('#history-list-subject');
+        }
+
+        var triggerListReload = function () {
+            if (state.listDebounceTimer) {
+                clearTimeout(state.listDebounceTimer);
+            }
+            state.listDebounceTimer = setTimeout(function () {
+                if (state.listTable) {
+                    state.listTable.draw();
+                }
+            }, 300);
+        };
+
+        var textFilterSelector =
+            '#phraseSearchList, #regionSearchList, #mainPageSearchList, ' +
+            '#minPositionList, #maxPositionList, #minPointsList, #maxPointsList, ' +
+            '#minCoverageList, #maxCoverageList, #minCoverageTfList, #maxCoverageTfList, ' +
+            '#minWidthList, #maxWidthList, #minDensityList, #maxDensityList';
+
+        $(document)
+            .off('input.raListServer keyup.raListServer', textFilterSelector)
+            .on('input.raListServer', textFilterSelector, triggerListReload)
+            .off('change.raListServer', '#dateMinList, #dateMaxList')
+            .on('change.raListServer', '#dateMinList, #dateMaxList', function () {
+                if (state.listTable) {
+                    state.listTable.draw();
+                }
+            });
+
+        $('#list-history').off('click.raListChild').on('click.raListChild', 'td.dt-control', function () {
+            var $td = $(this);
+            var tr = $td.closest('tr');
+            var row = listTable.row(tr);
+
+            if (row.child.isShown()) {
+                var existingId = tr.data('raChildTableId');
+                if (existingId && $.fn.DataTable && $.fn.DataTable.isDataTable('#' + existingId)) {
+                    $('#' + existingId).DataTable().destroy();
+                }
+                row.child.hide();
+                tr.removeClass('shown');
+                return;
+            }
+
+            var phrase = $td.attr('data-target');
+            row.child('<div class="ra-hist-v2__loading"><i class="fa fa-spinner fa-spin mr-1" aria-hidden="true"></i> Загрузка истории фразы…</div>').show();
+            tr.addClass('shown');
+
+            $.ajax({
+                type: 'POST',
+                dataType: 'json',
+                url: '/get-stories-v2-phrase',
+                data: {
+                    historyId: storyId,
+                    phrase: phrase
+                },
+                success: function (resp) {
+                    if (!tr.hasClass('shown')) {
+                        return;
+                    }
+                    var rows = (resp && Array.isArray(resp.rows)) ? resp.rows : [];
+                    state.childSeq += 1;
+                    var childId = 'ra-child-' + state.childSeq;
+                    tr.data('raChildTableId', childId);
+
+                    if (typeof format !== 'function') {
+                        row.child('<div class="ra-hist-v2__empty">Не удалось отрендерить таблицу</div>').show();
+                        return;
+                    }
+                    row.child(format(phrase, rows, childId)).show();
+
+                    var childTable = $('#' + childId).DataTable({
+                        order: [[0, 'desc']],
+                        destroy: true,
+                        language: window.raDtRu || {},
+                        oLanguage: {
+                            sSearch: (window.raDtRu && window.raDtRu.search) || 'Поиск:',
+                            sLengthMenu: (window.raDtRu && window.raDtRu.lengthMenu) || 'Показать _MENU_ записей',
+                            sEmptyTable: (window.raDtRu && window.raDtRu.emptyTable) || 'Нет записей',
+                            sInfo: (window.raDtRu && window.raDtRu.info) || '',
+                            sInfoEmpty: (window.raDtRu && window.raDtRu.infoEmpty) || '',
+                            sInfoFiltered: (window.raDtRu && window.raDtRu.infoFiltered) || ''
+                        }
+                    });
+                    if (typeof customFilters === 'function') {
+                        customFilters(childId, childTable, childId);
+                    }
+                    if (typeof getHistoryInfo === 'function') {
+                        getHistoryInfo();
+                    }
+                    if (typeof repeatScan === 'function') {
+                        repeatScan();
+                    }
+                    if (typeof window.initRelevanceActionTips === 'function') {
+                        window.initRelevanceActionTips(document.getElementById(childId) || document);
+                    }
+                },
+                error: function () {
+                    row.child('<div class="ra-hist-v2__empty">Не удалось загрузить историю фразы</div>').show();
+                }
+            });
+        });
+    }
+
+    /**
      * @param {Array} stories
      * @param {{storyId?: string|number}} opts
      */
     function render(stories, opts) {
         opts = opts || {};
+        state.serverMode = false;
         state.stories = Array.isArray(stories) ? stories.slice() : [];
         state.storyId = opts.storyId != null ? opts.storyId : state.storyId;
         state.page = 1;
@@ -549,6 +986,8 @@
 
     window.raHistoryV2 = {
         render: render,
+        loadProject: loadProject,
+        openList: openList,
         applyView: applyView
     };
 

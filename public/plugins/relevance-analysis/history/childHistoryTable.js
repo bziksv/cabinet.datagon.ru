@@ -266,11 +266,13 @@ function hideTableHistory() {
     $('.history').hide()
 }
 
-function format(data) {
-    let array = object
+function format(data, rowsOverride, tableIdOverride) {
+    let items = Array.isArray(rowsOverride)
+        ? rowsOverride
+        : ((typeof object !== 'undefined' && object && object[data]) ? object[data] : []);
 
     let child = ''
-    $.each(array[data], function (key, value) {
+    $.each(items, function (key, value) {
         let state
         if (value['state'] === 1) {
             state = raHistoryActionsHtml(value['id'])
@@ -339,7 +341,7 @@ function format(data) {
     }
 
     date = date.getFullYear() + '-' + month + '-' + day
-    let tableId = data.replace(' ', '-')
+    let tableId = tableIdOverride || String(data || '').replace(/[^a-zA-Z0-9_-]/g, '-') || 'ra-child-table'
 
     return (
         '<table class="table table-bordered table-hover dataTable dtr-inline list-children table-sm" id="' + tableId + '">' +

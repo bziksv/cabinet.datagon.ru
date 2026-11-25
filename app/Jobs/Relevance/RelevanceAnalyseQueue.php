@@ -117,6 +117,24 @@ class RelevanceAnalyseQueue implements ShouldQueue
             $this->relevance->setSites($params->sites);
         }
 
-        RunRelevanceAnalyseQueue::dispatch($this->relevance)->onQueue('relevance_high_priority');
+        RunRelevanceAnalyseQueue::dispatch($this->relevance)->onQueue($this->finishQueue());
+    }
+
+    /**
+     * Финальный шаг наследует очередь, из которой пришёл первый шаг (приоритет пользователя
+     * из UsersJobs::getPriority). Раньше был жёстко relevance_high_priority, из-за чего
+     * тяжёлые пользователи обгоняли остальных на последнем шаге.
+     */
+    protected function finishQueue(): string
+    {
+        $allowed = [
+            'relevance_high_priority',
+            'relevance_medium_priority',
+            'relevance_normal_priority',
+        ];
+
+        $queue = $this->job ? (string) $this->job->getQueue() : '';
+
+        return in_array($queue, $allowed, true) ? $queue : 'relevance_high_priority';
     }
 }

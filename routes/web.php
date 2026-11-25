@@ -695,6 +695,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/get-details-history', 'HistoryRelevanceController@getDetailsInfo')->name('get.details.info');
     Route::post('/get-stories', 'HistoryRelevanceController@getStories')->name('get.stories');
     Route::post('/get-stories-v2', 'HistoryRelevanceController@getHistoryInfoV2')->name('get.stories.v2');
+    Route::post('/get-stories-v2-phrase', 'HistoryRelevanceController@getPhraseStoriesV2')->name('get.stories.v2.phrase');
     Route::get('/get-file/{id}/{type}', 'HistoryRelevanceController@getFile')->name('get.relevance.file');
 
     Route::get('/get-history-info/{object}', 'HistoryRelevanceController@getHistoryInfo')->name('get.history.info');

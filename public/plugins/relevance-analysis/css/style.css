@@ -3047,6 +3047,26 @@ table.dataTable thead th > .form-control.search-input + .form-control.search-inp
     color: #fff;
 }
 
+.ra-hist-v2__page:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.ra-hist-v2__ellipsis {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 0.35rem;
+    color: #64748b;
+    font-size: 0.8125rem;
+}
+
+.ra-hist-v2__loading {
+    padding: 1.5rem 1rem;
+    text-align: center;
+    color: #475569;
+    font-size: 0.875rem;
+}
+
 .ra-hist-v2__empty {
     padding: 1.5rem 1rem;
     text-align: center;

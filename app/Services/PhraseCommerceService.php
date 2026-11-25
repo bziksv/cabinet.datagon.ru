@@ -109,6 +109,7 @@ class PhraseCommerceService
 
         $rows = [];
         $requests = 0;
+        $billablePages = 0;
         $errors = 0;
         /** Один контрольный город на ПС за весь прогон — стабильнее сравнение по фразам. */
         $contrastByEngine = [];
@@ -128,13 +129,17 @@ class PhraseCommerceService
                 $err2 = false;
                 $n1 = 0;
                 $n2 = 0;
-                $urlsPrimary = $this->fetchSerp($engine, $primaryLr, $phrase, $depth, $err1, $n1);
+                $b1 = 0;
+                $b2 = 0;
+                $urlsPrimary = $this->fetchSerp($engine, $primaryLr, $phrase, $depth, $err1, $n1, $b1);
                 $requests += max(1, $n1);
+                $billablePages += max(1, $b1);
                 if ($pauseMs > 0) {
                     usleep($pauseMs * 1000);
                 }
-                $urlsContrast = $this->fetchSerp($engine, $contrastLr, $phrase, $depth, $err2, $n2);
+                $urlsContrast = $this->fetchSerp($engine, $contrastLr, $phrase, $depth, $err2, $n2, $b2);
                 $requests += max(1, $n2);
+                $billablePages += max(1, $b2);
                 if ($err1 || $err2) {
                     $errors++;
                 }
@@ -172,8 +177,11 @@ class PhraseCommerceService
             }
         }
 
+        $baseCost = self::estimateCost(count($phrases), $engines);
+
         return [
-            'cost' => self::estimateCost(count($phrases), $engines),
+            'cost' => max($baseCost, $billablePages),
+            'base_cost' => $baseCost,
             'requests' => $requests,
             'errors' => $errors,
             'depth' => $depth,
@@ -343,13 +351,15 @@ class PhraseCommerceService
         string $query,
         int $depth,
         bool &$hadError,
-        int &$pageRequests
+        int &$pageRequests,
+        int &$billablePages = 0
     ): array {
         $hadError = false;
         $pageRequests = 0;
+        $billablePages = 0;
 
         if ($engine === 'google') {
-            return $this->fetchGoogleSerp($lr, $query, $depth, $hadError, $pageRequests);
+            return $this->fetchGoogleSerp($lr, $query, $depth, $hadError, $pageRequests, $billablePages);
         }
 
         $urls = [];
@@ -359,6 +369,9 @@ class PhraseCommerceService
 
         for ($page = 0; $page < $maxPages && count($urls) < $depth; $page++) {
             $chunk = $this->fetchSerpPageWithRetry('yandex', $lr, $query, $depth, $page, $hadError, $pageRequests);
+            if ($chunk !== [] || $page === 0) {
+                $billablePages++;
+            }
             $added = $this->appendUniqueUrls($urls, $seen, $chunk, $depth);
 
             if ($chunk === [] || $added === 0 || count($urls) >= $depth) {
@@ -385,7 +398,8 @@ class PhraseCommerceService
         string $query,
         int $depth,
         bool &$hadError,
-        int &$pageRequests
+        int &$pageRequests,
+        int &$billablePages = 0
     ): array {
         $basePages = self::googlePagesForDepth($depth);
         $maxPages = $basePages + 3;
@@ -395,6 +409,9 @@ class PhraseCommerceService
 
         for ($page = 0; $page < $maxPages && count($urls) < $depth; $page++) {
             $chunk = $this->fetchSerpPageWithRetry('google', $lr, $query, self::GOOGLE_PAGE_SIZE, $page, $hadError, $pageRequests);
+            if ($chunk !== [] || $page < $basePages) {
+                $billablePages++;
+            }
             $added = $this->appendUniqueUrls($urls, $seen, $chunk, $depth);
 
             if ($chunk === [] || $added === 0 || count($urls) >= $depth) {

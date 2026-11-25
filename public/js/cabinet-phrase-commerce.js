@@ -7,6 +7,9 @@
     }
 
     var analyzeUrl = root.getAttribute('data-analyze-url');
+    var runsUrl = root.getAttribute('data-runs-url');
+    var runBaseUrl = root.getAttribute('data-run-base-url');
+    var initialActiveRunId = root.getAttribute('data-active-run-id');
     var exportUrl = root.getAttribute('data-export-url');
     var historyBase = root.getAttribute('data-history-url');
     var historyStoreUrl = root.getAttribute('data-history-store-url');
@@ -226,12 +229,17 @@
         return many;
     }
 
+    function formatSpaceInt(n) {
+        return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    }
+
     function updateCostPreview() {
         var cost = estimateCostClient();
         var label = (costPreview && costPreview.getAttribute('data-label')) || 'Спишется';
         if (costText) {
+            var prefix = cost > 0 ? label + ' от ' : label + ' ';
             costText.innerHTML =
-                label + ' <strong id="cabinetPcCostValue">' + String(cost) + '</strong> ' + pluralLimit(cost);
+                prefix + '<strong id="cabinetPcCostValue">' + formatSpaceInt(cost) + '</strong> ' + pluralLimit(cost);
         }
     }
 
@@ -549,10 +557,15 @@
             shared.className = 'cabinet-pc-engine__shared';
             var base = geo.base_count != null ? geo.base_count : null;
             var hosts = (geo.shared_hosts || []).slice(0, 3).join(', ');
+            var topBadge =
+                row.serp_count && row.serp_contrast_count && row.serp_count === row.serp_contrast_count
+                    ? ' (ТОП-' + String(row.serp_count) + ')'
+                    : '';
             shared.textContent =
-                'общих хостов: ' +
+                'общих доменов: ' +
                 String(geo.shared || 0) +
                 (base != null ? ' из ' + base : '') +
+                topBadge +
                 (hosts ? ' · ' + hosts + ((geo.shared_hosts || []).length > 3 ? '…' : '') : '');
             td.appendChild(shared);
         }
@@ -812,6 +825,113 @@
         return canSave && saveEl && saveEl.checked;
     }
 
+    var pollTimer = null;
+
+    function stopPoll() {
+        if (pollTimer) {
+            clearTimeout(pollTimer);
+            pollTimer = null;
+        }
+    }
+
+    function applyCompletedRun(run, meta) {
+        stopPoll();
+        finishProgress();
+        if (submitBtn) {
+            submitBtn.disabled = false;
+        }
+
+        var results = run.results || {};
+        showResults({
+            cost: run.actual_cost || 0,
+            summary: results.summary || {},
+            rows: results.rows || [],
+        });
+
+        if (run.history_item) {
+            addHistoryRow(run.history_item);
+            setActiveHistory(run.history_item);
+        } else {
+            setActiveHistory(null);
+        }
+
+        if (meta && meta.remaining != null) {
+            root.setAttribute('data-remaining', String(meta.remaining));
+        }
+
+        var warn = run.error_message ? ' · ' + run.error_message : '';
+        var savedTxt = run.history_id ? ' · сохранено #' + run.history_id : '';
+        var elapsedTxt = run.elapsed_sec != null ? ' · ' + formatElapsed(run.elapsed_sec * 1000) : '';
+        setStatus('Готово' + savedTxt + warn + elapsedTxt, !!run.error_message);
+        updateCostPreview();
+    }
+
+    function pollRun(runId, startedElapsedSec) {
+        if (!runBaseUrl || !runId) {
+            return;
+        }
+        stopPoll();
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+        }
+        progressStartedAt = Date.now() - (startedElapsedSec || 0) * 1000;
+        setProgressVisible(true);
+        if (!progressTimer) {
+            progressTimer = setInterval(function () {
+                if (progressTime) {
+                    progressTime.textContent = formatElapsed(Date.now() - progressStartedAt);
+                }
+            }, 500);
+        }
+
+        function tick() {
+            fetch(runBaseUrl + '/' + runId, {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            })
+                .then(function (res) {
+                    return res.json();
+                })
+                .then(function (data) {
+                    if (!data || !data.ok || !data.run) {
+                        throw new Error((data && data.message) || 'Не удалось получить статус проверки');
+                    }
+                    var run = data.run;
+                    if (run.elapsed_sec != null) {
+                        progressStartedAt = Date.now() - run.elapsed_sec * 1000;
+                    }
+                    if (run.status === 'pending' || run.status === 'running') {
+                        var total = run.phrases_total || 1;
+                        var done = run.phrases_done || 0;
+                        updateProgress(done, total, run.current_phrase || '');
+                        if (run.status === 'pending' && done === 0 && progressTitle) {
+                            progressTitle.textContent = 'В очереди на сервере… (0 из ' + total + ')';
+                        }
+                        setStatus('Проверка на сервере: ' + done + ' из ' + total);
+                        pollTimer = setTimeout(tick, 2500);
+                        return;
+                    }
+                    if (run.status === 'done') {
+                        applyCompletedRun(run, data);
+                        return;
+                    }
+                    stopPoll();
+                    finishProgress();
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                    }
+                    setStatus(run.error_message || 'Ошибка при выполнении проверки', true);
+                })
+                .catch(function (err) {
+                    pollTimer = setTimeout(tick, 4000);
+                    setStatus((err && err.message) || 'Ожидание ответа сервера…', true);
+                });
+        }
+
+        tick();
+    }
+
     function runAnalyze() {
         var phrases = listPhrases();
         if (enginesCount() === 0) {
@@ -823,185 +943,36 @@
             return;
         }
 
+        if (!runsUrl) {
+            setStatus('Очередь проверок недоступна', true);
+            return;
+        }
+
         if (submitBtn) {
             submitBtn.disabled = true;
         }
-        setStatus('Идёт расчёт…');
+        setStatus('Запуск проверки на сервере…');
         progressStartedAt = Date.now();
         setProgressVisible(true);
         updateProgress(0, phrases.length, phrases[0]);
-        progressTimer = setInterval(function () {
-            if (progressTime) {
-                progressTime.textContent = formatElapsed(Date.now() - progressStartedAt);
-            }
-        }, 500);
 
-        var allRows = [];
-        var totalCost = 0;
-        var totalRequests = 0;
-        var totalErrors = 0;
-        var depth = 20;
-        var contrast = { yandex: '', google: '' };
-        var remaining = null;
-        var idx = 0;
+        var body = buildFormBody(phrases.join('\n'), {});
+        body.set('save', wantSaveHistory() ? '1' : '0');
 
-        function next() {
-            if (idx >= phrases.length) {
-                return finishOk();
-            }
-            var phrase = phrases[idx];
-            updateProgress(idx, phrases.length, phrase);
-            return postJson(
-                analyzeUrl,
-                buildFormBody(phrase, {
-                    yandexLr2: contrast.yandex,
-                    googleLr2: contrast.google,
-                })
-            )
-                .then(function (pack) {
-                    if (!pack.ok || !pack.data || !pack.data.ok) {
-                        throw new Error((pack.data && pack.data.message) || 'Ошибка проверки');
-                    }
-                    var data = pack.data;
-                    allRows = allRows.concat(data.rows || []);
-                    totalCost += data.cost || 0;
-                    totalRequests += data.requests || 0;
-                    totalErrors += data.errors || 0;
-                    if (data.depth) {
-                        depth = data.depth;
-                    }
-                    if (data.remaining != null) {
-                        remaining = data.remaining;
-                    }
-                    var cr = data.contrast_regions || {};
-                    if (cr.yandex) {
-                        contrast.yandex = String(cr.yandex);
-                    }
-                    if (cr.google) {
-                        contrast.google = String(cr.google);
-                    }
-                    // fallback from rows
-                    (data.rows || []).forEach(function (row) {
-                        if (row.engine === 'yandex' && row.region_contrast && !contrast.yandex) {
-                            contrast.yandex = String(row.region_contrast);
-                        }
-                        if (row.engine === 'google' && row.region_contrast && !contrast.google) {
-                            contrast.google = String(row.region_contrast);
-                        }
-                    });
-                    idx += 1;
-                    updateProgress(idx, phrases.length, phrases[idx] || phrase);
-                    return next();
-                });
-        }
-
-        function finishOk() {
-            var summary = buildSummaryClient(allRows);
-            var payload = {
-                cost: totalCost,
-                requests: totalRequests,
-                errors: totalErrors,
-                depth: depth,
-                summary: summary,
-                rows: allRows,
-                remaining: remaining,
-            };
-
-            var savePromise = Promise.resolve(null);
-            if (wantSaveHistory() && historyStoreUrl) {
-                if (progressTitle) {
-                    progressTitle.textContent = 'Сохранение в историю…';
+        postJson(runsUrl, body)
+            .then(function (pack) {
+                if (!pack.ok || !pack.data || !pack.data.ok || !pack.data.run) {
+                    throw new Error((pack.data && pack.data.message) || 'Не удалось запустить проверку');
                 }
-                var body = new FormData();
-                body.append('_token', csrf);
-                body.append('phrases', phrases.join('\n'));
-                body.append('rows', JSON.stringify(allRows));
-                body.append('summary', JSON.stringify(summary));
-                body.append('cost', String(totalCost));
-                body.append('depth', String(depth));
-                var engines = [];
-                if (engineYandex && engineYandex.checked) {
-                    engines.push('yandex');
+                pollRun(pack.data.run.id, 0);
+            })
+            .catch(function (err) {
+                finishProgress();
+                if (submitBtn) {
+                    submitBtn.disabled = false;
                 }
-                if (engineGoogle && engineGoogle.checked) {
-                    engines.push('google');
-                }
-                body.append('engines', engines.join(','));
-                var y = document.getElementById('cabinetPcYandexLr');
-                var g = document.getElementById('cabinetPcGoogleLr');
-                if (y) {
-                    body.append('yandex_lr', y.value || '');
-                }
-                if (g) {
-                    body.append('google_lr', g.value || '');
-                }
-                if (contrast.yandex) {
-                    body.append('yandex_lr2', contrast.yandex);
-                }
-                if (contrast.google) {
-                    body.append('google_lr2', contrast.google);
-                }
-                savePromise = postJson(historyStoreUrl, body);
-            }
-
-            return savePromise
-                .then(function (pack) {
-                    finishProgress();
-                    if (submitBtn) {
-                        submitBtn.disabled = false;
-                    }
-                    showResults(payload);
-                    if (pack && pack.ok && pack.data && pack.data.item) {
-                        addHistoryRow(pack.data.item);
-                        setActiveHistory(pack.data.item);
-                    } else {
-                        setActiveHistory(null);
-                    }
-                    var historyId = pack && pack.data && pack.data.history_id;
-                    var historyWarn =
-                        pack && pack.ok === false
-                            ? (pack.data && pack.data.message) || 'Не удалось сохранить историю'
-                            : '';
-                    setStatus(
-                        'Готово' +
-                            (historyId ? ' · сохранено #' + historyId : '') +
-                            (historyWarn ? ' · ' + historyWarn : '') +
-                            ' · ' +
-                            formatElapsed(Date.now() - progressStartedAt),
-                        !!historyWarn
-                    );
-                    if (remaining != null) {
-                        root.setAttribute('data-remaining', String(remaining));
-                    }
-                    updateCostPreview();
-                })
-                .catch(function (err) {
-                    finishProgress();
-                    if (submitBtn) {
-                        submitBtn.disabled = false;
-                    }
-                    showResults(payload);
-                    setStatus(
-                        'Готово, но история не сохранена: ' + (err && err.message ? err.message : 'ошибка'),
-                        true
-                    );
-                });
-        }
-
-        next().catch(function (err) {
-            finishProgress();
-            if (submitBtn) {
-                submitBtn.disabled = false;
-            }
-            if (allRows.length) {
-                showResults({
-                    cost: totalCost,
-                    summary: buildSummaryClient(allRows),
-                    rows: allRows,
-                });
-            }
-            setStatus((err && err.message) || 'Ошибка сети или сервера', true);
-        });
+                setStatus((err && err.message) || 'Ошибка запуска проверки', true);
+            });
     }
 
     if (form) {
@@ -1305,13 +1276,23 @@
 
     (function tryOpenHistoryFromUrl() {
         var match = window.location.search.match(/(?:\?|&)history=(\d+)/);
-        if (!match || !historyBase) {
+        if (match && historyBase) {
+            var id = match[1];
+            var btn = document.querySelector('tr[data-id="' + id + '"] .cabinet-pc-history-open');
+            if (btn) {
+                btn.click();
+                return;
+            }
+        }
+
+        var runMatch = window.location.search.match(/(?:\?|&)run=(\d+)/);
+        if (runMatch && runBaseUrl) {
+            pollRun(runMatch[1], 0);
             return;
         }
-        var id = match[1];
-        var btn = document.querySelector('tr[data-id="' + id + '"] .cabinet-pc-history-open');
-        if (btn) {
-            btn.click();
+
+        if (initialActiveRunId && runBaseUrl) {
+            pollRun(initialActiveRunId, 0);
         }
     })();
 })();

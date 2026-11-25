@@ -503,6 +503,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('phrase-commerce', 'PhraseCommerceController@index')->name('pages.phrase-commerce')->middleware('permission:Phrase commerce');
     Route::post('phrase-commerce/analyze', 'PhraseCommerceController@analyze')->name('pages.phrase-commerce.analyze')->middleware('permission:Phrase commerce');
+    Route::post('phrase-commerce/runs', 'PhraseCommerceController@runStore')->name('pages.phrase-commerce.runs.store')->middleware('permission:Phrase commerce');
+    Route::get('phrase-commerce/runs/{id}', 'PhraseCommerceController@runShow')->name('pages.phrase-commerce.runs.show')->middleware('permission:Phrase commerce');
     Route::post('phrase-commerce/export', 'PhraseCommerceController@exportCsv')->name('pages.phrase-commerce.export')->middleware('permission:Phrase commerce');
     Route::post('phrase-commerce/history', 'PhraseCommerceController@historyStore')->name('pages.phrase-commerce.history.store')->middleware('permission:Phrase commerce');
     Route::get('phrase-commerce/history/{id}', 'PhraseCommerceController@historyShow')->name('pages.phrase-commerce.history.show')->middleware('permission:Phrase commerce');

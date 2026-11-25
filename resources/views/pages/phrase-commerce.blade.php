@@ -10,6 +10,10 @@
 
     <div class="cabinet-pc-page" id="cabinetPcPage"
          data-analyze-url="{{ route('pages.phrase-commerce.analyze') }}"
+         data-runs-url="{{ route('pages.phrase-commerce.runs.store') }}"
+         data-run-base-url="{{ url('/phrase-commerce/runs') }}"
+         data-active-run-id="{{ !empty($activeRun) ? (int) $activeRun->id : '' }}"
+         data-telegram-connected="{{ !empty($telegramConnected) ? '1' : '0' }}"
          data-export-url="{{ route('pages.phrase-commerce.export') }}"
          data-history-url="{{ url('/phrase-commerce/history') }}"
          data-history-store-url="{{ route('pages.phrase-commerce.history.store') }}"
@@ -47,6 +51,12 @@
                      data-unit-few="{{ __('Site types cost unit few') }}"
                      data-unit-many="{{ __('Site types cost unit many') }}">
                     <span id="cabinetPcCostText">{{ __('Phrase commerce cost label') }} <strong id="cabinetPcCostValue">0</strong> {{ __('Site types cost unit many') }}</span>
+                    <span class="cabinet-pc-cost-tip" tabindex="0" role="button" aria-label="Подробнее о списании лимитов">
+                        <i class="far fa-question-circle" aria-hidden="true"></i>
+                        <span class="cabinet-pc-cost-tip__popover">
+                            Базово: Яндекс — 2, Google — 4 лимита за фразу (ТОП-20 × 2 региона). Если поисковая система отдаёт меньше 10 сайтов на странице, мы добираем дополнительные страницы до 20 результатов и списываем фактическое число страниц (для Google обычно +1–2 лимита на фразу).
+                        </span>
+                    </span>
                 </div>
             </div>
         </div>
@@ -129,6 +139,17 @@
                          aria-valuenow="0"
                          aria-valuemin="0"
                          aria-valuemax="100"></div>
+                </div>
+                <div class="cabinet-pc-progress__note small mt-2" id="cabinetPcProgressNote">
+                    <i class="fas fa-info-circle mr-1" aria-hidden="true"></i>
+                    <span>
+                        Проверка выполняется на сервере — можно дождаться здесь или закрыть вкладку и зайти позже, результат сохранится в истории.
+                        @if(!empty($telegramConnected))
+                            Когда анализ будет готов, пришлём уведомление в Telegram.
+                        @else
+                            <a href="{{ url('/profile') }}" class="alert-link">Подключите Telegram</a>, чтобы получать уведомление о готовности.
+                        @endif
+                    </span>
                 </div>
             </div>
         </form>

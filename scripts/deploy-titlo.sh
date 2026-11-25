@@ -54,6 +54,7 @@ SUPERVISOR_GROUPS=(
   cabinet-titlo-site-audit
   cabinet-titlo-site-audit-aggregate
   cabinet-titlo-wordstat
+  cabinet-titlo-phrase-commerce
 )
 
 # Рестарт в фоне, отвязанно от SSH: relevance ждёт текущие задачи до 11 минут (stopwaitsecs=660),

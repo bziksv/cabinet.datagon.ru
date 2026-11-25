@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\RunPhraseCommerceCheck;
 use App\PhraseCommerceHistory;
+use App\PhraseCommerceRun;
 use App\Services\PhraseCommerceService;
 use App\Support\CompetitorSearchRegions;
 use App\Support\DemoCabinet;
@@ -11,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -49,6 +52,17 @@ class PhraseCommerceController extends Controller
                 ->get(['id', 'title', 'params', 'phrases_count', 'results_count', 'cost', 'created_at']);
         }
 
+        $activeRun = null;
+        if (Schema::hasTable('phrase_commerce_runs')) {
+            $activeRun = PhraseCommerceRun::query()
+                ->where('user_id', $user->id)
+                ->whereIn('status', [PhraseCommerceRun::STATUS_PENDING, PhraseCommerceRun::STATUS_RUNNING])
+                ->orderByDesc('id')
+                ->first();
+        }
+
+        $telegramConnected = method_exists($user, 'isTelegramConnected') && $user->isTelegramConnected();
+
         return view('pages.phrase-commerce', compact(
             'defaultYandex',
             'defaultGoogle',
@@ -59,8 +73,180 @@ class PhraseCommerceController extends Controller
             'historyLimit',
             'canSaveHistory',
             'savedCount',
-            'histories'
+            'histories',
+            'activeRun',
+            'telegramConnected'
         ));
+    }
+
+    /**
+     * Запустить фоновую серверную проверку через очередь phrase-commerce.
+     */
+    public function runStore(Request $request, PhraseCommerceService $service): JsonResponse
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return response()->json(['error' => 'auth', 'message' => __('Unauthorized')], 401);
+        }
+
+        if (! Schema::hasTable('phrase_commerce_runs')) {
+            return response()->json(['error' => 'unavailable', 'message' => 'Очередь проверок временно недоступна'], 503);
+        }
+
+        $phrasesRaw = (string) $request->input('phrases', '');
+        $phrases = preg_split('/\r\n|\r|\n/u', $phrasesRaw) ?: [];
+        $phrases = $service->normalizePhrases($phrases);
+
+        $engines = [];
+        if ($request->boolean('yandex', true)) {
+            $engines[] = 'yandex';
+        }
+        if ($request->boolean('google', false)) {
+            $engines[] = 'google';
+        }
+
+        if ($phrases === []) {
+            return response()->json(['error' => 'validation', 'message' => __('Phrase commerce phrases required')], 422);
+        }
+        if ($engines === []) {
+            return response()->json(['error' => 'validation', 'message' => __('Phrase commerce engines required')], 422);
+        }
+
+        $estimatedCost = PhraseCommerceService::estimateCost(count($phrases), $engines);
+        if (! PhraseCommerceLimits::canSpend($estimatedCost, $user)) {
+            return response()->json([
+                'error' => 'limit',
+                'message' => PhraseCommerceLimits::limitMessage($user) ?: __('Phrase commerce limit exhausted'),
+                'remaining' => PhraseCommerceLimits::remainingForUser($user),
+                'limit' => PhraseCommerceLimits::limitForUser($user),
+            ], 403);
+        }
+
+        $title = $phrases[0] ?? __('Phrase commerce');
+        if (count($phrases) > 1) {
+            $title .= ' +' . (count($phrases) - 1);
+        }
+
+        $params = [
+            'phrases' => $phrases,
+            'engines' => $engines,
+            'yandex_lr' => (string) $request->input('yandex_lr', config('cabinet-phrase-commerce.default_yandex_lr', '213')),
+            'google_lr' => (string) $request->input('google_lr', config('cabinet-phrase-commerce.default_google_lr', '1011969')),
+            'yandex_lr2' => (string) $request->input('yandex_lr2', ''),
+            'google_lr2' => (string) $request->input('google_lr2', ''),
+        ];
+
+        $save = $request->boolean('save', true) && PhraseCommerceLimits::canSaveHistory($user);
+
+        $run = PhraseCommerceRun::query()->create([
+            'user_id' => $user->id,
+            'status' => PhraseCommerceRun::STATUS_PENDING,
+            'save_to_history' => $save,
+            'title' => mb_substr($title, 0, 255),
+            'params' => $params,
+            'phrases_total' => count($phrases),
+            'phrases_done' => 0,
+            'current_phrase' => $phrases[0] ?? null,
+            'estimated_cost' => $estimatedCost,
+        ]);
+
+        RunPhraseCommerceCheck::dispatch($run->id);
+
+        return response()->json([
+            'ok' => true,
+            'run' => $this->serializeRun($run, false),
+        ]);
+    }
+
+    /**
+     * Статус и (по завершении) результаты фоновой проверки.
+     */
+    public function runShow(int $id): JsonResponse
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return response()->json(['error' => 'auth', 'message' => __('Unauthorized')], 401);
+        }
+
+        if (! Schema::hasTable('phrase_commerce_runs')) {
+            return response()->json(['error' => 'not_found'], 404);
+        }
+
+        /** @var PhraseCommerceRun|null $run */
+        $run = PhraseCommerceRun::query()
+            ->where('user_id', $user->id)
+            ->where('id', $id)
+            ->first();
+
+        if (! $run) {
+            return response()->json(['error' => 'not_found'], 404);
+        }
+
+        $includeResults = $run->status === PhraseCommerceRun::STATUS_DONE;
+
+        return response()->json([
+            'ok' => true,
+            'run' => $this->serializeRun($run, $includeResults),
+            'remaining' => PhraseCommerceLimits::remainingForUser($user),
+            'limit' => PhraseCommerceLimits::limitForUser($user),
+            'saved_count' => PhraseCommerceLimits::savedCount($user),
+            'history_limit' => PhraseCommerceLimits::historyLimitForUser($user),
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeRun(PhraseCommerceRun $run, bool $includeResults): array
+    {
+        $startedAt = $run->started_at ?: $run->created_at;
+        $endAt = $run->finished_at ?: now();
+        $elapsedSec = $startedAt ? max(0, $endAt->diffInSeconds($startedAt)) : 0;
+
+        $data = [
+            'id' => $run->id,
+            'status' => $run->status,
+            'title' => $run->title,
+            'phrases_total' => (int) $run->phrases_total,
+            'phrases_done' => (int) $run->phrases_done,
+            'current_phrase' => $run->current_phrase,
+            'estimated_cost' => (int) $run->estimated_cost,
+            'actual_cost' => (int) $run->actual_cost,
+            'requests_count' => (int) $run->requests_count,
+            'errors_count' => (int) $run->errors_count,
+            'history_id' => $run->history_id,
+            'error_message' => $run->error_message,
+            'elapsed_sec' => $elapsedSec,
+            'regions_label' => $run->regionsLabel(),
+            'created_at' => optional($run->created_at)->format('d.m.Y H:i'),
+        ];
+
+        if ($includeResults) {
+            $results = is_array($run->results) ? $run->results : [];
+            $data['results'] = $results;
+            $data['params'] = $run->params;
+
+            if ($run->history_id) {
+                $history = PhraseCommerceHistory::query()
+                    ->where('user_id', $run->user_id)
+                    ->where('id', $run->history_id)
+                    ->first();
+                if ($history) {
+                    $data['history_item'] = [
+                        'id' => $history->id,
+                        'title' => $history->title,
+                        'phrases_count' => $history->phrases_count,
+                        'results_count' => $history->results_count,
+                        'engines_label' => $history->enginesLabel(),
+                        'settings_label' => $history->regionsLabel(),
+                        'regions_label' => $history->regionsLabel(),
+                        'created_at' => optional($history->created_at)->format('d.m.Y H:i'),
+                    ];
+                }
+            }
+        }
+
+        return $data;
     }
 
     public function analyze(Request $request, PhraseCommerceService $service): JsonResponse

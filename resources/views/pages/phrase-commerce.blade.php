@@ -189,7 +189,7 @@
                             <th>{{ __('Date') }}</th>
                             <th>{{ __('Title') }}</th>
                             <th>{{ __('Site types col engine') }}</th>
-                            <th>{{ __('Site types history settings') }}</th>
+                            <th>{{ __('Region') }}</th>
                             <th>{{ __('Site types col phrases') }}</th>
                             <th></th>
                         </tr>

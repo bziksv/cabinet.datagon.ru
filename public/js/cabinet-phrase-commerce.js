@@ -1086,6 +1086,9 @@
                 if (item.title) {
                     parts.push(item.title);
                 }
+                if (item.regions_label && item.regions_label !== '—') {
+                    parts.push(item.regions_label);
+                }
                 if (item.created_at) {
                     parts.push(item.created_at);
                 }

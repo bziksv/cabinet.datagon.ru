@@ -261,7 +261,8 @@ class PhraseCommerceController extends Controller
                 'phrases_count' => $history->phrases_count,
                 'results_count' => $history->results_count,
                 'engines_label' => $history->enginesLabel(),
-                'settings_label' => $history->settingsLabel(),
+                'settings_label' => $history->regionsLabel(),
+                'regions_label' => $history->regionsLabel(),
                 'created_at' => optional($history->created_at)->format('d.m.Y H:i'),
             ],
             'saved_count' => PhraseCommerceLimits::savedCount($user),
@@ -296,6 +297,7 @@ class PhraseCommerceController extends Controller
                 'phrases_count' => $row->phrases_count,
                 'results_count' => $row->results_count,
                 'cost' => $row->cost,
+                'regions_label' => $row->regionsLabel(),
                 'created_at' => optional($row->created_at)->format('d.m.Y H:i'),
             ],
         ]);

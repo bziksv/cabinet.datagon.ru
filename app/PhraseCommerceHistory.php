@@ -38,19 +38,54 @@ class PhraseCommerceHistory extends Model
         return implode('+', $out);
     }
 
-    public function settingsLabel(): string
+    public function regionsLabel(): string
     {
         $p = $this->params ?? [];
-        $y = $p['yandex_lr'] ?? '';
-        $g = $p['google_lr'] ?? '';
-        $parts = [];
-        if ($y !== '') {
-            $parts[] = 'Я:' . $y;
+        $engines = $p['engines'] ?? [];
+        if (! is_array($engines) || $engines === []) {
+            $engines = [];
+            if (! empty($p['yandex_lr'])) {
+                $engines[] = 'yandex';
+            }
+            if (! empty($p['google_lr'])) {
+                $engines[] = 'google';
+            }
         }
-        if ($g !== '') {
-            $parts[] = 'G:' . $g;
+
+        $multi = count($engines) > 1;
+        $parts = [];
+
+        foreach ($engines as $engine) {
+            $engine = $engine === 'google' ? 'google' : 'yandex';
+            $lr = (string) ($engine === 'google' ? ($p['google_lr'] ?? '') : ($p['yandex_lr'] ?? ''));
+            if ($lr === '') {
+                continue;
+            }
+            $name = $this->resolveRegionName($engine, $lr);
+            $parts[] = $multi
+                ? (($engine === 'google' ? 'G: ' : 'Я: ') . $name)
+                : $name;
         }
 
         return $parts === [] ? '—' : implode(' · ', $parts);
+    }
+
+    public function settingsLabel(): string
+    {
+        return $this->regionsLabel();
+    }
+
+    private function resolveRegionName(string $engine, string $lr): string
+    {
+        $found = \App\Support\CompetitorSearchRegions::find($engine, $lr);
+        $name = is_array($found) ? trim((string) ($found['name'] ?? '')) : '';
+        if ($name === '') {
+            return $lr;
+        }
+        // Убираем скобки вроде «(Moscow)» и хвост с кодом региона для компактности
+        $short = trim(preg_replace('/\s*\([^)]*\)/u', '', $name) ?? $name);
+        $short = trim(preg_replace('/\s*\[[^\]]*\]/u', '', $short) ?? $short);
+
+        return $short !== '' ? $short : $name;
     }
 }

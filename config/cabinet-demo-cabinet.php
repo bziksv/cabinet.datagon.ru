@@ -74,6 +74,7 @@ return [
         '/site-audit',
         '/checklist',
         '/reports',
+        '/wordstat-keywords',
     ],
 
     /** URL регистрации с маркетинга */

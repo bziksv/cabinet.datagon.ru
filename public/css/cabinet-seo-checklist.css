@@ -8866,3 +8866,58 @@ html.cabinet-sc-lightbox-open {
         max-height: none;
     }
 }
+
+.cabinet-sc-stage-add {
+    border-top: 1px dashed var(--sc-border, #e2e8f0);
+    padding: 0.45rem 0.9rem 0.6rem;
+    background: #fafbfd;
+}
+
+.cabinet-sc-stage-add__summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--sc-muted, #64748b);
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.cabinet-sc-stage-add__summary::-webkit-details-marker {
+    display: none;
+}
+
+.cabinet-sc-stage-add__summary:hover {
+    color: var(--bs-primary, #2563eb);
+}
+
+.cabinet-sc-stage-add__form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.55rem;
+}
+
+.cabinet-sc-stage-add__project {
+    flex: 0 0 18rem;
+    min-width: 14rem;
+}
+
+.cabinet-sc-stage-add__title {
+    flex: 1 1 16rem;
+    min-width: 12rem;
+}
+
+.cabinet-sc-stage-add__date {
+    flex: 0 0 9.5rem;
+    width: 9.5rem;
+}
+
+.cabinet-sc-stage-add__role {
+    flex: 0 0 11rem;
+    width: 11rem;
+}
+

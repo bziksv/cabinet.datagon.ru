@@ -660,6 +660,9 @@ class SeoChecklistService
                 })->orWhereIn('status', ['doing', 'rework', 'clarify', 'review'])
                     ->orWhere(function ($q3) {
                         $q3->where('is_important', true)->whereNull('due_at');
+                    })
+                    ->orWhere(function ($q4) {
+                        $q4->whereNull('due_at')->where('code', 'like', 'custom_%');
                     });
             });
             $query->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')
@@ -729,7 +732,7 @@ class SeoChecklistService
                 continue;
             }
 
-            if (!empty($item->is_important) && empty($pinnedIds[(int) $item->id])) {
+            if ((!empty($item->is_important) || strpos((string) $item->code, 'custom_') === 0) && empty($pinnedIds[(int) $item->id])) {
                 $groups['no_due']['items']->push($item);
             }
         }
@@ -2486,6 +2489,22 @@ class SeoChecklistService
         $repeat = SeoChecklistDefaultTemplate::normalizeRepeatRule($payload['repeat_rule'] ?? null);
         $dueDays = $this->normalizeDueDays($payload['due_days_from_start'] ?? null);
 
+        $dueAt = null;
+        $dueAtRaw = trim((string) ($payload['due_at'] ?? ''));
+        if ($dueAtRaw !== '') {
+            try {
+                $dueAt = \Carbon\Carbon::createFromFormat('Y-m-d', $dueAtRaw)->endOfDay();
+            } catch (\Throwable $e) {
+                return ['ok' => false, 'message' => __('Invalid due date')];
+            }
+        } else {
+            $dueAt = $this->dueAtFromProjectStart(
+                $project->created_at,
+                $dueDays,
+                (bool) ($project->skip_weekends ?? false)
+            );
+        }
+
         $sort = (int) $project->items()->whereNull('parent_id')->where('stage_key', $stageKey)->max('sort') + 10;
         $code = 'custom_' . substr(md5($title . microtime(true) . mt_rand()), 0, 12);
 
@@ -2504,11 +2523,7 @@ class SeoChecklistService
             'allows_subtasks' => true,
             'repeat_rule' => $repeat,
             'due_days_from_start' => $dueDays,
-            'due_at' => $this->dueAtFromProjectStart(
-                $project->created_at,
-                $dueDays,
-                (bool) ($project->skip_weekends ?? false)
-            ),
+            'due_at' => $dueAt,
             'links_json' => [],
             'status' => 'todo',
             'created_by' => Auth::id() ? (int) Auth::id() : null,

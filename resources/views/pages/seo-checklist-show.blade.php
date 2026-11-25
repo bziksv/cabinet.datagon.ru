@@ -451,6 +451,10 @@
                                             @endforeach
                                         </select>
                                     </label>
+                                    <label>
+                                        <span>{{ __('Due date') }}</span>
+                                        <input type="date" name="due_at" class="form-control form-control-sm">
+                                    </label>
                                 </div>
                                 <div class="cabinet-sc-tpl-task__row mb-2">
                                     <select name="repeat_rule" class="form-select form-select-sm">
@@ -980,6 +984,39 @@
                             </li>
                         @endforeach
                     </ul>
+                    @if($canManage && $project->status !== 'archived')
+                        <details class="cabinet-sc-stage-add">
+                            <summary class="cabinet-sc-stage-add__summary">
+                                <i class="bi bi-plus-lg" aria-hidden="true"></i>
+                                <span>{{ __('Add task') }}</span>
+                            </summary>
+                            <form method="post"
+                                  action="{{ route('pages.seo-checklist.items.store', ['id' => $project->id]) }}"
+                                  class="cabinet-sc-stage-add__form"
+                                  data-ajax-form
+                                  data-ajax-silent="1"
+                                  data-sc-add-item-form>
+                                @csrf
+                                <input type="hidden" name="stage_key" value="{{ $stage['key'] }}">
+                                <input type="hidden" name="include_in_report" value="1">
+                                <input type="text"
+                                       name="title"
+                                       class="form-control form-control-sm cabinet-sc-stage-add__title"
+                                       required
+                                       placeholder="{{ __('New task') }}…">
+                                <input type="date"
+                                       name="due_at"
+                                       class="form-control form-control-sm cabinet-sc-stage-add__date"
+                                       aria-label="{{ __('Due date') }}">
+                                <select name="role" class="form-select form-select-sm cabinet-sc-stage-add__role" aria-label="{{ __('Role') }}">
+                                    @foreach($roleLabels as $rk => $rl)
+                                        <option value="{{ $rk }}" @if($rk === 'owner') selected @endif>{{ $rl }}</option>
+                                    @endforeach
+                                </select>
+                                <button type="submit" class="btn btn-sm btn-primary">{{ __('Add') }}</button>
+                            </form>
+                        </details>
+                    @endif
                 </details>
             @endforeach
         </div>

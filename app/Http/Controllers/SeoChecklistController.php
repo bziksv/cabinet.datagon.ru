@@ -125,13 +125,34 @@ class SeoChecklistController extends Controller
 
         $chronicle = $this->service->chronicleForUser($userId, null, null, true, 1);
 
+        $activeProjects = $this->service->accessibleProjectsQuery($userId)
+            ->where('status', 'active')
+            ->with('template:id,title,code,stages_json')
+            ->orderBy('domain')
+            ->get(['id', 'user_id', 'team_id', 'domain', 'title', 'template_id', 'status']);
+
+        $manageableProjects = $activeProjects->filter(function ($proj) use ($userId) {
+            return $this->service->canManageProject($proj, $userId);
+        })->values();
+
+        $projectStagesMap = [];
+        foreach ($manageableProjects as $proj) {
+            $stagesMeta = $this->service->resolveTemplateStages($proj->template);
+            $list = [];
+            foreach ($stagesMeta as $sk => $sm) {
+                $list[] = [
+                    'key' => (string) $sk,
+                    'title' => (string) ($sm['title'] ?? $sk),
+                ];
+            }
+            $projectStagesMap[(int) $proj->id] = $list;
+        }
+
         return view('pages.seo-checklist-my-tasks', [
             'plan' => $plan,
-            'filterProjects' => $this->service->accessibleProjectsQuery($userId)
-                ->where('status', 'active')
-                ->with('template:id,title,code')
-                ->orderBy('domain')
-                ->get(['id', 'domain', 'title', 'template_id']),
+            'filterProjects' => $activeProjects,
+            'manageableProjects' => $manageableProjects,
+            'projectStagesMap' => $projectStagesMap,
             'membershipRolesByProject' => $plan['membership_roles'] ?? [],
             'roleLabels' => $this->roleLabels(),
             'statusLabels' => $this->statusLabels(),
@@ -2331,6 +2352,7 @@ class SeoChecklistController extends Controller
             'help' => $request->input('help'),
             'stage_key' => $request->input('stage_key'),
             'role' => $request->input('role'),
+            'due_at' => $request->input('due_at'),
             'is_important' => $request->has('is_important') || (bool) $request->input('is_important'),
             'include_in_report' => $request->has('include_in_report') || (bool) $request->input('include_in_report'),
             'allows_subtasks' => $request->has('allows_subtasks') || (bool) $request->input('allows_subtasks'),

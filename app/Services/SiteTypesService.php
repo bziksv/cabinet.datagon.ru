@@ -384,6 +384,7 @@ class SiteTypesService
         if ($url === '') {
             return '';
         }
+        $url = preg_replace('#^https?://(?:www\.)?google\.[a-z.]+(?=https?://)#i', '', $url) ?? $url;
         if (! preg_match('#^https?://#i', $url)) {
             $url = 'http://' . $url;
         }

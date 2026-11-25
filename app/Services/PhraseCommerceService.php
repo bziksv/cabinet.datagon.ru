@@ -352,24 +352,31 @@ class PhraseCommerceService
             return $this->fetchGoogleSerp($lr, $query, $depth, $hadError, $pageRequests);
         }
 
-        try {
-            $pageRequests = 1;
-            $xml = new SimplifiedXmlFacade($lr, $depth);
-            $xml->setQuery($query);
-            $chunk = $xml->getXMLResponse('yandex');
-            $urls = is_array($chunk) ? array_values($chunk) : [];
+        $urls = [];
+        $seen = [];
+        $pauseMs = max(0, (int) config('cabinet-phrase-commerce.request_pause_ms', 120));
+        $maxPages = 2;
 
-            return array_slice($urls, 0, $depth);
-        } catch (\Throwable $e) {
-            $hadError = true;
-            report($e);
+        for ($page = 0; $page < $maxPages && count($urls) < $depth; $page++) {
+            $chunk = $this->fetchSerpPageWithRetry('yandex', $lr, $query, $depth, $page, $hadError, $pageRequests);
+            $added = $this->appendUniqueUrls($urls, $seen, $chunk, $depth);
 
-            return [];
+            if ($chunk === [] || $added === 0 || count($urls) >= $depth) {
+                break;
+            }
+
+            if ($pauseMs > 0 && $page + 1 < $maxPages) {
+                usleep($pauseMs * 1000);
+            }
         }
+
+        return array_slice($urls, 0, $depth);
     }
 
     /**
      * Google: ≤10 URL на страницу, page=0,1,…
+     * Часто на странице 7–9 органических результатов (реклама/карты/товары),
+     * поэтому добираем дополнительные страницы (до +3), пока не наберём $depth (20) сайтов.
      *
      * @return array<int, string>
      */
@@ -380,40 +387,95 @@ class PhraseCommerceService
         bool &$hadError,
         int &$pageRequests
     ): array {
-        $pages = self::googlePagesForDepth($depth);
+        $basePages = self::googlePagesForDepth($depth);
+        $maxPages = $basePages + 3;
         $urls = [];
+        $seen = [];
         $pauseMs = max(0, (int) config('cabinet-phrase-commerce.request_pause_ms', 120));
 
-        for ($page = 0; $page < $pages; $page++) {
-            try {
-                $pageRequests++;
-                $xml = new SimplifiedXmlFacade($lr, self::GOOGLE_PAGE_SIZE);
-                $xml->setQuery($query);
-                $xml->setPage((string) $page);
-                $chunk = $xml->getXMLResponse('google');
-                $chunk = is_array($chunk) ? array_values($chunk) : [];
-                foreach ($chunk as $url) {
-                    $urls[] = $url;
-                    if (count($urls) >= $depth) {
-                        break 2;
-                    }
-                }
-                // Google часто отдаёт <10 organic на странице — не стопаем пагинацию раньше depth.
-                if (count($chunk) === 0) {
-                    break;
-                }
-            } catch (\Throwable $e) {
-                $hadError = true;
-                report($e);
+        for ($page = 0; $page < $maxPages && count($urls) < $depth; $page++) {
+            $chunk = $this->fetchSerpPageWithRetry('google', $lr, $query, self::GOOGLE_PAGE_SIZE, $page, $hadError, $pageRequests);
+            $added = $this->appendUniqueUrls($urls, $seen, $chunk, $depth);
+
+            if ($chunk === [] || $added === 0 || count($urls) >= $depth) {
                 break;
             }
 
-            if ($pauseMs > 0 && $page + 1 < $pages) {
+            if ($pauseMs > 0 && $page + 1 < $maxPages) {
                 usleep($pauseMs * 1000);
             }
         }
 
         return array_slice($urls, 0, $depth);
+    }
+
+    /**
+     * Запрос одной страницы выдачи с ретраем при пустом ответе/временном сбое.
+     *
+     * @return array<int, string>
+     */
+    private function fetchSerpPageWithRetry(
+        string $engine,
+        string $lr,
+        string $query,
+        int $pageSize,
+        int $page,
+        bool &$hadError,
+        int &$pageRequests
+    ): array {
+        $retryDelaysMs = [400, 1000];
+        $maxAttempts = 1 + count($retryDelaysMs);
+
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            try {
+                $pageRequests++;
+                $xml = new SimplifiedXmlFacade($lr, $pageSize);
+                $xml->setQuery($query);
+                $xml->setPage((string) $page);
+                $chunk = $xml->getXMLResponse($engine);
+                $chunk = is_array($chunk) ? array_values($chunk) : [];
+                if ($chunk !== []) {
+                    return $chunk;
+                }
+            } catch (\Throwable $e) {
+                $hadError = true;
+                report($e);
+            }
+
+            if ($attempt < count($retryDelaysMs)) {
+                usleep($retryDelaysMs[$attempt] * 1000);
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * @param array<int, string> $urls
+     * @param array<string, true> $seen
+     * @param array<int, string> $chunk
+     */
+    private function appendUniqueUrls(array &$urls, array &$seen, array $chunk, int $depth): int
+    {
+        $added = 0;
+        foreach ($chunk as $url) {
+            $url = SimplifiedXmlFacade::sanitizeSerpUrl((string) $url);
+            if ($url === '') {
+                continue;
+            }
+            $key = mb_strtolower($url);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $urls[] = $url;
+            $added++;
+            if (count($urls) >= $depth) {
+                break;
+            }
+        }
+
+        return $added;
     }
 
     /**
@@ -633,7 +695,7 @@ class PhraseCommerceService
         $overlap = $baseCount > 0 ? count($shared) / $baseCount : 0.0;
         $minIndependent = (float) config('cabinet-phrase-commerce.geo_independent_min_overlap', 0.4);
         $depth = (int) config('cabinet-phrase-commerce.depth', self::DEPTH);
-        $incomplete = $nA < $depth || $nB < $depth;
+        $incomplete = count($urlsA) < $depth || count($urlsB) < $depth;
 
         $base = [
             'shared_hosts' => $shared,

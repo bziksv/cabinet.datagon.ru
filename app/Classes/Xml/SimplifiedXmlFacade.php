@@ -382,7 +382,7 @@ class SimplifiedXmlFacade extends XmlFacade
                 continue;
             }
             $doc = $item['doc'];
-            $url = isset($doc['url']) ? (string) $doc['url'] : '';
+            $url = isset($doc['url']) ? self::sanitizeSerpUrl((string) $doc['url']) : '';
             if ($url === '') {
                 continue;
             }
@@ -501,7 +501,7 @@ class SimplifiedXmlFacade extends XmlFacade
             $providers = ['xmlstock', 'xmlproxy', 'xmlriver'];
         }
 
-        if (in_array('xmlriver', $providers, true) && $this->getRiverLocation() === null) {
+        if (in_array('xmlriver', $providers, true) && $this->getRiverLocation($searchEngine) === null) {
             $providers = array_values(array_diff($providers, ['xmlriver']));
         }
 
@@ -731,7 +731,7 @@ class SimplifiedXmlFacade extends XmlFacade
             }
 
             if ($provider === 'xmlriver') {
-                $loc = $this->getRiverLocation();
+                $loc = $this->getRiverLocation('google');
                 if ($loc === null) {
                     return null;
                 }
@@ -796,15 +796,40 @@ class SimplifiedXmlFacade extends XmlFacade
         CompetitorAnalysisDebugLog::append($this->debugPageHash, $level, $message, $context);
     }
 
+    public static function sanitizeSerpUrl(string $url): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return '';
+        }
+
+        // XMLStock Google иногда склеивает префикс: https://www.google.comhttps://site.ru/...
+        $url = preg_replace('#^https?://(?:www\.)?google\.[a-z.]+(?=https?://)#i', '', $url) ?? $url;
+
+        // Редирект Google /url?q=https://...
+        if (preg_match('#^https?://(?:www\.)?google\.[a-z.]+/url\?#i', $url)) {
+            $query = parse_url($url, PHP_URL_QUERY);
+            if (is_string($query) && $query !== '') {
+                parse_str($query, $params);
+                $target = $params['q'] ?? ($params['url'] ?? null);
+                if (is_string($target) && preg_match('#^https?://#i', trim($target))) {
+                    $url = trim($target);
+                }
+            }
+        }
+
+        return $url;
+    }
+
     protected function parseResult($xmlResult): array
     {
         $result = [];
         if (isset($xmlResult['doc']['url'])) {
-            return [$xmlResult['doc']['url']];
+            return [self::sanitizeSerpUrl((string) $xmlResult['doc']['url'])];
         }
 
         foreach ($xmlResult as $item) {
-            $result[] = Str::lower($item['doc']['url']);
+            $result[] = Str::lower(self::sanitizeSerpUrl((string) ($item['doc']['url'] ?? '')));
         }
 
         return $result;
@@ -885,7 +910,7 @@ class SimplifiedXmlFacade extends XmlFacade
         return $position;
     }
 
-    protected function getRiverLocation(): ?string
+    protected function getRiverLocation(string $searchEngine = 'yandex'): ?string
     {
         $array = [
             '213' => '1015930',
@@ -952,6 +977,16 @@ class SimplifiedXmlFacade extends XmlFacade
             '16' => '1012084',
         ];
 
-        return $array[$this->lr] ?? null;
+        $lr = trim((string) $this->lr);
+        if (isset($array[$lr])) {
+            return $array[$lr];
+        }
+
+        // Для Google lr уже является Google Criteria ID (например 1011969 — Москва, 1012054 — Казань).
+        if ($searchEngine === 'google' && preg_match('/^\d{4,9}$/', $lr)) {
+            return $lr;
+        }
+
+        return null;
     }
 }

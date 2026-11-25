@@ -255,6 +255,15 @@ class PhraseCommerceController extends Controller
         return response()->json([
             'ok' => true,
             'history_id' => $history->id,
+            'item' => [
+                'id' => $history->id,
+                'title' => $history->title,
+                'phrases_count' => $history->phrases_count,
+                'results_count' => $history->results_count,
+                'engines_label' => $history->enginesLabel(),
+                'settings_label' => $history->settingsLabel(),
+                'created_at' => optional($history->created_at)->format('d.m.Y H:i'),
+            ],
             'saved_count' => PhraseCommerceLimits::savedCount($user),
             'history_limit' => PhraseCommerceLimits::historyLimitForUser($user),
             'can_save_history' => PhraseCommerceLimits::canSaveHistory($user),

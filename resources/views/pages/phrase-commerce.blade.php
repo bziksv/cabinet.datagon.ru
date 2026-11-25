@@ -178,8 +178,8 @@
             </div>
         </div>
 
-        @if($canSaveHistory && count($histories))
-            <div class="px-4 pb-4">
+        @if($canSaveHistory)
+            <div class="px-4 pb-4" id="cabinetPcHistoryWrap">
                 <h5 class="h6 mb-2">{{ __('Phrase commerce history title') }}</h5>
                 <div class="table-responsive">
                     <table class="table table-sm table-bordered mb-0">
@@ -193,8 +193,8 @@
                             <th></th>
                         </tr>
                         </thead>
-                        <tbody>
-                        @foreach($histories as $h)
+                        <tbody id="cabinetPcHistoryBody">
+                        @forelse($histories as $h)
                             <tr data-id="{{ $h->id }}">
                                 <td class="text-nowrap">{{ optional($h->created_at)->format('d.m.Y H:i') }}</td>
                                 <td>{{ $h->title }}</td>
@@ -206,7 +206,11 @@
                                     <button type="button" class="btn btn-xs btn-outline-danger cabinet-pc-history-del">{{ __('Delete') }}</button>
                                 </td>
                             </tr>
-                        @endforeach
+                        @empty
+                            <tr class="cabinet-pc-history-empty">
+                                <td colspan="6" class="small text-muted">{{ __('Phrase commerce history empty') }}</td>
+                            </tr>
+                        @endforelse
                         </tbody>
                     </table>
                 </div>

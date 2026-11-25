@@ -951,6 +951,9 @@
                         submitBtn.disabled = false;
                     }
                     showResults(payload);
+                    if (pack && pack.ok && pack.data && pack.data.item) {
+                        addHistoryRow(pack.data.item);
+                    }
                     var historyId = pack && pack.data && pack.data.history_id;
                     var historyWarn =
                         pack && pack.ok === false
@@ -1067,67 +1070,142 @@
         phrasesEl.addEventListener('input', updateCostPreview);
     }
 
-    document.querySelectorAll('.cabinet-pc-history-open').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var tr = btn.closest('tr');
-            var id = tr && tr.getAttribute('data-id');
-            if (!id) {
-                return;
-            }
-            setStatus('Загрузка истории…');
-            fetch(historyBase + '/' + id, {
-                credentials: 'same-origin',
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            })
-                .then(function (res) {
-                    return res.json();
-                })
-                .then(function (data) {
-                    if (!data || !data.ok || !data.item) {
-                        setStatus((data && data.message) || 'Не найдено', true);
-                        return;
-                    }
-                    var item = data.item;
-                    var results = item.results || {};
-                    showResults({
-                        cost: item.cost,
-                        summary: results.summary || {},
-                        rows: results.rows || [],
-                    });
-                    if (phrasesEl && item.params && Array.isArray(item.params.phrases)) {
-                        phrasesEl.value = item.params.phrases.join('\n');
-                    }
-                    setStatus('Открыто из истории #' + id);
-                    updateCostPreview();
-                })
-                .catch(function () {
-                    setStatus('Ошибка загрузки истории', true);
-                });
-        });
-    });
+    var historyBody = document.getElementById('cabinetPcHistoryBody');
 
-    document.querySelectorAll('.cabinet-pc-history-del').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            var tr = btn.closest('tr');
-            var id = tr && tr.getAttribute('data-id');
-            if (!id || !window.confirm('Удалить сохранённую проверку?')) {
-                return;
-            }
-            fetch(historyBase + '/' + id, {
-                method: 'DELETE',
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': csrf,
-                },
-            }).then(function () {
-                if (tr) {
-                    tr.remove();
+    function ensureHistoryEmptyRow() {
+        if (!historyBody || historyBody.querySelector('tr[data-id]')) {
+            return;
+        }
+        if (historyBody.querySelector('.cabinet-pc-history-empty')) {
+            return;
+        }
+        var empty = document.createElement('tr');
+        empty.className = 'cabinet-pc-history-empty';
+        var td = document.createElement('td');
+        td.colSpan = 6;
+        td.className = 'small text-muted';
+        td.textContent = 'Сохранённых проверок пока нет';
+        empty.appendChild(td);
+        historyBody.appendChild(empty);
+    }
+
+    function bindHistoryRow(tr) {
+        var openBtn = tr.querySelector('.cabinet-pc-history-open');
+        var delBtn = tr.querySelector('.cabinet-pc-history-del');
+
+        if (openBtn) {
+            openBtn.addEventListener('click', function () {
+                var id = tr.getAttribute('data-id');
+                if (!id) {
+                    return;
                 }
+                setStatus('Загрузка истории…');
+                fetch(historyBase + '/' + id, {
+                    credentials: 'same-origin',
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                })
+                    .then(function (res) {
+                        return res.json();
+                    })
+                    .then(function (data) {
+                        if (!data || !data.ok || !data.item) {
+                            setStatus((data && data.message) || 'Не найдено', true);
+                            return;
+                        }
+                        var item = data.item;
+                        var results = item.results || {};
+                        showResults({
+                            cost: item.cost,
+                            summary: results.summary || {},
+                            rows: results.rows || [],
+                        });
+                        if (phrasesEl && item.params && Array.isArray(item.params.phrases)) {
+                            phrasesEl.value = item.params.phrases.join('\n');
+                        }
+                        setStatus('Открыто из истории #' + id);
+                        updateCostPreview();
+                    })
+                    .catch(function () {
+                        setStatus('Ошибка загрузки истории', true);
+                    });
             });
+        }
+
+        if (delBtn) {
+            delBtn.addEventListener('click', function () {
+                var id = tr.getAttribute('data-id');
+                if (!id || !window.confirm('Удалить сохранённую проверку?')) {
+                    return;
+                }
+                fetch(historyBase + '/' + id, {
+                    method: 'DELETE',
+                    credentials: 'same-origin',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRF-TOKEN': csrf,
+                    },
+                }).then(function () {
+                    tr.remove();
+                    ensureHistoryEmptyRow();
+                });
+            });
+        }
+    }
+
+    function addHistoryRow(item) {
+        if (!historyBody || !item || !item.id) {
+            return;
+        }
+        if (historyBody.querySelector('tr[data-id="' + item.id + '"]')) {
+            return;
+        }
+        var empty = historyBody.querySelector('.cabinet-pc-history-empty');
+        if (empty) {
+            empty.remove();
+        }
+
+        var tr = document.createElement('tr');
+        tr.setAttribute('data-id', String(item.id));
+
+        var cells = [
+            { text: item.created_at || '', cls: 'text-nowrap' },
+            { text: item.title || '' },
+            { text: item.engines_label || '', cls: 'text-nowrap' },
+            { text: item.settings_label || '', cls: 'small text-secondary' },
+            { text: String(item.phrases_count != null ? item.phrases_count : '') },
+        ];
+        cells.forEach(function (c) {
+            var td = document.createElement('td');
+            if (c.cls) {
+                td.className = c.cls;
+            }
+            td.textContent = c.text;
+            tr.appendChild(td);
         });
-    });
+
+        var actions = document.createElement('td');
+        actions.className = 'text-nowrap';
+        var openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = 'btn btn-xs btn-outline-primary cabinet-pc-history-open';
+        openBtn.textContent = 'Открыть';
+        var delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'btn btn-xs btn-outline-danger cabinet-pc-history-del';
+        delBtn.textContent = 'Удалить';
+        actions.appendChild(openBtn);
+        actions.appendChild(document.createTextNode(' '));
+        actions.appendChild(delBtn);
+        tr.appendChild(actions);
+
+        historyBody.insertBefore(tr, historyBody.firstChild);
+        bindHistoryRow(tr);
+    }
+
+    if (historyBody) {
+        historyBody.querySelectorAll('tr[data-id]').forEach(bindHistoryRow);
+    }
 
     initRegionSelect(document.getElementById('cabinetPcYandexLr'));
     initRegionSelect(document.getElementById('cabinetPcGoogleLr'));

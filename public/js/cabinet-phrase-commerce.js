@@ -953,6 +953,9 @@
                     showResults(payload);
                     if (pack && pack.ok && pack.data && pack.data.item) {
                         addHistoryRow(pack.data.item);
+                        setActiveHistory(pack.data.item);
+                    } else {
+                        setActiveHistory(null);
                     }
                     var historyId = pack && pack.data && pack.data.history_id;
                     var historyWarn =
@@ -1071,6 +1074,42 @@
     }
 
     var historyBody = document.getElementById('cabinetPcHistoryBody');
+    var activeHistoryEl = document.getElementById('cabinetPcActiveHistory');
+    var activeHistoryId = null;
+
+    function setActiveHistory(item) {
+        activeHistoryId = item && item.id ? String(item.id) : null;
+
+        if (activeHistoryEl) {
+            if (activeHistoryId) {
+                var parts = ['#' + activeHistoryId];
+                if (item.title) {
+                    parts.push(item.title);
+                }
+                if (item.created_at) {
+                    parts.push(item.created_at);
+                }
+                activeHistoryEl.textContent = parts.join(' · ');
+                activeHistoryEl.classList.remove('d-none');
+            } else {
+                activeHistoryEl.textContent = '';
+                activeHistoryEl.classList.add('d-none');
+            }
+        }
+
+        if (historyBody) {
+            historyBody.querySelectorAll('tr[data-id]').forEach(function (row) {
+                var isActive = activeHistoryId !== null && row.getAttribute('data-id') === activeHistoryId;
+                row.classList.toggle('cabinet-pc-history-row--active', isActive);
+                var btn = row.querySelector('.cabinet-pc-history-open');
+                if (btn) {
+                    btn.textContent = isActive ? 'Открыто' : 'Открыть';
+                    btn.classList.toggle('btn-primary', isActive);
+                    btn.classList.toggle('btn-outline-primary', !isActive);
+                }
+            });
+        }
+    }
 
     function ensureHistoryEmptyRow() {
         if (!historyBody || historyBody.querySelector('tr[data-id]')) {
@@ -1122,8 +1161,12 @@
                         if (phrasesEl && item.params && Array.isArray(item.params.phrases)) {
                             phrasesEl.value = item.params.phrases.join('\n');
                         }
+                        setActiveHistory(item);
                         setStatus('Открыто из истории #' + id);
                         updateCostPreview();
+                        if (resultsWrap && resultsWrap.scrollIntoView) {
+                            resultsWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
                     })
                     .catch(function () {
                         setStatus('Ошибка загрузки истории', true);
@@ -1146,6 +1189,9 @@
                         'X-CSRF-TOKEN': csrf,
                     },
                 }).then(function () {
+                    if (activeHistoryId === String(id)) {
+                        setActiveHistory(null);
+                    }
                     tr.remove();
                     ensureHistoryEmptyRow();
                 });

@@ -138,6 +138,7 @@
             <div class="d-flex flex-wrap align-items-center justify-content-between mb-2 gap-2">
                 <h5 class="h6 mb-0">{{ __('Phrase commerce results title') }}
                     <span class="text-muted font-weight-normal" id="cabinetPcResultsMeta"></span>
+                    <span class="cabinet-pc-active-history d-none" id="cabinetPcActiveHistory"></span>
                 </h5>
                 <div class="d-flex flex-wrap gap-2">
                     <button type="button" class="btn btn-sm btn-outline-primary" id="cabinetPcCopy" title="{{ __('Phrase commerce copy filtered') }}">

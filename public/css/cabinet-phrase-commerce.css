@@ -2,6 +2,29 @@
     --pc-accent: #0d9488;
 }
 
+.cabinet-pc-active-history {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: 0.5rem;
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+    background: #f0fdfa;
+    border: 1px solid #99f6e4;
+    color: #0f766e;
+    font-size: 0.78rem;
+    font-weight: 500;
+    vertical-align: middle;
+}
+
+.cabinet-pc-history-row--active > td {
+    background-color: #f0fdfa !important;
+}
+
+.cabinet-pc-history-row--active > td:first-child {
+    box-shadow: inset 3px 0 0 var(--pc-accent);
+}
+
 .cabinet-pc-lead {
     background: linear-gradient(135deg, #f0fdfa 0%, #f8fafc 55%, #ecfeff 100%);
     border-bottom: 1px solid #e9ecef;

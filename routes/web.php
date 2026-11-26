@@ -335,6 +335,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('site-audit/project/{id}', 'SiteAuditController@destroyProject')->name('pages.site-audit.project.destroy')->middleware('permission:Site audit');
     Route::post('site-audit/project/{id}/team', 'SiteAuditController@assignProjectTeam')->name('pages.site-audit.project.team')->middleware('permission:Site audit');
     Route::post('site-audit/project/{id}/schedule', 'SiteAuditController@saveSchedule')->name('pages.site-audit.schedule')->middleware('permission:Site audit');
+    Route::post('site-audit/project/{id}/checklist-link', 'SiteAuditController@saveChecklistLink')->name('pages.site-audit.checklist-link')->middleware('permission:Site audit');
+    Route::post('site-audit/project/{id}/checklist-sync', 'SiteAuditController@syncChecklistNow')->name('pages.site-audit.checklist-sync')->middleware('permission:Site audit');
+    Route::post('site-audit/checklist-bulk/preview', 'SiteAuditController@checklistBulkPreview')->name('pages.site-audit.checklist-bulk.preview')->middleware('permission:Site audit');
+    Route::post('site-audit/checklist-bulk', 'SiteAuditController@checklistBulkApply')->name('pages.site-audit.checklist-bulk')->middleware('permission:Site audit');
     Route::get('site-audit/crawl/{id}', 'SiteAuditController@showCrawl')->name('pages.site-audit.crawl.show')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/repeat', 'SiteAuditController@repeatCrawl')->name('pages.site-audit.crawl.repeat')->middleware('permission:Site audit');
     Route::post('site-audit/crawl/{id}/continue', 'SiteAuditController@continueCrawl')->name('pages.site-audit.crawl.continue')->middleware('permission:Site audit');

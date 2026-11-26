@@ -173,6 +173,29 @@ class SiteAuditController extends Controller
 
         $canSchedule = $user && ! DemoCabinet::isCurrentUser() && SiteAuditSchedule::allowedForUser($user);
 
+        $checklistLinksByProject = collect();
+        $manageableChecklists = collect();
+        if (! $isHistoryPartial && \App\SiteAuditChecklistLink::tableReady() && \App\SeoChecklist\SeoChecklistProject::tableReady()) {
+            $projectIds = $projects->pluck('id')->all();
+            if ($projectIds !== []) {
+                $checklistLinksByProject = \App\SiteAuditChecklistLink::query()
+                    ->whereIn('site_audit_project_id', $projectIds)
+                    ->with('checklistProject.template')
+                    ->get()
+                    ->keyBy('site_audit_project_id');
+            }
+            $scService = app(\App\Services\SeoChecklist\SeoChecklistService::class);
+            $manageableChecklists = $scService->accessibleProjectsQuery((int) $user->id)
+                ->where('status', 'active')
+                ->with('template:id,title,code')
+                ->orderBy('domain')
+                ->get(['id', 'user_id', 'team_id', 'domain', 'title', 'template_id', 'status'])
+                ->filter(static function ($cp) use ($scService, $user) {
+                    return $scService->canManageProject($cp, (int) $user->id);
+                })
+                ->values();
+        }
+
         $viewData = [
             'projects' => $projects,
             'crawls' => $crawls,
@@ -198,6 +221,8 @@ class SiteAuditController extends Controller
             'teamAccessReady' => $teamAccessReady,
             'teamCandidates' => $teamCandidates,
             'teamRoleLabels' => $teamRoleLabels,
+            'checklistLinksByProject' => $checklistLinksByProject,
+            'manageableChecklists' => $manageableChecklists,
         ];
 
         // AJAX-поиск/пагинация истории — только блок #sa-history, без полной страницы.
@@ -215,6 +240,157 @@ class SiteAuditController extends Controller
         }
 
         return view('pages.site-audit', $viewData);
+    }
+
+    public function saveChecklistLink(Request $request, int $id): RedirectResponse
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            abort(403);
+        }
+
+        $user = Auth::user();
+        abort_unless($user, 401);
+
+        if (! \App\SiteAuditChecklistLink::tableReady()) {
+            return redirect()->route('pages.site-audit')->with('error', 'Таблица связей с чеклистом не готова (нужна миграция).');
+        }
+
+        $project = SiteAuditProject::query()
+            ->where('id', $id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        $checklistId = (int) $request->input('checklist_project_id', 0);
+        if ($checklistId < 1) {
+            \App\SiteAuditChecklistLink::query()
+                ->where('site_audit_project_id', $project->id)
+                ->delete();
+
+            return redirect()->route('pages.site-audit')->with('status', 'Связь с SEO-чеклистом для ' . $project->domain . ' отключена.');
+        }
+
+        $checklist = \App\SeoChecklist\SeoChecklistProject::query()->find($checklistId);
+        $scService = app(\App\Services\SeoChecklist\SeoChecklistService::class);
+        if (! $checklist || $checklist->status === 'archived' || ! $scService->canManageProject($checklist, (int) $user->id)) {
+            return redirect()->route('pages.site-audit')->with('error', 'Нет прав на выбранную доску SEO-чеклиста.');
+        }
+
+        $rawSev = (array) $request->input('severities', \App\SiteAuditChecklistLink::DEFAULT_SEVERITIES);
+        $severities = array_values(array_intersect(\App\SiteAuditChecklistLink::ALLOWED_SEVERITIES, array_map('strval', $rawSev)));
+        if ($severities === []) {
+            $severities = \App\SiteAuditChecklistLink::DEFAULT_SEVERITIES;
+        }
+
+        $stageMode = $request->input('stage_mode') === 'single' ? 'single' : 'smart';
+        $role = (string) $request->input('default_role', 'owner');
+        if (! in_array($role, ['owner', 'pm', 'shared', 'any'], true)) {
+            $role = 'owner';
+        }
+
+        \App\SiteAuditChecklistLink::query()->updateOrCreate(
+            ['site_audit_project_id' => $project->id],
+            [
+                'checklist_project_id' => $checklist->id,
+                'enabled' => $request->boolean('enabled', true),
+                'severities_json' => $severities,
+                'stage_mode' => $stageMode,
+                'fallback_stage_key' => trim((string) $request->input('fallback_stage_key', 'audits')) ?: 'audits',
+                'default_role' => $role,
+                'due_days_critical' => max(0, min(60, (int) $request->input('due_days_critical', 3))),
+                'due_days_important' => max(0, min(60, (int) $request->input('due_days_important', 7))),
+                'due_days_other' => max(0, min(90, (int) $request->input('due_days_other', 14))),
+                'created_by' => (int) $user->id,
+            ]
+        );
+
+        return redirect()->route('pages.site-audit')->with('status', 'Автозадачи в SEO-чеклист для ' . $project->domain . ' сохранены.');
+    }
+
+    public function checklistBulkPreview(Request $request): JsonResponse
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            return response()->json(['ok' => false, 'error' => 'Недоступно в демо'], 403);
+        }
+
+        $user = Auth::user();
+        abort_unless($user, 401);
+
+        $connector = app(\App\Services\SiteAudit\SiteAuditChecklistBulkConnector::class);
+
+        return response()->json($connector->plan($user, (int) $request->input('team_id', 0)));
+    }
+
+    public function checklistBulkApply(Request $request): RedirectResponse
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            abort(403);
+        }
+
+        $user = Auth::user();
+        abort_unless($user, 401);
+
+        $connector = app(\App\Services\SiteAudit\SiteAuditChecklistBulkConnector::class);
+        $boardIds = array_values(array_filter(array_map('intval', (array) $request->input('board_ids', []))));
+
+        $result = $connector->apply($user, (int) $request->input('team_id', 0), $boardIds);
+        if (! $result['ok']) {
+            return redirect()->route('pages.site-audit')->with('error', (string) $result['error']);
+        }
+
+        if ($result['linked'] === 0) {
+            return redirect()->route('pages.site-audit')->with('error', 'Не выбрано ни одной доски для подключения');
+        }
+
+        $msg = 'Подключено сайтов: ' . $result['linked'];
+        $msg .= '. Новых авторасписаний: ' . $result['scheduled'];
+        $noSchedule = (int) ($result['summary']['no_schedule'] ?? 0);
+        if ($noSchedule > 0) {
+            $msg .= '. Без расписания (лимит): ' . $noSchedule;
+        }
+
+        return redirect()->route('pages.site-audit')->with('status', $msg . '. Автозадачи появятся после первой проверки сайта.');
+    }
+
+    public function syncChecklistNow(Request $request, int $id): RedirectResponse
+    {
+        if (DemoCabinet::isCurrentUser()) {
+            abort(403);
+        }
+
+        $user = Auth::user();
+        abort_unless($user, 401);
+
+        $project = SiteAuditProject::query()
+            ->where('id', $id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        $crawl = SiteAuditCrawl::query()
+            ->where('project_id', $project->id)
+            ->where('status', SiteAuditCrawl::STATUS_DONE)
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $crawl) {
+            return redirect()->route('pages.site-audit')->with('error', 'У проекта ' . $project->domain . ' нет завершённых аудитов.');
+        }
+
+        $res = (new \App\Services\SiteAudit\SiteAuditChecklistSyncService())->syncCrawl($crawl, false, true);
+        if (! empty($res['skipped'])) {
+            return redirect()->route('pages.site-audit')->with('error', 'Синхронизация не выполнена: ' . ($res['reason'] ?? 'нет привязки к чеклисту'));
+        }
+
+        $msg = sprintf(
+            'Синхронизация %s (аудит #%d): создано %d, обновлено %d, на проверку %d, регрессий %d.',
+            $project->domain,
+            $crawl->id,
+            $res['created'],
+            $res['updated'],
+            $res['moved_to_review'],
+            $res['reopened']
+        );
+
+        return redirect()->route('pages.site-audit')->with('status', $msg);
     }
 
     public function assignProjectTeam(Request $request, int $id): RedirectResponse

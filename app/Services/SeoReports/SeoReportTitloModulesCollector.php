@@ -235,7 +235,7 @@ class SeoReportTitloModulesCollector
         $closed = $closedQuery
             ->orderByRaw('COALESCE(done_at, updated_at) DESC')
             ->limit(60)
-            ->get(['id', 'title', 'status', 'done_at', 'updated_at', 'parent_id'])
+            ->get(['id', 'title', 'status', 'done_at', 'updated_at', 'parent_id', 'code', 'links_json'])
             ->map(static function (SeoChecklistItem $item) {
                 $dt = $item->done_at ?: $item->updated_at;
                 return [
@@ -243,6 +243,7 @@ class SeoReportTitloModulesCollector
                     'title' => (string) $item->title,
                     'status' => (string) $item->status,
                     'done_at' => $dt ? $dt->format('Y-m-d') : null,
+                    'audit' => SeoReportAuditPages::refFromItem((string) $item->code, $item->links_json),
                 ];
             })
             ->values()
@@ -261,7 +262,7 @@ class SeoReportTitloModulesCollector
             ->orderBy('due_at')
             ->orderBy('id')
             ->limit(30)
-            ->get(['id', 'title', 'status', 'due_at', 'parent_id'])
+            ->get(['id', 'title', 'status', 'due_at', 'parent_id', 'code', 'links_json'])
             ->map(static function (SeoChecklistItem $item) {
                 $due = $item->due_at;
                 return [
@@ -270,6 +271,7 @@ class SeoReportTitloModulesCollector
                     'status' => (string) $item->status,
                     'due_at' => $due ? $due->format('Y-m-d') : null,
                     'overdue' => $item->isOverdue(),
+                    'audit' => SeoReportAuditPages::refFromItem((string) $item->code, $item->links_json),
                 ];
             })
             ->values()

@@ -3,6 +3,8 @@
     'titleHtml' => e('Аудит сайта') . view('partials.cabinet-module-version-badge', ['configKey' => 'cabinet-site-audit'])->render(),
 ])
     @slot('css')
+        <link rel="stylesheet" href="{{ asset('plugins/select2/css/select2.min.css') }}">
+        <link rel="stylesheet" href="{{ asset('plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('css/cabinet-site-audit.css') }}?v={{ @filemtime(public_path('css/cabinet-site-audit.css')) ?: time() }}">
     @endslot
 
@@ -52,6 +54,7 @@
         @include('partials.cabinet-confirm-modal')
         @if(!empty($teamAccessReady))
             @include('pages.partials.site-audit-team-create-modal')
+            @include('pages.partials.site-audit-checklist-bulk-modal')
         @endif
         <script>
             (function () {
@@ -784,6 +787,31 @@
                         if (hi) hi.classList.add('table-active');
                     }
                 }
+            })();
+        </script>
+        <script src="{{ asset('plugins/select2/js/select2.full.min.js') }}"></script>
+        <script>
+            (function () {
+                if (!window.jQuery || !jQuery.fn.select2) return;
+                function initSelect($sel) {
+                    if (!$sel.length || $sel.data('select2')) return;
+                    $sel.select2({
+                        theme: 'bootstrap4',
+                        width: '100%',
+                        placeholder: $sel.data('placeholder') || 'Не привязано',
+                        allowClear: true
+                    });
+                }
+                document.addEventListener('toggle', function (ev) {
+                    var el = ev.target;
+                    if (!el || !el.open) return;
+                    jQuery(el).find('[data-sa-checklist-select]').each(function () {
+                        initSelect(jQuery(this));
+                    });
+                }, true);
+                jQuery('details[open] [data-sa-checklist-select]').each(function () {
+                    initSelect(jQuery(this));
+                });
             })();
         </script>
         <script src="{{ asset('js/cabinet-site-audit-tour.js') }}?v={{ @filemtime(public_path('js/cabinet-site-audit-tour.js')) ?: time() }}"></script>

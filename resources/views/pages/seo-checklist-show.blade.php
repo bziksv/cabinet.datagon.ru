@@ -537,6 +537,7 @@
                                 data-status="{{ $item->status }}"
                                 data-role="{{ $role }}"
                                 data-important="{{ $item->is_important ? '1' : '0' }}"
+                                data-audit="{{ str_starts_with((string) $item->code, \App\Services\SiteAudit\SiteAuditChecklistSyncService::CODE_PREFIX) ? '1' : '0' }}"
                                 data-overdue="{{ $itemOverdue ? '1' : '0' }}"
                                 data-due-past="{{ ($item->due_at && $item->due_at->isPast()) ? '1' : '0' }}"
                                 data-due-soon="{{ $itemDueSoon ? '1' : '0' }}"
@@ -658,6 +659,24 @@
                                                     <i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i>
                                                     <span class="visually-hidden">{{ __('Include in SEO reports') }}</span>
                                                 </label>
+                                                @php
+                                                    $isAuditAuto = str_starts_with((string) $item->code, \App\Services\SiteAudit\SiteAuditChecklistSyncService::CODE_PREFIX);
+                                                    $auditReportHref = ($isAuditAuto && !empty($infoLinks[0]['path'])) ? url($infoLinks[0]['path']) : null;
+                                                @endphp
+                                                @if($isAuditAuto)
+                                                    @if($auditReportHref)
+                                                        <a href="{{ $auditReportHref }}"
+                                                           target="_blank"
+                                                           rel="noopener"
+                                                           class="cabinet-sc-src-badge cabinet-sc-src-badge--link"
+                                                           data-tip="{{ __('Open audit report') }}">{{ __('Site audit') }} ↗</a>
+                                                    @else
+                                                        <span class="cabinet-sc-src-badge"
+                                                              data-tip="{{ __('Created automatically from Site Audit') }}"
+                                                              aria-label="{{ __('Created automatically from Site Audit') }}"
+                                                              role="img">{{ __('Site audit') }}</span>
+                                                    @endif
+                                                @endif
                                             </div>
                                             <div class="cabinet-sc-plan__controls">
                                                 <div class="cabinet-sc-plan__actions cabinet-sc-task__actions">

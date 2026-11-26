@@ -39,6 +39,11 @@ class SiteAuditProject extends Model
         return $this->hasMany(SiteAuditCrawl::class, 'project_id');
     }
 
+    public function checklistLink()
+    {
+        return $this->hasOne(SiteAuditChecklistLink::class, 'site_audit_project_id');
+    }
+
     public function setting(string $key, $default = null)
     {
         return data_get($this->settings_json, $key, $default);

@@ -34,6 +34,7 @@ class SeoReport extends Model
         'summary_text',
         'work_done_text',
         'work_plan_text',
+        'include_audit_pages',
         'fail_reason',
         'generated_at',
         'approved_at',
@@ -50,6 +51,7 @@ class SeoReport extends Model
         'generated_at' => 'datetime',
         'approved_at' => 'datetime',
         'archived_from_report_id' => 'integer',
+        'include_audit_pages' => 'boolean',
     ];
 
     public function project(): BelongsTo

@@ -357,6 +357,12 @@
                     <textarea class="form-control form-control-sm" name="work_plan_text" rows="4" data-sr-text="work_plan">{{ old('work_plan_text', $report->work_plan_text) }}</textarea>
                     <div class="form-text">{{ __('Work plan editor hint checklist') }}</div>
                 </div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" value="1" id="sr-include-audit-pages" name="include_audit_pages"
+                           @checked(old('include_audit_pages', $report->include_audit_pages))>
+                    <label class="form-check-label small" for="sr-include-audit-pages">{{ __('Include audit pages list') }}</label>
+                    <div class="form-text">{{ __('Include audit pages list hint') }}</div>
+                </div>
                 <div class="mb-2">
                     <label class="form-label small">{{ __('Traffic comment') }}</label>
                     <textarea class="form-control form-control-sm" name="comment_traffic" rows="2">{{ old('comment_traffic', $comments['traffic'] ?? '') }}</textarea>

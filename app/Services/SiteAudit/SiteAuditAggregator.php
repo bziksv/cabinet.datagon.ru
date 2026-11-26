@@ -477,6 +477,14 @@ class SiteAuditAggregator
         }
 
         try {
+            (new SiteAuditChecklistSyncService())->syncCrawl($crawl);
+        } catch (\Throwable $e) {
+            Log::warning('SiteAudit checklist auto-sync failed: ' . $e->getMessage(), [
+                'crawl_id' => $crawl->id,
+            ]);
+        }
+
+        try {
             $pruner = new SiteAuditPruner();
             $pruner->pruneUserToLimit((int) $crawl->user_id);
             $pruner->pruneProject((int) $crawl->project_id);

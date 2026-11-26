@@ -662,7 +662,10 @@ class SeoChecklistService
                         $q3->where('is_important', true)->whereNull('due_at');
                     })
                     ->orWhere(function ($q4) {
-                        $q4->whereNull('due_at')->where('code', 'like', 'custom_%');
+                        $q4->whereNull('due_at')->where(function ($q5) {
+                            $q5->where('code', 'like', 'custom_%')
+                                ->orWhere('code', 'like', 'sa_auto_%');
+                        });
                     });
             });
             $query->orderByRaw('CASE WHEN due_at IS NULL THEN 1 ELSE 0 END')
@@ -732,7 +735,7 @@ class SeoChecklistService
                 continue;
             }
 
-            if ((!empty($item->is_important) || strpos((string) $item->code, 'custom_') === 0) && empty($pinnedIds[(int) $item->id])) {
+            if ((!empty($item->is_important) || strpos((string) $item->code, 'custom_') === 0 || strpos((string) $item->code, 'sa_auto_') === 0) && empty($pinnedIds[(int) $item->id])) {
                 $groups['no_due']['items']->push($item);
             }
         }

@@ -40,6 +40,7 @@
         ['key' => 'due-soon', 'label' => __('Due soon'), 'tip' => __('Due soon filter hint')],
         ['key' => 'no-review', 'label' => __('Without review'), 'tip' => __('Without review filter hint')],
         ['key' => 'important', 'label' => __('Important'), 'tip' => __('Important filter hint')],
+        ['key' => 'audit', 'label' => __('From audit'), 'tip' => __('From audit filter hint')],
         ['key' => 'unread-notes', 'label' => __('Unread notes'), 'tip' => __('Unread notes filter hint')],
     ];
 @endphp

@@ -45,6 +45,7 @@ SUPERVISOR_GROUPS=(
   cabinet-titlo-cluster-wait
   cabinet-titlo-position
   cabinet-titlo-relevance
+  cabinet-titlo-relevance-medium
   cabinet-titlo-monitoring-helper
   cabinet-titlo-monitoring-change-dates
   cabinet-titlo-monitoring-wait

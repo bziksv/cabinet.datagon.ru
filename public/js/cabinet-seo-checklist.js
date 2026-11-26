@@ -874,6 +874,7 @@
                     if (!unreadNotes) show = false;
                 }
                 if (show && filters.indexOf('important') !== -1 && !important) show = false;
+                if (show && filters.indexOf('audit') !== -1 && item.getAttribute('data-audit') !== '1') show = false;
                 if (show && filters.indexOf('mine') !== -1 && !isMineRole(role)) show = false;
 
                 var dueFilters = [];

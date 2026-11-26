@@ -608,6 +608,28 @@
     </div>
 @endif
 
+@php
+    $auditPageGroups = $report->include_audit_pages
+        ? \App\Services\SeoReports\SeoReportAuditPages::groups([$workDoneItems, $workPlanItems], \App\Services\SeoReports\SeoReportAuditPages::URLS_LIMIT_PDF)
+        : [];
+@endphp
+@if($auditPageGroups !== [])
+    <div class="section">
+        <h2>Страницы по задачам аудита</h2>
+        @foreach($auditPageGroups as $g)
+            <div class="meta">{{ $g['title'] }}</div>
+            <ul>
+                @foreach($g['urls'] as $u)
+                    <li>{{ $u }}</li>
+                @endforeach
+            </ul>
+            @if($g['total'] > count($g['urls']))
+                <div class="meta">… полный список — в Excel-файле пакета</div>
+            @endif
+        @endforeach
+    </div>
+@endif
+
 <div class="footer">SEO-отчёт Titlo · {{ $project->domain }} · {{ $generatedAt }}</div>
 </body>
 </html>

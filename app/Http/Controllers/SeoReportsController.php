@@ -1065,6 +1065,7 @@ class SeoReportsController extends Controller
         $report->summary_text = trim((string) $request->input('summary_text', '')) ?: null;
         $report->work_done_text = trim((string) $request->input('work_done_text', '')) ?: null;
         $report->work_plan_text = trim((string) $request->input('work_plan_text', '')) ?: null;
+        $report->include_audit_pages = $request->boolean('include_audit_pages');
 
         $comments = is_array($report->comments_json) ? $report->comments_json : [];
         $comments['traffic'] = trim((string) $request->input('comment_traffic', '')) ?: null;
@@ -1414,6 +1415,7 @@ class SeoReportsController extends Controller
             'summary_text' => $source->summary_text,
             'work_done_text' => $source->work_done_text,
             'work_plan_text' => $source->work_plan_text,
+            'include_audit_pages' => (bool) $source->include_audit_pages,
             'comments_json' => $source->comments_json,
             'public_pin' => $source->public_pin,
         ]);

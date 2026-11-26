@@ -1997,9 +1997,9 @@
 .cabinet-sc-plan__help-tip[data-tip]:focus-visible::after {
     content: attr(data-tip);
     position: absolute;
-    left: 50%;
+    left: 0;
     top: calc(100% + 8px);
-    transform: translateX(-50%);
+    transform: none;
     z-index: 90;
     width: max-content;
     max-width: min(18rem, 70vw);
@@ -2024,9 +2024,9 @@
 .cabinet-sc-plan__help-tip[data-tip]:focus-visible::before {
     content: "";
     position: absolute;
-    left: 50%;
+    left: 0.45rem;
     top: calc(100% + 2px);
-    transform: translateX(-50%);
+    transform: none;
     z-index: 91;
     border: 5px solid transparent;
     border-bottom-color: #0f172a;
@@ -8921,3 +8921,29 @@ html.cabinet-sc-lightbox-open {
     width: 11rem;
 }
 
+
+/* Метка задач, созданных автосинком Site Audit */
+.cabinet-sc-src-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    flex: 0 0 auto;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.35;
+    white-space: nowrap;
+    cursor: default;
+}
+.cabinet-sc-src-badge--link {
+    text-decoration: none;
+    cursor: pointer;
+}
+.cabinet-sc-src-badge--link:hover {
+    background: #bae6fd;
+    color: #075985;
+    text-decoration: none;
+}

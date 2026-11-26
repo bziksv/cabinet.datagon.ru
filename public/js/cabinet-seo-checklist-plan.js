@@ -1434,6 +1434,9 @@
                         if (show && facetMode && activePresets.indexOf('important') !== -1 && !important) {
                             show = false;
                         }
+                        if (show && facetMode && activePresets.indexOf('audit') !== -1 && item.getAttribute('data-audit') !== '1') {
+                            show = false;
+                        }
                         if (show && facetMode && activePresets.indexOf('unread-notes') !== -1 && !unreadNotes) {
                             show = false;
                         }

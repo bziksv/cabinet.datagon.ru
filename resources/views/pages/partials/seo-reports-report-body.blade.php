@@ -1993,6 +1993,11 @@
                         @endforeach
                     </ul>
                 @endif
+                @if($report->include_audit_pages && $workDoneItems !== [])
+                    @include('pages.partials.seo-reports-audit-pages-html', [
+                        'auditGroups' => \App\Services\SeoReports\SeoReportAuditPages::groups([$workDoneItems], \App\Services\SeoReports\SeoReportAuditPages::URLS_LIMIT_VIEW),
+                    ])
+                @endif
                 @if($report->work_done_text)
                     @if($workDoneItems !== [])
                         <h3 class="h6 mt-3">{{ __('Manager notes') }}</h3>
@@ -2016,6 +2021,11 @@
                             <li>{{ $item['title'] ?? '—' }}</li>
                         @endforeach
                     </ul>
+                @endif
+                @if($report->include_audit_pages && $workPlanItems !== [])
+                    @include('pages.partials.seo-reports-audit-pages-html', [
+                        'auditGroups' => \App\Services\SeoReports\SeoReportAuditPages::groups([$workPlanItems], \App\Services\SeoReports\SeoReportAuditPages::URLS_LIMIT_VIEW),
+                    ])
                 @endif
                 @if($report->work_plan_text)
                     @if($workPlanItems !== [])

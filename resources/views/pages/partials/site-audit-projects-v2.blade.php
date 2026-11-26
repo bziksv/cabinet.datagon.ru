@@ -22,6 +22,14 @@
                         data-bs-target="#sa-team-create-modal">
                     <i class="bi bi-plus-lg" aria-hidden="true"></i> Создать команду
                 </button>
+                @if(isset($checklistTeams) && $checklistTeams->isNotEmpty())
+                    <button type="button"
+                            class="btn btn-sm btn-outline-primary"
+                            data-bs-toggle="modal"
+                            data-bs-target="#sa-checklist-bulk-modal">
+                        <i class="bi bi-diagram-3" aria-hidden="true"></i> Подключить команду к аудиту
+                    </button>
+                @endif
             @endif
             <a href="{{ route('profile.index') }}#team" class="cabinet-sa-sites__team-link">Моя команда</a>
         </div>
@@ -223,6 +231,94 @@
                             </form>
                         @elseif($isProjectOwner)
                             <div class="small text-secondary mt-2">Авторасписание на бесплатном тарифе недоступно.</div>
+                        @endif
+
+                        @if($isProjectOwner && ($manageableChecklists ?? collect())->isNotEmpty())
+                            @php
+                                $clLink = ($checklistLinksByProject ?? collect())->get($project->id);
+                                $clEnabled = $clLink ? (bool) $clLink->enabled : false;
+                                $clSevs = $clLink ? $clLink->severities() : \App\SiteAuditChecklistLink::DEFAULT_SEVERITIES;
+                                $clMode = $clLink ? (string) ($clLink->stage_mode ?: 'smart') : 'smart';
+                                $clRole = $clLink ? (string) ($clLink->default_role ?: 'owner') : 'owner';
+                                $clSummary = ($clLink && is_array($clLink->last_sync_summary_json)) ? $clLink->last_sync_summary_json : null;
+                                // Все доски, которыми пользователь может управлять; доски той же команды — первыми
+                                $clOptions = ($manageableChecklists ?? collect())->sortBy(function ($cp) use ($project) {
+                                    $sameTeam = (int) ($project->team_id ?? 0) > 0 && (int) ($cp->team_id ?? 0) === (int) $project->team_id;
+                                    return ($sameTeam ? '0' : '1') . '|' . mb_strtolower((string) $cp->domain);
+                                })->values();
+                            @endphp
+                            <div class="cabinet-sa-project__checklist mt-3 pt-3 border-top">
+                                <form method="POST" action="{{ route('pages.site-audit.checklist-link', $project->id) }}">
+                                    @csrf
+                                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                                        <div class="form-check mb-0">
+                                            <input type="checkbox" class="form-check-input" id="sa-cl-on-{{ $project->id }}"
+                                                   name="enabled" value="1" {{ ($clLink && $clEnabled) || !$clLink ? 'checked' : '' }}>
+                                            <label class="form-check-label fw-medium" for="sa-cl-on-{{ $project->id }}">Автозадачи в SEO-чеклист</label>
+                                        </div>
+                                        @if($clLink && $clLink->last_synced_at)
+                                            <span class="small text-secondary">
+                                                синк {{ $clLink->last_synced_at->format('d.m H:i') }}
+                                                @if($clSummary)
+                                                    (+{{ (int) ($clSummary['created'] ?? 0) }} / обн. {{ (int) ($clSummary['updated'] ?? 0) }} / пров. {{ (int) ($clSummary['moved_to_review'] ?? 0) }})
+                                                @endif
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-12 col-md-6">
+                                            <label class="form-label small mb-1" for="sa-cl-proj-{{ $project->id }}">Доска чеклиста</label>
+                                            <select name="checklist_project_id"
+                                                    id="sa-cl-proj-{{ $project->id }}"
+                                                    class="form-select form-select-sm"
+                                                    data-sa-checklist-select
+                                                    data-placeholder="Не привязано">
+                                                <option value=""></option>
+                                                @foreach($clOptions as $cp)
+                                                    @php
+                                                        $bName = ($cp->template && $cp->template->title) ? $cp->template->title : (($cp->title && $cp->title !== $cp->domain) ? $cp->title : null);
+                                                    @endphp
+                                                    <option value="{{ $cp->id }}" {{ $clLink && (int) $clLink->checklist_project_id === (int) $cp->id ? 'selected' : '' }}>
+                                                        {{ $cp->domain }}@if($bName) · {{ $bName }}@endif
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <label class="form-label small mb-1" for="sa-cl-mode-{{ $project->id }}">Этапы</label>
+                                            <select name="stage_mode" id="sa-cl-mode-{{ $project->id }}" class="form-select form-select-sm">
+                                                <option value="smart" {{ $clMode === 'smart' ? 'selected' : '' }}>По смыслу</option>
+                                                <option value="single" {{ $clMode === 'single' ? 'selected' : '' }}>В «SEO-аудиты»</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <label class="form-label small mb-1" for="sa-cl-role-{{ $project->id }}">Роль</label>
+                                            <select name="default_role" id="sa-cl-role-{{ $project->id }}" class="form-select form-select-sm">
+                                                <option value="owner" {{ $clRole === 'owner' ? 'selected' : '' }}>Ответственный</option>
+                                                <option value="pm" {{ $clRole === 'pm' ? 'selected' : '' }}>PM</option>
+                                                <option value="shared" {{ $clRole === 'shared' ? 'selected' : '' }}>Общая</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2">
+                                        <div class="d-flex flex-wrap align-items-center gap-3 small">
+                                            <label class="mb-0"><input type="checkbox" name="severities[]" value="critical" {{ in_array('critical', $clSevs, true) ? 'checked' : '' }}> Критичные</label>
+                                            <label class="mb-0"><input type="checkbox" name="severities[]" value="important" {{ in_array('important', $clSevs, true) ? 'checked' : '' }}> Важные</label>
+                                            <label class="mb-0"><input type="checkbox" name="severities[]" value="warning" {{ in_array('warning', $clSevs, true) ? 'checked' : '' }}> Предупреждения</label>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <button type="submit" class="btn btn-sm btn-primary">Сохранить</button>
+                                        </div>
+                                    </div>
+                                </form>
+                                @if($clLink)
+                                    <form method="POST" action="{{ route('pages.site-audit.checklist-sync', $project->id) }}" class="mt-2 d-flex align-items-center gap-2">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">Синхронизировать последний аудит сейчас</button>
+                                        <a href="{{ route('pages.seo-checklist.show', ['id' => $clLink->checklist_project_id]) }}" class="small">Открыть доску →</a>
+                                    </form>
+                                @endif
+                            </div>
                         @endif
                     </div>
                 </details>

@@ -56,6 +56,12 @@ class SeoReportExportService
             . '-' . optional($report->period_to)->format('Y-m') . '.pdf';
     }
 
+    public function auditXlsxFilename(SeoReportProject $project, SeoReport $report): string
+    {
+        return 'seo-report-audit-pages-' . preg_replace('/[^a-z0-9\-\.]+/i', '-', $project->domain)
+            . '-' . optional($report->period_to)->format('Y-m') . '.xlsx';
+    }
+
     public function packFilename(SeoReportProject $project, SeoReport $report): string
     {
         return 'seo-report-pack-' . preg_replace('/[^a-z0-9\-\.]+/i', '-', $project->domain)
@@ -208,9 +214,30 @@ class SeoReportExportService
             // pack without docx
         }
 
+        // Страницы по задачам аудита (галочка в отчёте) — Excel с листами по задачам
+        $xlsxPath = null;
+        if (!empty($report->include_audit_pages)) {
+            $lists = [
+                is_array($snapshot['work_done']['from_checklist'] ?? null) ? $snapshot['work_done']['from_checklist'] : [],
+                is_array($snapshot['work_plan']['from_checklist'] ?? null) ? $snapshot['work_plan']['from_checklist'] : [],
+            ];
+            $groups = SeoReportAuditPages::groups($lists, SeoReportAuditPages::URLS_LIMIT_EXPORT);
+            try {
+                $xlsxPath = SeoReportAuditPages::workbookPath((string) $project->domain, $groups);
+                if ($xlsxPath !== null) {
+                    $zip->addFile($xlsxPath, $this->auditXlsxFilename($project, $report));
+                }
+            } catch (\Throwable $e) {
+                // pack without audit pages
+            }
+        }
+
         $zip->close();
         if (!empty($docxPath) && is_file($docxPath)) {
             @unlink($docxPath);
+        }
+        if ($xlsxPath !== null && is_file($xlsxPath)) {
+            @unlink($xlsxPath);
         }
 
         return [

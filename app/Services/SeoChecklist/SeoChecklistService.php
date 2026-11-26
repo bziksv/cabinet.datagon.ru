@@ -1237,7 +1237,8 @@ class SeoChecklistService
     public function myTaskRoles(SeoChecklistProject $project, int $userId): array
     {
         $roles = [];
-        if ((int) $project->user_id === $userId || (int) $project->owner_user_id === $userId) {
+        $hasExplicitOwner = (int) ($project->owner_user_id ?? 0) > 0;
+        if ((int) $project->owner_user_id === $userId) {
             $roles[] = 'owner';
         }
         if ((int) $project->pm_user_id === $userId) {
@@ -1256,6 +1257,12 @@ class SeoChecklistService
             } elseif (in_array($memberRole, ['auditor', 'participant'], true)) {
                 $roles[] = 'shared';
             }
+        }
+
+        // Создатель доски (user_id) считается owner только если отдельный ответственный не назначен
+        // и у него нет другой явной роли в проекте (например PM или аудитор).
+        if ($roles === [] && ! $hasExplicitOwner && (int) $project->user_id === $userId) {
+            $roles[] = 'owner';
         }
 
         return array_values(array_unique($roles));
